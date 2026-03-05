@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const Embeds = require('../../utils/embeds');
-const db = require('../../utils/database');
+const welcomeStore = require('../../utils/welcome-config-store');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,7 +22,7 @@ module.exports = {
             });
         }
 
-        await db.set(`welcome_${interaction.guild.id}`, channel.id);
+        await welcomeStore.setWelcomeChannelId(interaction.guild.id, channel.id);
 
         return interaction.reply({
             embeds: [Embeds.success('Canal de Bienvenida', `Canal de bienvenida establecido en ${channel}.`)]
