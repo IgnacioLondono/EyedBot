@@ -4,6 +4,7 @@ const path = require('path');
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
 const MusicSystem = require('./cogs/music');
+const config = require('./config');
 const { safeReply, isUnknownInteractionError } = require('./utils/interactions');
 const { handleReturnInteraction } = require('./utils/fun-return');
 require('dotenv').config();
@@ -24,9 +25,9 @@ const client = new Client({
 // Initialize player and attach to client
 const ffmpegPath = require('ffmpeg-static');
 const player = new Player(client, {
-    connectionTimeout: 30000,
-    probeTimeout: 10000,
-    skipFFmpeg: false,
+    connectionTimeout: 45000,
+    probeTimeout: 20000,
+    skipFFmpeg: config.musicSkipFfmpeg,
     ffmpegPath
 });
 client.player = player;
