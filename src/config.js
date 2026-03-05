@@ -7,6 +7,7 @@ module.exports = {
     tenorApiKey: process.env.TENOR_API_KEY || '',
     musicDefaultVolume: Number.parseInt(process.env.MUSIC_DEFAULT_VOLUME || '40', 10),
     musicMaxVolume: Number.parseInt(process.env.MUSIC_MAX_VOLUME || '65', 10),
+    musicSkipFfmpeg: (process.env.MUSIC_SKIP_FFMPEG || 'true').toLowerCase() === 'true',
     musicCleanProfileEnabled: (process.env.MUSIC_CLEAN_PROFILE_ENABLED || 'false').toLowerCase() === 'true',
     musicCleanFilters: (process.env.MUSIC_CLEAN_FILTERS || 'normalizer')
         .split(',')

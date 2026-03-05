@@ -366,7 +366,7 @@ module.exports = {
                     nodeOptions: {
                         metadata: { channel: interaction.channel },
                         selfDeaf: true,
-                        skipFFmpeg: false
+                        skipFFmpeg: config.musicSkipFfmpeg
                     }
                 });
             } catch {
@@ -388,7 +388,7 @@ module.exports = {
                             nodeOptions: {
                                 metadata: { channel: interaction.channel },
                                 selfDeaf: true,
-                                skipFFmpeg: false
+                                skipFFmpeg: config.musicSkipFfmpeg
                             }
                         }).catch(() => null);
                         result = fallbackResult;
