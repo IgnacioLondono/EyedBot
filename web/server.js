@@ -7,6 +7,7 @@ const session = require('express-session');
 const DiscordOauth2 = require('discord-oauth2');
 const axios = require('axios');
 const cors = require('cors');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -74,6 +75,32 @@ app.use(session({
 
 // Variable global para el cliente del bot (se inyectará desde index.js)
 let botClient = null;
+
+const templatesFilePath = path.join(__dirname, '..', 'data', 'embed-templates.json');
+
+function ensureTemplateStore() {
+    const dir = path.dirname(templatesFilePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(templatesFilePath)) fs.writeFileSync(templatesFilePath, JSON.stringify({ guilds: {} }, null, 2), 'utf8');
+}
+
+function readTemplateStore() {
+    ensureTemplateStore();
+    try {
+        const raw = fs.readFileSync(templatesFilePath, 'utf8');
+        const parsed = JSON.parse(raw || '{}');
+        if (!parsed || typeof parsed !== 'object') return { guilds: {} };
+        if (!parsed.guilds || typeof parsed.guilds !== 'object') parsed.guilds = {};
+        return parsed;
+    } catch {
+        return { guilds: {} };
+    }
+}
+
+function writeTemplateStore(data) {
+    ensureTemplateStore();
+    fs.writeFileSync(templatesFilePath, JSON.stringify(data, null, 2), 'utf8');
+}
 
 // Función para inyectar el cliente del bot
 function setBotClient(client) {
@@ -365,6 +392,80 @@ app.post('/api/send-embed', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error enviando embed:', error);
         res.status(500).json({ error: error.message || 'Error al enviar embed' });
+    }
+});
+
+app.get('/api/embed-templates/:guildId', requireAuth, (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const store = readTemplateStore();
+        const list = Array.isArray(store.guilds[guildId]) ? store.guilds[guildId] : [];
+        res.json(list);
+    } catch (error) {
+        console.error('Error listando plantillas de embed:', error);
+        res.status(500).json({ error: 'Error al listar plantillas' });
+    }
+});
+
+app.post('/api/embed-templates', requireAuth, (req, res) => {
+    try {
+        const { guildId, name, embed } = req.body || {};
+        if (!guildId || !name || !embed || typeof embed !== 'object') {
+            return res.status(400).json({ error: 'Datos incompletos para guardar plantilla' });
+        }
+
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const cleanName = String(name).trim().slice(0, 80);
+        if (!cleanName) return res.status(400).json({ error: 'Nombre de plantilla inválido' });
+
+        const store = readTemplateStore();
+        if (!Array.isArray(store.guilds[guildId])) store.guilds[guildId] = [];
+
+        // Reemplaza por nombre si ya existe para no duplicar spam.
+        const existingIndex = store.guilds[guildId].findIndex((t) => String(t.name).toLowerCase() === cleanName.toLowerCase());
+        const template = {
+            id: existingIndex >= 0 ? store.guilds[guildId][existingIndex].id : `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            name: cleanName,
+            guildId,
+            createdBy: req.session.user?.id || 'unknown',
+            updatedAt: new Date().toISOString(),
+            embed
+        };
+
+        if (existingIndex >= 0) {
+            store.guilds[guildId][existingIndex] = template;
+        } else {
+            store.guilds[guildId].push(template);
+        }
+
+        writeTemplateStore(store);
+        res.json({ success: true, template });
+    } catch (error) {
+        console.error('Error guardando plantilla de embed:', error);
+        res.status(500).json({ error: 'Error al guardar plantilla' });
+    }
+});
+
+app.delete('/api/embed-templates/:guildId/:templateId', requireAuth, (req, res) => {
+    try {
+        const { guildId, templateId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const store = readTemplateStore();
+        const list = Array.isArray(store.guilds[guildId]) ? store.guilds[guildId] : [];
+        const next = list.filter((t) => t.id !== templateId);
+        store.guilds[guildId] = next;
+        writeTemplateStore(store);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error eliminando plantilla de embed:', error);
+        res.status(500).json({ error: 'Error al eliminar plantilla' });
     }
 });
 

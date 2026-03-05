@@ -2,6 +2,7 @@
 let currentUser = null;
 let currentGuilds = [];
 let embedFields = [];
+let currentEmbedTemplates = [];
 
 // Función auxiliar para fetch con credenciales
 async function fetchWithCredentials(url, options = {}) {
@@ -328,6 +329,9 @@ function setupEventListeners() {
     document.getElementById('previewBtn').addEventListener('click', updateEmbedPreview);
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
     document.getElementById('addFieldBtn').addEventListener('click', addField);
+    document.getElementById('saveTemplateBtn').addEventListener('click', saveEmbedTemplate);
+    document.getElementById('loadTemplateBtn').addEventListener('click', loadSelectedTemplate);
+    document.getElementById('deleteTemplateBtn').addEventListener('click', deleteSelectedTemplate);
     
     // Guardar estado al cambiar de sección
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -455,6 +459,7 @@ async function handleGuildSelect() {
     if (!guildId) {
         channelSelect.disabled = true;
         channelSelect.innerHTML = '<option value="">Primero selecciona un servidor</option>';
+        renderTemplateSelect([]);
         return;
     }
 
@@ -467,12 +472,51 @@ async function handleGuildSelect() {
                 channels
                     .filter(ch => ch.type === 0) // Solo canales de texto
                     .map(ch => `<option value="${ch.id}"># ${ch.name}</option>`).join('');
+            await loadEmbedTemplates(guildId);
         } else {
             showToast('Error al cargar canales', 'error');
         }
     } catch (error) {
         console.error('Error cargando canales:', error);
         showToast('Error al cargar canales', 'error');
+    }
+}
+
+function renderTemplateSelect(templates) {
+    const select = document.getElementById('templateSelect');
+    if (!select) return;
+
+    currentEmbedTemplates = Array.isArray(templates) ? templates : [];
+
+    if (!currentEmbedTemplates.length) {
+        select.disabled = true;
+        select.innerHTML = '<option value="">No hay plantillas guardadas</option>';
+        return;
+    }
+
+    select.disabled = false;
+    select.innerHTML = '<option value="">Selecciona una plantilla</option>' +
+        currentEmbedTemplates.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+}
+
+async function loadEmbedTemplates(guildId) {
+    if (!guildId) {
+        renderTemplateSelect([]);
+        return;
+    }
+
+    try {
+        const response = await fetchWithCredentials(`/api/embed-templates/${guildId}`);
+        if (!response.ok) {
+            renderTemplateSelect([]);
+            return;
+        }
+
+        const templates = await response.json();
+        renderTemplateSelect(templates);
+    } catch (error) {
+        console.error('Error cargando plantillas:', error);
+        renderTemplateSelect([]);
     }
 }
 
@@ -513,6 +557,125 @@ function removeField(fieldId) {
     document.getElementById(fieldId).remove();
     updateEmbedPreview();
     saveState();
+}
+
+function getEmbedPayloadFromForm() {
+    const embed = {
+        title: document.getElementById('embedTitle').value,
+        description: document.getElementById('embedDescription').value,
+        color: document.getElementById('embedColor').value.replace('#', ''),
+        footer: document.getElementById('embedFooter').value,
+        image: document.getElementById('embedImage').value || null,
+        thumbnail: document.getElementById('embedThumbnail').value || null,
+        timestamp: document.getElementById('embedTimestamp').checked,
+        fields: []
+    };
+
+    document.querySelectorAll('.field-item').forEach(field => {
+        const name = field.querySelector('.field-name').value;
+        const value = field.querySelector('.field-value').value;
+        const inline = field.querySelector('.field-inline').checked;
+
+        if (name && value) {
+            embed.fields.push({ name, value, inline });
+        }
+    });
+
+    return embed;
+}
+
+function applyEmbedToForm(embed = {}) {
+    document.getElementById('embedTitle').value = embed.title || '';
+    document.getElementById('embedDescription').value = embed.description || '';
+    document.getElementById('embedColor').value = embed.color ? `#${embed.color}` : '#C41E3A';
+    document.getElementById('embedFooter').value = embed.footer || '';
+    document.getElementById('embedImage').value = embed.image || '';
+    document.getElementById('embedThumbnail').value = embed.thumbnail || '';
+    document.getElementById('embedTimestamp').checked = !!embed.timestamp;
+
+    const container = document.getElementById('fieldsContainer');
+    container.innerHTML = '';
+
+    (embed.fields || []).forEach((field, index) => {
+        const fieldId = `field_${Date.now()}_${index}`;
+        const fieldHTML = `
+            <div class="field-item" id="${fieldId}">
+                <div class="field-item-header">
+                    <h5>Campo ${index + 1}</h5>
+                    <button type="button" class="btn-remove-field" onclick="removeField('${fieldId}')">Eliminar</button>
+                </div>
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" class="form-control field-name" placeholder="Nombre del campo" value="${escapeHtmlForValue(field.name || '')}" oninput="updateEmbedPreview(); saveState();">
+                </div>
+                <div class="form-group">
+                    <label>Valor</label>
+                    <textarea class="form-control field-value" rows="2" placeholder="Valor del campo" oninput="updateEmbedPreview(); saveState();">${escapeHtmlForValue(field.value || '')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" class="field-inline" ${field.inline ? 'checked' : ''} onchange="updateEmbedPreview(); saveState();"> Inline
+                    </label>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', fieldHTML);
+    });
+
+    updateEmbedPreview();
+    saveState();
+}
+
+async function saveEmbedTemplate() {
+    const guildId = document.getElementById('guildSelect').value;
+    const name = document.getElementById('templateName').value.trim();
+    if (!guildId) return showToast('Selecciona un servidor para guardar la plantilla', 'warning');
+    if (!name) return showToast('Escribe un nombre para la plantilla', 'warning');
+
+    try {
+        const response = await fetchWithCredentials('/api/embed-templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ guildId, name, embed: getEmbedPayloadFromForm() })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return showToast(data.error || 'No se pudo guardar la plantilla', 'error');
+
+        showToast('Plantilla guardada', 'success');
+        await loadEmbedTemplates(guildId);
+    } catch (error) {
+        console.error('Error guardando plantilla:', error);
+        showToast('Error guardando plantilla', 'error');
+    }
+}
+
+function loadSelectedTemplate() {
+    const selected = document.getElementById('templateSelect').value;
+    if (!selected) return showToast('Selecciona una plantilla', 'warning');
+    const tpl = currentEmbedTemplates.find((t) => t.id === selected);
+    if (!tpl) return showToast('Plantilla no encontrada', 'error');
+    applyEmbedToForm(tpl.embed || {});
+    showToast('Plantilla cargada', 'success');
+}
+
+async function deleteSelectedTemplate() {
+    const guildId = document.getElementById('guildSelect').value;
+    const selected = document.getElementById('templateSelect').value;
+    if (!guildId || !selected) return showToast('Selecciona una plantilla para eliminar', 'warning');
+
+    try {
+        const response = await fetchWithCredentials(`/api/embed-templates/${guildId}/${selected}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return showToast(data.error || 'No se pudo eliminar la plantilla', 'error');
+        showToast('Plantilla eliminada', 'success');
+        await loadEmbedTemplates(guildId);
+    } catch (error) {
+        console.error('Error eliminando plantilla:', error);
+        showToast('Error eliminando plantilla', 'error');
+    }
 }
 
 // Actualizar vista previa del embed
@@ -570,27 +733,7 @@ async function sendEmbed() {
         return;
     }
 
-    const embed = {
-        title: document.getElementById('embedTitle').value,
-        description: document.getElementById('embedDescription').value,
-        color: document.getElementById('embedColor').value.replace('#', ''),
-        footer: document.getElementById('embedFooter').value,
-        image: document.getElementById('embedImage').value || null,
-        thumbnail: document.getElementById('embedThumbnail').value || null,
-        timestamp: document.getElementById('embedTimestamp').checked,
-        fields: []
-    };
-
-    // Recopilar campos
-    document.querySelectorAll('.field-item').forEach(field => {
-        const name = field.querySelector('.field-name').value;
-        const value = field.querySelector('.field-value').value;
-        const inline = field.querySelector('.field-inline').checked;
-        
-        if (name && value) {
-            embed.fields.push({ name, value, inline });
-        }
-    });
+    const embed = getEmbedPayloadFromForm();
 
     try {
         const response = await fetchWithCredentials('/api/send-embed', {
