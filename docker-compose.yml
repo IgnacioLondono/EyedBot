@@ -30,6 +30,7 @@ services:
       - GUILD_ID=${GUILD_ID}
       - REDIRECT_URI=${REDIRECT_URI:-http://localhost:3000/callback}
       - SESSION_SECRET=${SESSION_SECRET:-change_this_session_secret}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-false}
       - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
       - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
       - LAVALINK_PORT=${LAVALINK_PORT:-2333}

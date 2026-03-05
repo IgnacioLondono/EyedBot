@@ -25,6 +25,8 @@ if (!process.env.CLIENT_SECRET) {
 
 // Configuración de OAuth2
 const redirectUri = process.env.REDIRECT_URI || `http://localhost:${PORT}/callback`;
+const redirectIsHttps = /^https:\/\//i.test(redirectUri);
+const cookieSecure = (process.env.SESSION_COOKIE_SECURE || (redirectIsHttps ? 'true' : 'false')).toLowerCase() === 'true';
 
 const oauth = new DiscordOauth2({
     clientId: process.env.CLIENT_ID,
@@ -36,6 +38,7 @@ console.log('🔐 OAuth2 configurado:');
 console.log(`   Client ID: ${process.env.CLIENT_ID ? '✅ Configurado' : '❌ Faltante'}`);
 console.log(`   Client Secret: ${process.env.CLIENT_SECRET ? '✅ Configurado' : '❌ Faltante'}`);
 console.log(`   Redirect URI: ${redirectUri}`);
+console.log(`   Session Cookie Secure: ${cookieSecure ? '✅ true' : '⚠️ false (HTTP/local)'}`);
 
 // Middleware
 app.use(cors());
@@ -43,13 +46,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Necesario si se usa proxy inverso para respetar cookies seguras.
+app.set('trust proxy', 1);
+
 // Configuración de sesiones
 app.use(session({
     secret: process.env.SESSION_SECRET || 'tu-secret-super-seguro-cambiar-en-produccion',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // false en desarrollo (http)
+        secure: cookieSecure,
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000, // 24 horas
         sameSite: 'lax' // Ayuda con redirecciones de OAuth
