@@ -148,13 +148,17 @@ class MusicSystem {
 
     _buildNowPlayingEmbed(track, queue) {
         const isPaused = queue?.node?.isPaused?.() || false;
-        const volume = queue?.node?.volume ?? config.musicDefaultVolume;
         const repeatMode = queue?.repeatMode ?? QueueRepeatMode.OFF;
         const loopLabel = repeatMode === QueueRepeatMode.TRACK
             ? 'Cancion'
             : repeatMode === QueueRepeatMode.QUEUE
                 ? 'Cola'
                 : 'Desactivado';
+
+        const artwork = track?.thumbnail
+            || track?.raw?.thumbnail?.url
+            || track?.raw?.thumbnail
+            || null;
 
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
@@ -163,11 +167,10 @@ class MusicSystem {
             .addFields(
                 { name: '👤 Artista', value: track?.author || 'Desconocido', inline: true },
                 { name: '⏱️ Duracion', value: track?.duration || 'Desconocida', inline: true },
-                { name: '🔊 Volumen', value: `${volume}%`, inline: true },
                 { name: '🔁 Loop', value: loopLabel, inline: true }
             );
 
-        if (track?.thumbnail) embed.setThumbnail(track.thumbnail);
+        if (artwork) embed.setImage(artwork);
         if (track?.url) embed.setURL(track.url);
         return embed;
     }
