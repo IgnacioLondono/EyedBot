@@ -27,6 +27,31 @@ const upload = multer({
     limits: { fileSize: 8 * 1024 * 1024 }
 });
 
+function timeoutAfter(ms, label = 'timeout') {
+    return new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(label)), ms);
+    });
+}
+
+async function safeDbGet(key, fallback = null, timeoutMs = 3000) {
+    try {
+        return await Promise.race([db.get(key), timeoutAfter(timeoutMs, `db.get timeout: ${key}`)]);
+    } catch (error) {
+        console.warn(`⚠️ safeDbGet fallback for ${key}:`, error.message);
+        return fallback;
+    }
+}
+
+async function safeDbSet(key, value, timeoutMs = 3000) {
+    try {
+        await Promise.race([db.set(key, value), timeoutAfter(timeoutMs, `db.set timeout: ${key}`)]);
+        return true;
+    } catch (error) {
+        console.warn(`⚠️ safeDbSet failed for ${key}:`, error.message);
+        return false;
+    }
+}
+
 // Validar variables de entorno requeridas
 if (!CLIENT_ID) {
     console.error('❌ ERROR: CLIENT_ID no está configurado en .env');
@@ -349,8 +374,8 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const config = await db.get(`welcome_config_${guildId}`);
-        const fallbackChannel = await db.get(`welcome_${guildId}`);
+        const config = await safeDbGet(`welcome_config_${guildId}`, null);
+        const fallbackChannel = await safeDbGet(`welcome_${guildId}`, null);
 
         if (!config) {
             return res.json({
@@ -403,8 +428,11 @@ app.post('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => 
             updatedBy: req.session.user?.id || 'unknown'
         };
 
-        await db.set(`welcome_config_${guildId}`, config);
-        await db.set(`welcome_${guildId}`, config.channelId);
+        const savedConfig = await safeDbSet(`welcome_config_${guildId}`, config);
+        const savedChannel = await safeDbSet(`welcome_${guildId}`, config.channelId);
+        if (!savedConfig || !savedChannel) {
+            return res.status(503).json({ error: 'La base de datos no respondió. Revisa DB_HOST/DB_NAME o intenta de nuevo.' });
+        }
 
         res.json({ success: true, config });
     } catch (error) {
@@ -423,8 +451,8 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         const guild = botClient.guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
-        const cfg = await db.get(`welcome_config_${guildId}`);
-        const channelId = cfg?.channelId || await db.get(`welcome_${guildId}`);
+        const cfg = await safeDbGet(`welcome_config_${guildId}`, null);
+        const channelId = cfg?.channelId || await safeDbGet(`welcome_${guildId}`, null);
         const channel = channelId ? guild.channels.cache.get(channelId) : null;
         if (!channel) return res.status(404).json({ error: 'Canal de bienvenida no encontrado' });
 
@@ -1006,7 +1034,15 @@ app.get('/api/guild/:guildId/members', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
 
-        await guild.members.fetch();
+        try {
+            // Evita que la UI se quede cargando si Discord/API tarda demasiado.
+            await Promise.race([
+                guild.members.fetch(),
+                timeoutAfter(7000, 'guild.members.fetch timeout')
+            ]);
+        } catch (error) {
+            console.warn(`⚠️ members fetch fallback (${guildId}):`, error.message);
+        }
         
         let members = Array.from(guild.members.cache.values())
             .filter(m => !m.user.bot)
