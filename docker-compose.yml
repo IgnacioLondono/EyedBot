@@ -20,8 +20,6 @@ services:
       dockerfile: Dockerfile
     container_name: eyedbot
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       - NODE_ENV=production
       - DISCORD_TOKEN=${DISCORD_TOKEN}
