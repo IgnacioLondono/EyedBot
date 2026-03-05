@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TulaBot Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --saber-blue-dark: #1E3A8A;
+            --saber-blue: #3B82F6;
+            --saber-blue-light: #60A5FA;
+            --saber-gold: #D4AF37;
+            --saber-gold-light: #FFD700;
+            --bg-primary: #0F172A;
+            --bg-secondary: #1E293B;
+            --bg-card: #1E293B;
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+            --text-muted: #94A3B8;
+            --border-color: rgba(59, 130, 246, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Background Effects - Minimalista */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(212, 175, 55, 0.05) 0%, transparent 50%);
+            animation: patternFloat 30s ease-in-out infinite;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            animation: glowPulse 20s ease-in-out infinite;
+            z-index: 0;
+            border-radius: 50%;
+        }
+
+        @keyframes patternFloat {
+            0%, 100% { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+            50% { 
+                opacity: 0.7;
+                transform: translateY(-20px);
+            }
+        }
+
+        @keyframes glowPulse {
+            0%, 100% { 
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.5;
+            }
+            50% { 
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0.8;
+            }
+        }
+
+        .login-container {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 4rem 3rem;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 40px rgba(59, 130, 246, 0.15);
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            animation: containerFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes containerFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .logo-container {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .logo-icon {
+            width: 72px;
+            height: 72px;
+            color: var(--saber-blue);
+            filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.5));
+            animation: iconGlow 3s ease-in-out infinite;
+            transition: all 0.3s ease;
+        }
+
+        .logo-container:hover .logo-icon {
+            color: var(--saber-gold);
+            filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.6));
+        }
+
+        @keyframes iconGlow {
+            0%, 100% { 
+                filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.5));
+            }
+            50% { 
+                filter: drop-shadow(0 0 24px rgba(59, 130, 246, 0.7)) drop-shadow(0 0 32px rgba(212, 175, 55, 0.4));
+            }
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            background: linear-gradient(135deg, var(--saber-blue-light), var(--saber-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.75rem;
+            font-size: 2.25rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+            font-size: 1rem;
+        }
+
+        .login-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--saber-blue), var(--saber-blue-dark));
+            color: white;
+            padding: 1.125rem 2.5rem;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+        }
+
+        .login-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .login-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.5);
+            background: linear-gradient(135deg, var(--saber-blue-light), var(--saber-blue));
+        }
+
+        .login-btn svg {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .login-btn:hover svg {
+            transform: scale(1.1);
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 1.125rem;
+            margin-bottom: 1.5rem;
+            color: #EF4444;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: errorSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: left;
+        }
+
+        @keyframes errorSlide {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .error svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .info {
+            background: rgba(212, 175, 55, 0.08);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 12px;
+            padding: 1.125rem;
+            margin-top: 2rem;
+            color: var(--saber-gold);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            text-align: left;
+        }
+
+        .info svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: var(--saber-gold);
+        }
+
+        .info strong {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--saber-gold-light);
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 3rem 2rem;
+            }
+
+            h1 {
+                font-size: 1.875rem;
+            }
+
+            .subtitle {
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo-container">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2C8 2 4 4 4 8c0 2 1 3.5 2 4.5v8c0 1 1 2 2 2h8c1 0 2-1 2-2v-8c1-1 2-2.5 2-4.5 0-4-4-6-8-6z"/>
+                <path d="M8 12h8"/>
+                <path d="M10 16h4"/>
+            </svg>
+        </div>
+        <h1>TulaBot Panel</h1>
+        <p class="subtitle">Inicia sesión con tu cuenta de Discord para acceder al panel de administración</p>
+        
+        <div id="errorMessage" class="error" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span></span>
+        </div>
+        
+        <a href="/login" class="login-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            <span>Iniciar Sesión con Discord</span>
+        </a>
+
+        <div class="info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <div>
+                <strong>Nota Importante</strong>
+                Necesitas tener permisos de administrador en al menos un servidor donde el bot esté presente.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mostrar mensajes de error si hay alguno en la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        const errorMessages = {
+            'no_code': 'No se recibió código de autorización. Intenta de nuevo.',
+            'auth_failed': 'Error al autenticar. Verifica tu configuración de OAuth2.',
+            'discord_error': 'Discord rechazó la autorización. Intenta de nuevo.',
+            'session_error': 'Error al guardar la sesión. Intenta de nuevo.',
+            'config_error': 'CLIENT_SECRET no está configurado. Verifica tu archivo .env',
+            'invalid_secret': 'CLIENT_SECRET incorrecto. Verifica que coincida con Discord Developer Portal.'
+        };
+
+        if (error && errorMessages[error]) {
+            const errorDiv = document.getElementById('errorMessage');
+            const errorSpan = errorDiv.querySelector('span');
+            errorSpan.textContent = errorMessages[error];
+            errorDiv.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

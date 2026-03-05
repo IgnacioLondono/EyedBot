@@ -1,0 +1,54 @@
+# Dependencias
+node_modules/
+web/node_modules/
+package-lock.json
+web/package-lock.json
+
+# Variables de entorno y configuración sensible
+.env
+.env.local
+.env.production
+.env.development
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Build y dist
+dist/
+build/
+.cache/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Archivos temporales
+tmp/
+temp/
+*.tmp
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos de backup
+*.bak
+*.backup
+
+# Archivos de verificación (pueden contener tokens)
+verificar-*.js
+
+# Archivos de configuración local
+config.json
+local.json

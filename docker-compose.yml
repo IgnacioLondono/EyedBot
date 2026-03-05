@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: eyedbot-lavalink
+    restart: unless-stopped
+    environment:
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - _JAVA_OPTIONS=-Xmx512m
+    volumes:
+      - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    ports:
+      - "2333:2333"
+
+  # Bot de Discord
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eyedbot
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
+      - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
+      - LAVALINK_PORT=${LAVALINK_PORT:-2333}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - MUSIC_DEFAULT_VOLUME=${MUSIC_DEFAULT_VOLUME:-70}
+      - MUSIC_MAX_VOLUME=${MUSIC_MAX_VOLUME:-85}
+    depends_on:
+      - lavalink

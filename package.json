@@ -1,0 +1,45 @@
+{
+  "name": "tulabot-discord-bot",
+  "version": "1.0.0",
+  "description": "Bot profesional de Discord con 60 comandos - Moderación, Música y Comunidad",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "verify-oauth": "node verificar-oauth.js",
+    "verify-gemini": "node verificar-gemini.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "discord.js",
+    "music",
+    "moderation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@discord-player/extractor": "^7.1.0",
+    "@discordjs/voice": "^0.19.0",
+    "@distube/ytdl-core": "^4.16.12",
+    "@google/generative-ai": "^0.24.1",
+    "@noble/ciphers": "^2.0.1",
+    "@snazzah/davey": "^0.1.10",
+    "axios": "^1.6.2",
+    "discord-api-types": "^0.38.35",
+    "discord-player": "^7.1.0",
+    "discord.js": "^14.25.1",
+    "dotenv": "^16.3.1",
+    "ffmpeg-static": "^5.3.0",
+    "ms": "^2.1.3",
+    "mysql2": "^3.6.5",
+    "opusscript": "^0.0.8",
+    "shoukaku": "^4.3.0",
+    "youtube-sr": "^4.3.4",
+    "ytdl-core": "^4.11.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
