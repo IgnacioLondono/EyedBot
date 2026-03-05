@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - TulaBot Panel</title>
+    <title>Login - EyedBot Panel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --saber-blue-dark: #1E3A8A;
-            --saber-blue: #3B82F6;
-            --saber-blue-light: #60A5FA;
-            --saber-gold: #D4AF37;
-            --saber-gold-light: #FFD700;
-            --bg-primary: #0F172A;
-            --bg-secondary: #1E293B;
-            --bg-card: #1E293B;
+            --saber-blue-dark: #291956;
+            --saber-blue: #7c4dff;
+            --saber-blue-light: #be9bff;
+            --saber-gold: #ff78d1;
+            --saber-gold-light: #ffd2ef;
+            --bg-primary: #090512;
+            --bg-secondary: #150c26;
+            --bg-card: #1a1030;
             --text-primary: #F8FAFC;
             --text-secondary: #CBD5E1;
             --text-muted: #94A3B8;
-            --border-color: rgba(59, 130, 246, 0.2);
+            --border-color: rgba(154, 109, 255, 0.28);
         }
 
         * {
@@ -30,7 +30,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background: var(--bg-primary);
             min-height: 100vh;
             display: flex;
@@ -148,7 +148,7 @@
         }
 
         h1 {
-            font-family: 'Cinzel', serif;
+            font-family: 'Sora', sans-serif;
             background: linear-gradient(135deg, var(--saber-blue-light), var(--saber-gold));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -300,12 +300,11 @@
     <div class="login-container">
         <div class="logo-container">
             <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2C8 2 4 4 4 8c0 2 1 3.5 2 4.5v8c0 1 1 2 2 2h8c1 0 2-1 2-2v-8c1-1 2-2.5 2-4.5 0-4-4-6-8-6z"/>
-                <path d="M8 12h8"/>
-                <path d="M10 16h4"/>
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8"></path>
+                <circle cx="12" cy="12" r="3"></circle>
             </svg>
         </div>
-        <h1>TulaBot Panel</h1>
+        <h1>EyedBot Panel</h1>
         <p class="subtitle">Inicia sesión con tu cuenta de Discord para acceder al panel de administración</p>
         
         <div id="errorMessage" class="error" style="display: none;">
