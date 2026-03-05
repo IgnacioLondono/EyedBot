@@ -24,6 +24,7 @@ RUN npm install --no-audit --no-fund && \
 
 # Copiar código fuente
 COPY src/ ./src/
+COPY web/ ./web/
 COPY verificar-*.js ./
 
 # Crear directorios necesarios
