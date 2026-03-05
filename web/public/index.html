@@ -230,6 +230,52 @@
                                     <span>Enviar Embed</span>
                                 </button>
                             </div>
+
+                            <div class="fields-section" style="margin-top: 1rem;">
+                                <h4>Plantillas de Embed</h4>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="templateName">Nombre de plantilla</label>
+                                        <input type="text" id="templateName" class="form-control" placeholder="Ej: Bienvenida violeta">
+                                    </div>
+                                    <div class="form-group" style="display: flex; align-items: end;">
+                                        <button type="button" id="saveTemplateBtn" class="btn btn-secondary" style="width: 100%;">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                                <polyline points="7 3 7 8 15 8"></polyline>
+                                            </svg>
+                                            <span>Guardar Plantilla</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="templateSelect">Plantillas guardadas</label>
+                                        <select id="templateSelect" class="form-control" disabled>
+                                            <option value="">Selecciona un servidor para cargar plantillas</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="display: flex; gap: 0.5rem; align-items: end;">
+                                        <button type="button" id="loadTemplateBtn" class="btn btn-secondary" style="flex: 1;">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="7 10 12 15 17 10"></polyline>
+                                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                            </svg>
+                                            <span>Cargar</span>
+                                        </button>
+                                        <button type="button" id="deleteTemplateBtn" class="btn btn-secondary" style="flex: 1;">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            </svg>
+                                            <span>Eliminar</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
