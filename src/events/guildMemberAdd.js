@@ -1,5 +1,5 @@
 const Embeds = require('../utils/embeds');
-const db = require('../utils/database');
+const welcomeStore = require('../utils/welcome-config-store');
 
 function applyTemplate(text, member) {
     return String(text || '')
@@ -12,8 +12,8 @@ function applyTemplate(text, member) {
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member) {
-        const welcomeConfig = await db.get(`welcome_config_${member.guild.id}`);
-        const welcomeChannelId = welcomeConfig?.channelId || await db.get(`welcome_${member.guild.id}`);
+        const welcomeConfig = await welcomeStore.getWelcomeConfig(member.guild.id);
+        const welcomeChannelId = welcomeConfig?.channelId || await welcomeStore.getWelcomeChannelId(member.guild.id);
         if (!welcomeChannelId) return;
 
         const channel = member.guild.channels.cache.get(welcomeChannelId);

@@ -10,6 +10,7 @@ const cors = require('cors');
 const fs = require('fs');
 const multer = require('multer');
 const db = require('../src/utils/database');
+const welcomeStore = require('../src/utils/welcome-config-store');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -374,8 +375,8 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const config = await safeDbGet(`welcome_config_${guildId}`, null);
-        const fallbackChannel = await safeDbGet(`welcome_${guildId}`, null);
+        const config = await welcomeStore.getWelcomeConfig(guildId);
+        const fallbackChannel = await welcomeStore.getWelcomeChannelId(guildId);
 
         if (!config) {
             return res.json({
@@ -428,11 +429,8 @@ app.post('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => 
             updatedBy: req.session.user?.id || 'unknown'
         };
 
-        const savedConfig = await safeDbSet(`welcome_config_${guildId}`, config);
-        const savedChannel = await safeDbSet(`welcome_${guildId}`, config.channelId);
-        if (!savedConfig || !savedChannel) {
-            return res.status(503).json({ error: 'La base de datos no respondió. Revisa DB_HOST/DB_NAME o intenta de nuevo.' });
-        }
+        await welcomeStore.setWelcomeConfig(guildId, config);
+        await welcomeStore.setWelcomeChannelId(guildId, config.channelId);
 
         res.json({ success: true, config });
     } catch (error) {
@@ -451,8 +449,8 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         const guild = botClient.guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
-        const cfg = await safeDbGet(`welcome_config_${guildId}`, null);
-        const channelId = cfg?.channelId || await safeDbGet(`welcome_${guildId}`, null);
+        const cfg = await welcomeStore.getWelcomeConfig(guildId);
+        const channelId = cfg?.channelId || await welcomeStore.getWelcomeChannelId(guildId);
         const channel = channelId ? guild.channels.cache.get(channelId) : null;
         if (!channel) return res.status(404).json({ error: 'Canal de bienvenida no encontrado' });
 
@@ -1036,8 +1034,9 @@ app.get('/api/guild/:guildId/members', requireAuth, async (req, res) => {
 
         try {
             // Evita que la UI se quede cargando si Discord/API tarda demasiado.
+            const fetchPromise = guild.members.fetch().catch(() => null);
             await Promise.race([
-                guild.members.fetch(),
+                fetchPromise,
                 timeoutAfter(7000, 'guild.members.fetch timeout')
             ]);
         } catch (error) {
