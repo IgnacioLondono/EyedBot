@@ -8,6 +8,7 @@ const DiscordOauth2 = require('discord-oauth2');
 const axios = require('axios');
 const cors = require('cors');
 const fs = require('fs');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -20,6 +21,10 @@ function envValue(name, fallback = '') {
 
 const CLIENT_ID = envValue('CLIENT_ID');
 const CLIENT_SECRET = envValue('CLIENT_SECRET');
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024 }
+});
 
 // Validar variables de entorno requeridas
 if (!CLIENT_ID) {
@@ -330,9 +335,15 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
 });
 
 // Ruta para enviar embeds
-app.post('/api/send-embed', requireAuth, async (req, res) => {
+app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'thumbnailFile', maxCount: 1 }]), async (req, res) => {
     try {
-        const { guildId, channelId, embed } = req.body;
+        const { guildId, channelId } = req.body;
+        const embedRaw = req.body?.embed;
+        const embed = typeof embedRaw === 'string' ? JSON.parse(embedRaw) : embedRaw;
+
+        if (!embed || typeof embed !== 'object') {
+            return res.status(400).json({ error: 'Payload de embed inválido' });
+        }
 
         if (!botClient) {
             return res.status(500).json({ error: 'Bot no disponible' });
@@ -349,7 +360,9 @@ app.post('/api/send-embed', requireAuth, async (req, res) => {
         }
 
         // Verificar permisos
-        if (!channel.permissionsFor(guild.members.me)?.has(['SendMessages', 'EmbedLinks'])) {
+        const hasFiles = (req.files?.imageFile?.length || 0) > 0 || (req.files?.thumbnailFile?.length || 0) > 0;
+        const requiredPerms = hasFiles ? ['SendMessages', 'EmbedLinks', 'AttachFiles'] : ['SendMessages', 'EmbedLinks'];
+        if (!channel.permissionsFor(guild.members.me)?.has(requiredPerms)) {
             return res.status(403).json({ error: 'El bot no tiene permisos en este canal' });
         }
 
@@ -383,7 +396,23 @@ app.post('/api/send-embed', requireAuth, async (req, res) => {
             });
         }
 
-        await channel.send({ embeds: [discordEmbed] });
+        const files = [];
+        const imageUpload = req.files?.imageFile?.[0];
+        const thumbnailUpload = req.files?.thumbnailFile?.[0];
+
+        if (imageUpload?.buffer) {
+            const imageName = imageUpload.originalname || `embed_image_${Date.now()}.jpg`;
+            files.push({ attachment: imageUpload.buffer, name: imageName });
+            if (!embed.image) discordEmbed.setImage(`attachment://${imageName}`);
+        }
+
+        if (thumbnailUpload?.buffer) {
+            const thumbName = thumbnailUpload.originalname || `embed_thumb_${Date.now()}.jpg`;
+            files.push({ attachment: thumbnailUpload.buffer, name: thumbName });
+            if (!embed.thumbnail) discordEmbed.setThumbnail(`attachment://${thumbName}`);
+        }
+
+        await channel.send({ embeds: [discordEmbed], files });
 
         // Guardar en logs (opcional)
         console.log(`[Embed] ${req.session.user.username} envió un embed en ${guild.name}/${channel.name}`);

@@ -188,11 +188,35 @@
                             <div class="form-group">
                                 <label for="embedImage">URL de Imagen</label>
                                 <input type="url" id="embedImage" class="form-control" placeholder="https://ejemplo.com/imagen.png">
+                                <small style="color: var(--text-muted);">Opcional: o sube una imagen local debajo.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="embedImageFile">Subir Imagen</label>
+                                <input type="file" id="embedImageFile" class="form-control" accept="image/*">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="embedImageScale">Tamano Imagen Subida</label>
+                                <input type="range" id="embedImageScale" class="form-control" min="25" max="100" value="100" step="5">
+                                <small id="embedImageScaleValue" style="color: var(--text-muted);">100%</small>
                             </div>
 
                             <div class="form-group">
                                 <label for="embedThumbnail">URL de Miniatura</label>
                                 <input type="url" id="embedThumbnail" class="form-control" placeholder="https://ejemplo.com/miniatura.png">
+                                <small style="color: var(--text-muted);">Opcional: o sube miniatura local debajo.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="embedThumbnailFile">Subir Miniatura</label>
+                                <input type="file" id="embedThumbnailFile" class="form-control" accept="image/*">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="embedThumbnailScale">Tamano Miniatura Subida</label>
+                                <input type="range" id="embedThumbnailScale" class="form-control" min="25" max="100" value="100" step="5">
+                                <small id="embedThumbnailScaleValue" style="color: var(--text-muted);">100%</small>
                             </div>
 
                             <div class="form-group checkbox-group">

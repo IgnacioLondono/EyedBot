@@ -3,6 +3,10 @@ let currentUser = null;
 let currentGuilds = [];
 let embedFields = [];
 let currentEmbedTemplates = [];
+let uploadedImageFile = null;
+let uploadedImagePreviewUrl = '';
+let uploadedThumbnailFile = null;
+let uploadedThumbnailPreviewUrl = '';
 
 // Función auxiliar para fetch con credenciales
 async function fetchWithCredentials(url, options = {}) {
@@ -28,6 +32,8 @@ function saveState() {
             footer: document.getElementById('embedFooter')?.value || '',
             image: document.getElementById('embedImage')?.value || '',
             thumbnail: document.getElementById('embedThumbnail')?.value || '',
+            imageScale: Number.parseInt(document.getElementById('embedImageScale')?.value || '100', 10),
+            thumbnailScale: Number.parseInt(document.getElementById('embedThumbnailScale')?.value || '100', 10),
             timestamp: document.getElementById('embedTimestamp')?.checked || false,
             fields: []
         },
@@ -90,6 +96,10 @@ function restoreEmbedForm(state) {
     if (document.getElementById('embedFooter')) document.getElementById('embedFooter').value = form.footer || '';
     if (document.getElementById('embedImage')) document.getElementById('embedImage').value = form.image || '';
     if (document.getElementById('embedThumbnail')) document.getElementById('embedThumbnail').value = form.thumbnail || '';
+    if (document.getElementById('embedImageScale')) document.getElementById('embedImageScale').value = `${form.imageScale || 100}`;
+    if (document.getElementById('embedThumbnailScale')) document.getElementById('embedThumbnailScale').value = `${form.thumbnailScale || 100}`;
+    if (document.getElementById('embedImageScaleValue')) document.getElementById('embedImageScaleValue').textContent = `${form.imageScale || 100}%`;
+    if (document.getElementById('embedThumbnailScaleValue')) document.getElementById('embedThumbnailScaleValue').textContent = `${form.thumbnailScale || 100}%`;
     if (document.getElementById('embedTimestamp')) document.getElementById('embedTimestamp').checked = form.timestamp || false;
 
     // Restaurar servidor y canal (después de cargar los servidores)
@@ -318,6 +328,22 @@ function setupEventListeners() {
         saveState();
     });
     document.getElementById('embedThumbnail').addEventListener('input', () => {
+        updateEmbedPreview();
+        saveState();
+    });
+    document.getElementById('embedImageFile').addEventListener('change', (e) => {
+        handleImageFileSelection(e, 'image');
+    });
+    document.getElementById('embedThumbnailFile').addEventListener('change', (e) => {
+        handleImageFileSelection(e, 'thumbnail');
+    });
+    document.getElementById('embedImageScale').addEventListener('input', (e) => {
+        document.getElementById('embedImageScaleValue').textContent = `${e.target.value}%`;
+        updateEmbedPreview();
+        saveState();
+    });
+    document.getElementById('embedThumbnailScale').addEventListener('input', (e) => {
+        document.getElementById('embedThumbnailScaleValue').textContent = `${e.target.value}%`;
         updateEmbedPreview();
         saveState();
     });
@@ -686,7 +712,12 @@ function updateEmbedPreview() {
     const footer = document.getElementById('embedFooter').value;
     const image = document.getElementById('embedImage').value;
     const thumbnail = document.getElementById('embedThumbnail').value;
+    const imageScale = Number.parseInt(document.getElementById('embedImageScale').value || '100', 10);
+    const thumbnailScale = Number.parseInt(document.getElementById('embedThumbnailScale').value || '100', 10);
     const timestamp = document.getElementById('embedTimestamp').checked;
+
+    const imageSource = uploadedImagePreviewUrl || image;
+    const thumbSource = uploadedThumbnailPreviewUrl || thumbnail;
 
     const preview = document.getElementById('embedPreview');
     
@@ -715,12 +746,86 @@ function updateEmbedPreview() {
         <div class="discord-embed" style="border-left-color: ${color};">
             ${title ? `<div class="discord-embed-title">${escapeHtml(title)}</div>` : ''}
             ${description ? `<div class="discord-embed-description">${escapeHtml(description)}</div>` : ''}
-            ${thumbnail ? `<img src="${thumbnail}" alt="Thumbnail" class="discord-embed-thumbnail" style="float: right; max-width: 80px; border-radius: 4px; margin-left: 1rem;">` : ''}
+            ${thumbSource ? `<img src="${thumbSource}" alt="Thumbnail" class="discord-embed-thumbnail" style="float: right; max-width: ${Math.max(30, Math.round(80 * (thumbnailScale / 100)))}px; border-radius: 4px; margin-left: 1rem;">` : ''}
             ${fieldsHTML ? `<div class="discord-embed-fields">${fieldsHTML}</div>` : ''}
-            ${image ? `<img src="${image}" alt="Image" class="discord-embed-image">` : ''}
+            ${imageSource ? `<img src="${imageSource}" alt="Image" class="discord-embed-image" style="max-width: ${imageScale}%;">` : ''}
             ${footer || timestamp ? `<div class="discord-embed-footer">${footer || ''} ${timestamp ? '• ' + new Date().toLocaleString() : ''}</div>` : ''}
         </div>
     `;
+}
+
+function handleImageFileSelection(event, target) {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+        if (target === 'image') {
+            uploadedImageFile = null;
+            uploadedImagePreviewUrl = '';
+        } else {
+            uploadedThumbnailFile = null;
+            uploadedThumbnailPreviewUrl = '';
+        }
+        updateEmbedPreview();
+        saveState();
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        showToast('Solo puedes subir archivos de imagen', 'warning');
+        event.target.value = '';
+        return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    if (target === 'image') {
+        uploadedImageFile = file;
+        if (uploadedImagePreviewUrl) URL.revokeObjectURL(uploadedImagePreviewUrl);
+        uploadedImagePreviewUrl = previewUrl;
+    } else {
+        uploadedThumbnailFile = file;
+        if (uploadedThumbnailPreviewUrl) URL.revokeObjectURL(uploadedThumbnailPreviewUrl);
+        uploadedThumbnailPreviewUrl = previewUrl;
+    }
+
+    updateEmbedPreview();
+    saveState();
+}
+
+function resizeImageFile(file, scalePercent = 100, maxSide = 1600) {
+    return new Promise((resolve, reject) => {
+        if (!file || !file.type.startsWith('image/')) return resolve(file);
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.max(0.25, Math.min(1, scalePercent / 100));
+                let width = Math.max(1, Math.round(img.width * scale));
+                let height = Math.max(1, Math.round(img.height * scale));
+
+                const largest = Math.max(width, height);
+                if (largest > maxSide) {
+                    const ratio = maxSide / largest;
+                    width = Math.max(1, Math.round(width * ratio));
+                    height = Math.max(1, Math.round(height * ratio));
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    if (!blob) return resolve(file);
+                    resolve(new File([blob], file.name.replace(/\s+/g, '_'), { type: blob.type || 'image/jpeg' }));
+                }, file.type && file.type !== 'image/gif' ? file.type : 'image/jpeg', 0.9);
+            };
+            img.onerror = () => reject(new Error('No se pudo procesar la imagen'));
+            img.src = reader.result;
+        };
+        reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
+        reader.readAsDataURL(file);
+    });
 }
 
 // Enviar embed
@@ -734,14 +839,33 @@ async function sendEmbed() {
     }
 
     const embed = getEmbedPayloadFromForm();
+    const imageScale = Number.parseInt(document.getElementById('embedImageScale').value || '100', 10);
+    const thumbnailScale = Number.parseInt(document.getElementById('embedThumbnailScale').value || '100', 10);
 
     try {
+        const formData = new FormData();
+        formData.append('guildId', guildId);
+        formData.append('channelId', channelId);
+
+        if (uploadedImageFile) {
+            const resizedMain = await resizeImageFile(uploadedImageFile, imageScale, 1600);
+            const imageName = `embed_image_${Date.now()}.${(resizedMain.name.split('.').pop() || 'jpg').toLowerCase()}`;
+            formData.append('imageFile', resizedMain, imageName);
+            embed.image = `attachment://${imageName}`;
+        }
+
+        if (uploadedThumbnailFile) {
+            const resizedThumb = await resizeImageFile(uploadedThumbnailFile, thumbnailScale, 512);
+            const thumbName = `embed_thumb_${Date.now()}.${(resizedThumb.name.split('.').pop() || 'jpg').toLowerCase()}`;
+            formData.append('thumbnailFile', resizedThumb, thumbName);
+            embed.thumbnail = `attachment://${thumbName}`;
+        }
+
+        formData.append('embed', JSON.stringify(embed));
+
         const response = await fetchWithCredentials('/api/send-embed', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ guildId, channelId, embed })
+            body: formData
         });
 
         const data = await response.json();
@@ -754,8 +878,20 @@ async function sendEmbed() {
             document.getElementById('embedFooter').value = '';
             document.getElementById('embedImage').value = '';
             document.getElementById('embedThumbnail').value = '';
+            document.getElementById('embedImageFile').value = '';
+            document.getElementById('embedThumbnailFile').value = '';
+            document.getElementById('embedImageScale').value = '100';
+            document.getElementById('embedThumbnailScale').value = '100';
+            document.getElementById('embedImageScaleValue').textContent = '100%';
+            document.getElementById('embedThumbnailScaleValue').textContent = '100%';
             document.getElementById('embedTimestamp').checked = false;
             document.getElementById('fieldsContainer').innerHTML = '';
+            if (uploadedImagePreviewUrl) URL.revokeObjectURL(uploadedImagePreviewUrl);
+            if (uploadedThumbnailPreviewUrl) URL.revokeObjectURL(uploadedThumbnailPreviewUrl);
+            uploadedImageFile = null;
+            uploadedImagePreviewUrl = '';
+            uploadedThumbnailFile = null;
+            uploadedThumbnailPreviewUrl = '';
             updateEmbedPreview();
             saveState(); // Guardar estado limpio
         } else {
