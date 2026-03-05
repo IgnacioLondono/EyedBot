@@ -33,9 +33,9 @@ module.exports = {
         }
 
         if (filter === 'clean') {
-            const profile = ['normalizer', 'compressor', 'softlimiter'];
+            const profile = ['normalizer'];
             await ffmpeg.setFilters(profile).catch(() => null);
-            return interaction.reply({ embeds: [new EmbedBuilder().setColor('#0099FF').setTitle('🎚️ Filtros').setDescription('Perfil limpio aplicado: normalizer + compressor + softlimiter.')] });
+            return interaction.reply({ embeds: [new EmbedBuilder().setColor('#0099FF').setTitle('🎚️ Filtros').setDescription('Perfil limpio aplicado: normalizer (suave).')] });
         }
 
         await ffmpeg.toggle(filter).catch(() => null);
