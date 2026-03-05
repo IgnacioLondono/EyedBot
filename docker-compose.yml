@@ -24,8 +24,8 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - CLIENT_ID=${CLIENT_ID}
+      - DISCORD_TOKEN=MTQ1MTAxNzM1NTA0Njk0ODk3Ng.GCWK09.Un7ZNXrA1oQgmAydqqe_KRWIojLNLEik4hhYiU${DISCORD_TOKEN}
+      - CLIENT_ID=1451017355046948976${CLIENT_ID}
       - GUILD_ID=${GUILD_ID}
       - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
       - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
