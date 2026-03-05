@@ -9,6 +9,16 @@ const { safeReply, isUnknownInteractionError } = require('./utils/interactions')
 const { handleReturnInteraction } = require('./utils/fun-return');
 require('dotenv').config();
 
+let webPanel = null;
+if ((process.env.WEB_ENABLED || 'true').toLowerCase() === 'true') {
+    try {
+        webPanel = require('../web/server');
+        console.log('🌐 Panel web cargado.');
+    } catch (error) {
+        console.error('❌ No se pudo cargar el panel web:', error?.message || error);
+    }
+}
+
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
@@ -62,6 +72,10 @@ loadCommands(commandsPath);
 
 client.once('clientReady', () => {
     console.log(`👁️ EyedBot conectado como ${client.user.tag}`);
+    if (webPanel?.setBotClient) {
+        webPanel.setBotClient(client);
+        console.log('🔗 Panel web conectado al cliente del bot.');
+    }
 });
 
 client.on('interactionCreate', async interaction => {
