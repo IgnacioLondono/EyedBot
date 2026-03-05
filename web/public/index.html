@@ -203,6 +203,28 @@
                             </div>
 
                             <div class="form-group">
+                                <label>Ajuste de Recorte (Imagen)</label>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="embedImageCropX">X (%)</label>
+                                        <input type="range" id="embedImageCropX" class="form-control" min="0" max="80" value="0" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="embedImageCropY">Y (%)</label>
+                                        <input type="range" id="embedImageCropY" class="form-control" min="0" max="80" value="0" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="embedImageCropW">Ancho (%)</label>
+                                        <input type="range" id="embedImageCropW" class="form-control" min="20" max="100" value="100" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="embedImageCropH">Alto (%)</label>
+                                        <input type="range" id="embedImageCropH" class="form-control" min="20" max="100" value="100" step="1">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
                                 <label for="embedThumbnail">URL de Miniatura</label>
                                 <input type="url" id="embedThumbnail" class="form-control" placeholder="https://ejemplo.com/miniatura.png">
                                 <small style="color: var(--text-muted);">Opcional: o sube miniatura local debajo.</small>
@@ -217,6 +239,28 @@
                                 <label for="embedThumbnailScale">Tamano Miniatura Subida</label>
                                 <input type="range" id="embedThumbnailScale" class="form-control" min="25" max="100" value="100" step="5">
                                 <small id="embedThumbnailScaleValue" style="color: var(--text-muted);">100%</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Ajuste de Recorte (Miniatura)</label>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="embedThumbnailCropX">X (%)</label>
+                                        <input type="range" id="embedThumbnailCropX" class="form-control" min="0" max="80" value="0" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="embedThumbnailCropY">Y (%)</label>
+                                        <input type="range" id="embedThumbnailCropY" class="form-control" min="0" max="80" value="0" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="embedThumbnailCropW">Ancho (%)</label>
+                                        <input type="range" id="embedThumbnailCropW" class="form-control" min="20" max="100" value="100" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="embedThumbnailCropH">Alto (%)</label>
+                                        <input type="range" id="embedThumbnailCropH" class="form-control" min="20" max="100" value="100" step="1">
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="form-group checkbox-group">
@@ -451,6 +495,7 @@
                 </div>
                 <div id="serverInfoContainer" class="server-info-container"></div>
                 <div id="moderationContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                <div id="welcomeContainer" class="moderation-container" style="margin-top: 2rem;"></div>
             </div>
         </section>
 

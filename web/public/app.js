@@ -7,6 +7,7 @@ let uploadedImageFile = null;
 let uploadedImagePreviewUrl = '';
 let uploadedThumbnailFile = null;
 let uploadedThumbnailPreviewUrl = '';
+let currentWelcomeConfig = null;
 
 // Función auxiliar para fetch con credenciales
 async function fetchWithCredentials(url, options = {}) {
@@ -34,6 +35,14 @@ function saveState() {
             thumbnail: document.getElementById('embedThumbnail')?.value || '',
             imageScale: Number.parseInt(document.getElementById('embedImageScale')?.value || '100', 10),
             thumbnailScale: Number.parseInt(document.getElementById('embedThumbnailScale')?.value || '100', 10),
+            imageCropX: Number.parseInt(document.getElementById('embedImageCropX')?.value || '0', 10),
+            imageCropY: Number.parseInt(document.getElementById('embedImageCropY')?.value || '0', 10),
+            imageCropW: Number.parseInt(document.getElementById('embedImageCropW')?.value || '100', 10),
+            imageCropH: Number.parseInt(document.getElementById('embedImageCropH')?.value || '100', 10),
+            thumbnailCropX: Number.parseInt(document.getElementById('embedThumbnailCropX')?.value || '0', 10),
+            thumbnailCropY: Number.parseInt(document.getElementById('embedThumbnailCropY')?.value || '0', 10),
+            thumbnailCropW: Number.parseInt(document.getElementById('embedThumbnailCropW')?.value || '100', 10),
+            thumbnailCropH: Number.parseInt(document.getElementById('embedThumbnailCropH')?.value || '100', 10),
             timestamp: document.getElementById('embedTimestamp')?.checked || false,
             fields: []
         },
@@ -100,6 +109,14 @@ function restoreEmbedForm(state) {
     if (document.getElementById('embedThumbnailScale')) document.getElementById('embedThumbnailScale').value = `${form.thumbnailScale || 100}`;
     if (document.getElementById('embedImageScaleValue')) document.getElementById('embedImageScaleValue').textContent = `${form.imageScale || 100}%`;
     if (document.getElementById('embedThumbnailScaleValue')) document.getElementById('embedThumbnailScaleValue').textContent = `${form.thumbnailScale || 100}%`;
+    if (document.getElementById('embedImageCropX')) document.getElementById('embedImageCropX').value = `${form.imageCropX || 0}`;
+    if (document.getElementById('embedImageCropY')) document.getElementById('embedImageCropY').value = `${form.imageCropY || 0}`;
+    if (document.getElementById('embedImageCropW')) document.getElementById('embedImageCropW').value = `${form.imageCropW || 100}`;
+    if (document.getElementById('embedImageCropH')) document.getElementById('embedImageCropH').value = `${form.imageCropH || 100}`;
+    if (document.getElementById('embedThumbnailCropX')) document.getElementById('embedThumbnailCropX').value = `${form.thumbnailCropX || 0}`;
+    if (document.getElementById('embedThumbnailCropY')) document.getElementById('embedThumbnailCropY').value = `${form.thumbnailCropY || 0}`;
+    if (document.getElementById('embedThumbnailCropW')) document.getElementById('embedThumbnailCropW').value = `${form.thumbnailCropW || 100}`;
+    if (document.getElementById('embedThumbnailCropH')) document.getElementById('embedThumbnailCropH').value = `${form.thumbnailCropH || 100}`;
     if (document.getElementById('embedTimestamp')) document.getElementById('embedTimestamp').checked = form.timestamp || false;
 
     // Restaurar servidor y canal (después de cargar los servidores)
@@ -347,6 +364,15 @@ function setupEventListeners() {
         updateEmbedPreview();
         saveState();
     });
+    ['embedImageCropX', 'embedImageCropY', 'embedImageCropW', 'embedImageCropH', 'embedThumbnailCropX', 'embedThumbnailCropY', 'embedThumbnailCropW', 'embedThumbnailCropH']
+        .forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', () => {
+                updateEmbedPreview();
+                saveState();
+            });
+        });
     document.getElementById('embedTimestamp').addEventListener('change', () => {
         updateEmbedPreview();
         saveState();
@@ -790,7 +816,25 @@ function handleImageFileSelection(event, target) {
     saveState();
 }
 
-function resizeImageFile(file, scalePercent = 100, maxSide = 1600) {
+function getCropSettings(target) {
+    if (target === 'thumbnail') {
+        return {
+            x: Number.parseInt(document.getElementById('embedThumbnailCropX')?.value || '0', 10),
+            y: Number.parseInt(document.getElementById('embedThumbnailCropY')?.value || '0', 10),
+            w: Number.parseInt(document.getElementById('embedThumbnailCropW')?.value || '100', 10),
+            h: Number.parseInt(document.getElementById('embedThumbnailCropH')?.value || '100', 10)
+        };
+    }
+
+    return {
+        x: Number.parseInt(document.getElementById('embedImageCropX')?.value || '0', 10),
+        y: Number.parseInt(document.getElementById('embedImageCropY')?.value || '0', 10),
+        w: Number.parseInt(document.getElementById('embedImageCropW')?.value || '100', 10),
+        h: Number.parseInt(document.getElementById('embedImageCropH')?.value || '100', 10)
+    };
+}
+
+function resizeImageFile(file, scalePercent = 100, maxSide = 1600, crop = { x: 0, y: 0, w: 100, h: 100 }) {
     return new Promise((resolve, reject) => {
         if (!file || !file.type.startsWith('image/')) return resolve(file);
 
@@ -798,9 +842,21 @@ function resizeImageFile(file, scalePercent = 100, maxSide = 1600) {
         reader.onload = () => {
             const img = new Image();
             img.onload = () => {
+                const cropX = Math.max(0, Math.min(100, Number(crop?.x) || 0));
+                const cropY = Math.max(0, Math.min(100, Number(crop?.y) || 0));
+                const cropW = Math.max(1, Math.min(100, Number(crop?.w) || 100));
+                const cropH = Math.max(1, Math.min(100, Number(crop?.h) || 100));
+
+                const sx = Math.round((cropX / 100) * img.width);
+                const sy = Math.round((cropY / 100) * img.height);
+                const maxCropW = img.width - sx;
+                const maxCropH = img.height - sy;
+                const sw = Math.max(1, Math.min(maxCropW, Math.round((cropW / 100) * img.width)));
+                const sh = Math.max(1, Math.min(maxCropH, Math.round((cropH / 100) * img.height)));
+
                 const scale = Math.max(0.25, Math.min(1, scalePercent / 100));
-                let width = Math.max(1, Math.round(img.width * scale));
-                let height = Math.max(1, Math.round(img.height * scale));
+                let width = Math.max(1, Math.round(sw * scale));
+                let height = Math.max(1, Math.round(sh * scale));
 
                 const largest = Math.max(width, height);
                 if (largest > maxSide) {
@@ -813,7 +869,7 @@ function resizeImageFile(file, scalePercent = 100, maxSide = 1600) {
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
 
                 canvas.toBlob((blob) => {
                     if (!blob) return resolve(file);
@@ -848,14 +904,14 @@ async function sendEmbed() {
         formData.append('channelId', channelId);
 
         if (uploadedImageFile) {
-            const resizedMain = await resizeImageFile(uploadedImageFile, imageScale, 1600);
+            const resizedMain = await resizeImageFile(uploadedImageFile, imageScale, 1600, getCropSettings('image'));
             const imageName = `embed_image_${Date.now()}.${(resizedMain.name.split('.').pop() || 'jpg').toLowerCase()}`;
             formData.append('imageFile', resizedMain, imageName);
             embed.image = `attachment://${imageName}`;
         }
 
         if (uploadedThumbnailFile) {
-            const resizedThumb = await resizeImageFile(uploadedThumbnailFile, thumbnailScale, 512);
+            const resizedThumb = await resizeImageFile(uploadedThumbnailFile, thumbnailScale, 512, getCropSettings('thumbnail'));
             const thumbName = `embed_thumb_${Date.now()}.${(resizedThumb.name.split('.').pop() || 'jpg').toLowerCase()}`;
             formData.append('thumbnailFile', resizedThumb, thumbName);
             embed.thumbnail = `attachment://${thumbName}`;
@@ -884,6 +940,14 @@ async function sendEmbed() {
             document.getElementById('embedThumbnailScale').value = '100';
             document.getElementById('embedImageScaleValue').textContent = '100%';
             document.getElementById('embedThumbnailScaleValue').textContent = '100%';
+            document.getElementById('embedImageCropX').value = '0';
+            document.getElementById('embedImageCropY').value = '0';
+            document.getElementById('embedImageCropW').value = '100';
+            document.getElementById('embedImageCropH').value = '100';
+            document.getElementById('embedThumbnailCropX').value = '0';
+            document.getElementById('embedThumbnailCropY').value = '0';
+            document.getElementById('embedThumbnailCropW').value = '100';
+            document.getElementById('embedThumbnailCropH').value = '100';
             document.getElementById('embedTimestamp').checked = false;
             document.getElementById('fieldsContainer').innerHTML = '';
             if (uploadedImagePreviewUrl) URL.revokeObjectURL(uploadedImagePreviewUrl);
@@ -1166,10 +1230,12 @@ async function loadGuildsForServer() {
         const select = document.getElementById('serverSelect');
         const serverInfoContainer = document.getElementById('serverInfoContainer');
         const moderationContainer = document.getElementById('moderationContainer');
+        const welcomeContainer = document.getElementById('welcomeContainer');
         
         // Limpiar contenedores
         serverInfoContainer.innerHTML = '';
         moderationContainer.innerHTML = '';
+        if (welcomeContainer) welcomeContainer.innerHTML = '';
         
         const response = await fetchWithCredentials('/api/guilds');
         if (response.ok) {
@@ -1188,11 +1254,14 @@ async function loadGuildsForServer() {
                     if (e.target.value) {
                         serverInfoContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando información...</p></div>';
                         moderationContainer.innerHTML = '';
+                        if (welcomeContainer) welcomeContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de bienvenida...</p></div>';
                         await loadServerInfo(e.target.value);
                         await loadServerMembers(e.target.value);
+                        await loadWelcomePanel(e.target.value);
                     } else {
                         serverInfoContainer.innerHTML = '';
                         moderationContainer.innerHTML = '';
+                        if (welcomeContainer) welcomeContainer.innerHTML = '';
                     }
                     saveState();
                 });
@@ -1345,6 +1414,161 @@ function displayMembers(members, guildId) {
             displayMembers(members, guildId);
         }
     });
+}
+
+async function loadWelcomePanel(guildId) {
+    const container = document.getElementById('welcomeContainer');
+    if (!container) return;
+
+    try {
+        const channelsResponse = await fetchWithCredentials(`/api/guild/${guildId}/channels`);
+        const configResponse = await fetchWithCredentials(`/api/guild/${guildId}/welcome-config`);
+
+        if (!channelsResponse.ok || !configResponse.ok) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar la configuración de bienvenida.</div>';
+            return;
+        }
+
+        const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
+        const cfg = await configResponse.json();
+        currentWelcomeConfig = cfg;
+
+        container.innerHTML = `
+            <h3 style="margin-bottom:1rem;color:var(--fate-red);font-family:'Cinzel',serif;">Sistema de Bienvenidas</h3>
+            <div class="embed-form-container" style="padding:1rem;">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="welcomeChannelSelect">Canal de bienvenida</label>
+                        <select id="welcomeChannelSelect" class="form-control">
+                            <option value="">Selecciona un canal</option>
+                            ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeColor">Color del embed</label>
+                        <input type="color" id="welcomeColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group checkbox-group">
+                        <label><input type="checkbox" id="welcomeEnabled" ${cfg.enabled !== false ? 'checked' : ''}> <span>Activar bienvenidas</span></label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label><input type="checkbox" id="welcomeMentionUser" ${cfg.mentionUser !== false ? 'checked' : ''}> <span>Mencionar usuario</span></label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label><input type="checkbox" id="welcomeDmEnabled" ${cfg.dmEnabled ? 'checked' : ''}> <span>Enviar DM</span></label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeTitle">Titulo</label>
+                    <input type="text" id="welcomeTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || '¡Bienvenido!')}">
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeMessage">Mensaje (usa {user}, {username}, {server}, {memberCount})</label>
+                    <textarea id="welcomeMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '¡Hola {user}! Bienvenido a {server}.')}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeFooter">Footer</label>
+                    <input type="text" id="welcomeFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || '')}">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="welcomeImageUrl">URL imagen principal</label>
+                        <input type="url" id="welcomeImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeThumbnailMode">Miniatura</label>
+                        <select id="welcomeThumbnailMode" class="form-control">
+                            <option value="avatar" ${cfg.thumbnailMode === 'avatar' ? 'selected' : ''}>Avatar del usuario</option>
+                            <option value="url" ${cfg.thumbnailMode === 'url' ? 'selected' : ''}>URL personalizada</option>
+                            <option value="none" ${cfg.thumbnailMode === 'none' ? 'selected' : ''}>Sin miniatura</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeThumbnailUrl">URL miniatura (si modo URL)</label>
+                    <input type="url" id="welcomeThumbnailUrl" class="form-control" value="${escapeHtmlForValue(cfg.thumbnailUrl || '')}" placeholder="https://...">
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeDmMessage">Mensaje DM (si activas enviar DM)</label>
+                    <textarea id="welcomeDmMessage" class="form-control" rows="3">${escapeHtmlForValue(cfg.dmMessage || '')}</textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="saveWelcomeBtn" class="btn btn-primary">Guardar Bienvenida</button>
+                    <button type="button" id="testWelcomeBtn" class="btn btn-secondary">Enviar Prueba</button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('saveWelcomeBtn').addEventListener('click', () => saveWelcomeConfig(guildId));
+        document.getElementById('testWelcomeBtn').addEventListener('click', () => sendWelcomeTest(guildId));
+    } catch (error) {
+        console.error('Error cargando panel de bienvenida:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de bienvenida.</div>';
+    }
+}
+
+function collectWelcomeConfigFromForm() {
+    return {
+        enabled: document.getElementById('welcomeEnabled')?.checked ?? true,
+        channelId: document.getElementById('welcomeChannelSelect')?.value || '',
+        mentionUser: document.getElementById('welcomeMentionUser')?.checked ?? true,
+        title: document.getElementById('welcomeTitle')?.value || '¡Bienvenido!',
+        message: document.getElementById('welcomeMessage')?.value || '¡Hola {user}! Bienvenido a {server}.',
+        color: (document.getElementById('welcomeColor')?.value || '#7c4dff').replace('#', ''),
+        footer: document.getElementById('welcomeFooter')?.value || '',
+        imageUrl: document.getElementById('welcomeImageUrl')?.value || '',
+        thumbnailMode: document.getElementById('welcomeThumbnailMode')?.value || 'avatar',
+        thumbnailUrl: document.getElementById('welcomeThumbnailUrl')?.value || '',
+        dmEnabled: document.getElementById('welcomeDmEnabled')?.checked ?? false,
+        dmMessage: document.getElementById('welcomeDmMessage')?.value || ''
+    };
+}
+
+async function saveWelcomeConfig(guildId) {
+    const payload = collectWelcomeConfigFromForm();
+    if (!payload.channelId) {
+        showToast('Selecciona un canal para la bienvenida', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/welcome-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return showToast(data.error || 'No se pudo guardar la bienvenida', 'error');
+        showToast('Configuración de bienvenida guardada', 'success');
+    } catch (error) {
+        console.error('Error guardando bienvenida:', error);
+        showToast('Error guardando bienvenida', 'error');
+    }
+}
+
+async function sendWelcomeTest(guildId) {
+    try {
+        await saveWelcomeConfig(guildId);
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/welcome-test`, {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return showToast(data.error || 'No se pudo enviar la prueba', 'error');
+        showToast('Prueba de bienvenida enviada', 'success');
+    } catch (error) {
+        console.error('Error enviando prueba:', error);
+        showToast('Error enviando prueba', 'error');
+    }
 }
 
 // Moderar usuario

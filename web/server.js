@@ -9,6 +9,7 @@ const axios = require('axios');
 const cors = require('cors');
 const fs = require('fs');
 const multer = require('multer');
+const db = require('../src/utils/database');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -331,6 +332,123 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error obteniendo canales:', error);
         res.status(500).json({ error: 'Error al obtener canales' });
+    }
+});
+
+function applyWelcomeTemplate(text, member) {
+    return String(text || '')
+        .replace(/\{user\}/gi, `<@${member.id}>`)
+        .replace(/\{username\}/gi, member.user.username)
+        .replace(/\{server\}/gi, member.guild.name)
+        .replace(/\{memberCount\}/gi, String(member.guild.memberCount));
+}
+
+app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await db.get(`welcome_config_${guildId}`);
+        const fallbackChannel = await db.get(`welcome_${guildId}`);
+
+        if (!config) {
+            return res.json({
+                enabled: Boolean(fallbackChannel),
+                channelId: fallbackChannel || '',
+                mentionUser: true,
+                title: '¡Bienvenido!',
+                message: '¡Hola {user}! Bienvenido a **{server}**. Eres el miembro #{memberCount}.',
+                color: '7c4dff',
+                footer: 'EyedBot Welcome System',
+                imageUrl: '',
+                thumbnailMode: 'avatar',
+                thumbnailUrl: '',
+                dmEnabled: false,
+                dmMessage: 'Bienvenido a {server}, {username}.'
+            });
+        }
+
+        if (!config.channelId && fallbackChannel) config.channelId = fallbackChannel;
+        res.json(config);
+    } catch (error) {
+        console.error('Error obteniendo welcome config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de bienvenida' });
+    }
+});
+
+app.post('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const body = req.body || {};
+        if (!body.channelId) return res.status(400).json({ error: 'Debes seleccionar un canal de bienvenida' });
+
+        const config = {
+            enabled: body.enabled !== false,
+            channelId: String(body.channelId),
+            mentionUser: body.mentionUser !== false,
+            title: String(body.title || '¡Bienvenido!').slice(0, 256),
+            message: String(body.message || '¡Hola {user}! Bienvenido a **{server}**.').slice(0, 2000),
+            color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
+            footer: String(body.footer || '').slice(0, 300),
+            imageUrl: String(body.imageUrl || '').slice(0, 1000),
+            thumbnailMode: ['none', 'avatar', 'url'].includes(String(body.thumbnailMode || 'avatar')) ? String(body.thumbnailMode) : 'avatar',
+            thumbnailUrl: String(body.thumbnailUrl || '').slice(0, 1000),
+            dmEnabled: body.dmEnabled === true,
+            dmMessage: String(body.dmMessage || '').slice(0, 1000),
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+
+        await db.set(`welcome_config_${guildId}`, config);
+        await db.set(`welcome_${guildId}`, config.channelId);
+
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando welcome config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de bienvenida' });
+    }
+});
+
+app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await db.get(`welcome_config_${guildId}`);
+        const channelId = cfg?.channelId || await db.get(`welcome_${guildId}`);
+        const channel = channelId ? guild.channels.cache.get(channelId) : null;
+        if (!channel) return res.status(404).json({ error: 'Canal de bienvenida no encontrado' });
+
+        const member = guild.members.cache.get(req.session.user?.id) || await guild.members.fetch(req.session.user?.id).catch(() => null);
+        if (!member) return res.status(404).json({ error: 'No pude obtener tu usuario en este servidor' });
+
+        const { EmbedBuilder } = require('discord.js');
+        const embed = new EmbedBuilder()
+            .setColor(cfg?.color || '7c4dff')
+            .setTitle(applyWelcomeTemplate(cfg?.title || '¡Bienvenido!', member))
+            .setDescription(applyWelcomeTemplate(cfg?.message || '¡Hola {user}!', member));
+
+        if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
+        if (cfg?.imageUrl) embed.setImage(cfg.imageUrl);
+        if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
+
+        const content = cfg?.mentionUser ? `<@${member.id}>` : null;
+        await channel.send({ content, embeds: [embed] });
+
+        res.json({ success: true, message: 'Prueba de bienvenida enviada' });
+    } catch (error) {
+        console.error('Error enviando welcome test:', error);
+        res.status(500).json({ error: 'Error al enviar prueba de bienvenida' });
     }
 });
 
