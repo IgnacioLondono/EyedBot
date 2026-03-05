@@ -182,6 +182,10 @@ docker-compose exec bot node docker/migrate-json-to-mysql.js
 
 Para desplegar en Portainer, consulta la [Guía Completa de Configuración](CONFIGURACION_COMPLETA.md).
 
+Para OpenMediaVault + Portainer usando despliegue por Git, usa:
+
+- [PORTAINER_OMV.md](PORTAINER_OMV.md)
+
 Pasos rápidos:
 1. Sube el proyecto a tu servidor
 2. En Portainer, crea un nuevo Stack

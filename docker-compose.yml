@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4
@@ -8,10 +6,12 @@ services:
     environment:
       - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
       - _JAVA_OPTIONS=-Xmx512m
-    volumes:
-      - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml:ro
     ports:
       - "2333:2333"
+    volumes:
+      - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    networks:
+      - eyedbot-net
 
   # Bot de Discord
   bot:
@@ -20,15 +20,36 @@ services:
       dockerfile: Dockerfile
     container_name: eyedbot
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - CLIENT_ID=${CLIENT_ID}
+      - DISCORD_TOKEN=${DISCORD_TOKEN:?DISCORD_TOKEN is required}
+      - CLIENT_ID=${CLIENT_ID:?CLIENT_ID is required}
+      - GUILD_ID=${GUILD_ID:?GUILD_ID is required}
       - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
       - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
       - LAVALINK_PORT=${LAVALINK_PORT:-2333}
       - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
-      - MUSIC_DEFAULT_VOLUME=${MUSIC_DEFAULT_VOLUME:-70}
-      - MUSIC_MAX_VOLUME=${MUSIC_MAX_VOLUME:-85}
+      - MUSIC_DEFAULT_VOLUME=${MUSIC_DEFAULT_VOLUME:-55}
+      - MUSIC_MAX_VOLUME=${MUSIC_MAX_VOLUME:-75}
+      - MUSIC_CLEAN_PROFILE_ENABLED=${MUSIC_CLEAN_PROFILE_ENABLED:-false}
+      - MUSIC_CLEAN_FILTERS=${MUSIC_CLEAN_FILTERS:-normalizer,compressor,softlimiter}
+      - DB_HOST=${DB_HOST:-mysql}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER:-tulabot}
+      - DB_PASSWORD=${DB_PASSWORD:-tulabot_password}
+      - DB_NAME=${DB_NAME:-tulabot}
+      - TENOR_API_KEY=${TENOR_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
     depends_on:
       - lavalink
+    networks:
+      - eyedbot-net
+
+networks:
+  eyedbot-net:
+    driver: bridge
