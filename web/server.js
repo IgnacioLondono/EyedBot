@@ -11,13 +11,22 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
 
+function envValue(name, fallback = '') {
+    const raw = process.env[name];
+    if (raw === undefined || raw === null) return fallback;
+    return String(raw).trim();
+}
+
+const CLIENT_ID = envValue('CLIENT_ID');
+const CLIENT_SECRET = envValue('CLIENT_SECRET');
+
 // Validar variables de entorno requeridas
-if (!process.env.CLIENT_ID) {
+if (!CLIENT_ID) {
     console.error('❌ ERROR: CLIENT_ID no está configurado en .env');
     console.log('💡 Agrega CLIENT_ID=tu_client_id a tu archivo .env');
 }
 
-if (!process.env.CLIENT_SECRET) {
+if (!CLIENT_SECRET) {
     console.error('❌ ERROR: CLIENT_SECRET no está configurado en .env');
     console.log('💡 Agrega CLIENT_SECRET=tu_client_secret a tu archivo .env');
     console.log('💡 Obtén el CLIENT_SECRET de Discord Developer Portal > OAuth2');
@@ -29,14 +38,14 @@ const redirectIsHttps = /^https:\/\//i.test(redirectUri);
 const cookieSecure = (process.env.SESSION_COOKIE_SECURE || (redirectIsHttps ? 'true' : 'false')).toLowerCase() === 'true';
 
 const oauth = new DiscordOauth2({
-    clientId: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
+    clientId: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
     redirectUri: redirectUri
 });
 
 console.log('🔐 OAuth2 configurado:');
-console.log(`   Client ID: ${process.env.CLIENT_ID ? '✅ Configurado' : '❌ Faltante'}`);
-console.log(`   Client Secret: ${process.env.CLIENT_SECRET ? '✅ Configurado' : '❌ Faltante'}`);
+console.log(`   Client ID: ${CLIENT_ID ? '✅ Configurado' : '❌ Faltante'}`);
+console.log(`   Client Secret: ${CLIENT_SECRET ? '✅ Configurado' : '❌ Faltante'}`);
 console.log(`   Redirect URI: ${redirectUri}`);
 console.log(`   Session Cookie Secure: ${cookieSecure ? '✅ true' : '⚠️ false (HTTP/local)'}`);
 
@@ -73,7 +82,7 @@ function setBotClient(client) {
 
 // Rutas de autenticación
 app.get('/login', (req, res) => {
-    if (!process.env.CLIENT_ID) {
+    if (!CLIENT_ID) {
         return res.status(500).send(`
             <html>
                 <head><title>Error de Configuración</title></head>
@@ -130,7 +139,7 @@ app.get('/callback', async (req, res) => {
         }
 
         // Verificar que CLIENT_SECRET esté configurado
-        if (!process.env.CLIENT_SECRET) {
+        if (!CLIENT_SECRET) {
             console.error('❌ CLIENT_SECRET no está configurado en .env');
             return res.redirect('/login?error=config_error');
         }
@@ -143,8 +152,8 @@ app.get('/callback', async (req, res) => {
 
         console.log('🔐 Intercambiando código por token...');
         console.log(`   Redirect URI: ${redirectUri}`);
-        console.log(`   Client ID: ${process.env.CLIENT_ID ? '✅ Configurado' : '❌ Faltante'}`);
-        console.log(`   Client Secret: ${process.env.CLIENT_SECRET ? '✅ Configurado' : '❌ Faltante'}`);
+        console.log(`   Client ID: ${CLIENT_ID ? '✅ Configurado' : '❌ Faltante'}`);
+        console.log(`   Client Secret: ${CLIENT_SECRET ? '✅ Configurado' : '❌ Faltante'}`);
         
         const tokenData = await oauth.tokenRequest({
             code,
