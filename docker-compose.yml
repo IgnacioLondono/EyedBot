@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     environment:
       - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - SERVER_PORT=2333
       - _JAVA_OPTIONS=-Xmx512m
     ports:
       - "2333:2333"
@@ -23,7 +24,7 @@ services:
     environment:
       - NODE_ENV=production
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - CLIENT_ID=1451017355046948976${CLIENT_ID}
+      - CLIENT_ID=${CLIENT_ID:-1451017355046948976}
       - GUILD_ID=${GUILD_ID}
       - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
       - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
