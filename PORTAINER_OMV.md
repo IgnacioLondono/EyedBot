@@ -29,8 +29,25 @@ Opcionales recomendadas:
 
 - `TENOR_API_KEY`
 - `GEMINI_API_KEY`
-- `LAVALINK_ENABLED=true` (si quieres usar lavalink)
+- `LAVALINK_HOST=lavalink`
+- `LAVALINK_PORT=2333`
 - `LAVALINK_PASSWORD` (si cambias la default)
+
+Audio recomendado (perfil limpio/estable):
+
+- `MUSIC_DEFAULT_VOLUME=55`
+- `MUSIC_MAX_VOLUME=80`
+- `MUSIC_SKIP_FFMPEG=false`
+- `MUSIC_CLEAN_PROFILE_ENABLED=true`
+- `MUSIC_CLEAN_FILTERS=normalizer2,softlimiter`
+- `MUSIC_LEAVE_ON_EMPTY=true`
+- `MUSIC_LEAVE_ON_EMPTY_COOLDOWN_MS=90000`
+- `MUSIC_LEAVE_ON_END=true`
+- `MUSIC_LEAVE_ON_END_COOLDOWN_MS=180000`
+- `MUSIC_LEAVE_ON_STOP=true`
+- `MUSIC_LEAVE_ON_STOP_COOLDOWN_MS=30000`
+- `MUSIC_BUFFERING_TIMEOUT_MS=7000`
+- `MUSIC_CONNECTION_TIMEOUT_MS=45000`
 
 ## 4. Volumenes persistentes
 
@@ -55,5 +72,5 @@ Esto conserva conteos y logs entre reinicios.
 ## 7. Troubleshooting rapido
 
 - Si no conecta Discord: revisa `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`
-- Si musica falla por stream: prueba `LAVALINK_ENABLED=true`
+- Si musica falla por stream: revisa red/salida a YouTube y prueba bajar filtros con `/filters reset`
 - Si Stack no levanta: revisa logs de `eyedbot` y `eyedbot-lavalink`

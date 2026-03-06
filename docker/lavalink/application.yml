@@ -24,8 +24,15 @@ lavalink:
       channelMix: true
       lowPass: true
       pluginFilters: true
-    youtubePlaylistLoadLimit: 6
-    playerUpdateInterval: 5
+    youtubePlaylistLoadLimit: 20
+    playerUpdateInterval: 2
+    bufferDurationMs: 600
+    frameBufferDurationMs: 8000
+    opusEncodingQuality: 10
+    resamplingQuality: HIGH
+    trackStuckThresholdMs: 15000
+    useSeekGhosting: true
+    gc-warnings: true
 
 metrics:
   prometheus:

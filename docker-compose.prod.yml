@@ -1,7 +1,5 @@
-# docker-compose.prod.yml - Configuración para producción
-# Usar: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-version: '3.8'
+# docker-compose.prod.yml - Configuracion para produccion
+# Usar: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
   lavalink:
@@ -15,18 +13,8 @@ services:
           cpus: '0.25'
           memory: 256M
 
-  mysql:
-    # En producción, considera usar un volumen externo gestionado
-    volumes:
-      - mysql_data_prod:/var/lib/mysql
-    # Descomentar para exponer MySQL solo si es necesario
-    # ports:
-    #   - "127.0.0.1:3306:3306"  # Solo localhost
-    command: --default-authentication-plugin=mysql_native_password --max_connections=200
-
   bot:
     restart: always
-    # Limitar recursos si es necesario
     deploy:
       resources:
         limits:
@@ -35,34 +23,10 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-    # Health check
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  web:
-    restart: always
-    # Limitar recursos
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    # Health check
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-volumes:
-  mysql_data_prod:
-    driver: local
 

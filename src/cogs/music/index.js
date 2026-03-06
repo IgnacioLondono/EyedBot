@@ -44,7 +44,27 @@ class MusicSystem {
         this.client = client;
         if (!this.client.musicSearchSessions) this.client.musicSearchSessions = new Map();
         if (!this.client.musicNowPlayingMessages) this.client.musicNowPlayingMessages = new Map();
+        if (!this.client.musicRecoveryAttempts) this.client.musicRecoveryAttempts = new Map();
+        if (!this.client.musicRecoveryLockUntil) this.client.musicRecoveryLockUntil = new Map();
         this._registerPlayerEvents();
+    }
+
+    buildNodeOptions(channel) {
+        const safeVolume = Math.max(0, Math.min(config.musicMaxVolume || 80, config.musicDefaultVolume || 55));
+        return {
+            metadata: { channel },
+            selfDeaf: true,
+            skipFFmpeg: config.musicSkipFfmpeg,
+            volume: safeVolume,
+            leaveOnEmpty: config.musicLeaveOnEmpty,
+            leaveOnEmptyCooldown: config.musicLeaveOnEmptyCooldownMs,
+            leaveOnEnd: config.musicLeaveOnEnd,
+            leaveOnEndCooldown: config.musicLeaveOnEndCooldownMs,
+            leaveOnStop: config.musicLeaveOnStop,
+            leaveOnStopCooldown: config.musicLeaveOnStopCooldownMs,
+            bufferingTimeout: config.musicBufferingTimeoutMs,
+            connectionTimeout: config.musicConnectionTimeoutMs
+        };
     }
 
     _registerPlayerEvents() {
@@ -129,6 +149,78 @@ class MusicSystem {
         return (scoreTitle * 1.15 + scoreArtist * 0.85) + bonus - penalty;
     }
 
+    _isLikelyBadUploadTitle(title) {
+        const t = normalize(title);
+        if (!t) return false;
+        return t.includes('not full')
+            || t.includes('short')
+            || t.includes('preview')
+            || t.includes('teaser')
+            || t.includes('edit')
+            || t.includes('amv')
+            || t.includes('clip');
+    }
+
+    _isRecoverablePlaybackError(error) {
+        const msg = (error?.message || '').toString().toLowerCase();
+        return msg.includes('could not extract stream')
+            || msg.includes('extract stream')
+            || msg.includes('video unavailable')
+            || msg.includes('playability')
+            || msg.includes('age-restricted');
+    }
+
+    _recoveryKey(guildId, track) {
+        const id = this._extractYouTubeId(this._trackUrl(track) || '');
+        const fallback = normalize(`${track?.title || ''} ${track?.author || ''}`);
+        return `${guildId}:${id || fallback || 'unknown'}`;
+    }
+
+    async _findRecoveryTrack(track, requestedBy) {
+        const title = (track?.title || '').toString();
+        const author = (track?.author || '').toString();
+        if (!title) return null;
+
+        const queries = [
+            `${author} ${title} official audio full`.trim(),
+            `${author} ${title} official audio`.trim(),
+            `${author} ${title} topic`.trim(),
+            `${author} ${title}`.trim(),
+            title
+        ].filter(Boolean);
+
+        let best = null;
+        let bestScore = -Infinity;
+        const originalUrl = this._trackUrl(track);
+
+        for (const q of queries) {
+            const result = await this.client.player.search(q, {
+                requestedBy,
+                searchEngine: 'youtube'
+            }).catch(() => null);
+
+            const candidates = result?.tracks || [];
+            for (const candidate of candidates) {
+                const cTitle = candidate?.title || '';
+                if (this._isLikelyBadUploadTitle(cTitle)) continue;
+                const cUrl = this._trackUrl(candidate);
+                if (this._isExactUrlMatch(cUrl, originalUrl)) continue;
+
+                const score = this._scoreVideoAgainstTarget(
+                    { title: cTitle, channel: { name: candidate?.author || '' } },
+                    title,
+                    author
+                );
+                if (score > bestScore) {
+                    best = candidate;
+                    bestScore = score;
+                }
+            }
+        }
+
+        return best;
+    }
+
     _musicControlComponents(guildId, isPaused = false) {
         const row1 = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`music_skip_${guildId}`).setEmoji('⏭️').setStyle(ButtonStyle.Secondary),
@@ -201,6 +293,9 @@ class MusicSystem {
         const channel = queue?.metadata?.channel || null;
         if (!guildId || !channel) return;
 
+        this.client.musicRecoveryAttempts.delete(guildId);
+        this.client.musicRecoveryLockUntil.delete(guildId);
+
         const safeVolume = Math.max(0, Math.min(config.musicMaxVolume || 75, config.musicDefaultVolume || 60));
         const maxVolume = config.musicMaxVolume || 75;
         const currentVolume = queue?.node?.volume;
@@ -246,8 +341,40 @@ class MusicSystem {
     }
 
     async _onPlayerError(queue, error, track) {
+        const guildId = this._queueGuildId(queue);
         const channel = queue?.metadata?.channel;
         if (!channel?.send) return;
+
+        if (guildId && track && this._isRecoverablePlaybackError(error)) {
+            const lockUntil = this.client.musicRecoveryLockUntil.get(guildId) || 0;
+            const now = Date.now();
+            const key = this._recoveryKey(guildId, track);
+            const lastAttempt = this.client.musicRecoveryAttempts.get(key) || 0;
+
+            if (now >= lockUntil && now - lastAttempt > 15000) {
+                this.client.musicRecoveryAttempts.set(key, now);
+                this.client.musicRecoveryLockUntil.set(guildId, now + 10000);
+
+                const requestedBy = track?.requestedBy || queue?.currentTrack?.requestedBy || null;
+                const recovered = await this._findRecoveryTrack(track, requestedBy);
+                if (recovered) {
+                    const played = await queue.play(recovered, {
+                        nodeOptions: this.buildNodeOptions(channel)
+                    }).catch(() => null);
+
+                    if (played) {
+                        await channel.send({
+                            embeds: [new EmbedBuilder()
+                                .setColor('#00C897')
+                                .setTitle('♻️ Recuperacion automatica')
+                                .setDescription(`Falló el stream de **${track?.title || 'la pista'}** y cargué una version alternativa reproducible.`)]
+                        }).catch(() => {});
+                        return;
+                    }
+                }
+            }
+        }
+
         await channel.send({
             embeds: [new EmbedBuilder()
                 .setColor('#FFA500')
@@ -417,11 +544,7 @@ class MusicSystem {
 
         await this.client.player.play(voiceChannel, exactTrack, {
             requestedBy: interaction.user,
-            nodeOptions: {
-                metadata: { channel: interaction.channel },
-                selfDeaf: true,
-                skipFFmpeg: false
-            }
+            nodeOptions: this.buildNodeOptions(interaction.channel)
         });
 
         this.client.musicSearchSessions.delete(key);
