@@ -78,6 +78,13 @@ function jaccard(a, b) {
     return union ? inter / union : 0;
 }
 
+function overlapRatio(target, candidate) {
+    if (!target.size) return 0;
+    let inter = 0;
+    for (const token of target) if (candidate.has(token)) inter++;
+    return inter / target.size;
+}
+
 function scoreYoutubeCandidate(video, title, artist) {
     const vTitle = video?.title || '';
     const vAuthor = video?.channel?.name || video?.author || '';
@@ -89,6 +96,10 @@ function scoreYoutubeCandidate(video, title, artist) {
 
     const tNorm = normalizeText(vTitle);
     const queryNorm = normalizeText(`${title} ${artist}`);
+    const artistTokens = tokenSet(artist);
+    const candidateTokens = tokenSet(`${vAuthor} ${vTitle}`);
+    const artistOverlap = overlapRatio(artistTokens, candidateTokens);
+    const shortTitle = tokenSet(title).size <= 2;
 
     const heavyPenalty = (tNorm.includes('not full') ? 1.2 : 0)
         + (tNorm.includes('short') && !queryNorm.includes('short') ? 0.8 : 0)
@@ -100,13 +111,35 @@ function scoreYoutubeCandidate(video, title, artist) {
         + (tNorm.includes('sped up') ? 0.5 : 0)
         + (tNorm.includes('remix') && !queryNorm.includes('remix') ? 0.4 : 0)
         + (tNorm.includes('cover') && !queryNorm.includes('cover') ? 0.7 : 0)
-        + (tNorm.includes('instrumental') && !queryNorm.includes('instrumental') ? 0.3 : 0);
+        + (tNorm.includes('instrumental') && !queryNorm.includes('instrumental') ? 0.3 : 0)
+        + (artistTokens.size && artistOverlap === 0 ? 1.4 : 0)
+        + (artistTokens.size && artistOverlap > 0 && artistOverlap < 0.34 ? 0.45 : 0)
+        + (artistTokens.size && shortTitle && artistOverlap < 0.34 ? 0.65 : 0);
 
     const bonus = (tNorm.includes('official') ? 0.15 : 0)
         + (tNorm.includes('topic') ? 0.2 : 0)
         + (tNorm.includes('audio') ? 0.1 : 0);
 
     return (titleScore * 1.3 + artistScore * 1.0) + bonus - heavyPenalty;
+}
+
+function hasArtistSignal(video, artist) {
+    const artistTokens = tokenSet(artist);
+    if (!artistTokens.size) return true;
+    const candidateTokens = tokenSet(`${video?.channel?.name || video?.author || ''} ${video?.title || ''}`);
+    return overlapRatio(artistTokens, candidateTokens) >= 0.34;
+}
+
+function isLikelyBadUploadTitle(title) {
+    const t = normalizeText(title);
+    if (!t) return false;
+    return t.includes('not full')
+        || t.includes('short')
+        || t.includes('preview')
+        || t.includes('teaser')
+        || t.includes('edit')
+        || t.includes('amv')
+        || t.includes('clip');
 }
 
 async function getProviderMetadata(url) {
@@ -165,6 +198,8 @@ async function resolveProviderToYoutubeUrl(meta) {
 
     let best = null;
     let bestScore = -Infinity;
+    let strictBest = null;
+    let strictBestScore = -Infinity;
 
     for (const q of queries) {
         const videos = await YouTube.search(q, {
@@ -175,11 +210,25 @@ async function resolveProviderToYoutubeUrl(meta) {
 
         for (const v of videos || []) {
             const s = scoreYoutubeCandidate(v, title, artist);
+
+            if (artist && hasArtistSignal(v, artist) && s > strictBestScore) {
+                strictBestScore = s;
+                strictBest = v;
+            }
+
             if (s > bestScore) {
                 bestScore = s;
                 best = v;
             }
         }
+    }
+
+    if (strictBest) {
+        return strictBest.url || (strictBest.id ? `https://www.youtube.com/watch?v=${strictBest.id}` : null);
+    }
+
+    if (artist && config.musicStrictArtistMatch) {
+        return null;
     }
 
     if (!best) return null;
@@ -256,7 +305,10 @@ module.exports = {
             safeSearch: false
         }).catch(() => []);
 
-        const options = (results || []).slice(0, 12).map((v) => {
+        const filtered = (results || []).filter((v) => !isLikelyBadUploadTitle(v?.title || ''));
+        const source = filtered.length ? filtered : (results || []);
+
+        const options = source.slice(0, 12).map((v) => {
             const label = `${v.title || 'Sin titulo'} (${v.durationFormatted || v.duration || '??:??'})`;
             return {
                 name: label.substring(0, 100),
@@ -363,11 +415,7 @@ module.exports = {
             try {
                 played = await interaction.client.player.play(voiceChannel, strictTrack, {
                     requestedBy,
-                    nodeOptions: {
-                        metadata: { channel: interaction.channel },
-                        selfDeaf: true,
-                        skipFFmpeg: config.musicSkipFfmpeg
-                    }
+                    nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
                 });
             } catch {
                 const first = result?.tracks?.[0];
@@ -385,11 +433,7 @@ module.exports = {
 
                         played = await interaction.client.player.play(voiceChannel, fallbackTrack || fallbackResult, {
                             requestedBy,
-                            nodeOptions: {
-                                metadata: { channel: interaction.channel },
-                                selfDeaf: true,
-                                skipFFmpeg: config.musicSkipFfmpeg
-                            }
+                            nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
                         }).catch(() => null);
                         result = fallbackResult;
                     }
@@ -419,7 +463,10 @@ module.exports = {
             safeSearch: false
         }).catch(() => []);
 
-        const tracks = videos.map(mapVideo).filter((t) => t.url || t.id);
+        const cleanedVideos = (videos || []).filter((v) => !isLikelyBadUploadTitle(v?.title || ''));
+        const sourceVideos = cleanedVideos.length ? cleanedVideos : (videos || []);
+
+        const tracks = sourceVideos.map(mapVideo).filter((t) => t.url || t.id);
         if (!tracks.length) {
             return safeEditReply(interaction, {
                 embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Sin resultados').setDescription(`No encontré resultados para **${query}**.`)]

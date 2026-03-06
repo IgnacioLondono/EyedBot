@@ -1,7 +1,13 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getQueueOrReply, userInSameVoice } = require('./_common');
 
-const FILTERS = ['clean', 'reset', 'bassboost', 'nightcore', 'vaporwave'];
+const FILTERS = ['studio', 'vocal', 'bassboost', 'nightcore', 'vaporwave', 'clean', 'reset'];
+const PRESETS = {
+    studio: ['normalizer2', 'softlimiter'],
+    vocal: ['compressor', 'normalizer2'],
+    bassboost: ['bassboost_low', 'softlimiter'],
+    clean: ['normalizer']
+};
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -32,10 +38,15 @@ module.exports = {
             return interaction.reply({ embeds: [new EmbedBuilder().setColor('#0099FF').setTitle('🎚️ Filtros').setDescription('Perfil plano aplicado (sin filtros).')] });
         }
 
-        if (filter === 'clean') {
-            const profile = ['normalizer'];
+        if (PRESETS[filter]) {
+            const profile = PRESETS[filter];
             await ffmpeg.setFilters(profile).catch(() => null);
-            return interaction.reply({ embeds: [new EmbedBuilder().setColor('#0099FF').setTitle('🎚️ Filtros').setDescription('Perfil limpio aplicado: normalizer (suave).')] });
+            return interaction.reply({
+                embeds: [new EmbedBuilder()
+                    .setColor('#0099FF')
+                    .setTitle('🎚️ Perfil de audio')
+                    .setDescription(`Perfil **${filter}** aplicado: ${profile.join(', ')}`)]
+            });
         }
 
         await ffmpeg.toggle(filter).catch(() => null);
