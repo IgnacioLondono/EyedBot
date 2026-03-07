@@ -433,6 +433,63 @@ function applyWelcomeTemplate(text, member) {
         .replace(/\{memberCount\}/gi, String(member.guild.memberCount));
 }
 
+function buildDefaultGreetingConfig(mode, fallbackChannel = '') {
+    if (mode === 'goodbye') {
+        return {
+            enabled: Boolean(fallbackChannel),
+            channelId: fallbackChannel || '',
+            mentionUser: false,
+            title: 'Hasta pronto',
+            message: '{username} ha salido de **{server}**. Ahora somos {memberCount} miembros.',
+            color: 'ff5f9e',
+            footer: 'EyedBot Goodbye System',
+            imageUrl: '',
+            thumbnailMode: 'avatar',
+            thumbnailUrl: '',
+            dmEnabled: false,
+            dmMessage: ''
+        };
+    }
+
+    return {
+        enabled: Boolean(fallbackChannel),
+        channelId: fallbackChannel || '',
+        mentionUser: true,
+        title: '¡Bienvenido!',
+        message: '¡Hola {user}! Bienvenido a **{server}**. Eres el miembro #{memberCount}.',
+        color: '7c4dff',
+        footer: 'EyedBot Welcome System',
+        imageUrl: '',
+        thumbnailMode: 'avatar',
+        thumbnailUrl: '',
+        dmEnabled: false,
+        dmMessage: 'Bienvenido a {server}, {username}.'
+    };
+}
+
+function normalizeGreetingConfigInput(body = {}, mode, userId) {
+    const fallback = mode === 'goodbye'
+        ? { title: 'Hasta pronto', message: '{username} ha salido de **{server}**.' }
+        : { title: '¡Bienvenido!', message: '¡Hola {user}! Bienvenido a **{server}**.' };
+
+    return {
+        enabled: body.enabled !== false,
+        channelId: String(body.channelId || ''),
+        mentionUser: body.mentionUser !== false,
+        title: String(body.title || fallback.title).slice(0, 256),
+        message: String(body.message || fallback.message).slice(0, 2000),
+        color: String(body.color || (mode === 'goodbye' ? 'ff5f9e' : '7c4dff')).replace('#', '').slice(0, 6),
+        footer: String(body.footer || '').slice(0, 300),
+        imageUrl: String(body.imageUrl || '').slice(0, 1000),
+        thumbnailMode: ['none', 'avatar', 'url'].includes(String(body.thumbnailMode || 'avatar')) ? String(body.thumbnailMode) : 'avatar',
+        thumbnailUrl: String(body.thumbnailUrl || '').slice(0, 1000),
+        dmEnabled: body.dmEnabled === true,
+        dmMessage: String(body.dmMessage || '').slice(0, 1000),
+        updatedAt: new Date().toISOString(),
+        updatedBy: userId || 'unknown'
+    };
+}
+
 function normalizeVerifyEmojiInput(rawEmoji = '✅') {
     const raw = String(rawEmoji || '✅').trim();
     const custom = raw.match(/^<a?:\w+:(\d+)>$/);
@@ -820,22 +877,7 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
         const config = await welcomeStore.getWelcomeConfig(guildId);
         const fallbackChannel = await welcomeStore.getWelcomeChannelId(guildId);
 
-        if (!config) {
-            return res.json({
-                enabled: Boolean(fallbackChannel),
-                channelId: fallbackChannel || '',
-                mentionUser: true,
-                title: '¡Bienvenido!',
-                message: '¡Hola {user}! Bienvenido a **{server}**. Eres el miembro #{memberCount}.',
-                color: '7c4dff',
-                footer: 'EyedBot Welcome System',
-                imageUrl: '',
-                thumbnailMode: 'avatar',
-                thumbnailUrl: '',
-                dmEnabled: false,
-                dmMessage: 'Bienvenido a {server}, {username}.'
-            });
-        }
+        if (!config) return res.json(buildDefaultGreetingConfig('welcome', fallbackChannel));
 
         if (!config.channelId && fallbackChannel) config.channelId = fallbackChannel;
         res.json(config);
@@ -912,22 +954,7 @@ app.post('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => 
         const body = req.body || {};
         if (!body.channelId) return res.status(400).json({ error: 'Debes seleccionar un canal de bienvenida' });
 
-        const config = {
-            enabled: body.enabled !== false,
-            channelId: String(body.channelId),
-            mentionUser: body.mentionUser !== false,
-            title: String(body.title || '¡Bienvenido!').slice(0, 256),
-            message: String(body.message || '¡Hola {user}! Bienvenido a **{server}**.').slice(0, 2000),
-            color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
-            footer: String(body.footer || '').slice(0, 300),
-            imageUrl: String(body.imageUrl || '').slice(0, 1000),
-            thumbnailMode: ['none', 'avatar', 'url'].includes(String(body.thumbnailMode || 'avatar')) ? String(body.thumbnailMode) : 'avatar',
-            thumbnailUrl: String(body.thumbnailUrl || '').slice(0, 1000),
-            dmEnabled: body.dmEnabled === true,
-            dmMessage: String(body.dmMessage || '').slice(0, 1000),
-            updatedAt: new Date().toISOString(),
-            updatedBy: req.session.user?.id || 'unknown'
-        };
+        const config = normalizeGreetingConfigInput(body, 'welcome', req.session.user?.id);
 
         await welcomeStore.setWelcomeConfig(guildId, config);
         await welcomeStore.setWelcomeChannelId(guildId, config.channelId);
@@ -985,6 +1012,95 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error enviando welcome test:', error);
         res.status(500).json({ error: 'Error al enviar prueba de bienvenida' });
+    }
+});
+
+app.get('/api/guild/:guildId/goodbye-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await welcomeStore.getGoodbyeConfig(guildId);
+        const fallbackChannel = await welcomeStore.getGoodbyeChannelId(guildId);
+
+        if (!config) return res.json(buildDefaultGreetingConfig('goodbye', fallbackChannel));
+
+        if (!config.channelId && fallbackChannel) config.channelId = fallbackChannel;
+        res.json(config);
+    } catch (error) {
+        console.error('Error obteniendo goodbye config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de despedida' });
+    }
+});
+
+app.post('/api/guild/:guildId/goodbye-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const body = req.body || {};
+        if (!body.channelId) return res.status(400).json({ error: 'Debes seleccionar un canal de despedida' });
+
+        const config = normalizeGreetingConfigInput(body, 'goodbye', req.session.user?.id);
+
+        await welcomeStore.setGoodbyeConfig(guildId, config);
+        await welcomeStore.setGoodbyeChannelId(guildId, config.channelId);
+
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando goodbye config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de despedida' });
+    }
+});
+
+app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await welcomeStore.getGoodbyeConfig(guildId);
+        const channelId = cfg?.channelId || await welcomeStore.getGoodbyeChannelId(guildId);
+        const channel = channelId ? guild.channels.cache.get(channelId) : null;
+        if (!channel) return res.status(404).json({ error: 'Canal de despedida no encontrado' });
+
+        const member = guild.members.cache.get(req.session.user?.id) || await guild.members.fetch(req.session.user?.id).catch(() => null);
+        if (!member) return res.status(404).json({ error: 'No pude obtener tu usuario en este servidor' });
+
+        const { EmbedBuilder } = require('discord.js');
+        const embed = new EmbedBuilder()
+            .setColor(cfg?.color || 'ff5f9e')
+            .setTitle(applyWelcomeTemplate(cfg?.title || 'Hasta pronto', member))
+            .setDescription(applyWelcomeTemplate(cfg?.message || '{username} ha salido de {server}.', member));
+
+        if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
+        const files = [];
+        if (cfg?.imageUrl) {
+            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
+            if (localImagePath) {
+                const attachmentName = path.basename(localImagePath);
+                embed.setImage(`attachment://${attachmentName}`);
+                files.push({ attachment: localImagePath, name: attachmentName });
+            } else {
+                embed.setImage(cfg.imageUrl);
+            }
+        }
+        if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
+
+        const content = cfg?.mentionUser ? `<@${member.id}>` : null;
+        await channel.send({ content, embeds: [embed], files });
+
+        res.json({ success: true, message: 'Prueba de despedida enviada' });
+    } catch (error) {
+        console.error('Error enviando goodbye test:', error);
+        res.status(500).json({ error: 'Error al enviar prueba de despedida' });
     }
 });
 

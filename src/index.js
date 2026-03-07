@@ -5,6 +5,7 @@ const config = require('./config');
 const { safeReply, isUnknownInteractionError } = require('./utils/interactions');
 const { handleReturnInteraction } = require('./utils/fun-return');
 const guildMemberAddEvent = require('./events/guildMemberAdd');
+const guildMemberRemoveEvent = require('./events/guildMemberRemove');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
 const { handleTicketButton, handleTicketModal } = require('./events/ticket-interaction');
 const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
@@ -109,6 +110,14 @@ client.on('guildMemberAdd', async (member) => {
         await guildMemberAddEvent.execute(member);
     } catch (error) {
         console.error('Error en guildMemberAdd:', error);
+    }
+});
+
+client.on('guildMemberRemove', async (member) => {
+    try {
+        await guildMemberRemoveEvent.execute(member);
+    } catch (error) {
+        console.error('Error en guildMemberRemove:', error);
     }
 });
 

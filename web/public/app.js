@@ -8,10 +8,12 @@ let uploadedImagePreviewUrl = '';
 let uploadedThumbnailFile = null;
 let uploadedThumbnailPreviewUrl = '';
 let currentWelcomeConfig = null;
+let currentGoodbyeConfig = null;
 let currentServerGuildId = '';
 let currentServerGuilds = [];
 let welcomeImageFile = null;
 let welcomeImagePreviewUrl = '';
+let currentGreetingMode = 'welcome';
 const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
@@ -54,6 +56,45 @@ function setServerFeaturesNavigationVisible(isVisible) {
 
 function hasSelectedGuildContext() {
     return serverFeaturesUnlocked && Boolean(currentServerGuildId);
+}
+
+function updateServerMenuIdentity() {
+    const guildNameEl = document.getElementById('serverMenuGuildName');
+    const guildIconEl = document.getElementById('serverMenuGuildIcon');
+    if (!guildNameEl || !guildIconEl) return;
+
+    if (!hasSelectedGuildContext()) {
+        guildNameEl.textContent = 'Sin servidor seleccionado';
+        guildIconEl.style.display = 'none';
+        guildIconEl.src = '';
+        return;
+    }
+
+    const selectedGuild = currentServerGuilds.find((g) => String(g.id) === String(currentServerGuildId));
+    if (!selectedGuild) {
+        guildNameEl.textContent = 'Servidor activo';
+        guildIconEl.style.display = 'none';
+        guildIconEl.src = '';
+        return;
+    }
+
+    guildNameEl.textContent = selectedGuild.name || 'Servidor activo';
+    if (selectedGuild.icon) {
+        guildIconEl.style.display = 'block';
+        guildIconEl.src = selectedGuild.icon;
+    } else {
+        guildIconEl.style.display = 'none';
+        guildIconEl.src = '';
+    }
+}
+
+function updateBackToServerButtonsVisibility(sectionId = '') {
+    const isVisible = hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'commandsSection'].includes(sectionId);
+    ['backToServerFromEmbed', 'backToServerFromStats', 'backToServerFromLogs', 'backToServerFromCommands'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.style.display = isVisible ? 'inline-flex' : 'none';
+    });
 }
 
 const SERVER_UI_PREFS_KEY = 'eyedbot_server_ui_prefs_v1';
@@ -122,6 +163,8 @@ function resetServerContextToDashboard() {
     currentServerGuilds = [];
     setServerFeaturesNavigationVisible(false);
     clearServerBoundSectionState();
+    updateServerMenuIdentity();
+    updateBackToServerButtonsVisibility('dashboard');
     updateDashboardButtonState();
     saveState();
 }
@@ -379,6 +422,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     serverFeaturesUnlocked = false;
     currentServerGuildId = '';
     setServerFeaturesNavigationVisible(false);
+    updateServerMenuIdentity();
     updateDashboardButtonState();
     
     await loadGuilds();
@@ -466,6 +510,15 @@ function setupEventListeners() {
         if (!sideBtn) return;
         event.preventDefault();
         handleServerSideAction(sideBtn);
+    });
+
+    ['backToServerFromEmbed', 'backToServerFromStats', 'backToServerFromLogs', 'backToServerFromCommands'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            showSection('serverSection');
+            switchServerPane('serverPaneSettings');
+        });
     });
 
     const serverTabSearch = document.getElementById('serverTabSearch');
@@ -621,6 +674,8 @@ function showSection(sectionId) {
         loadGuildsForServer();
         switchServerPane(currentServerPaneId || 'serverPaneOverview');
     }
+
+    updateBackToServerButtonsVisibility(sectionId);
     
     // Guardar sección activa
     saveState();
@@ -1484,6 +1539,7 @@ async function selectServerGuild(guildId) {
 
     currentServerGuildId = guildId;
     setServerFeaturesNavigationVisible(serverFeaturesUnlocked && hasSelectedGuildContext());
+    updateServerMenuIdentity();
     if (serverSelect) serverSelect.value = guildId;
     renderServerTabs(currentServerGuilds, guildId);
 
@@ -1563,6 +1619,7 @@ async function loadGuildsForServer() {
         if (response.ok) {
             const guilds = await response.json();
             currentServerGuilds = Array.isArray(guilds) ? guilds : [];
+            updateServerMenuIdentity();
 
             const selectedGuild = guilds.find((g) => String(g.id) === String(currentServerGuildId));
             if (!selectedGuild) {
@@ -2693,205 +2750,296 @@ function displayMembers(members, guildId) {
     });
 }
 
+function getGreetingPanelMeta(mode) {
+    if (mode === 'goodbye') {
+        return {
+            key: 'goodbye',
+            panelTitle: 'Sistema de Despedidas',
+            subtitle: 'Configura el mensaje de salida para cuando un usuario abandone el servidor.',
+            channelLabel: 'Canal de despedida',
+            toggleLabel: 'Activar despedidas',
+            saveButton: 'Guardar Despedida',
+            testButton: 'Guardar y Enviar Prueba',
+            uploadSuccess: 'Imagen de despedida subida correctamente',
+            saveSuccess: 'Configuración de despedida guardada',
+            testSuccess: 'Prueba de despedida enviada',
+            channelRequired: 'Selecciona un canal para la despedida',
+            defaultTitle: 'Hasta pronto',
+            defaultMessage: '{username} ha salido de **{server}**. Ahora somos {memberCount} miembros.',
+            defaultColor: 'ff5f9e',
+            defaultFooter: 'EyedBot Goodbye System',
+            disabledText: 'Despedidas desactivadas'
+        };
+    }
+
+    return {
+        key: 'welcome',
+        panelTitle: 'Sistema de Bienvenidas',
+        subtitle: 'Configura mensaje, imagen y comportamiento para este servidor. Usa variables: <code>{user}</code>, <code>{username}</code>, <code>{server}</code>, <code>{memberCount}</code>.',
+        channelLabel: 'Canal de bienvenida',
+        toggleLabel: 'Activar bienvenidas',
+        saveButton: 'Guardar Bienvenida',
+        testButton: 'Guardar y Enviar Prueba',
+        uploadSuccess: 'Imagen de bienvenida subida correctamente',
+        saveSuccess: 'Configuración de bienvenida guardada',
+        testSuccess: 'Prueba de bienvenida enviada',
+        channelRequired: 'Selecciona un canal para la bienvenida',
+        defaultTitle: '¡Bienvenido!',
+        defaultMessage: '¡Hola {user}! Bienvenido a {server}.',
+        defaultColor: '7c4dff',
+        defaultFooter: 'EyedBot Welcome System',
+        disabledText: 'Bienvenidas desactivadas'
+    };
+}
+
+function getCurrentGreetingConfig(mode) {
+    return mode === 'goodbye' ? currentGoodbyeConfig : currentWelcomeConfig;
+}
+
+function setCurrentGreetingConfig(mode, config) {
+    if (mode === 'goodbye') {
+        currentGoodbyeConfig = config;
+        return;
+    }
+    currentWelcomeConfig = config;
+}
+
+function saveCurrentGreetingDraft() {
+    const formExists = document.getElementById('welcomeChannelSelect');
+    if (!formExists) return;
+    setCurrentGreetingConfig(currentGreetingMode, collectWelcomeConfigFromForm());
+}
+
+function renderGreetingPanel(guildId, channels, mode) {
+    const container = document.getElementById('welcomeContainer');
+    if (!container) return;
+
+    const meta = getGreetingPanelMeta(mode);
+    const cfg = getCurrentGreetingConfig(mode) || {};
+    const subtitleHtml = mode === 'welcome' ? meta.subtitle : escapeHtml(meta.subtitle);
+
+    container.innerHTML = `
+        <h3 class="welcome-panel-title">Bienvenida y Despedida</h3>
+        <div class="greeting-tabs" role="tablist" aria-label="Pestañas de configuración">
+            <button type="button" class="greeting-tab-btn ${mode === 'welcome' ? 'active' : ''}" data-greeting-tab="welcome" role="tab" aria-selected="${mode === 'welcome' ? 'true' : 'false'}">Bienvenida</button>
+            <button type="button" class="greeting-tab-btn ${mode === 'goodbye' ? 'active' : ''}" data-greeting-tab="goodbye" role="tab" aria-selected="${mode === 'goodbye' ? 'true' : 'false'}">Despedida</button>
+        </div>
+        <p class="welcome-panel-subtitle">${subtitleHtml}</p>
+        <div class="welcome-layout">
+            <div class="welcome-editor">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="welcomeChannelSelect">${escapeHtml(meta.channelLabel)}</label>
+                        <select id="welcomeChannelSelect" class="form-control">
+                            <option value="">Selecciona un canal</option>
+                            ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeColor">Color del embed</label>
+                        <input type="color" id="welcomeColor" class="form-control color-input" value="#${(cfg.color || meta.defaultColor).replace('#', '')}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group checkbox-group">
+                        <label><input type="checkbox" id="welcomeEnabled" ${cfg.enabled !== false ? 'checked' : ''}> <span>${escapeHtml(meta.toggleLabel)}</span></label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label><input type="checkbox" id="welcomeMentionUser" ${cfg.mentionUser !== false ? 'checked' : ''}> <span>Mencionar usuario</span></label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label><input type="checkbox" id="welcomeDmEnabled" ${cfg.dmEnabled ? 'checked' : ''}> <span>Enviar DM</span></label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeTitle">Titulo</label>
+                    <input type="text" id="welcomeTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || meta.defaultTitle)}">
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeMessage">Mensaje</label>
+                    <textarea id="welcomeMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || meta.defaultMessage)}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeFooter">Footer</label>
+                    <input type="text" id="welcomeFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || meta.defaultFooter)}">
+                </div>
+
+                <div class="welcome-image-editor">
+                    <h4>Editor de Imagen</h4>
+                    <div class="form-group">
+                        <label for="welcomeImageUrl">URL de imagen principal</label>
+                        <input type="url" id="welcomeImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeImageFile">Subir imagen para editar</label>
+                        <input type="file" id="welcomeImageFile" class="form-control" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeImageScale">Escala</label>
+                        <input type="range" id="welcomeImageScale" class="form-control" min="25" max="100" step="5" value="100">
+                        <small id="welcomeImageScaleValue">100%</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="welcomeImageCropX">X (%)</label>
+                            <input type="range" id="welcomeImageCropX" class="form-control" min="0" max="80" step="1" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeImageCropY">Y (%)</label>
+                            <input type="range" id="welcomeImageCropY" class="form-control" min="0" max="80" step="1" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeImageCropW">Ancho (%)</label>
+                            <input type="range" id="welcomeImageCropW" class="form-control" min="20" max="100" step="1" value="100">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeImageCropH">Alto (%)</label>
+                            <input type="range" id="welcomeImageCropH" class="form-control" min="20" max="100" step="1" value="100">
+                        </div>
+                    </div>
+                    <div class="form-actions welcome-editor-actions">
+                        <button type="button" id="welcomeUploadImageBtn" class="btn btn-secondary">Procesar y Subir Imagen</button>
+                        <small id="welcomeImageUploadStatus"></small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="welcomeThumbnailMode">Miniatura</label>
+                        <select id="welcomeThumbnailMode" class="form-control">
+                            <option value="avatar" ${cfg.thumbnailMode === 'avatar' ? 'selected' : ''}>Avatar del usuario</option>
+                            <option value="url" ${cfg.thumbnailMode === 'url' ? 'selected' : ''}>URL personalizada</option>
+                            <option value="none" ${cfg.thumbnailMode === 'none' ? 'selected' : ''}>Sin miniatura</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeThumbnailUrl">URL miniatura</label>
+                        <input type="url" id="welcomeThumbnailUrl" class="form-control" value="${escapeHtmlForValue(cfg.thumbnailUrl || '')}" placeholder="https://...">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeDmMessage">Mensaje DM (opcional)</label>
+                    <textarea id="welcomeDmMessage" class="form-control" rows="3">${escapeHtmlForValue(cfg.dmMessage || '')}</textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="saveWelcomeBtn" class="btn btn-primary">${escapeHtml(meta.saveButton)}</button>
+                    <button type="button" id="testWelcomeBtn" class="btn btn-secondary">${escapeHtml(meta.testButton)}</button>
+                </div>
+            </div>
+
+            <div class="welcome-preview-panel">
+                <h4>Vista Previa del Embed</h4>
+                <div id="welcomePreviewCard" class="embed-preview"></div>
+            </div>
+        </div>
+    `;
+
+    const previewListeners = [
+        'welcomeChannelSelect',
+        'welcomeColor',
+        'welcomeEnabled',
+        'welcomeMentionUser',
+        'welcomeDmEnabled',
+        'welcomeTitle',
+        'welcomeMessage',
+        'welcomeFooter',
+        'welcomeImageUrl',
+        'welcomeThumbnailMode',
+        'welcomeThumbnailUrl',
+        'welcomeDmMessage',
+        'welcomeImageScale',
+        'welcomeImageCropX',
+        'welcomeImageCropY',
+        'welcomeImageCropW',
+        'welcomeImageCropH'
+    ];
+
+    previewListeners.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const eventName = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
+        el.addEventListener(eventName, () => {
+            if (id === 'welcomeImageScale') {
+                const value = Number.parseInt(el.value || '100', 10);
+                const label = document.getElementById('welcomeImageScaleValue');
+                if (label) label.textContent = `${value}%`;
+            }
+
+            if (id === 'welcomeThumbnailMode') {
+                const thumbUrlInput = document.getElementById('welcomeThumbnailUrl');
+                if (thumbUrlInput) thumbUrlInput.disabled = String(el.value || 'avatar') !== 'url';
+            }
+
+            renderWelcomeEmbedPreview(guildId);
+        });
+    });
+
+    container.querySelectorAll('[data-greeting-tab]').forEach((tabBtn) => {
+        tabBtn.addEventListener('click', () => {
+            const nextMode = tabBtn.dataset.greetingTab;
+            if (!nextMode || nextMode === currentGreetingMode) return;
+            saveCurrentGreetingDraft();
+            currentGreetingMode = nextMode;
+            renderGreetingPanel(guildId, channels, currentGreetingMode);
+        });
+    });
+
+    const thumbUrlInput = document.getElementById('welcomeThumbnailUrl');
+    const thumbMode = document.getElementById('welcomeThumbnailMode')?.value || 'avatar';
+    if (thumbUrlInput) thumbUrlInput.disabled = thumbMode !== 'url';
+
+    const imageFileInput = document.getElementById('welcomeImageFile');
+    if (imageFileInput) {
+        imageFileInput.addEventListener('change', handleWelcomeImageSelection);
+    }
+
+    const uploadBtn = document.getElementById('welcomeUploadImageBtn');
+    if (uploadBtn) {
+        uploadBtn.addEventListener('click', () => uploadWelcomeEditedImage(guildId));
+    }
+
+    const saveBtn = document.getElementById('saveWelcomeBtn');
+    const testBtn = document.getElementById('testWelcomeBtn');
+    if (saveBtn) saveBtn.addEventListener('click', () => saveWelcomeConfig(guildId));
+    if (testBtn) testBtn.addEventListener('click', () => sendWelcomeTest(guildId));
+    renderWelcomeEmbedPreview(guildId);
+}
+
 async function loadWelcomePanel(guildId) {
     const container = document.getElementById('welcomeContainer');
     if (!container) return;
 
     try {
-        const channelsResponse = await fetchWithCredentials(`/api/guild/${guildId}/channels`);
-        const configResponse = await fetchWithCredentials(`/api/guild/${guildId}/welcome-config`);
+        const [channelsResponse, welcomeResponse, goodbyeResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/channels`),
+            fetchWithCredentials(`/api/guild/${guildId}/welcome-config`),
+            fetchWithCredentials(`/api/guild/${guildId}/goodbye-config`)
+        ]);
 
-        if (!channelsResponse.ok || !configResponse.ok) {
-            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar la configuración de bienvenida.</div>';
+        if (!channelsResponse.ok || !welcomeResponse.ok || !goodbyeResponse.ok) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar la configuración de bienvenida y despedida.</div>';
             return;
         }
 
         const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
-        const cfg = await configResponse.json();
-        currentWelcomeConfig = cfg;
+        currentWelcomeConfig = await welcomeResponse.json();
+        currentGoodbyeConfig = await goodbyeResponse.json();
 
         if (welcomeImagePreviewUrl) URL.revokeObjectURL(welcomeImagePreviewUrl);
         welcomeImageFile = null;
         welcomeImagePreviewUrl = '';
 
-        container.innerHTML = `
-            <h3 class="welcome-panel-title">Sistema de Bienvenidas</h3>
-            <p class="welcome-panel-subtitle">Configura mensaje, imagen y comportamiento para este servidor. Usa variables: <code>{user}</code>, <code>{username}</code>, <code>{server}</code>, <code>{memberCount}</code>.</p>
-            <div class="welcome-layout">
-                <div class="welcome-editor">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="welcomeChannelSelect">Canal de bienvenida</label>
-                            <select id="welcomeChannelSelect" class="form-control">
-                                <option value="">Selecciona un canal</option>
-                                ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="welcomeColor">Color del embed</label>
-                            <input type="color" id="welcomeColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="welcomeEnabled" ${cfg.enabled !== false ? 'checked' : ''}> <span>Activar bienvenidas</span></label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="welcomeMentionUser" ${cfg.mentionUser !== false ? 'checked' : ''}> <span>Mencionar usuario</span></label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="welcomeDmEnabled" ${cfg.dmEnabled ? 'checked' : ''}> <span>Enviar DM</span></label>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="welcomeTitle">Titulo</label>
-                        <input type="text" id="welcomeTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || '¡Bienvenido!')}">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="welcomeMessage">Mensaje</label>
-                        <textarea id="welcomeMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '¡Hola {user}! Bienvenido a {server}.')}</textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="welcomeFooter">Footer</label>
-                        <input type="text" id="welcomeFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || '')}">
-                    </div>
-
-                    <div class="welcome-image-editor">
-                        <h4>Editor de Imagen</h4>
-                        <div class="form-group">
-                            <label for="welcomeImageUrl">URL de imagen principal</label>
-                            <input type="url" id="welcomeImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
-                        </div>
-                        <div class="form-group">
-                            <label for="welcomeImageFile">Subir imagen para editar</label>
-                            <input type="file" id="welcomeImageFile" class="form-control" accept="image/*">
-                        </div>
-                        <div class="form-group">
-                            <label for="welcomeImageScale">Escala</label>
-                            <input type="range" id="welcomeImageScale" class="form-control" min="25" max="100" step="5" value="100">
-                            <small id="welcomeImageScaleValue">100%</small>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="welcomeImageCropX">X (%)</label>
-                                <input type="range" id="welcomeImageCropX" class="form-control" min="0" max="80" step="1" value="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="welcomeImageCropY">Y (%)</label>
-                                <input type="range" id="welcomeImageCropY" class="form-control" min="0" max="80" step="1" value="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="welcomeImageCropW">Ancho (%)</label>
-                                <input type="range" id="welcomeImageCropW" class="form-control" min="20" max="100" step="1" value="100">
-                            </div>
-                            <div class="form-group">
-                                <label for="welcomeImageCropH">Alto (%)</label>
-                                <input type="range" id="welcomeImageCropH" class="form-control" min="20" max="100" step="1" value="100">
-                            </div>
-                        </div>
-                        <div class="form-actions welcome-editor-actions">
-                            <button type="button" id="welcomeUploadImageBtn" class="btn btn-secondary">Procesar y Subir Imagen</button>
-                            <small id="welcomeImageUploadStatus"></small>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="welcomeThumbnailMode">Miniatura</label>
-                            <select id="welcomeThumbnailMode" class="form-control">
-                                <option value="avatar" ${cfg.thumbnailMode === 'avatar' ? 'selected' : ''}>Avatar del usuario</option>
-                                <option value="url" ${cfg.thumbnailMode === 'url' ? 'selected' : ''}>URL personalizada</option>
-                                <option value="none" ${cfg.thumbnailMode === 'none' ? 'selected' : ''}>Sin miniatura</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="welcomeThumbnailUrl">URL miniatura</label>
-                            <input type="url" id="welcomeThumbnailUrl" class="form-control" value="${escapeHtmlForValue(cfg.thumbnailUrl || '')}" placeholder="https://...">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="welcomeDmMessage">Mensaje DM (opcional)</label>
-                        <textarea id="welcomeDmMessage" class="form-control" rows="3">${escapeHtmlForValue(cfg.dmMessage || '')}</textarea>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="button" id="saveWelcomeBtn" class="btn btn-primary">Guardar Bienvenida</button>
-                        <button type="button" id="testWelcomeBtn" class="btn btn-secondary">Guardar y Enviar Prueba</button>
-                    </div>
-                </div>
-
-                <div class="welcome-preview-panel">
-                    <h4>Vista Previa del Embed</h4>
-                    <div id="welcomePreviewCard" class="embed-preview"></div>
-                </div>
-            </div>
-        `;
-
-        const previewListeners = [
-            'welcomeChannelSelect',
-            'welcomeColor',
-            'welcomeEnabled',
-            'welcomeMentionUser',
-            'welcomeDmEnabled',
-            'welcomeTitle',
-            'welcomeMessage',
-            'welcomeFooter',
-            'welcomeImageUrl',
-            'welcomeThumbnailMode',
-            'welcomeThumbnailUrl',
-            'welcomeDmMessage',
-            'welcomeImageScale',
-            'welcomeImageCropX',
-            'welcomeImageCropY',
-            'welcomeImageCropW',
-            'welcomeImageCropH'
-        ];
-
-        previewListeners.forEach((id) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            const eventName = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
-            el.addEventListener(eventName, () => {
-                if (id === 'welcomeImageScale') {
-                    const value = Number.parseInt(el.value || '100', 10);
-                    const label = document.getElementById('welcomeImageScaleValue');
-                    if (label) label.textContent = `${value}%`;
-                }
-
-                if (id === 'welcomeThumbnailMode') {
-                    const thumbUrlInput = document.getElementById('welcomeThumbnailUrl');
-                    if (thumbUrlInput) thumbUrlInput.disabled = String(el.value || 'avatar') !== 'url';
-                }
-
-                renderWelcomeEmbedPreview(guildId);
-            });
-        });
-
-        const thumbUrlInput = document.getElementById('welcomeThumbnailUrl');
-        const thumbMode = document.getElementById('welcomeThumbnailMode')?.value || 'avatar';
-        if (thumbUrlInput) thumbUrlInput.disabled = thumbMode !== 'url';
-
-        const imageFileInput = document.getElementById('welcomeImageFile');
-        if (imageFileInput) {
-            imageFileInput.addEventListener('change', handleWelcomeImageSelection);
-        }
-
-        const uploadBtn = document.getElementById('welcomeUploadImageBtn');
-        if (uploadBtn) {
-            uploadBtn.addEventListener('click', () => uploadWelcomeEditedImage(guildId));
-        }
-
-        document.getElementById('saveWelcomeBtn').addEventListener('click', () => saveWelcomeConfig(guildId));
-        document.getElementById('testWelcomeBtn').addEventListener('click', () => sendWelcomeTest(guildId));
-        renderWelcomeEmbedPreview(guildId);
+        if (!['welcome', 'goodbye'].includes(currentGreetingMode)) currentGreetingMode = 'welcome';
+        renderGreetingPanel(guildId, channels, currentGreetingMode);
     } catch (error) {
-        console.error('Error cargando panel de bienvenida:', error);
-        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de bienvenida.</div>';
+        console.error('Error cargando panel de bienvenida/despedida:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de bienvenida y despedida.</div>';
     }
 }
 
@@ -2908,6 +3056,7 @@ function renderWelcomeEmbedPreview(guildId) {
     if (!preview) return;
 
     const guild = currentServerGuilds.find((g) => String(g.id) === String(guildId));
+    const meta = getGreetingPanelMeta(currentGreetingMode);
     const payload = collectWelcomeConfigFromForm();
 
     const sample = {
@@ -2917,7 +3066,7 @@ function renderWelcomeEmbedPreview(guildId) {
         memberCount: guild?.botGuild?.memberCount || 123
     };
 
-    const colorHex = (payload.color || '7c4dff').replace('#', '');
+    const colorHex = (payload.color || meta.defaultColor).replace('#', '');
     const color = `#${colorHex}`;
     const title = applyWelcomePreviewTemplate(payload.title, sample);
     const message = applyWelcomePreviewTemplate(payload.message, sample);
@@ -2937,7 +3086,7 @@ function renderWelcomeEmbedPreview(guildId) {
             ${message ? `<div class="discord-embed-description">${escapeHtml(message)}</div>` : ''}
             ${showThumb ? `<img src="${safeThumbSrc}" alt="thumbnail" class="discord-embed-thumbnail" style="float:right;max-width:80px;border-radius:4px;margin-left:1rem;">` : ''}
             ${image ? `<img src="${safeImageSrc}" alt="welcome image" class="discord-embed-image">` : ''}
-            ${(footer || payload.enabled === false) ? `<div class="discord-embed-footer">${escapeHtml(footer || '')}${payload.enabled === false ? ' • Desactivado' : ''}</div>` : ''}
+            ${(footer || payload.enabled === false) ? `<div class="discord-embed-footer">${escapeHtml(footer || '')}${payload.enabled === false ? ` - ${escapeHtml(meta.disabledText)}` : ''}</div>` : ''}
         </div>
     `;
 }
@@ -3014,7 +3163,7 @@ async function uploadWelcomeEditedImage(guildId) {
 
         if (imageUrlInput) imageUrlInput.value = data.url;
         if (status) status.textContent = 'Imagen subida y aplicada';
-        showToast('Imagen de bienvenida subida correctamente', 'success');
+        showToast(getGreetingPanelMeta(currentGreetingMode).uploadSuccess, 'success');
         renderWelcomeEmbedPreview(guildId);
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
@@ -3025,14 +3174,15 @@ async function uploadWelcomeEditedImage(guildId) {
 }
 
 function collectWelcomeConfigFromForm() {
+    const meta = getGreetingPanelMeta(currentGreetingMode);
     return {
         enabled: document.getElementById('welcomeEnabled')?.checked ?? true,
         channelId: document.getElementById('welcomeChannelSelect')?.value || '',
         mentionUser: document.getElementById('welcomeMentionUser')?.checked ?? true,
-        title: document.getElementById('welcomeTitle')?.value || '¡Bienvenido!',
-        message: document.getElementById('welcomeMessage')?.value || '¡Hola {user}! Bienvenido a {server}.',
-        color: (document.getElementById('welcomeColor')?.value || '#7c4dff').replace('#', ''),
-        footer: document.getElementById('welcomeFooter')?.value || '',
+        title: document.getElementById('welcomeTitle')?.value || meta.defaultTitle,
+        message: document.getElementById('welcomeMessage')?.value || meta.defaultMessage,
+        color: (document.getElementById('welcomeColor')?.value || `#${meta.defaultColor}`).replace('#', ''),
+        footer: document.getElementById('welcomeFooter')?.value || meta.defaultFooter,
         imageUrl: document.getElementById('welcomeImageUrl')?.value || '',
         thumbnailMode: document.getElementById('welcomeThumbnailMode')?.value || 'avatar',
         thumbnailUrl: document.getElementById('welcomeThumbnailUrl')?.value || '',
@@ -3042,45 +3192,47 @@ function collectWelcomeConfigFromForm() {
 }
 
 async function saveWelcomeConfig(guildId, showSuccessToast = true) {
+    const meta = getGreetingPanelMeta(currentGreetingMode);
     const payload = collectWelcomeConfigFromForm();
     if (!payload.channelId) {
-        showToast('Selecciona un canal para la bienvenida', 'warning');
+        showToast(meta.channelRequired, 'warning');
         return false;
     }
 
     try {
-        const response = await fetchWithCredentials(`/api/guild/${guildId}/welcome-config`, {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/${meta.key}-config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            showToast(data.error || 'No se pudo guardar la bienvenida', 'error');
+            showToast(data.error || `No se pudo guardar la ${meta.key === 'welcome' ? 'bienvenida' : 'despedida'}`, 'error');
             return false;
         }
 
-        if (showSuccessToast) showToast('Configuración de bienvenida guardada', 'success');
-        currentWelcomeConfig = data.config || payload;
+        if (showSuccessToast) showToast(meta.saveSuccess, 'success');
+        setCurrentGreetingConfig(currentGreetingMode, data.config || payload);
         return true;
     } catch (error) {
-        console.error('Error guardando bienvenida:', error);
-        showToast('Error guardando bienvenida', 'error');
+        console.error('Error guardando configuración de greetings:', error);
+        showToast(`Error guardando ${meta.key === 'welcome' ? 'bienvenida' : 'despedida'}`, 'error');
         return false;
     }
 }
 
 async function sendWelcomeTest(guildId) {
     try {
+        const meta = getGreetingPanelMeta(currentGreetingMode);
         const saved = await saveWelcomeConfig(guildId, false);
         if (!saved) return;
 
-        const response = await fetchWithCredentials(`/api/guild/${guildId}/welcome-test`, {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/${meta.key}-test`, {
             method: 'POST'
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) return showToast(data.error || 'No se pudo enviar la prueba', 'error');
-        showToast('Prueba de bienvenida enviada', 'success');
+        showToast(meta.testSuccess, 'success');
     } catch (error) {
         console.error('Error enviando prueba:', error);
         showToast('Error enviando prueba', 'error');
@@ -3123,6 +3275,7 @@ window.selectGuild = async function(guildId) {
     showSection('serverSection');
     await loadGuildsForServer();
     switchServerPane('serverPaneOverview');
+    updateServerMenuIdentity();
 
     saveState();
 };

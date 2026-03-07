@@ -77,6 +77,9 @@
         <section id="embedSection" class="section">
             <div class="container">
                 <div class="section-header">
+                    <button type="button" id="backToServerFromEmbed" class="btn btn-secondary back-to-server-btn" style="display:none;">
+                        <- Volver a Configuración por Servidor
+                    </button>
                     <h2 class="section-title">Enviar Embed</h2>
                     <div class="title-accent"></div>
                 </div>
@@ -314,6 +317,9 @@
         <section id="statsSection" class="section">
             <div class="container">
                 <div class="section-header">
+                    <button type="button" id="backToServerFromStats" class="btn btn-secondary back-to-server-btn" style="display:none;">
+                        <- Volver a Configuración por Servidor
+                    </button>
                     <h2 class="section-title">Estadísticas del Bot</h2>
                     <div class="title-accent"></div>
                 </div>
@@ -393,6 +399,9 @@
         <section id="logsSection" class="section">
             <div class="container">
                 <div class="section-header">
+                    <button type="button" id="backToServerFromLogs" class="btn btn-secondary back-to-server-btn" style="display:none;">
+                        <- Volver a Configuración por Servidor
+                    </button>
                     <h2 class="section-title">Logs del Bot</h2>
                     <div class="title-accent"></div>
                     <div class="logs-controls">
@@ -425,6 +434,9 @@
         <section id="commandsSection" class="section">
             <div class="container">
                 <div class="section-header">
+                    <button type="button" id="backToServerFromCommands" class="btn btn-secondary back-to-server-btn" style="display:none;">
+                        <- Volver a Configuración por Servidor
+                    </button>
                     <h2 class="section-title">Gestión de Comandos</h2>
                     <div class="title-accent"></div>
                 </div>
@@ -442,8 +454,13 @@
                 <div class="server-shell">
                     <aside class="server-side-menu" id="serverSideMenu">
                         <div class="server-side-header">
-                            <h3>Panel del Servidor</h3>
-                            <p>Pestanas independientes</p>
+                            <div class="server-side-identity">
+                                <img id="serverMenuGuildIcon" class="server-side-guild-icon" alt="Servidor" src="" style="display:none;">
+                                <div>
+                                    <h3>Panel del servidor</h3>
+                                    <div id="serverMenuGuildName" class="server-side-guild-name">Sin servidor seleccionado</div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="side-menu-search">
