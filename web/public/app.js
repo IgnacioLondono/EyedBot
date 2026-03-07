@@ -15,12 +15,40 @@ let welcomeImagePreviewUrl = '';
 const gatedNavButtonIds = ['embedBtn', 'statsBtn', 'commandsBtn', 'serverBtn'];
 let serverFeaturesUnlocked = false;
 
+const DASHBOARD_ICON = `
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+    </svg>
+`;
+
+const HOME_ICON = `
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 10.5L12 3l9 7.5"></path>
+        <path d="M5 9.5V21h14V9.5"></path>
+    </svg>
+`;
+
+function updateDashboardButtonState() {
+    const dashboardBtn = document.getElementById('dashboardBtn');
+    if (!dashboardBtn) return;
+
+    if (hasSelectedGuildContext()) {
+        dashboardBtn.innerHTML = `${HOME_ICON}<span>Volver a inicio</span>`;
+    } else {
+        dashboardBtn.innerHTML = `${DASHBOARD_ICON}<span>Dashboard</span>`;
+    }
+}
+
 function setServerFeaturesNavigationVisible(isVisible) {
     gatedNavButtonIds.forEach((id) => {
         const button = document.getElementById(id);
         if (!button) return;
         button.classList.toggle('nav-hidden', !isVisible);
     });
+    updateDashboardButtonState();
 }
 
 function hasSelectedGuildContext() {
@@ -239,6 +267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     serverFeaturesUnlocked = false;
     currentServerGuildId = '';
     setServerFeaturesNavigationVisible(false);
+    updateDashboardButtonState();
     
     await loadGuilds();
     await loadStats();
@@ -521,8 +550,23 @@ async function loadGuildsForEmbed() {
         if (response.ok) {
             const guilds = await response.json();
             const select = document.getElementById('guildSelect');
-            select.innerHTML = '<option value="">Selecciona un servidor</option>' +
-                guilds.map(guild => `<option value="${guild.id}">${guild.name}</option>`).join('');
+
+            if (!hasSelectedGuildContext()) {
+                select.disabled = true;
+                select.innerHTML = '<option value="">Selecciona un servidor en el Dashboard</option>';
+                return;
+            }
+
+            const selectedGuild = guilds.find((g) => String(g.id) === String(currentServerGuildId));
+            if (!selectedGuild) {
+                select.disabled = true;
+                select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+                return;
+            }
+
+            select.disabled = true;
+            select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
+            select.value = selectedGuild.id;
         }
     } catch (error) {
         console.error('Error cargando servidores:', error);
@@ -1249,7 +1293,6 @@ function displayCommands(commands) {
 }
 
 // Cargar servidores para sección de servidor
-let serverSelectListenerSetup = false;
 
 function renderServerTabs(guilds, selectedGuildId = '') {
     const tabsContainer = document.getElementById('serverTabs');
@@ -1263,25 +1306,19 @@ function renderServerTabs(guilds, selectedGuildId = '') {
     tabsContainer.innerHTML = guilds.map((guild) => {
         const isActive = String(guild.id) === String(selectedGuildId);
         return `
-            <button type="button" class="server-tab-btn ${isActive ? 'active' : ''}" data-guild-id="${guild.id}">
+            <button type="button" class="server-tab-btn ${isActive ? 'active' : ''}" data-guild-id="${guild.id}" disabled>
                 ${guild.icon ? `<img class="server-tab-icon" src="${guild.icon}" alt="${escapeHtml(guild.name)}">` : '<div class="server-tab-icon server-tab-icon-placeholder">#</div>'}
                 <span class="server-tab-name">${escapeHtml(guild.name)}</span>
             </button>
         `;
     }).join('');
-
-    tabsContainer.querySelectorAll('.server-tab-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const guildId = btn.dataset.guildId || '';
-            if (guildId) selectServerGuild(guildId);
-        });
-    });
 }
 
 async function selectServerGuild(guildId) {
     const serverInfoContainer = document.getElementById('serverInfoContainer');
     const moderationContainer = document.getElementById('moderationContainer');
     const welcomeContainer = document.getElementById('welcomeContainer');
+    const verifyContainer = document.getElementById('verifyContainer');
     const serverSelect = document.getElementById('serverSelect');
 
     if (!guildId) {
@@ -1292,6 +1329,7 @@ async function selectServerGuild(guildId) {
         if (serverInfoContainer) serverInfoContainer.innerHTML = '';
         if (moderationContainer) moderationContainer.innerHTML = '';
         if (welcomeContainer) welcomeContainer.innerHTML = '';
+        if (verifyContainer) verifyContainer.innerHTML = '';
         saveState();
         return;
     }
@@ -1308,10 +1346,14 @@ async function selectServerGuild(guildId) {
     if (welcomeContainer) {
         welcomeContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de bienvenida...</p></div>';
     }
+    if (verifyContainer) {
+        verifyContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de verificación...</p></div>';
+    }
 
     await loadServerInfo(guildId);
     await loadServerMembers(guildId);
     await loadWelcomePanel(guildId);
+    await loadVerifyPanel(guildId);
     saveState();
 }
 
@@ -1322,39 +1364,40 @@ async function loadGuildsForServer() {
         const serverInfoContainer = document.getElementById('serverInfoContainer');
         const moderationContainer = document.getElementById('moderationContainer');
         const welcomeContainer = document.getElementById('welcomeContainer');
+        const verifyContainer = document.getElementById('verifyContainer');
         
         // Limpiar contenedores
         serverInfoContainer.innerHTML = '';
         moderationContainer.innerHTML = '';
         if (welcomeContainer) welcomeContainer.innerHTML = '';
+        if (verifyContainer) verifyContainer.innerHTML = '';
         if (tabsContainer) tabsContainer.innerHTML = '';
         
+        if (!hasSelectedGuildContext()) {
+            if (select) {
+                select.disabled = true;
+                select.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
+            }
+            return;
+        }
+
         const response = await fetchWithCredentials('/api/guilds');
         if (response.ok) {
             const guilds = await response.json();
             currentServerGuilds = Array.isArray(guilds) ? guilds : [];
-            if (guilds && guilds.length > 0) {
-                select.innerHTML = '<option value="">Selecciona un servidor</option>' +
-                    guilds.map(guild => `<option value="${guild.id}">${escapeHtml(guild.name)}</option>`).join('');
-            } else {
-                select.innerHTML = '<option value="">No hay servidores disponibles</option>';
+
+            const selectedGuild = guilds.find((g) => String(g.id) === String(currentServerGuildId));
+            if (!selectedGuild) {
+                select.disabled = true;
+                select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+                return;
             }
 
-            const selectedFromState = select.value || currentServerGuildId;
-            const validSelected = guilds.find((g) => String(g.id) === String(selectedFromState));
-            renderServerTabs(guilds, validSelected?.id || '');
-            
-            // Event listener (solo una vez)
-            if (!serverSelectListenerSetup) {
-                serverSelectListenerSetup = true;
-                select.addEventListener('change', async (e) => {
-                    await selectServerGuild(e.target.value || '');
-                });
-            }
-
-            if (validSelected?.id) {
-                await selectServerGuild(validSelected.id);
-            }
+            select.disabled = true;
+            select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
+            select.value = selectedGuild.id;
+            renderServerTabs([selectedGuild], selectedGuild.id);
+            await selectServerGuild(selectedGuild.id);
         } else {
             const error = await response.json().catch(() => ({ error: 'Error al cargar servidores' }));
             select.innerHTML = '<option value="">Error al cargar servidores</option>';
@@ -1363,6 +1406,251 @@ async function loadGuildsForServer() {
     } catch (error) {
         console.error('Error cargando servidores:', error);
         showToast('Error al cargar servidores', 'error');
+    }
+}
+
+function collectVerifyConfigFromForm() {
+    return {
+        enabled: document.getElementById('verifyEnabled')?.checked ?? true,
+        channelId: document.getElementById('verifyChannelSelect')?.value || '',
+        roleId: document.getElementById('verifyRoleSelect')?.value || '',
+        emoji: document.getElementById('verifyEmoji')?.value?.trim() || '✅',
+        title: document.getElementById('verifyTitle')?.value || 'Verify',
+        message: document.getElementById('verifyMessage')?.value || '¡Reacciona a este mensaje para ver los demás canales!',
+        color: (document.getElementById('verifyColor')?.value || '#7c4dff').replace('#', ''),
+        footer: document.getElementById('verifyFooter')?.value || '',
+        imageUrl: document.getElementById('verifyImageUrl')?.value || '',
+        removeRoleOnUnreact: document.getElementById('verifyRemoveOnUnreact')?.checked ?? false,
+        messageId: document.getElementById('verifyMessageId')?.value || ''
+    };
+}
+
+async function saveVerifyConfig(guildId, showSuccessToast = true) {
+    const payload = collectVerifyConfigFromForm();
+    if (!payload.channelId || !payload.roleId) {
+        showToast('Selecciona canal y rol de verificación', 'warning');
+        return false;
+    }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/verify-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo guardar verificación', 'error');
+            return false;
+        }
+
+        if (showSuccessToast) showToast('Configuración de verificación guardada', 'success');
+        if (document.getElementById('verifyMessageId')) {
+            document.getElementById('verifyMessageId').value = data.config?.messageId || payload.messageId || '';
+        }
+        return true;
+    } catch (error) {
+        console.error('Error guardando verify config:', error);
+        showToast('Error guardando verificación', 'error');
+        return false;
+    }
+}
+
+async function publishVerifyEmbed(guildId) {
+    const saved = await saveVerifyConfig(guildId, false);
+    if (!saved) return;
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/verify-publish`, {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo publicar verify embed', 'error');
+            return;
+        }
+
+        if (document.getElementById('verifyMessageId')) {
+            document.getElementById('verifyMessageId').value = data.messageId || '';
+        }
+        if (document.getElementById('verifyEnabled')) {
+            document.getElementById('verifyEnabled').checked = true;
+        }
+
+        showToast('Embed de verificación publicado', 'success');
+    } catch (error) {
+        console.error('Error publicando verify embed:', error);
+        showToast('Error publicando verify embed', 'error');
+    }
+}
+
+async function uploadVerifyImage(guildId) {
+    const fileInput = document.getElementById('verifyImageFile');
+    const imageUrlInput = document.getElementById('verifyImageUrl');
+    const status = document.getElementById('verifyImageUploadStatus');
+    const file = fileInput?.files?.[0] || null;
+
+    if (!file) {
+        showToast('Selecciona una imagen primero', 'warning');
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        showToast('Solo puedes subir archivos de imagen', 'warning');
+        return;
+    }
+
+    if (status) status.textContent = 'Subiendo imagen...';
+
+    try {
+        const formData = new FormData();
+        formData.append('imageFile', file, `verify_${Date.now()}_${file.name}`);
+
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/verify-image`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.url) {
+            showToast(data.error || 'No se pudo subir la imagen de verify', 'error');
+            if (status) status.textContent = '';
+            return;
+        }
+
+        if (imageUrlInput) imageUrlInput.value = data.url;
+        if (status) status.textContent = 'Imagen subida';
+        showToast('Imagen de verify subida correctamente', 'success');
+    } catch (error) {
+        console.error('Error subiendo imagen verify:', error);
+        showToast('Error subiendo imagen verify', 'error');
+        if (status) status.textContent = '';
+    }
+}
+
+async function loadVerifyPanel(guildId) {
+    const container = document.getElementById('verifyContainer');
+    if (!container) return;
+
+    try {
+        const [infoResponse, channelsResponse, configResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/info`),
+            fetchWithCredentials(`/api/guild/${guildId}/channels`),
+            fetchWithCredentials(`/api/guild/${guildId}/verify-config`)
+        ]);
+
+        if (!infoResponse.ok || !channelsResponse.ok || !configResponse.ok) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar el sistema de verificación.</div>';
+            return;
+        }
+
+        const info = await infoResponse.json();
+        const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
+        const cfg = await configResponse.json();
+
+        const roles = (Array.isArray(info?.roles) ? info.roles : [])
+            .filter((role) => role && role.id && role.name && role.name !== '@everyone')
+            .sort((a, b) => (b.position || 0) - (a.position || 0));
+
+        container.innerHTML = `
+            <h3 class="welcome-panel-title">Sistema de Verificación</h3>
+            <p class="welcome-panel-subtitle">Publica un embed con reacción para asignar automáticamente el rol de verificado.</p>
+            <div class="welcome-layout">
+                <div class="welcome-editor">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="verifyChannelSelect">Canal de verificación</label>
+                            <select id="verifyChannelSelect" class="form-control">
+                                <option value="">Selecciona un canal</option>
+                                ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="verifyRoleSelect">Rol de verificado</label>
+                            <select id="verifyRoleSelect" class="form-control">
+                                <option value="">Selecciona un rol</option>
+                                ${roles.map((r) => `<option value="${r.id}" ${cfg.roleId === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="verifyEnabled" ${cfg.enabled ? 'checked' : ''}> <span>Activar sistema de verificación</span></label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="verifyRemoveOnUnreact" ${cfg.removeRoleOnUnreact ? 'checked' : ''}> <span>Quitar rol al quitar reacción</span></label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="verifyEmoji">Emoji de reacción</label>
+                            <input type="text" id="verifyEmoji" class="form-control" value="${escapeHtmlForValue(cfg.emoji || '✅')}" placeholder="✅ o <:emoji:id>">
+                        </div>
+                        <div class="form-group">
+                            <label for="verifyColor">Color del embed</label>
+                            <input type="color" id="verifyColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="verifyTitle">Título</label>
+                        <input type="text" id="verifyTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Verify')}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="verifyMessage">Mensaje</label>
+                        <textarea id="verifyMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '¡Reacciona a este mensaje para ver los demás canales!')}</textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="verifyFooter">Footer</label>
+                            <input type="text" id="verifyFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label for="verifyImageUrl">URL imagen (opcional)</label>
+                            <input type="url" id="verifyImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
+                            <input type="file" id="verifyImageFile" class="form-control" accept="image/*" style="margin-top:0.5rem;">
+                            <div class="form-actions" style="margin-top:0.5rem;">
+                                <button type="button" id="verifyUploadImageBtn" class="btn btn-secondary">Subir Imagen</button>
+                                <small id="verifyImageUploadStatus"></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="verifyMessageId">Message ID publicado</label>
+                        <input type="text" id="verifyMessageId" class="form-control" value="${escapeHtmlForValue(cfg.messageId || '')}" readonly>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="saveVerifyBtn" class="btn btn-secondary">Guardar Configuración</button>
+                        <button type="button" id="publishVerifyBtn" class="btn btn-primary">Publicar Verify Embed</button>
+                    </div>
+                </div>
+
+                <div class="welcome-preview-panel">
+                    <h4>Resumen</h4>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal: <strong>${cfg.channelId ? escapeHtml(channels.find((c) => c.id === cfg.channelId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Rol: <strong>${cfg.roleId ? escapeHtml(roles.find((r) => r.id === cfg.roleId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Emoji: <strong>${escapeHtml(cfg.emoji || '✅')}</strong></p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Estado: <strong>${cfg.enabled ? 'Activo' : 'Inactivo'}</strong></p>
+                    ${cfg.messageId ? `<p style="color: var(--text-secondary);">Message ID: <code>${escapeHtml(cfg.messageId)}</code></p>` : '<p style="color: var(--text-secondary);">Aún no publicado.</p>'}
+                </div>
+            </div>
+        `;
+
+        const saveBtn = document.getElementById('saveVerifyBtn');
+        const publishBtn = document.getElementById('publishVerifyBtn');
+        const uploadBtn = document.getElementById('verifyUploadImageBtn');
+        if (saveBtn) saveBtn.addEventListener('click', () => saveVerifyConfig(guildId, true));
+        if (publishBtn) publishBtn.addEventListener('click', () => publishVerifyEmbed(guildId));
+        if (uploadBtn) uploadBtn.addEventListener('click', () => uploadVerifyImage(guildId));
+    } catch (error) {
+        console.error('Error cargando panel de verificación:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de verificación.</div>';
     }
 }
 
@@ -1930,10 +2218,12 @@ window.selectGuild = function(guildId) {
     serverFeaturesUnlocked = true;
     currentServerGuildId = guildId;
     setServerFeaturesNavigationVisible(true);
+    updateDashboardButtonState();
 
     showSection('embedSection');
     const guildSelect = document.getElementById('guildSelect');
     if (guildSelect) {
+        guildSelect.disabled = true;
         guildSelect.value = guildId;
         handleGuildSelect();
     }

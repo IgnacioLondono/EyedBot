@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const { Player } = require('discord-player');
@@ -8,6 +8,9 @@ const config = require('./config');
 const { safeReply, isUnknownInteractionError } = require('./utils/interactions');
 const { handleReturnInteraction } = require('./utils/fun-return');
 const guildMemberAddEvent = require('./events/guildMemberAdd');
+const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
+const db = require('./utils/database');
+const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 require('dotenv').config();
 
 let webPanel = null;
@@ -29,9 +32,11 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates
-    ]
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
 // Initialize player and attach to client
@@ -78,6 +83,8 @@ client.once('clientReady', () => {
         webPanel.setBotClient(client);
         console.log('🔗 Panel web conectado al cliente del bot.');
     }
+
+    startBackupScheduler();
 });
 
 client.on('guildMemberAdd', async (member) => {
@@ -85,6 +92,22 @@ client.on('guildMemberAdd', async (member) => {
         await guildMemberAddEvent.execute(member);
     } catch (error) {
         console.error('Error en guildMemberAdd:', error);
+    }
+});
+
+client.on('messageReactionAdd', async (reaction, user) => {
+    try {
+        await handleReactionAdd(reaction, user);
+    } catch (error) {
+        console.error('Error en messageReactionAdd (verify):', error);
+    }
+});
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    try {
+        await handleReactionRemove(reaction, user);
+    } catch (error) {
+        console.error('Error en messageReactionRemove (verify):', error);
     }
 });
 
@@ -189,8 +212,25 @@ async function main() {
         console.error('❌ Error registrando comandos:', error);
     }
 
+    await db.init().catch(() => false);
     await client.player.extractors.loadMulti(DefaultExtractors);
     client.login(TOKEN);
 }
+
+async function gracefulShutdown(signal) {
+    console.log(`⚠️ Señal recibida: ${signal}. Cerrando bot...`);
+    try {
+        stopBackupScheduler();
+        await db.close().catch(() => null);
+        await client.destroy();
+    } catch {
+        // ignore shutdown errors
+    } finally {
+        process.exit(0);
+    }
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 main();

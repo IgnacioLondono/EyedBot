@@ -1,5 +1,7 @@
 const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
+const fs = require('fs');
+const path = require('path');
 
 function applyTemplate(text, member) {
     return String(text || '')
@@ -7,6 +9,28 @@ function applyTemplate(text, member) {
         .replace(/\{username\}/gi, member.user.username)
         .replace(/\{server\}/gi, member.guild.name)
         .replace(/\{memberCount\}/gi, String(member.guild.memberCount));
+}
+
+function resolveLocalUploadFile(rawUrl = '') {
+    const raw = String(rawUrl || '').trim();
+    if (!raw) return null;
+
+    let uploadPath = '';
+    if (raw.startsWith('/uploads/')) {
+        uploadPath = raw;
+    } else {
+        try {
+            const parsed = new URL(raw);
+            if (String(parsed.pathname || '').startsWith('/uploads/')) uploadPath = parsed.pathname;
+        } catch {
+            uploadPath = '';
+        }
+    }
+
+    if (!uploadPath) return null;
+    const absolute = path.join(__dirname, '..', '..', 'web', 'public', uploadPath.replace(/^\/+/, ''));
+    if (!fs.existsSync(absolute)) return null;
+    return absolute;
 }
 
 module.exports = {
@@ -32,7 +56,17 @@ module.exports = {
                 .setDescription(applyTemplate(welcomeConfig.message || '¡Hola {user}!', member));
 
             if (welcomeConfig.footer) embed.setFooter({ text: applyTemplate(welcomeConfig.footer, member) });
-            if (welcomeConfig.imageUrl) embed.setImage(welcomeConfig.imageUrl);
+            const files = [];
+            if (welcomeConfig.imageUrl) {
+                const localImagePath = resolveLocalUploadFile(welcomeConfig.imageUrl);
+                if (localImagePath) {
+                    const attachmentName = path.basename(localImagePath);
+                    embed.setImage(`attachment://${attachmentName}`);
+                    files.push({ attachment: localImagePath, name: attachmentName });
+                } else {
+                    embed.setImage(welcomeConfig.imageUrl);
+                }
+            }
 
             if (welcomeConfig.thumbnailMode === 'avatar') {
                 embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
@@ -41,7 +75,7 @@ module.exports = {
             }
 
             const content = welcomeConfig.mentionUser === false ? null : `${member}`;
-            await channel.send({ content, embeds: [embed] }).catch(() => null);
+            await channel.send({ content, embeds: [embed], files }).catch(() => null);
 
             if (welcomeConfig.dmEnabled && welcomeConfig.dmMessage) {
                 await member.send({ content: applyTemplate(welcomeConfig.dmMessage, member) }).catch(() => null);

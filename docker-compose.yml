@@ -59,6 +59,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./backups:/app/backups
     ports:
       - "3000:3000"
     depends_on:
