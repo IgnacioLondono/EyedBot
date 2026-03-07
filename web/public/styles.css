@@ -30,6 +30,14 @@
     --shadow-card: 0 10px 26px rgba(5, 2, 12, 0.52);
     --glow-blue: 0 0 20px rgba(154, 109, 255, 0.32);
     --glow-gold: 0 0 20px rgba(255, 120, 209, 0.35);
+
+    /* Backward-compatible aliases used in older UI rules */
+    --saber-blue: var(--iris-500);
+    --saber-blue-light: var(--iris-300);
+    --saber-blue-dark: var(--iris-800);
+    --saber-gold: var(--fuchsia);
+    --fate-red: var(--iris-400);
+    --fate-gold: var(--lavender);
 }
 
 * {
@@ -256,6 +264,10 @@ body {
     background: linear-gradient(90deg, var(--saber-blue), var(--saber-gold));
     border-radius: 2px;
     box-shadow: var(--glow-gold);
+}
+
+.nav-link.nav-hidden {
+    display: none;
 }
 
 .user-menu {
@@ -1133,6 +1145,132 @@ body {
     font-weight: 600;
 }
 
+.server-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.server-tabs-empty {
+    color: var(--text-muted);
+    padding: 0.75rem 0;
+}
+
+.server-tab-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.45rem 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    max-width: 280px;
+}
+
+.server-tab-btn:hover {
+    border-color: var(--iris-400);
+    transform: translateY(-1px);
+}
+
+.server-tab-btn.active {
+    background: rgba(154, 109, 255, 0.16);
+    border-color: var(--iris-300);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-blue);
+}
+
+.server-tab-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.server-tab-icon-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.server-tab-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.welcome-panel-title {
+    margin-bottom: 0.35rem;
+    color: var(--text-primary);
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.welcome-panel-subtitle {
+    margin-bottom: 1.25rem;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.welcome-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+    gap: 1.5rem;
+}
+
+.welcome-editor {
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 1rem;
+}
+
+.welcome-image-editor {
+    margin-top: 0.75rem;
+    padding: 0.95rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: rgba(124, 77, 255, 0.06);
+}
+
+.welcome-image-editor h4 {
+    margin-bottom: 0.85rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.welcome-editor-actions {
+    align-items: center;
+}
+
+#welcomeImageUploadStatus {
+    color: var(--text-secondary);
+}
+
+.welcome-preview-panel {
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 1rem;
+    height: fit-content;
+    position: sticky;
+    top: 84px;
+}
+
+.welcome-preview-panel h4 {
+    margin-bottom: 0.85rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
 /* Moderation */
 .moderation-container {
     background: var(--bg-card);
@@ -1397,6 +1535,14 @@ body {
 @media (max-width: 768px) {
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .welcome-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .welcome-preview-panel {
+        position: static;
     }
 
     .nav-links {
