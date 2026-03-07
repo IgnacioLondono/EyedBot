@@ -134,6 +134,32 @@ function writeTemplateStore(data) {
     fs.writeFileSync(templatesFilePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
+function ensureWelcomeUploadsDir() {
+    const uploadsDir = path.join(__dirname, 'public', 'uploads', 'welcome');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    return uploadsDir;
+}
+
+function sanitizeUploadName(name = 'welcome-image') {
+    return String(name)
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^[-_.]+|[-_.]+$/g, '')
+        .slice(0, 60) || 'welcome-image';
+}
+
+function extFromMimeOrName(mimeType = '', originalName = '') {
+    const mime = String(mimeType).toLowerCase();
+    if (mime === 'image/png') return '.png';
+    if (mime === 'image/webp') return '.webp';
+    if (mime === 'image/gif') return '.gif';
+    if (mime === 'image/jpeg' || mime === 'image/jpg') return '.jpg';
+
+    const fromName = path.extname(String(originalName).toLowerCase());
+    return ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(fromName) ? (fromName === '.jpeg' ? '.jpg' : fromName) : '.jpg';
+}
+
 // Función para inyectar el cliente del bot
 function setBotClient(client) {
     botClient = client;
@@ -400,6 +426,35 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error obteniendo welcome config:', error);
         res.status(500).json({ error: 'Error al obtener configuración de bienvenida' });
+    }
+});
+
+app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageFile'), async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const file = req.file;
+        if (!file?.buffer) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+        if (!String(file.mimetype || '').startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
+
+        const uploadsDir = ensureWelcomeUploadsDir();
+        const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `welcome-${guildId}`);
+        const extension = extFromMimeOrName(file.mimetype, file.originalname);
+        const fileName = `${guildId}_${Date.now()}_${baseName}${extension}`;
+        const outputPath = path.join(uploadsDir, fileName);
+
+        fs.writeFileSync(outputPath, file.buffer);
+
+        const publicPath = `/uploads/welcome/${fileName}`;
+        const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
+        res.json({ success: true, url: publicUrl, path: publicPath });
+    } catch (error) {
+        console.error('Error subiendo imagen de bienvenida:', error);
+        res.status(500).json({ error: 'Error al subir imagen de bienvenida' });
     }
 });
 
