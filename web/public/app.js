@@ -55,6 +55,48 @@ function hasSelectedGuildContext() {
     return serverFeaturesUnlocked && Boolean(currentServerGuildId);
 }
 
+function clearServerBoundSectionState() {
+    const channelSelect = document.getElementById('channelSelect');
+    if (channelSelect) {
+        channelSelect.disabled = true;
+        channelSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
+    }
+
+    const guildSelect = document.getElementById('guildSelect');
+    if (guildSelect) {
+        guildSelect.disabled = true;
+        guildSelect.innerHTML = '<option value="">Selecciona un servidor en el Dashboard</option>';
+    }
+
+    const templateSelect = document.getElementById('templateSelect');
+    if (templateSelect) {
+        templateSelect.disabled = true;
+        templateSelect.innerHTML = '<option value="">Selecciona un servidor para cargar plantillas</option>';
+    }
+
+    const serverSelect = document.getElementById('serverSelect');
+    if (serverSelect) {
+        serverSelect.disabled = true;
+        serverSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
+    }
+
+    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer'];
+    containerIds.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+}
+
+function resetServerContextToDashboard() {
+    serverFeaturesUnlocked = false;
+    currentServerGuildId = '';
+    currentServerGuilds = [];
+    setServerFeaturesNavigationVisible(false);
+    clearServerBoundSectionState();
+    updateDashboardButtonState();
+    saveState();
+}
+
 // Función auxiliar para fetch con credenciales
 async function fetchWithCredentials(url, options = {}) {
     return fetch(url, {
@@ -340,7 +382,13 @@ function updateUserUI() {
 // Configurar event listeners
 function setupEventListeners() {
     // Navegación
-    document.getElementById('dashboardBtn').addEventListener('click', () => showSection('dashboard'));
+    document.getElementById('dashboardBtn').addEventListener('click', async () => {
+        if (hasSelectedGuildContext()) {
+            resetServerContextToDashboard();
+        }
+        showSection('dashboard');
+        await loadGuilds();
+    });
     document.getElementById('embedBtn').addEventListener('click', () => showSection('embedSection'));
     document.getElementById('statsBtn').addEventListener('click', () => {
         showSection('statsSection');
@@ -550,10 +598,15 @@ async function loadGuildsForEmbed() {
         if (response.ok) {
             const guilds = await response.json();
             const select = document.getElementById('guildSelect');
+            const channelSelect = document.getElementById('channelSelect');
 
             if (!hasSelectedGuildContext()) {
                 select.disabled = true;
                 select.innerHTML = '<option value="">Selecciona un servidor en el Dashboard</option>';
+                if (channelSelect) {
+                    channelSelect.disabled = true;
+                    channelSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
+                }
                 return;
             }
 
@@ -561,12 +614,17 @@ async function loadGuildsForEmbed() {
             if (!selectedGuild) {
                 select.disabled = true;
                 select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+                if (channelSelect) {
+                    channelSelect.disabled = true;
+                    channelSelect.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+                }
                 return;
             }
 
             select.disabled = true;
             select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
             select.value = selectedGuild.id;
+            await handleGuildSelect();
         }
     } catch (error) {
         console.error('Error cargando servidores:', error);
@@ -1319,6 +1377,7 @@ async function selectServerGuild(guildId) {
     const moderationContainer = document.getElementById('moderationContainer');
     const welcomeContainer = document.getElementById('welcomeContainer');
     const verifyContainer = document.getElementById('verifyContainer');
+    const ticketContainer = document.getElementById('ticketContainer');
     const serverSelect = document.getElementById('serverSelect');
 
     if (!guildId) {
@@ -1330,6 +1389,7 @@ async function selectServerGuild(guildId) {
         if (moderationContainer) moderationContainer.innerHTML = '';
         if (welcomeContainer) welcomeContainer.innerHTML = '';
         if (verifyContainer) verifyContainer.innerHTML = '';
+        if (ticketContainer) ticketContainer.innerHTML = '';
         saveState();
         return;
     }
@@ -1349,11 +1409,15 @@ async function selectServerGuild(guildId) {
     if (verifyContainer) {
         verifyContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de verificación...</p></div>';
     }
+    if (ticketContainer) {
+        ticketContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de tickets...</p></div>';
+    }
 
     await loadServerInfo(guildId);
     await loadServerMembers(guildId);
     await loadWelcomePanel(guildId);
     await loadVerifyPanel(guildId);
+    await loadTicketPanel(guildId);
     saveState();
 }
 
@@ -1365,12 +1429,14 @@ async function loadGuildsForServer() {
         const moderationContainer = document.getElementById('moderationContainer');
         const welcomeContainer = document.getElementById('welcomeContainer');
         const verifyContainer = document.getElementById('verifyContainer');
+        const ticketContainer = document.getElementById('ticketContainer');
         
         // Limpiar contenedores
         serverInfoContainer.innerHTML = '';
         moderationContainer.innerHTML = '';
         if (welcomeContainer) welcomeContainer.innerHTML = '';
         if (verifyContainer) verifyContainer.innerHTML = '';
+        if (ticketContainer) ticketContainer.innerHTML = '';
         if (tabsContainer) tabsContainer.innerHTML = '';
         
         if (!hasSelectedGuildContext()) {
@@ -1651,6 +1717,198 @@ async function loadVerifyPanel(guildId) {
     } catch (error) {
         console.error('Error cargando panel de verificación:', error);
         container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de verificación.</div>';
+    }
+}
+
+function collectTicketConfigFromForm() {
+    const adminRoleSelect = document.getElementById('ticketAdminRoles');
+    const adminRoleIds = adminRoleSelect
+        ? Array.from(adminRoleSelect.selectedOptions || []).map((opt) => opt.value).filter(Boolean)
+        : [];
+
+    return {
+        enabled: document.getElementById('ticketEnabled')?.checked ?? true,
+        panelChannelId: document.getElementById('ticketChannelSelect')?.value || '',
+        adminRoleIds,
+        title: document.getElementById('ticketTitle')?.value || 'Soporte',
+        message: document.getElementById('ticketMessage')?.value || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.',
+        color: (document.getElementById('ticketColor')?.value || '#7c4dff').replace('#', ''),
+        footer: document.getElementById('ticketFooter')?.value || '',
+        buttonLabel: document.getElementById('ticketButtonLabel')?.value || 'Solicitar ticket',
+        messageId: document.getElementById('ticketMessageId')?.value || ''
+    };
+}
+
+async function saveTicketConfig(guildId, showSuccessToast = true) {
+    const payload = collectTicketConfigFromForm();
+    if (!payload.panelChannelId) {
+        showToast('Selecciona el canal donde se publicara el panel de tickets', 'warning');
+        return false;
+    }
+    if (!payload.adminRoleIds.length) {
+        showToast('Selecciona al menos un rol administrador para ver tickets', 'warning');
+        return false;
+    }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/ticket-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo guardar el sistema de tickets', 'error');
+            return false;
+        }
+
+        if (document.getElementById('ticketMessageId')) {
+            document.getElementById('ticketMessageId').value = data.config?.messageId || payload.messageId || '';
+        }
+        if (showSuccessToast) showToast('Configuracion de tickets guardada', 'success');
+        return true;
+    } catch (error) {
+        console.error('Error guardando ticket config:', error);
+        showToast('Error guardando configuracion de tickets', 'error');
+        return false;
+    }
+}
+
+async function publishTicketPanel(guildId) {
+    const saved = await saveTicketConfig(guildId, false);
+    if (!saved) return;
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/ticket-publish`, {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo publicar el panel de tickets', 'error');
+            return;
+        }
+
+        if (document.getElementById('ticketMessageId')) {
+            document.getElementById('ticketMessageId').value = data.messageId || '';
+        }
+        if (document.getElementById('ticketEnabled')) {
+            document.getElementById('ticketEnabled').checked = true;
+        }
+        showToast('Panel de tickets publicado', 'success');
+    } catch (error) {
+        console.error('Error publicando panel de tickets:', error);
+        showToast('Error publicando panel de tickets', 'error');
+    }
+}
+
+async function loadTicketPanel(guildId) {
+    const container = document.getElementById('ticketContainer');
+    if (!container) return;
+
+    try {
+        const [channelsResponse, infoResponse, configResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/channels`),
+            fetchWithCredentials(`/api/guild/${guildId}/info`),
+            fetchWithCredentials(`/api/guild/${guildId}/ticket-config`)
+        ]);
+
+        if (!channelsResponse.ok || !infoResponse.ok || !configResponse.ok) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar el sistema de tickets.</div>';
+            return;
+        }
+
+        const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
+        const info = await infoResponse.json();
+        const cfg = await configResponse.json();
+        const selectedRoleIds = new Set(Array.isArray(cfg.adminRoleIds) ? cfg.adminRoleIds.map(String) : []);
+
+        const roles = (Array.isArray(info?.roles) ? info.roles : [])
+            .filter((role) => role && role.id && role.name && role.name !== '@everyone')
+            .sort((a, b) => (b.position || 0) - (a.position || 0));
+
+        container.innerHTML = `
+            <h3 class="welcome-panel-title">Sistema de Tickets</h3>
+            <p class="welcome-panel-subtitle">Publica un embed interactivo con el boton <code>Solicitar ticket</code>; al pulsarlo, se pedira el motivo y se abrira un canal privado visible para los roles administradores seleccionados.</p>
+            <div class="welcome-layout">
+                <div class="welcome-editor">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="ticketChannelSelect">Canal para publicar panel</label>
+                            <select id="ticketChannelSelect" class="form-control">
+                                <option value="">Selecciona un canal</option>
+                                ${channels.map((c) => `<option value="${c.id}" ${cfg.panelChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ticketColor">Color del embed</label>
+                            <input type="color" id="ticketColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="ticketEnabled" ${cfg.enabled ? 'checked' : ''}> <span>Activar sistema de tickets</span></label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ticketAdminRoles">Roles administradores que pueden ver tickets</label>
+                        <select id="ticketAdminRoles" class="form-control" multiple size="7">
+                            ${roles.map((r) => `<option value="${r.id}" ${selectedRoleIds.has(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                        </select>
+                        <small style="color: var(--text-muted);">Mantén <code>Ctrl</code> (o <code>Cmd</code>) para seleccionar varios roles.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ticketTitle">Titulo</label>
+                        <input type="text" id="ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ticketMessage">Mensaje</label>
+                        <textarea id="ticketMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.')}</textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticketButtonLabel">Texto del boton</label>
+                            <input type="text" id="ticketButtonLabel" class="form-control" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}" maxlength="80">
+                        </div>
+                        <div class="form-group">
+                            <label for="ticketFooter">Footer</label>
+                            <input type="text" id="ticketFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || 'Sistema de Tickets')}">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ticketMessageId">Message ID publicado</label>
+                        <input type="text" id="ticketMessageId" class="form-control" value="${escapeHtmlForValue(cfg.messageId || '')}" readonly>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="saveTicketBtn" class="btn btn-secondary">Guardar Configuracion</button>
+                        <button type="button" id="publishTicketBtn" class="btn btn-primary">Publicar Panel de Tickets</button>
+                    </div>
+                </div>
+
+                <div class="welcome-preview-panel">
+                    <h4>Resumen</h4>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal: <strong>${cfg.panelChannelId ? escapeHtml(channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Roles admin: <strong>${selectedRoleIds.size}</strong></p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Boton: <strong>${escapeHtml(cfg.buttonLabel || 'Solicitar ticket')}</strong></p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Estado: <strong>${cfg.enabled ? 'Activo' : 'Inactivo'}</strong></p>
+                    ${cfg.messageId ? `<p style="color: var(--text-secondary);">Message ID: <code>${escapeHtml(cfg.messageId)}</code></p>` : '<p style="color: var(--text-secondary);">Aun no publicado.</p>'}
+                </div>
+            </div>
+        `;
+
+        const saveBtn = document.getElementById('saveTicketBtn');
+        const publishBtn = document.getElementById('publishTicketBtn');
+        if (saveBtn) saveBtn.addEventListener('click', () => saveTicketConfig(guildId, true));
+        if (publishBtn) publishBtn.addEventListener('click', () => publishTicketPanel(guildId));
+    } catch (error) {
+        console.error('Error cargando panel de tickets:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de tickets.</div>';
     }
 }
 
@@ -2214,19 +2472,14 @@ async function moderateUser(guildId, userId, action) {
 
 
 // Funciones globales
-window.selectGuild = function(guildId) {
+window.selectGuild = async function(guildId) {
     serverFeaturesUnlocked = true;
     currentServerGuildId = guildId;
     setServerFeaturesNavigationVisible(true);
     updateDashboardButtonState();
 
     showSection('embedSection');
-    const guildSelect = document.getElementById('guildSelect');
-    if (guildSelect) {
-        guildSelect.disabled = true;
-        guildSelect.value = guildId;
-        handleGuildSelect();
-    }
+    await loadGuildsForEmbed();
 
     saveState();
 };

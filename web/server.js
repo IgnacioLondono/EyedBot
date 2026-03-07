@@ -12,6 +12,9 @@ const multer = require('multer');
 const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
 const verifyStore = require('../src/utils/verify-config-store');
+const ticketStore = require('../src/utils/ticket-config-store');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ticketButtonCustomIdForGuild } = require('../src/events/ticket-interaction');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -576,6 +579,128 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
     }
 });
 
+app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const cfg = await ticketStore.getTicketConfig(guildId);
+        if (!cfg) {
+            return res.json({
+                enabled: false,
+                panelChannelId: '',
+                adminRoleIds: [],
+                title: 'Soporte',
+                message: 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.',
+                color: '7c4dff',
+                footer: 'Sistema de Tickets',
+                buttonLabel: 'Solicitar ticket',
+                messageId: ''
+            });
+        }
+
+        res.json(cfg);
+    } catch (error) {
+        console.error('Error obteniendo ticket config:', error);
+        res.status(500).json({ error: 'Error al obtener configuracion de tickets' });
+    }
+});
+
+app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const body = req.body || {};
+        const adminRoleIds = Array.isArray(body.adminRoleIds)
+            ? body.adminRoleIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 20)
+            : [];
+
+        const config = {
+            enabled: body.enabled === true,
+            panelChannelId: String(body.panelChannelId || '').trim(),
+            adminRoleIds,
+            title: String(body.title || 'Soporte').slice(0, 256),
+            message: String(body.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.').slice(0, 2000),
+            color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
+            footer: String(body.footer || '').slice(0, 300),
+            buttonLabel: String(body.buttonLabel || 'Solicitar ticket').slice(0, 80),
+            messageId: String(body.messageId || '').trim(),
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+
+        await ticketStore.setTicketConfig(guildId, config);
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando ticket config:', error);
+        res.status(500).json({ error: 'Error al guardar configuracion de tickets' });
+    }
+});
+
+app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await ticketStore.getTicketConfig(guildId);
+        if (!cfg?.panelChannelId) {
+            return res.status(400).json({ error: 'Configura el canal de tickets antes de publicar' });
+        }
+
+        const channel = guild.channels.cache.get(cfg.panelChannelId) || await guild.channels.fetch(cfg.panelChannelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(404).json({ error: 'Canal de panel no encontrado o no es de texto' });
+        }
+
+        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        if (!me) return res.status(500).json({ error: 'No pude obtener los permisos del bot en el servidor' });
+
+        if (!channel.permissionsFor(me)?.has(['SendMessages', 'EmbedLinks'])) {
+            return res.status(403).json({ error: 'Faltan permisos: Enviar mensajes o Insertar enlaces' });
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor((cfg.color || '7c4dff').replace('#', ''))
+            .setTitle(cfg.title || 'Soporte')
+            .setDescription(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.');
+
+        if (cfg.footer) embed.setFooter({ text: cfg.footer });
+
+        const openTicketBtn = new ButtonBuilder()
+            .setCustomId(ticketButtonCustomIdForGuild(guildId))
+            .setStyle(ButtonStyle.Primary)
+            .setLabel(cfg.buttonLabel || 'Solicitar ticket');
+
+        const posted = await channel.send({
+            embeds: [embed],
+            components: [new ActionRowBuilder().addComponents(openTicketBtn)]
+        });
+
+        const updatedCfg = {
+            ...cfg,
+            enabled: true,
+            panelChannelId: channel.id,
+            messageId: posted.id,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+
+        await ticketStore.setTicketConfig(guildId, updatedCfg);
+        res.json({ success: true, config: updatedCfg, messageId: posted.id, channelId: channel.id });
+    } catch (error) {
+        console.error('Error publicando ticket panel:', error);
+        res.status(500).json({ error: 'Error al publicar panel de tickets' });
+    }
+});
+
 app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -1108,7 +1233,7 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                 color: role.hexColor,
                 position: role.position,
                 members: role.members.size
-            })).sort((a, b) => b.position - a.position).slice(0, 20),
+            })).sort((a, b) => b.position - a.position),
             emojis: guild.emojis.cache.size,
             stickers: guild.stickers?.cache?.size || 0
         };
