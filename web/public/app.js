@@ -1828,7 +1828,7 @@ async function loadTicketPanel(guildId) {
 
         container.innerHTML = `
             <h3 class="welcome-panel-title">Sistema de Tickets</h3>
-            <p class="welcome-panel-subtitle">Publica un embed interactivo con el boton <code>Solicitar ticket</code>; al pulsarlo, se pedira el motivo y se abrira un canal privado visible para los roles administradores seleccionados.</p>
+            <p class="welcome-panel-subtitle">Publica un embed interactivo con el boton <code>Solicitar ticket</code>; al pulsarlo, se pedira el motivo y se abrira un canal privado para los roles que elijas para gestionar solicitudes.</p>
             <div class="welcome-layout">
                 <div class="welcome-editor">
                     <div class="form-grid">
@@ -1852,7 +1852,7 @@ async function loadTicketPanel(guildId) {
                     </div>
 
                     <div class="form-group">
-                        <label for="ticketAdminRoles">Roles administradores que pueden ver tickets</label>
+                        <label for="ticketAdminRoles">Roles que pueden gestionar solicitudes</label>
                         <select id="ticketAdminRoles" class="form-control" multiple size="7">
                             ${roles.map((r) => `<option value="${r.id}" ${selectedRoleIds.has(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
                         </select>
