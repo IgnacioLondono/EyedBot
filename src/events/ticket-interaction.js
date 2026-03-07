@@ -131,7 +131,8 @@ async function createTicketChannel(interaction, guildId, reason) {
                 PermissionsBitField.Flags.ViewChannel,
                 PermissionsBitField.Flags.SendMessages,
                 PermissionsBitField.Flags.ReadMessageHistory,
-                PermissionsBitField.Flags.ManageMessages
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.ManageChannels
             ]
         });
     });
