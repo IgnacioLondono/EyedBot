@@ -9,6 +9,7 @@ const { safeReply, isUnknownInteractionError } = require('./utils/interactions')
 const { handleReturnInteraction } = require('./utils/fun-return');
 const guildMemberAddEvent = require('./events/guildMemberAdd');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
+const { handleTicketButton, handleTicketModal } = require('./events/ticket-interaction');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 require('dotenv').config();
@@ -119,6 +120,9 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.isButton()) {
         try {
+            const ticketHandled = await handleTicketButton(interaction);
+            if (ticketHandled) return;
+
             if (interaction.customId.startsWith('fun_return_')) {
                 const handled = await handleReturnInteraction(interaction);
                 if (handled) return;
@@ -150,6 +154,9 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.isModalSubmit()) {
         try {
+            const ticketModalHandled = await handleTicketModal(interaction);
+            if (ticketModalHandled) return;
+
             if (interaction.customId.startsWith('music_volume_modal_')) {
                 await musicSystem.handleVolumeModalSubmit(interaction);
                 return;
