@@ -1,9 +1,6 @@
 const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { Player } = require('discord-player');
-const { DefaultExtractors } = require('@discord-player/extractor');
-const MusicSystem = require('./cogs/music');
 const config = require('./config');
 const { safeReply, isUnknownInteractionError } = require('./utils/interactions');
 const { handleReturnInteraction } = require('./utils/fun-return');
@@ -27,6 +24,8 @@ if ((process.env.WEB_ENABLED || 'true').toLowerCase() === 'true') {
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
+const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
+const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMMAND_WARN_MS || '1200', 10));
 
 const client = new Client({
     intents: [
@@ -40,15 +39,19 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// Initialize player and attach to client
-const ffmpegPath = require('ffmpeg-static');
-const player = new Player(client, {
-    connectionTimeout: 45000,
-    probeTimeout: 20000,
-    skipFFmpeg: config.musicSkipFfmpeg,
-    ffmpegPath
-});
-client.player = player;
+if (MUSIC_ENABLED) {
+    const { Player } = require('discord-player');
+    const ffmpegPath = require('ffmpeg-static');
+    const player = new Player(client, {
+        connectionTimeout: 45000,
+        probeTimeout: 20000,
+        skipFFmpeg: config.musicSkipFfmpeg,
+        ffmpegPath
+    });
+    client.player = player;
+} else {
+    console.log('🎵 Música desactivada (MUSIC_ENABLED=false).');
+}
 
 client.commands = new Collection();
 
@@ -64,6 +67,9 @@ function loadCommands(dir) {
         const filePath = path.join(dir, file);
         const stat = fs.statSync(filePath);
         if (stat.isDirectory()) {
+            if (!MUSIC_ENABLED && file.toLowerCase() === 'music') {
+                continue;
+            }
             loadCommands(filePath);
         } else if (file.endsWith('.js')) {
             const command = require(filePath);
@@ -113,8 +119,10 @@ client.on('messageReactionRemove', async (reaction, user) => {
 });
 
 client.on('interactionCreate', async interaction => {
-    const musicSystem = interaction.client.musicSystem || new MusicSystem(interaction.client);
-    if (!interaction.client.musicSystem) {
+    let musicSystem = interaction.client.musicSystem;
+    if (MUSIC_ENABLED && !musicSystem) {
+        const MusicSystem = require('./cogs/music');
+        musicSystem = new MusicSystem(interaction.client);
         interaction.client.musicSystem = musicSystem;
     }
 
@@ -129,11 +137,19 @@ client.on('interactionCreate', async interaction => {
             }
 
             if (interaction.customId.startsWith('search_select_')) {
+                if (!MUSIC_ENABLED) {
+                    await safeReply(interaction, { content: '🎵 La música está desactivada temporalmente.', flags: 64 }).catch(() => {});
+                    return;
+                }
                 await musicSystem.handleSearchSelection(interaction);
                 return;
             }
 
             if (interaction.customId.startsWith('music_')) {
+                if (!MUSIC_ENABLED) {
+                    await safeReply(interaction, { content: '🎵 La música está desactivada temporalmente.', flags: 64 }).catch(() => {});
+                    return;
+                }
                 const parts = interaction.customId.split('_');
                 let action = parts[1];
 
@@ -158,6 +174,10 @@ client.on('interactionCreate', async interaction => {
             if (ticketModalHandled) return;
 
             if (interaction.customId.startsWith('music_volume_modal_')) {
+                if (!MUSIC_ENABLED) {
+                    await safeReply(interaction, { content: '🎵 La música está desactivada temporalmente.', flags: 64 }).catch(() => {});
+                    return;
+                }
                 await musicSystem.handleVolumeModalSubmit(interaction);
                 return;
             }
@@ -185,8 +205,13 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
+    const startedAt = Date.now();
     try {
         await command.execute(interaction);
+        const elapsedMs = Date.now() - startedAt;
+        if (elapsedMs >= SLOW_COMMAND_WARN_MS) {
+            console.warn(`⚠️ Comando lento: /${interaction.commandName} tardó ${elapsedMs}ms en ${interaction.guildId || 'DM'}`);
+        }
     } catch (error) {
         if (isUnknownInteractionError(error)) return;
         console.error(error);
@@ -220,7 +245,10 @@ async function main() {
     }
 
     await db.init().catch(() => false);
-    await client.player.extractors.loadMulti(DefaultExtractors);
+    if (MUSIC_ENABLED && client.player) {
+        const { DefaultExtractors } = require('@discord-player/extractor');
+        await client.player.extractors.loadMulti(DefaultExtractors);
+    }
     client.login(TOKEN);
 }
 
