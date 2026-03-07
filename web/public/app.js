@@ -1104,7 +1104,7 @@ async function loadStats() {
             document.getElementById('statGuilds').textContent = stats.guilds || 0;
             document.getElementById('statUsers').textContent = stats.users || 0;
             document.getElementById('statChannels').textContent = stats.channels || 0;
-            document.getElementById('statPing').textContent = stats.ping || 0;
+            document.getElementById('statPing').textContent = Number.isFinite(stats.ping) && stats.ping >= 0 ? stats.ping : '--';
             document.getElementById('statCommands').textContent = stats.commands || 0;
             
             // Formatear uptime

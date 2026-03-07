@@ -9,13 +9,15 @@ module.exports = {
     async execute(interaction) {
         const sent = await interaction.deferReply({ fetchReply: true });
         const timeDiff = sent.createdTimestamp - interaction.createdTimestamp;
+        const apiPingRaw = Number(interaction.client.ws?.ping);
+        const apiPingText = Number.isFinite(apiPingRaw) && apiPingRaw >= 0 ? `${Math.round(apiPingRaw)}ms` : 'N/A';
 
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle('🏓 Pong!')
             .addFields(
                 { name: 'Latencia del Bot', value: `${timeDiff}ms`, inline: true },
-                { name: 'Latencia de la API', value: `${interaction.client.ws.ping}ms`, inline: true }
+                { name: 'Latencia de la API', value: apiPingText, inline: true }
             )
             .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
 

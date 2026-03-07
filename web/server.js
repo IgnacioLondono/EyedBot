@@ -1048,12 +1048,15 @@ app.get('/api/stats', requireAuth, (req, res) => {
         return res.status(500).json({ error: 'Bot no disponible' });
     }
 
+    const rawPing = Number(botClient.ws?.ping);
+    const normalizedPing = Number.isFinite(rawPing) && rawPing >= 0 ? Math.round(rawPing) : null;
+
     const stats = {
         guilds: botClient.guilds.cache.size,
         users: botClient.users.cache.size,
         channels: botClient.channels.cache.size,
         uptime: botClient.uptime,
-        ping: botClient.ws.ping,
+        ping: normalizedPing,
         commands: botClient.commands?.size || 0,
         memory: process.memoryUsage(),
         nodeVersion: process.version,
