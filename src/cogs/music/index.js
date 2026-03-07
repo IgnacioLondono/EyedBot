@@ -240,12 +240,7 @@ class MusicSystem {
 
     _buildNowPlayingEmbed(track, queue) {
         const isPaused = queue?.node?.isPaused?.() || false;
-        const repeatMode = queue?.repeatMode ?? QueueRepeatMode.OFF;
-        const loopLabel = repeatMode === QueueRepeatMode.TRACK
-            ? 'Cancion'
-            : repeatMode === QueueRepeatMode.QUEUE
-                ? 'Cola'
-                : 'Desactivado';
+        const loopLabel = this._repeatModeLabel(queue?.repeatMode ?? QueueRepeatMode.OFF);
 
         const artwork = track?.thumbnail
             || track?.raw?.thumbnail?.url
@@ -259,12 +254,36 @@ class MusicSystem {
             .addFields(
                 { name: '👤 Artista', value: track?.author || 'Desconocido', inline: true },
                 { name: '⏱️ Duracion', value: track?.duration || 'Desconocida', inline: true },
-                { name: '🔁 Loop', value: loopLabel, inline: true }
+                { name: '🔁 Modo', value: loopLabel, inline: true },
+                { name: '📋 En cola', value: String(queue?.tracks?.size || 0), inline: true },
+                { name: '🔊 Volumen', value: `${queue?.node?.volume ?? config.musicDefaultVolume}%`, inline: true }
             );
 
         if (artwork) embed.setImage(artwork);
         if (track?.url) embed.setURL(track.url);
         return embed;
+    }
+
+    _supportsAutoplayMode() {
+        return Number.isInteger(QueueRepeatMode?.AUTOPLAY);
+    }
+
+    _repeatModeLabel(mode) {
+        if (mode === QueueRepeatMode.TRACK) return 'Cancion';
+        if (mode === QueueRepeatMode.QUEUE) return 'Cola';
+        if (this._supportsAutoplayMode() && mode === QueueRepeatMode.AUTOPLAY) return 'Autoplay';
+        return 'Desactivado';
+    }
+
+    _nextRepeatMode(mode) {
+        if (mode === QueueRepeatMode.OFF) return QueueRepeatMode.TRACK;
+        if (mode === QueueRepeatMode.TRACK) return QueueRepeatMode.QUEUE;
+        if (mode === QueueRepeatMode.QUEUE) {
+            if (this._supportsAutoplayMode()) return QueueRepeatMode.AUTOPLAY;
+            return QueueRepeatMode.OFF;
+        }
+        if (this._supportsAutoplayMode() && mode === QueueRepeatMode.AUTOPLAY) return QueueRepeatMode.OFF;
+        return QueueRepeatMode.OFF;
     }
 
     async sendNowPlayingEmbed(guildId, channel, track, forcePaused = null) {
@@ -746,13 +765,9 @@ class MusicSystem {
             }
             case 'loop': {
                 const mode = queue.repeatMode ?? QueueRepeatMode.OFF;
-                const next = mode === QueueRepeatMode.OFF
-                    ? QueueRepeatMode.TRACK
-                    : mode === QueueRepeatMode.TRACK
-                        ? QueueRepeatMode.QUEUE
-                        : QueueRepeatMode.OFF;
+                const next = this._nextRepeatMode(mode);
                 queue.setRepeatMode(next);
-                const label = next === QueueRepeatMode.TRACK ? 'Canción' : next === QueueRepeatMode.QUEUE ? 'Cola' : 'Desactivado';
+                const label = this._repeatModeLabel(next);
                 await interaction.reply({ content: `🔁 Loop: ${label}`, flags: 64 }).catch(() => {});
                 return;
             }

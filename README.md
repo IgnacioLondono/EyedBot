@@ -11,10 +11,10 @@ Un bot de Discord completo y profesional con **60+ comandos** que incluye modera
 - `lock`, `unlock`, `slowmode` - Control de canales
 - `nick`, `role`, `announce` - Gestión avanzada
 
-### 🎵 Música (12 comandos)
+### 🎵 Música (13 comandos)
 - `play`, `pause`, `resume`, `stop` - Control de reproducción
 - `skip`, `queue`, `nowplaying` - Gestión de cola
-- `volume`, `shuffle`, `remove`, `loop`, `seek`, `filters` - Opciones avanzadas
+- `volume`, `shuffle`, `remove`, `loop`, `seek`, `filters`, `autoplay` - Opciones avanzadas
 
 ### 🎮 Diversión (20 comandos)
 - `gif`, `meme`, `8ball`, `coinflip`, `dice` - Entretenimiento
