@@ -55,6 +55,34 @@ function hasSelectedGuildContext() {
     return serverFeaturesUnlocked && Boolean(currentServerGuildId);
 }
 
+const SERVER_UI_PREFS_KEY = 'eyedbot_server_ui_prefs_v1';
+
+function getServerUIPreferences() {
+    try {
+        const raw = localStorage.getItem(SERVER_UI_PREFS_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function getServerPreference(guildId, key, fallback = {}) {
+    const prefs = getServerUIPreferences();
+    const guildPrefs = prefs[String(guildId)] || {};
+    const value = guildPrefs[key];
+    if (!value || typeof value !== 'object') return { ...fallback };
+    return { ...fallback, ...value };
+}
+
+function setServerPreference(guildId, key, value) {
+    const prefs = getServerUIPreferences();
+    const guildKey = String(guildId);
+    if (!prefs[guildKey] || typeof prefs[guildKey] !== 'object') prefs[guildKey] = {};
+    prefs[guildKey][key] = value;
+    localStorage.setItem(SERVER_UI_PREFS_KEY, JSON.stringify(prefs));
+}
+
 function clearServerBoundSectionState() {
     const channelSelect = document.getElementById('channelSelect');
     if (channelSelect) {
@@ -80,7 +108,7 @@ function clearServerBoundSectionState() {
         serverSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
     }
 
-    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer'];
+    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer', 'levelsContainer', 'automationContainer', 'securityContainer', 'notificationsContainer'];
     containerIds.forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = '';
@@ -95,6 +123,37 @@ function resetServerContextToDashboard() {
     clearServerBoundSectionState();
     updateDashboardButtonState();
     saveState();
+}
+
+function activateServerSideButton(button) {
+    const allButtons = document.querySelectorAll('.side-menu-btn');
+    allButtons.forEach((btn) => btn.classList.remove('active'));
+    if (button) button.classList.add('active');
+}
+
+function handleServerSideAction(button) {
+    if (!button) return;
+    const action = button.dataset.sideAction || '';
+    const target = button.dataset.sideTarget || '';
+    const note = button.dataset.sideNote || '';
+
+    activateServerSideButton(button);
+
+    if (action === 'section' && target) {
+        showSection(target);
+        if (note && target === 'commandsSection') {
+            showToast(`${note}: disponible dentro de Comandos`, 'success');
+        }
+        return;
+    }
+
+    if (action === 'server-scroll' && target) {
+        showSection('serverSection');
+        const el = document.getElementById(target);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
 }
 
 // Función auxiliar para fetch con credenciales
@@ -405,6 +464,15 @@ function setupEventListeners() {
     document.getElementById('serverBtn').addEventListener('click', () => {
         showSection('serverSection');
         loadGuildsForServer();
+    });
+
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const sideBtn = target.closest('.side-menu-btn');
+        if (!sideBtn) return;
+        event.preventDefault();
+        handleServerSideAction(sideBtn);
     });
 
     // Menú de usuario
@@ -1378,6 +1446,10 @@ async function selectServerGuild(guildId) {
     const welcomeContainer = document.getElementById('welcomeContainer');
     const verifyContainer = document.getElementById('verifyContainer');
     const ticketContainer = document.getElementById('ticketContainer');
+    const levelsContainer = document.getElementById('levelsContainer');
+    const automationContainer = document.getElementById('automationContainer');
+    const securityContainer = document.getElementById('securityContainer');
+    const notificationsContainer = document.getElementById('notificationsContainer');
     const serverSelect = document.getElementById('serverSelect');
 
     if (!guildId) {
@@ -1390,6 +1462,10 @@ async function selectServerGuild(guildId) {
         if (welcomeContainer) welcomeContainer.innerHTML = '';
         if (verifyContainer) verifyContainer.innerHTML = '';
         if (ticketContainer) ticketContainer.innerHTML = '';
+        if (levelsContainer) levelsContainer.innerHTML = '';
+        if (automationContainer) automationContainer.innerHTML = '';
+        if (securityContainer) securityContainer.innerHTML = '';
+        if (notificationsContainer) notificationsContainer.innerHTML = '';
         saveState();
         return;
     }
@@ -1412,12 +1488,28 @@ async function selectServerGuild(guildId) {
     if (ticketContainer) {
         ticketContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de tickets...</p></div>';
     }
+    if (levelsContainer) {
+        levelsContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de niveles...</p></div>';
+    }
+    if (automationContainer) {
+        automationContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando opciones de automatización...</p></div>';
+    }
+    if (securityContainer) {
+        securityContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando opciones de seguridad...</p></div>';
+    }
+    if (notificationsContainer) {
+        notificationsContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando notificaciones...</p></div>';
+    }
 
     await loadServerInfo(guildId);
     await loadServerMembers(guildId);
     await loadWelcomePanel(guildId);
     await loadVerifyPanel(guildId);
     await loadTicketPanel(guildId);
+    await loadLevelsPanel(guildId);
+    await loadAutomationPanel(guildId);
+    await loadSecurityPanel(guildId);
+    await loadNotificationsPanel(guildId);
     saveState();
 }
 
@@ -1430,6 +1522,10 @@ async function loadGuildsForServer() {
         const welcomeContainer = document.getElementById('welcomeContainer');
         const verifyContainer = document.getElementById('verifyContainer');
         const ticketContainer = document.getElementById('ticketContainer');
+        const levelsContainer = document.getElementById('levelsContainer');
+        const automationContainer = document.getElementById('automationContainer');
+        const securityContainer = document.getElementById('securityContainer');
+        const notificationsContainer = document.getElementById('notificationsContainer');
         
         // Limpiar contenedores
         serverInfoContainer.innerHTML = '';
@@ -1437,6 +1533,10 @@ async function loadGuildsForServer() {
         if (welcomeContainer) welcomeContainer.innerHTML = '';
         if (verifyContainer) verifyContainer.innerHTML = '';
         if (ticketContainer) ticketContainer.innerHTML = '';
+        if (levelsContainer) levelsContainer.innerHTML = '';
+        if (automationContainer) automationContainer.innerHTML = '';
+        if (securityContainer) securityContainer.innerHTML = '';
+        if (notificationsContainer) notificationsContainer.innerHTML = '';
         if (tabsContainer) tabsContainer.innerHTML = '';
         
         if (!hasSelectedGuildContext()) {
@@ -1472,6 +1572,206 @@ async function loadGuildsForServer() {
     } catch (error) {
         console.error('Error cargando servidores:', error);
         showToast('Error al cargar servidores', 'error');
+    }
+}
+
+function collectPanelValues(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return {};
+    const values = {};
+    container.querySelectorAll('[data-pref-key]').forEach((el) => {
+        const key = el.getAttribute('data-pref-key');
+        if (!key) return;
+        if (el.type === 'checkbox') {
+            values[key] = !!el.checked;
+        } else if (el.tagName === 'SELECT' && el.multiple) {
+            values[key] = Array.from(el.selectedOptions || []).map((opt) => opt.value);
+        } else {
+            values[key] = el.value;
+        }
+    });
+    return values;
+}
+
+async function loadAutomationPanel(guildId) {
+    const container = document.getElementById('automationContainer');
+    if (!container) return;
+
+    const defaults = {
+        antiSpamEnabled: true,
+        spamMessages: '6',
+        spamWindow: '10',
+        antiLinksEnabled: true,
+        antiCapsEnabled: false,
+        maxMentions: '5',
+        raidMode: 'balanced'
+    };
+    const prefs = getServerPreference(guildId, 'automation', defaults);
+
+    container.innerHTML = `
+        <h3 class="welcome-panel-title">Automation Center</h3>
+        <p class="welcome-panel-subtitle">Configura reglas rápidas de automatización para moderación preventiva del servidor.</p>
+        <div class="control-grid">
+            <div class="control-card">
+                <h4>Anti Spam</h4>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiSpamEnabled" ${prefs.antiSpamEnabled ? 'checked' : ''}> Activar filtro</label>
+                <div class="form-row" style="margin-top:0.6rem;">
+                    <div class="form-group">
+                        <label>Mensajes límite</label>
+                        <input type="number" min="3" max="20" class="form-control" data-pref-key="spamMessages" value="${escapeHtmlForValue(prefs.spamMessages)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Ventana (s)</label>
+                        <input type="number" min="3" max="60" class="form-control" data-pref-key="spamWindow" value="${escapeHtmlForValue(prefs.spamWindow)}">
+                    </div>
+                </div>
+            </div>
+            <div class="control-card">
+                <h4>Contenido</h4>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiLinksEnabled" ${prefs.antiLinksEnabled ? 'checked' : ''}> Bloquear enlaces sospechosos</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiCapsEnabled" ${prefs.antiCapsEnabled ? 'checked' : ''}> Bloquear exceso de mayúsculas</label>
+                <div class="form-group" style="margin-top:0.6rem;">
+                    <label>Máximo menciones por mensaje</label>
+                    <input type="number" min="1" max="25" class="form-control" data-pref-key="maxMentions" value="${escapeHtmlForValue(prefs.maxMentions)}">
+                </div>
+            </div>
+            <div class="control-card">
+                <h4>Modo anti-raid</h4>
+                <div class="form-group">
+                    <label>Perfil</label>
+                    <select class="form-control" data-pref-key="raidMode">
+                        <option value="soft" ${prefs.raidMode === 'soft' ? 'selected' : ''}>Suave</option>
+                        <option value="balanced" ${prefs.raidMode === 'balanced' ? 'selected' : ''}>Equilibrado</option>
+                        <option value="strict" ${prefs.raidMode === 'strict' ? 'selected' : ''}>Estricto</option>
+                    </select>
+                </div>
+                <small style="color:var(--text-muted);">Ajuste de referencia para futuras reglas avanzadas.</small>
+            </div>
+        </div>
+        <div class="form-actions" style="margin-top:1rem;">
+            <button type="button" class="btn btn-primary" id="saveAutomationBtn">Guardar Automatización</button>
+        </div>
+    `;
+
+    const saveBtn = document.getElementById('saveAutomationBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const values = collectPanelValues('automationContainer');
+            setServerPreference(guildId, 'automation', values);
+            showToast('Opciones de automatización guardadas', 'success');
+        });
+    }
+}
+
+async function loadSecurityPanel(guildId) {
+    const container = document.getElementById('securityContainer');
+    if (!container) return;
+
+    const defaults = {
+        accountAgeDays: '5',
+        memberAgeMinutes: '15',
+        highRiskWordsEnabled: true,
+        suspiciousLinkScan: true,
+        emergencyLockdown: false
+    };
+    const prefs = getServerPreference(guildId, 'security', defaults);
+
+    const infoResponse = await fetchWithCredentials(`/api/guild/${guildId}/info`).catch(() => null);
+    const info = infoResponse && infoResponse.ok ? await infoResponse.json() : null;
+    const verificationLevel = String(info?.verificationLevel ?? 'unknown');
+
+    container.innerHTML = `
+        <h3 class="welcome-panel-title">Security Center</h3>
+        <p class="welcome-panel-subtitle">Refuerza la entrada de usuarios y activa chequeos de seguridad del servidor.</p>
+        <div class="control-grid">
+            <div class="control-card">
+                <h4>Entrada de miembros</h4>
+                <p style="color:var(--text-secondary); margin-bottom:0.5rem;">Nivel verificación Discord: <strong>${escapeHtml(verificationLevel)}</strong></p>
+                <div class="form-group">
+                    <label>Edad mínima de cuenta (días)</label>
+                    <input type="number" min="0" max="90" class="form-control" data-pref-key="accountAgeDays" value="${escapeHtmlForValue(prefs.accountAgeDays)}">
+                </div>
+                <div class="form-group">
+                    <label>Tiempo en servidor antes de hablar (min)</label>
+                    <input type="number" min="0" max="180" class="form-control" data-pref-key="memberAgeMinutes" value="${escapeHtmlForValue(prefs.memberAgeMinutes)}">
+                </div>
+            </div>
+            <div class="control-card">
+                <h4>Detección</h4>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="highRiskWordsEnabled" ${prefs.highRiskWordsEnabled ? 'checked' : ''}> Filtro de palabras de alto riesgo</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="suspiciousLinkScan" ${prefs.suspiciousLinkScan ? 'checked' : ''}> Escaneo de enlaces sospechosos</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="emergencyLockdown" ${prefs.emergencyLockdown ? 'checked' : ''}> Activar modo lockdown de emergencia</label>
+            </div>
+        </div>
+        <div class="form-actions" style="margin-top:1rem;">
+            <button type="button" class="btn btn-primary" id="saveSecurityBtn">Guardar Seguridad</button>
+        </div>
+    `;
+
+    const saveBtn = document.getElementById('saveSecurityBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const values = collectPanelValues('securityContainer');
+            setServerPreference(guildId, 'security', values);
+            showToast('Opciones de seguridad guardadas', 'success');
+        });
+    }
+}
+
+async function loadNotificationsPanel(guildId) {
+    const container = document.getElementById('notificationsContainer');
+    if (!container) return;
+
+    const defaults = {
+        notifyChannelId: '',
+        joinLeave: true,
+        moderationActions: true,
+        ticketAlerts: true,
+        levelingAlerts: false,
+        streamAlerts: false
+    };
+    const prefs = getServerPreference(guildId, 'notifications', defaults);
+
+    const channelsResponse = await fetchWithCredentials(`/api/guild/${guildId}/channels`).catch(() => null);
+    const channels = channelsResponse && channelsResponse.ok
+        ? (await channelsResponse.json()).filter((c) => c.type === 0)
+        : [];
+
+    container.innerHTML = `
+        <h3 class="welcome-panel-title">Notifications Center</h3>
+        <p class="welcome-panel-subtitle">Define qué eventos quieres notificar y en qué canal centralizarlos.</p>
+        <div class="control-grid">
+            <div class="control-card">
+                <h4>Canal principal</h4>
+                <div class="form-group">
+                    <label>Canal de notificaciones</label>
+                    <select class="form-control" data-pref-key="notifyChannelId">
+                        <option value="">Selecciona un canal</option>
+                        ${channels.map((c) => `<option value="${c.id}" ${String(prefs.notifyChannelId) === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="control-card">
+                <h4>Eventos</h4>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="joinLeave" ${prefs.joinLeave ? 'checked' : ''}> Entradas / salidas</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="moderationActions" ${prefs.moderationActions ? 'checked' : ''}> Acciones de moderación</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="ticketAlerts" ${prefs.ticketAlerts ? 'checked' : ''}> Alertas de tickets</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="levelingAlerts" ${prefs.levelingAlerts ? 'checked' : ''}> Subidas de nivel</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="streamAlerts" ${prefs.streamAlerts ? 'checked' : ''}> Twitch / YouTube</label>
+            </div>
+        </div>
+        <div class="form-actions" style="margin-top:1rem;">
+            <button type="button" class="btn btn-primary" id="saveNotificationsBtn">Guardar Notificaciones</button>
+        </div>
+    `;
+
+    const saveBtn = document.getElementById('saveNotificationsBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const values = collectPanelValues('notificationsContainer');
+            setServerPreference(guildId, 'notifications', values);
+            showToast('Opciones de notificaciones guardadas', 'success');
+        });
     }
 }
 
@@ -1909,6 +2209,257 @@ async function loadTicketPanel(guildId) {
     } catch (error) {
         console.error('Error cargando panel de tickets:', error);
         container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de tickets.</div>';
+    }
+}
+
+function getLevelingRewardRows() {
+    return Array.from(document.querySelectorAll('.level-reward-row')).map((row) => {
+        const levelInput = row.querySelector('.level-reward-level');
+        const roleSelect = row.querySelector('.level-reward-role');
+        return {
+            level: Math.max(1, Number.parseInt(levelInput?.value || '1', 10) || 1),
+            roleId: roleSelect?.value || ''
+        };
+    }).filter((item) => item.roleId);
+}
+
+function collectLevelingConfigFromForm() {
+    return {
+        enabled: document.getElementById('levelingEnabled')?.checked ?? false,
+        messageXpEnabled: document.getElementById('levelingMessageEnabled')?.checked ?? true,
+        voiceXpEnabled: document.getElementById('levelingVoiceEnabled')?.checked ?? true,
+        messageCooldownMs: Math.max(10000, (Number.parseInt(document.getElementById('levelingMsgCooldown')?.value || '45', 10) || 45) * 1000),
+        messageXpMin: Math.max(1, Number.parseInt(document.getElementById('levelingMsgXpMin')?.value || '10', 10) || 10),
+        messageXpMax: Math.max(1, Number.parseInt(document.getElementById('levelingMsgXpMax')?.value || '16', 10) || 16),
+        voiceXpPerMinute: Math.max(1, Number.parseInt(document.getElementById('levelingVoiceXp')?.value || '6', 10) || 6),
+        voiceRequirePeers: document.getElementById('levelingVoicePeers')?.checked ?? true,
+        difficulty: {
+            baseXp: Math.max(50, Number.parseInt(document.getElementById('levelingBaseXp')?.value || '280', 10) || 280),
+            exponent: Math.max(1.2, Number.parseFloat(document.getElementById('levelingExponent')?.value || '2.08') || 2.08)
+        },
+        roleRewards: getLevelingRewardRows()
+    };
+}
+
+function renderLevelRewardRows(roles, rewards) {
+    const rows = Array.isArray(rewards) ? rewards : [];
+    if (!rows.length) return '<p style="color: var(--text-muted);">Aún no hay roles por nivel configurados.</p>';
+
+    return rows.map((reward, index) => `
+        <div class="form-row level-reward-row" data-index="${index}" style="margin-bottom:0.5rem;">
+            <div class="form-group" style="max-width:140px;">
+                <label>Nivel</label>
+                <input type="number" min="1" max="500" class="form-control level-reward-level" value="${Math.max(1, Number.parseInt(reward.level || '1', 10) || 1)}">
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label>Rol</label>
+                <select class="form-control level-reward-role">
+                    <option value="">Selecciona un rol</option>
+                    ${roles.map((role) => `<option value="${role.id}" ${String(reward.roleId) === String(role.id) ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group" style="max-width:130px; display:flex; align-items:flex-end;">
+                <button type="button" class="btn btn-secondary remove-level-reward" style="width:100%;">Eliminar</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function buildLeaderboardHtml(payload) {
+    const rows = Array.isArray(payload?.leaderboard) ? payload.leaderboard : [];
+    if (!rows.length) {
+        return '<p style="color: var(--text-muted);">Todavía no hay datos de niveles.</p>';
+    }
+
+    return rows.slice(0, 10).map((item, index) => `
+        <div style="display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0; border-bottom:1px solid var(--border-color);">
+            <strong style="min-width:28px; color: var(--fate-gold);">#${index + 1}</strong>
+            <img src="${item.avatar || ''}" alt="avatar" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.tag || item.username || 'Usuario')}</div>
+                <div style="font-size:0.82rem; color:var(--text-secondary);">Nivel ${item.level} • XP ${item.xp} • Msg ${item.messageCount} • Voz ${item.voiceMinutes}m</div>
+            </div>
+            <span style="font-size:0.78rem; color: var(--text-secondary);">${item.progressPercent || 0}%</span>
+        </div>
+    `).join('');
+}
+
+async function loadLevelsPanel(guildId) {
+    const container = document.getElementById('levelsContainer');
+    if (!container) return;
+
+    try {
+        const [infoResponse, configResponse, leaderboardResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/info`),
+            fetchWithCredentials(`/api/guild/${guildId}/leveling-config`),
+            fetchWithCredentials(`/api/guild/${guildId}/leveling-leaderboard`)
+        ]);
+
+        if (!infoResponse.ok || !configResponse.ok || !leaderboardResponse.ok) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar el sistema de niveles.</div>';
+            return;
+        }
+
+        const info = await infoResponse.json();
+        const config = await configResponse.json();
+        const leaderboard = await leaderboardResponse.json();
+
+        const roles = (Array.isArray(info?.roles) ? info.roles : [])
+            .filter((role) => role && role.id && role.name && role.name !== '@everyone')
+            .sort((a, b) => (b.position || 0) - (a.position || 0));
+
+        const rewards = Array.isArray(config.roleRewards) ? config.roleRewards : [];
+        const difficulty = config.difficulty || {};
+
+        container.innerHTML = `
+            <h3 class="welcome-panel-title">Sistema de Niveles</h3>
+            <p class="welcome-panel-subtitle">Asigna XP por mensajes y tiempo en voz. Es un sistema más difícil de subir para mantener el progreso equilibrado y premiar actividad real.</p>
+            <div class="welcome-layout">
+                <div class="welcome-editor">
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="levelingEnabled" ${config.enabled ? 'checked' : ''}> <span>Activar niveles</span></label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="levelingMessageEnabled" ${config.messageXpEnabled !== false ? 'checked' : ''}> <span>Dar XP por mensajes</span></label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="levelingVoiceEnabled" ${config.voiceXpEnabled !== false ? 'checked' : ''}> <span>Dar XP por voz</span></label>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="levelingMsgCooldown">Cooldown mensajes (segundos)</label>
+                            <input type="number" min="10" max="300" id="levelingMsgCooldown" class="form-control" value="${Math.max(10, Math.round((config.messageCooldownMs || 45000) / 1000))}">
+                        </div>
+                        <div class="form-group">
+                            <label for="levelingVoiceXp">XP por minuto en voz</label>
+                            <input type="number" min="1" max="100" id="levelingVoiceXp" class="form-control" value="${Math.max(1, Number.parseInt(config.voiceXpPerMinute || 6, 10) || 6)}">
+                        </div>
+                        <div class="form-group checkbox-group" style="align-self:end;">
+                            <label><input type="checkbox" id="levelingVoicePeers" ${config.voiceRequirePeers !== false ? 'checked' : ''}> <span>Voz exige al menos 2 usuarios</span></label>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="levelingMsgXpMin">XP mínimo por mensaje</label>
+                            <input type="number" min="1" max="300" id="levelingMsgXpMin" class="form-control" value="${Math.max(1, Number.parseInt(config.messageXpMin || 10, 10) || 10)}">
+                        </div>
+                        <div class="form-group">
+                            <label for="levelingMsgXpMax">XP máximo por mensaje</label>
+                            <input type="number" min="1" max="500" id="levelingMsgXpMax" class="form-control" value="${Math.max(1, Number.parseInt(config.messageXpMax || 16, 10) || 16)}">
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="levelingBaseXp">Dificultad base XP</label>
+                            <input type="number" min="50" max="5000" id="levelingBaseXp" class="form-control" value="${Math.max(50, Number.parseInt(difficulty.baseXp || 280, 10) || 280)}">
+                        </div>
+                        <div class="form-group">
+                            <label for="levelingExponent">Exponente de dificultad</label>
+                            <input type="number" min="1.2" max="3.5" step="0.01" id="levelingExponent" class="form-control" value="${Number.parseFloat(difficulty.exponent || 2.08).toFixed(2)}">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Roles por nivel</label>
+                        <div id="levelRewardRows">${renderLevelRewardRows(roles, rewards)}</div>
+                        <div class="form-actions" style="margin-top:0.5rem;">
+                            <button type="button" id="addLevelRewardBtn" class="btn btn-secondary">Agregar rol por nivel</button>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="saveLevelingBtn" class="btn btn-primary">Guardar sistema de niveles</button>
+                    </div>
+                </div>
+
+                <div class="welcome-preview-panel">
+                    <h4>Leaderboard</h4>
+                    <p style="color: var(--text-secondary); margin-bottom:0.75rem;">Usuarios seguidos: <strong>${leaderboard.totalTrackedUsers || 0}</strong></p>
+                    <div id="levelingLeaderboardWrap">${buildLeaderboardHtml(leaderboard)}</div>
+                </div>
+            </div>
+        `;
+
+        const rewardRows = document.getElementById('levelRewardRows');
+        const addRewardBtn = document.getElementById('addLevelRewardBtn');
+        const saveBtn = document.getElementById('saveLevelingBtn');
+
+        if (rewardRows) {
+            rewardRows.addEventListener('click', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+                if (!target.classList.contains('remove-level-reward')) return;
+                const row = target.closest('.level-reward-row');
+                if (row) row.remove();
+            });
+        }
+
+        if (addRewardBtn) {
+            addRewardBtn.addEventListener('click', () => {
+                const wrapper = document.getElementById('levelRewardRows');
+                if (!wrapper) return;
+
+                const empty = wrapper.querySelector('p');
+                if (empty) wrapper.innerHTML = '';
+
+                const row = document.createElement('div');
+                row.className = 'form-row level-reward-row';
+                row.style.marginBottom = '0.5rem';
+                row.innerHTML = `
+                    <div class="form-group" style="max-width:140px;">
+                        <label>Nivel</label>
+                        <input type="number" min="1" max="500" class="form-control level-reward-level" value="1">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Rol</label>
+                        <select class="form-control level-reward-role">
+                            <option value="">Selecciona un rol</option>
+                            ${roles.map((role) => `<option value="${role.id}">${escapeHtml(role.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="max-width:130px; display:flex; align-items:flex-end;">
+                        <button type="button" class="btn btn-secondary remove-level-reward" style="width:100%;">Eliminar</button>
+                    </div>
+                `;
+                wrapper.appendChild(row);
+            });
+        }
+
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                const payload = collectLevelingConfigFromForm();
+                if (payload.messageXpMax < payload.messageXpMin) {
+                    showToast('El XP máximo por mensaje no puede ser menor que el mínimo', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/leveling-config`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.error || 'No se pudo guardar el sistema de niveles', 'error');
+                        return;
+                    }
+                    showToast('Sistema de niveles guardado', 'success');
+                    await loadLevelsPanel(guildId);
+                } catch (error) {
+                    console.error('Error guardando sistema de niveles:', error);
+                    showToast('Error guardando sistema de niveles', 'error');
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error cargando panel de niveles:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de niveles.</div>';
     }
 }
 

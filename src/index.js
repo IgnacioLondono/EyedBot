@@ -7,6 +7,7 @@ const { handleReturnInteraction } = require('./utils/fun-return');
 const guildMemberAddEvent = require('./events/guildMemberAdd');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
 const { handleTicketButton, handleTicketModal } = require('./events/ticket-interaction');
+const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 require('dotenv').config();
@@ -92,6 +93,15 @@ client.once('clientReady', () => {
     }
 
     startBackupScheduler();
+    startVoiceXpLoop(client);
+});
+
+client.on('messageCreate', async (message) => {
+    try {
+        await handleMessageCreate(message);
+    } catch (error) {
+        console.error('Error en leveling messageCreate:', error);
+    }
 });
 
 client.on('guildMemberAdd', async (member) => {
@@ -256,6 +266,7 @@ async function gracefulShutdown(signal) {
     console.log(`⚠️ Señal recibida: ${signal}. Cerrando bot...`);
     try {
         stopBackupScheduler();
+        stopVoiceXpLoop();
         await db.close().catch(() => null);
         await client.destroy();
     } catch {

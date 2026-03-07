@@ -479,26 +479,81 @@
                     <h2 class="section-title">Configuración por Servidor</h2>
                     <div class="title-accent"></div>
                 </div>
-                <div id="serverTabs" class="server-tabs"></div>
-                <div class="form-group">
-                    <label for="serverSelect">
-                        <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                        Servidor Activo
-                    </label>
-                    <select id="serverSelect" class="form-control">
-                        <option value="">Selecciona un servidor</option>
-                    </select>
+                <div class="server-shell">
+                    <aside class="server-side-menu" id="serverSideMenu">
+                        <div class="server-side-header">
+                            <h3>Panel del Servidor</h3>
+                            <p>Atajos rápidos</p>
+                        </div>
+
+                        <div class="side-menu-group">
+                            <h4>General</h4>
+                            <button type="button" class="side-menu-btn active" data-side-action="server-scroll" data-side-target="serverSettingsBlock">Overview</button>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="serverSettingsBlock">Server Settings</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="embedSection">Embed Messages</button>
+                        </div>
+
+                        <div class="side-menu-group">
+                            <h4>Módulos</h4>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="welcomeContainer">Welcome & Goodbye</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="Auto Responder">Auto Responder</button>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="levelsContainer">Leveling System</button>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="levelsContainer" data-side-note="Auto Roles">Auto Roles</button>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="automationContainer">Automation Center</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="embedSection" data-side-note="Colors">Colors</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="Self-Assignable Roles">Self-Assignable Roles</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="Starboard">Starboard</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="Temporary Channels">Temporary Channels</button>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="ticketContainer">Tickets</button>
+                        </div>
+
+                        <div class="side-menu-group">
+                            <h4>Moderación</h4>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="moderationContainer">Moderation</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="logsSection">Logs</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="Automod">Automod</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="Anti-Raid">Anti-Raid</button>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="securityContainer">Security Center</button>
+                        </div>
+
+                        <div class="side-menu-group">
+                            <h4>Notificaciones</h4>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="Twitch">Twitch</button>
+                            <button type="button" class="side-menu-btn" data-side-action="section" data-side-target="commandsSection" data-side-note="YouTube">YouTube</button>
+                            <button type="button" class="side-menu-btn" data-side-action="server-scroll" data-side-target="notificationsContainer">Notifications Center</button>
+                        </div>
+                    </aside>
+
+                    <div class="server-content-area">
+                        <div id="serverSettingsBlock" class="moderation-container">
+                            <div id="serverTabs" class="server-tabs"></div>
+                            <div class="form-group">
+                                <label for="serverSelect">
+                                    <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    Servidor Activo
+                                </label>
+                                <select id="serverSelect" class="form-control">
+                                    <option value="">Selecciona un servidor</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="serverInfoContainer" class="server-info-container" style="margin-top: 2rem;"></div>
+                        <div id="moderationContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                        <div id="welcomeContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                        <div id="verifyContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                        <div id="ticketContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                        <div id="levelsContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                        <div id="automationContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                        <div id="securityContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                        <div id="notificationsContainer" class="moderation-container" style="margin-top: 2rem;"></div>
+                    </div>
                 </div>
-                <div id="serverInfoContainer" class="server-info-container"></div>
-                <div id="moderationContainer" class="moderation-container" style="margin-top: 2rem;"></div>
-                <div id="welcomeContainer" class="moderation-container" style="margin-top: 2rem;"></div>
-                <div id="verifyContainer" class="moderation-container" style="margin-top: 2rem;"></div>
-                <div id="ticketContainer" class="moderation-container" style="margin-top: 2rem;"></div>
             </div>
         </section>
 
