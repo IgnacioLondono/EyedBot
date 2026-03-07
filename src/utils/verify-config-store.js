@@ -3,6 +3,25 @@ const path = require('path');
 const db = require('./database');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'verify-configs.json');
+const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
+const cache = new Map();
+
+function cacheGet(key) {
+    const cached = cache.get(key);
+    if (!cached) return null;
+    if (Date.now() > cached.expiresAt) {
+        cache.delete(key);
+        return null;
+    }
+    return cached.value;
+}
+
+function cacheSet(key, value) {
+    cache.set(key, {
+        value,
+        expiresAt: Date.now() + CACHE_TTL_MS
+    });
+}
 
 function ensureStore() {
     const dir = path.dirname(STORE_PATH);
@@ -38,15 +57,24 @@ function ensureGuildBucket(store, guildId) {
 }
 
 async function getVerifyConfig(guildId) {
+    const cacheKey = `verifyConfig_${guildId}`;
+    const fromCache = cacheGet(cacheKey);
+    if (fromCache !== null) return fromCache;
+
     try {
         const fromDb = await db.get(`verify_config_${guildId}`);
-        if (fromDb && typeof fromDb === 'object') return fromDb;
+        if (fromDb && typeof fromDb === 'object') {
+            cacheSet(cacheKey, fromDb);
+            return fromDb;
+        }
     } catch {
         // fallback to local file
     }
 
     const store = readStore();
-    return store.guilds[guildId]?.verifyConfig || null;
+    const fallback = store.guilds[guildId]?.verifyConfig || null;
+    cacheSet(cacheKey, fallback);
+    return fallback;
 }
 
 async function setVerifyConfig(guildId, config) {
@@ -60,6 +88,7 @@ async function setVerifyConfig(guildId, config) {
     const bucket = ensureGuildBucket(store, guildId);
     bucket.verifyConfig = config;
     writeStore(store);
+    cacheSet(`verifyConfig_${guildId}`, config || null);
     return true;
 }
 

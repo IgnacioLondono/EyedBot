@@ -15,6 +15,15 @@ const OPEN_PREFIX = 'ticket_open_';
 const MODAL_PREFIX = 'ticket_reason_';
 const CLOSE_ID = 'ticket_close';
 
+async function sendEphemeral(interaction, content) {
+    if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content }).catch(() => null);
+        return;
+    }
+
+    await interaction.reply({ content, flags: 64 }).catch(() => null);
+}
+
 function toSafeChannelName(raw) {
     return String(raw || '')
         .toLowerCase()
@@ -70,19 +79,19 @@ async function showTicketReasonModal(interaction, guildId) {
 async function createTicketChannel(interaction, guildId, reason) {
     const guild = interaction.guild;
     if (!guild || String(guild.id) !== String(guildId)) {
-        await interaction.reply({ content: 'Este boton no corresponde a este servidor.', flags: 64 }).catch(() => null);
+        await sendEphemeral(interaction, 'Este boton no corresponde a este servidor.');
         return;
     }
 
     const cfg = await resolveConfig(guildId);
     if (!cfg) {
-        await interaction.reply({ content: 'El sistema de tickets no esta activo.', flags: 64 }).catch(() => null);
+        await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
         return;
     }
 
     const me = guild.members.me || await guild.members.fetch(interaction.client.user.id).catch(() => null);
     if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
-        await interaction.reply({ content: 'No tengo permisos para crear canales de ticket.', flags: 64 }).catch(() => null);
+        await sendEphemeral(interaction, 'No tengo permisos para crear canales de ticket.');
         return;
     }
 
@@ -91,7 +100,7 @@ async function createTicketChannel(interaction, guildId, reason) {
     );
 
     if (existing) {
-        await interaction.reply({ content: `Ya tienes un ticket abierto: <#${existing.id}>`, flags: 64 }).catch(() => null);
+        await sendEphemeral(interaction, `Ya tienes un ticket abierto: <#${existing.id}>`);
         return;
     }
 
@@ -145,7 +154,7 @@ async function createTicketChannel(interaction, guildId, reason) {
     }).catch(() => null);
 
     if (!created) {
-        await interaction.reply({ content: 'No pude crear el canal del ticket.', flags: 64 }).catch(() => null);
+        await sendEphemeral(interaction, 'No pude crear el canal del ticket.');
         return;
     }
 
@@ -167,7 +176,7 @@ async function createTicketChannel(interaction, guildId, reason) {
         components: [new ActionRowBuilder().addComponents(closeBtn)]
     }).catch(() => null);
 
-    await interaction.reply({ content: `Ticket creado: <#${created.id}>`, flags: 64 }).catch(() => null);
+    await sendEphemeral(interaction, `Ticket creado: <#${created.id}>`);
 }
 
 async function closeTicket(interaction) {
@@ -215,6 +224,8 @@ async function handleTicketButton(interaction) {
 async function handleTicketModal(interaction) {
     if (!interaction?.isModalSubmit()) return false;
     if (!interaction.customId.startsWith(MODAL_PREFIX)) return false;
+
+    await interaction.deferReply({ flags: 64 }).catch(() => null);
 
     const guildId = interaction.customId.slice(MODAL_PREFIX.length);
     const reason = interaction.fields.getTextInputValue('ticket_reason_input') || 'Sin motivo';
