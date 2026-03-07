@@ -16,8 +16,11 @@ module.exports = {
         const welcomeChannelId = welcomeConfig?.channelId || await welcomeStore.getWelcomeChannelId(member.guild.id);
         if (!welcomeChannelId) return;
 
-        const channel = member.guild.channels.cache.get(welcomeChannelId);
-        if (!channel) return;
+        let channel = member.guild.channels.cache.get(welcomeChannelId);
+        if (!channel) {
+            channel = await member.guild.channels.fetch(welcomeChannelId).catch(() => null);
+        }
+        if (!channel || !channel.isTextBased()) return;
 
         if (welcomeConfig && welcomeConfig.enabled === false) return;
 
@@ -54,7 +57,7 @@ module.exports = {
         );
         embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
 
-        channel.send({ embeds: [embed] });
+        await channel.send({ embeds: [embed] }).catch(() => null);
     }
 };
 

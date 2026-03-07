@@ -13,6 +13,7 @@ let currentServerGuilds = [];
 let welcomeImageFile = null;
 let welcomeImagePreviewUrl = '';
 const gatedNavButtonIds = ['embedBtn', 'statsBtn', 'commandsBtn', 'serverBtn'];
+let serverFeaturesUnlocked = false;
 
 function setServerFeaturesNavigationVisible(isVisible) {
     gatedNavButtonIds.forEach((id) => {
@@ -23,9 +24,7 @@ function setServerFeaturesNavigationVisible(isVisible) {
 }
 
 function hasSelectedGuildContext() {
-    const serverSelectValue = document.getElementById('serverSelect')?.value || '';
-    const embedGuildValue = document.getElementById('guildSelect')?.value || '';
-    return Boolean(currentServerGuildId || serverSelectValue || embedGuildValue);
+    return serverFeaturesUnlocked && Boolean(currentServerGuildId);
 }
 
 // Función auxiliar para fetch con credenciales
@@ -237,8 +236,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Cargar estado guardado
     const savedState = loadState();
-    const hasSavedGuildSelection = Boolean(savedState?.serverSection?.selectedGuildId || savedState?.embedForm?.guildId);
-    setServerFeaturesNavigationVisible(hasSavedGuildSelection);
+    serverFeaturesUnlocked = false;
+    currentServerGuildId = '';
+    setServerFeaturesNavigationVisible(false);
     
     await loadGuilds();
     await loadStats();
@@ -1286,7 +1286,7 @@ async function selectServerGuild(guildId) {
 
     if (!guildId) {
         currentServerGuildId = '';
-        setServerFeaturesNavigationVisible(hasSelectedGuildContext());
+        setServerFeaturesNavigationVisible(serverFeaturesUnlocked && hasSelectedGuildContext());
         if (serverSelect) serverSelect.value = '';
         renderServerTabs(currentServerGuilds, '');
         if (serverInfoContainer) serverInfoContainer.innerHTML = '';
@@ -1297,7 +1297,7 @@ async function selectServerGuild(guildId) {
     }
 
     currentServerGuildId = guildId;
-    setServerFeaturesNavigationVisible(true);
+    setServerFeaturesNavigationVisible(serverFeaturesUnlocked && hasSelectedGuildContext());
     if (serverSelect) serverSelect.value = guildId;
     renderServerTabs(currentServerGuilds, guildId);
 
@@ -1927,6 +1927,7 @@ async function moderateUser(guildId, userId, action) {
 
 // Funciones globales
 window.selectGuild = function(guildId) {
+    serverFeaturesUnlocked = true;
     currentServerGuildId = guildId;
     setServerFeaturesNavigationVisible(true);
 
