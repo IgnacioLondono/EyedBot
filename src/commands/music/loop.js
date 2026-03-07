@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { QueueRepeatMode } = require('discord-player');
-const { getQueueOrReply, userInSameVoice } = require('./_common');
+const { getQueueOrReply, userInSameVoice, repeatModeChoices, repeatModeFromString } = require('./_common');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -11,11 +10,7 @@ module.exports = {
                 .setName('modo')
                 .setDescription('Modo de loop')
                 .setRequired(true)
-                .addChoices(
-                    { name: 'off', value: 'off' },
-                    { name: 'track', value: 'track' },
-                    { name: 'queue', value: 'queue' }
-                )
+                .addChoices(...repeatModeChoices())
         ),
     cooldown: 2,
     async execute(interaction) {
@@ -25,7 +20,14 @@ module.exports = {
         if (!voiceCheck.ok) return interaction.reply({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Error').setDescription(voiceCheck.error)], flags: 64 });
 
         const mode = interaction.options.getString('modo');
-        const value = mode === 'track' ? QueueRepeatMode.TRACK : mode === 'queue' ? QueueRepeatMode.QUEUE : QueueRepeatMode.OFF;
+        const value = repeatModeFromString(mode);
+        if (value === null) {
+            return interaction.reply({
+                embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ No soportado').setDescription('Autoplay no está disponible con esta versión de discord-player.')],
+                flags: 64
+            });
+        }
+
         queue.setRepeatMode(value);
 
         return interaction.reply({ embeds: [new EmbedBuilder().setColor('#0099FF').setTitle('🔁 Loop').setDescription(`Modo: **${mode}**`)] });
