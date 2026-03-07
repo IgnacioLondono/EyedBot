@@ -13,8 +13,10 @@ const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
+const levelingStore = require('../src/utils/leveling-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { ticketButtonCustomIdForGuild } = require('../src/events/ticket-interaction');
+const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -698,6 +700,114 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => 
     } catch (error) {
         console.error('Error publicando ticket panel:', error);
         res.status(500).json({ error: 'Error al publicar panel de tickets' });
+    }
+});
+
+function normalizeLevelingConfigInput(body = {}, current = null, userId = 'unknown') {
+    const base = current && typeof current === 'object' ? current : levelingStore.defaultConfig();
+
+    const messageXpMin = Math.max(1, Math.min(300, Number.parseInt(body.messageXpMin ?? base.messageXpMin ?? 10, 10) || 10));
+    const messageXpMax = Math.max(messageXpMin, Math.min(500, Number.parseInt(body.messageXpMax ?? base.messageXpMax ?? 16, 10) || 16));
+
+    const roleRewards = Array.isArray(body.roleRewards)
+        ? body.roleRewards
+            .map((item) => ({
+                level: Math.max(1, Number.parseInt(item?.level, 10) || 1),
+                roleId: String(item?.roleId || '').trim()
+            }))
+            .filter((item) => item.roleId)
+            .sort((a, b) => a.level - b.level)
+            .slice(0, 50)
+        : (Array.isArray(base.roleRewards) ? base.roleRewards : []);
+
+    return {
+        enabled: body.enabled === true,
+        messageXpEnabled: body.messageXpEnabled !== false,
+        voiceXpEnabled: body.voiceXpEnabled !== false,
+        messageCooldownMs: Math.max(10000, Math.min(300000, Number.parseInt(body.messageCooldownMs ?? base.messageCooldownMs ?? 45000, 10) || 45000)),
+        messageXpMin,
+        messageXpMax,
+        voiceXpPerMinute: Math.max(1, Math.min(100, Number.parseInt(body.voiceXpPerMinute ?? base.voiceXpPerMinute ?? 6, 10) || 6)),
+        voiceRequirePeers: body.voiceRequirePeers !== false,
+        difficulty: sanitizeDifficulty(body.difficulty || base.difficulty || {}),
+        roleRewards,
+        updatedAt: new Date().toISOString(),
+        updatedBy: userId
+    };
+}
+
+app.get('/api/guild/:guildId/leveling-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await levelingStore.getLevelingConfig(guildId);
+        res.json(config || levelingStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo leveling config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de niveles' });
+    }
+});
+
+app.post('/api/guild/:guildId/leveling-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const current = await levelingStore.getLevelingConfig(guildId);
+        const config = normalizeLevelingConfigInput(req.body || {}, current, req.session.user?.id || 'unknown');
+        await levelingStore.setLevelingConfig(guildId, config);
+
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando leveling config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de niveles' });
+    }
+});
+
+app.get('/api/guild/:guildId/leveling-leaderboard', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const config = await levelingStore.getLevelingConfig(guildId);
+        const users = await levelingStore.listGuildUsers(guildId);
+
+        const top = users
+            .sort((a, b) => (b.xp || 0) - (a.xp || 0))
+            .slice(0, 25)
+            .map((entry) => {
+                const member = guild.members.cache.get(entry.userId);
+                const user = member?.user || botClient.users.cache.get(entry.userId) || null;
+                const progress = getProgress(entry.xp || 0, config?.difficulty || {});
+                return {
+                    userId: entry.userId,
+                    username: user?.username || 'Usuario',
+                    tag: user?.tag || `ID ${entry.userId}`,
+                    avatar: user?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null,
+                    xp: entry.xp || 0,
+                    level: progress.level,
+                    messageCount: entry.messageCount || 0,
+                    voiceMinutes: entry.voiceMinutes || 0,
+                    progressPercent: progress.percent
+                };
+            });
+
+        res.json({
+            enabled: config?.enabled === true,
+            totalTrackedUsers: users.length,
+            leaderboard: top
+        });
+    } catch (error) {
+        console.error('Error obteniendo leaderboard de niveles:', error);
+        res.status(500).json({ error: 'Error al obtener leaderboard de niveles' });
     }
 });
 
