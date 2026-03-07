@@ -28,7 +28,7 @@ COPY web/ ./web/
 COPY verificar-*.js ./
 
 # Crear directorios necesarios
-RUN mkdir -p logs data
+RUN mkdir -p logs data backups
 
 # Variables de entorno por defecto
 ENV NODE_ENV=production

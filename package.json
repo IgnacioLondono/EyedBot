@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "deploy": "node src/deploy-commands.js",
+    "backup:now": "node src/scripts/backup-now.js",
     "verify-oauth": "node verificar-oauth.js",
     "verify-gemini": "node verificar-gemini.js"
   },

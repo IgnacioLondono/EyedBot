@@ -11,6 +11,7 @@ const fs = require('fs');
 const multer = require('multer');
 const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
+const verifyStore = require('../src/utils/verify-config-store');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -140,6 +141,12 @@ function ensureWelcomeUploadsDir() {
     return uploadsDir;
 }
 
+function ensureVerifyUploadsDir() {
+    const uploadsDir = path.join(__dirname, 'public', 'uploads', 'verify');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    return uploadsDir;
+}
+
 function sanitizeUploadName(name = 'welcome-image') {
     return String(name)
         .toLowerCase()
@@ -158,6 +165,32 @@ function extFromMimeOrName(mimeType = '', originalName = '') {
 
     const fromName = path.extname(String(originalName).toLowerCase());
     return ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(fromName) ? (fromName === '.jpeg' ? '.jpg' : fromName) : '.jpg';
+}
+
+function extractUploadPath(rawUrl = '') {
+    const raw = String(rawUrl || '').trim();
+    if (!raw) return '';
+
+    if (raw.startsWith('/uploads/')) return raw;
+
+    try {
+        const parsed = new URL(raw);
+        if (String(parsed.pathname || '').startsWith('/uploads/')) return parsed.pathname;
+    } catch {
+        // non-URL strings
+    }
+
+    return '';
+}
+
+function resolveLocalUploadFile(rawUrl = '') {
+    const uploadPath = extractUploadPath(rawUrl);
+    if (!uploadPath) return null;
+
+    const cleaned = uploadPath.replace(/^\/+/, '');
+    const absolute = path.join(__dirname, 'public', cleaned);
+    if (!fs.existsSync(absolute)) return null;
+    return absolute;
 }
 
 // Función para inyectar el cliente del bot
@@ -395,6 +428,154 @@ function applyWelcomeTemplate(text, member) {
         .replace(/\{memberCount\}/gi, String(member.guild.memberCount));
 }
 
+function normalizeVerifyEmojiInput(rawEmoji = '✅') {
+    const raw = String(rawEmoji || '✅').trim();
+    const custom = raw.match(/^<a?:\w+:(\d+)>$/);
+    if (custom?.[1]) {
+        return { reactValue: custom[1], stored: custom[1], display: raw };
+    }
+    return { reactValue: raw, stored: raw, display: raw };
+}
+
+app.get('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const cfg = await verifyStore.getVerifyConfig(guildId);
+        if (!cfg) {
+            return res.json({
+                enabled: false,
+                channelId: '',
+                roleId: '',
+                emoji: '✅',
+                title: 'Verify',
+                message: '¡Reacciona a este mensaje para ver los demás canales!',
+                color: '7c4dff',
+                footer: '',
+                imageUrl: '',
+                removeRoleOnUnreact: false,
+                messageId: ''
+            });
+        }
+
+        return res.json(cfg);
+    } catch (error) {
+        console.error('Error obteniendo verify config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de verificación' });
+    }
+});
+
+app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const body = req.body || {};
+        const config = {
+            enabled: body.enabled === true,
+            channelId: String(body.channelId || '').trim(),
+            roleId: String(body.roleId || '').trim(),
+            emoji: String(body.emoji || '✅').trim().slice(0, 80),
+            title: String(body.title || 'Verify').slice(0, 256),
+            message: String(body.message || '¡Reacciona a este mensaje para ver los demás canales!').slice(0, 2000),
+            color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
+            footer: String(body.footer || '').slice(0, 300),
+            imageUrl: String(body.imageUrl || '').slice(0, 1000),
+            removeRoleOnUnreact: body.removeRoleOnUnreact === true,
+            messageId: String(body.messageId || '').trim(),
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+
+        await verifyStore.setVerifyConfig(guildId, config);
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando verify config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de verificación' });
+    }
+});
+
+app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await verifyStore.getVerifyConfig(guildId);
+        if (!cfg?.channelId || !cfg?.roleId) {
+            return res.status(400).json({ error: 'Configura canal y rol antes de publicar' });
+        }
+
+        const channel = guild.channels.cache.get(cfg.channelId) || await guild.channels.fetch(cfg.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(404).json({ error: 'Canal de verificación no encontrado o no es de texto' });
+        }
+
+        const role = guild.roles.cache.get(cfg.roleId) || await guild.roles.fetch(cfg.roleId).catch(() => null);
+        if (!role) return res.status(404).json({ error: 'Rol de verificación no encontrado' });
+
+        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        if (!me) return res.status(500).json({ error: 'No pude obtener los permisos del bot en el servidor' });
+
+        if (!channel.permissionsFor(me)?.has(['SendMessages', 'EmbedLinks', 'AddReactions'])) {
+            return res.status(403).json({ error: 'Faltan permisos: Enviar mensajes, Insertar enlaces o Añadir reacciones' });
+        }
+
+        if (!me.permissions.has('ManageRoles') || me.roles.highest.position <= role.position) {
+            return res.status(403).json({ error: 'El bot no puede administrar ese rol (revisa jerarquía y permiso Gestionar roles)' });
+        }
+
+        const { EmbedBuilder } = require('discord.js');
+        const embed = new EmbedBuilder()
+            .setColor((cfg.color || '7c4dff').replace('#', ''))
+            .setTitle(cfg.title || 'Verify')
+            .setDescription(cfg.message || '¡Reacciona para verificarte!');
+
+        if (cfg.footer) embed.setFooter({ text: cfg.footer });
+        const files = [];
+        if (cfg.imageUrl) {
+            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
+            if (localImagePath) {
+                const attachmentName = path.basename(localImagePath);
+                embed.setImage(`attachment://${attachmentName}`);
+                files.push({ attachment: localImagePath, name: attachmentName });
+            } else {
+                embed.setImage(cfg.imageUrl);
+            }
+        }
+
+        const posted = await channel.send({ embeds: [embed], files });
+
+        const emojiData = normalizeVerifyEmojiInput(cfg.emoji || '✅');
+        await posted.react(emojiData.reactValue).catch(() => null);
+
+        const updatedCfg = {
+            ...cfg,
+            enabled: true,
+            emoji: emojiData.stored,
+            emojiDisplay: emojiData.display,
+            messageId: posted.id,
+            channelId: channel.id,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+
+        await verifyStore.setVerifyConfig(guildId, updatedCfg);
+
+        res.json({ success: true, config: updatedCfg, messageId: posted.id, channelId: channel.id });
+    } catch (error) {
+        console.error('Error publicando verify embed:', error);
+        res.status(500).json({ error: 'Error al publicar el embed de verificación' });
+    }
+});
+
 app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -426,6 +607,35 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error obteniendo welcome config:', error);
         res.status(500).json({ error: 'Error al obtener configuración de bienvenida' });
+    }
+});
+
+app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFile'), async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const file = req.file;
+        if (!file?.buffer) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+        if (!String(file.mimetype || '').startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
+
+        const uploadsDir = ensureVerifyUploadsDir();
+        const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `verify-${guildId}`);
+        const extension = extFromMimeOrName(file.mimetype, file.originalname);
+        const fileName = `${guildId}_${Date.now()}_${baseName}${extension}`;
+        const outputPath = path.join(uploadsDir, fileName);
+
+        fs.writeFileSync(outputPath, file.buffer);
+
+        const publicPath = `/uploads/verify/${fileName}`;
+        const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
+        res.json({ success: true, url: publicUrl, path: publicPath });
+    } catch (error) {
+        console.error('Error subiendo imagen de verify:', error);
+        res.status(500).json({ error: 'Error al subir imagen de verify' });
     }
 });
 
@@ -519,12 +729,22 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
             .setDescription(applyWelcomeTemplate(cfg?.message || '¡Hola {user}!', member));
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
-        if (cfg?.imageUrl) embed.setImage(cfg.imageUrl);
+        const files = [];
+        if (cfg?.imageUrl) {
+            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
+            if (localImagePath) {
+                const attachmentName = path.basename(localImagePath);
+                embed.setImage(`attachment://${attachmentName}`);
+                files.push({ attachment: localImagePath, name: attachmentName });
+            } else {
+                embed.setImage(cfg.imageUrl);
+            }
+        }
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;
-        await channel.send({ content, embeds: [embed] });
+        await channel.send({ content, embeds: [embed], files });
 
         res.json({ success: true, message: 'Prueba de bienvenida enviada' });
     } catch (error) {
