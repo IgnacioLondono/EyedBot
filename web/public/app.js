@@ -12,8 +12,9 @@ let currentServerGuildId = '';
 let currentServerGuilds = [];
 let welcomeImageFile = null;
 let welcomeImagePreviewUrl = '';
-const gatedNavButtonIds = ['embedBtn', 'statsBtn', 'commandsBtn', 'serverBtn'];
+const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
+let currentServerPaneId = 'serverPaneOverview';
 
 const DASHBOARD_ICON = `
     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -131,27 +132,37 @@ function activateServerSideButton(button) {
     if (button) button.classList.add('active');
 }
 
+function switchServerPane(paneId, button = null) {
+    if (!paneId) return;
+    const panes = document.querySelectorAll('.server-pane');
+    panes.forEach((pane) => pane.classList.remove('active'));
+
+    const targetPane = document.getElementById(paneId);
+    if (!targetPane) return;
+    targetPane.classList.add('active');
+    currentServerPaneId = paneId;
+
+    if (button) activateServerSideButton(button);
+}
+
 function handleServerSideAction(button) {
     if (!button) return;
-    const action = button.dataset.sideAction || '';
-    const target = button.dataset.sideTarget || '';
-    const note = button.dataset.sideNote || '';
 
-    activateServerSideButton(button);
+    const paneId = button.dataset.serverPane || '';
+    const quickSection = button.dataset.quickSection || '';
 
-    if (action === 'section' && target) {
-        showSection(target);
-        if (note && target === 'commandsSection') {
-            showToast(`${note}: disponible dentro de Comandos`, 'success');
-        }
+    if (paneId) {
+        showSection('serverSection');
+        switchServerPane(paneId, button);
         return;
     }
 
-    if (action === 'server-scroll' && target) {
-        showSection('serverSection');
-        const el = document.getElementById(target);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (quickSection) {
+        activateServerSideButton(button);
+        showSection(quickSection);
+        const quickName = (button.textContent || '').trim();
+        if (quickName) {
+            showToast(`Abriendo atajo rapido: ${quickName}`, 'success');
         }
     }
 }
@@ -448,24 +459,6 @@ function setupEventListeners() {
         showSection('dashboard');
         await loadGuilds();
     });
-    document.getElementById('embedBtn').addEventListener('click', () => showSection('embedSection'));
-    document.getElementById('statsBtn').addEventListener('click', () => {
-        showSection('statsSection');
-        loadStats();
-    });
-    document.getElementById('logsBtn').addEventListener('click', () => {
-        showSection('logsSection');
-        loadLogs();
-    });
-    document.getElementById('commandsBtn').addEventListener('click', () => {
-        showSection('commandsSection');
-        loadCommands();
-    });
-    document.getElementById('serverBtn').addEventListener('click', () => {
-        showSection('serverSection');
-        loadGuildsForServer();
-    });
-
     document.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
@@ -474,6 +467,24 @@ function setupEventListeners() {
         event.preventDefault();
         handleServerSideAction(sideBtn);
     });
+
+    const serverTabSearch = document.getElementById('serverTabSearch');
+    if (serverTabSearch) {
+        serverTabSearch.addEventListener('input', (event) => {
+            const query = String(event.target?.value || '').trim().toLowerCase();
+            document.querySelectorAll('.side-menu-btn').forEach((btn) => {
+                const label = (btn.textContent || '').trim().toLowerCase();
+                const isVisible = !query || label.includes(query);
+                btn.classList.toggle('hidden', !isVisible);
+            });
+
+            document.querySelectorAll('.side-menu-group').forEach((group) => {
+                const title = group.querySelector('h4');
+                const visibleButtons = group.querySelectorAll('.side-menu-btn:not(.hidden)');
+                if (title) title.classList.toggle('hidden', visibleButtons.length === 0);
+            });
+        });
+    }
 
     // Menú de usuario
     document.getElementById('userMenu').addEventListener('click', (e) => {
@@ -581,7 +592,7 @@ function setupEventListeners() {
 
 // Mostrar sección
 function showSection(sectionId) {
-    if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'commandsSection', 'serverSection'].includes(sectionId)) {
+    if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'commandsSection', 'logsSection', 'serverSection'].includes(sectionId)) {
         showToast('Primero selecciona un servidor en el dashboard', 'warning');
         sectionId = 'dashboard';
     }
@@ -596,18 +607,19 @@ function showSection(sectionId) {
     });
 
     if (sectionId === 'dashboard') {
-        document.getElementById('dashboardBtn').classList.add('active');
+        const dashboardBtn = document.getElementById('dashboardBtn');
+        if (dashboardBtn) dashboardBtn.classList.add('active');
     } else if (sectionId === 'embedSection') {
-        document.getElementById('embedBtn').classList.add('active');
         loadGuildsForEmbed();
     } else if (sectionId === 'statsSection') {
-        document.getElementById('statsBtn').classList.add('active');
+        loadStats();
     } else if (sectionId === 'logsSection') {
-        document.getElementById('logsBtn').classList.add('active');
+        loadLogs();
     } else if (sectionId === 'commandsSection') {
-        document.getElementById('commandsBtn').classList.add('active');
+        loadCommands();
     } else if (sectionId === 'serverSection') {
-        document.getElementById('serverBtn').classList.add('active');
+        loadGuildsForServer();
+        switchServerPane(currentServerPaneId || 'serverPaneOverview');
     }
     
     // Guardar sección activa
@@ -1603,14 +1615,17 @@ async function loadAutomationPanel(guildId) {
         spamWindow: '10',
         antiLinksEnabled: true,
         antiCapsEnabled: false,
+        antiInvitesEnabled: true,
+        antiFloodAttachments: false,
         maxMentions: '5',
-        raidMode: 'balanced'
+        raidMode: 'balanced',
+        punishmentMode: 'mute'
     };
     const prefs = getServerPreference(guildId, 'automation', defaults);
 
     container.innerHTML = `
-        <h3 class="welcome-panel-title">Automation Center</h3>
-        <p class="welcome-panel-subtitle">Configura reglas rápidas de automatización para moderación preventiva del servidor.</p>
+        <h3 class="welcome-panel-title">Centro de automatizacion</h3>
+        <p class="welcome-panel-subtitle">Configura reglas rapidas para prevenir spam y comportamiento abusivo sin perder control manual.</p>
         <div class="control-grid">
             <div class="control-card">
                 <h4>Anti Spam</h4>
@@ -1630,6 +1645,8 @@ async function loadAutomationPanel(guildId) {
                 <h4>Contenido</h4>
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiLinksEnabled" ${prefs.antiLinksEnabled ? 'checked' : ''}> Bloquear enlaces sospechosos</label>
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiCapsEnabled" ${prefs.antiCapsEnabled ? 'checked' : ''}> Bloquear exceso de mayúsculas</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiInvitesEnabled" ${prefs.antiInvitesEnabled ? 'checked' : ''}> Bloquear invitaciones externas</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiFloodAttachments" ${prefs.antiFloodAttachments ? 'checked' : ''}> Limitar flood de adjuntos</label>
                 <div class="form-group" style="margin-top:0.6rem;">
                     <label>Máximo menciones por mensaje</label>
                     <input type="number" min="1" max="25" class="form-control" data-pref-key="maxMentions" value="${escapeHtmlForValue(prefs.maxMentions)}">
@@ -1645,20 +1662,71 @@ async function loadAutomationPanel(guildId) {
                         <option value="strict" ${prefs.raidMode === 'strict' ? 'selected' : ''}>Estricto</option>
                     </select>
                 </div>
-                <small style="color:var(--text-muted);">Ajuste de referencia para futuras reglas avanzadas.</small>
+                <div class="form-group" style="margin-top:0.55rem;">
+                    <label>Accion automatica</label>
+                    <select class="form-control" data-pref-key="punishmentMode">
+                        <option value="warn" ${prefs.punishmentMode === 'warn' ? 'selected' : ''}>Advertir</option>
+                        <option value="mute" ${prefs.punishmentMode === 'mute' ? 'selected' : ''}>Silenciar</option>
+                        <option value="kick" ${prefs.punishmentMode === 'kick' ? 'selected' : ''}>Expulsar</option>
+                    </select>
+                </div>
+                <small style="color:var(--text-muted);">Puedes usar presets y luego ajustar campos puntuales.</small>
             </div>
         </div>
         <div class="form-actions" style="margin-top:1rem;">
+            <button type="button" class="btn btn-secondary" id="presetSoftAutomationBtn">Preset Suave</button>
+            <button type="button" class="btn btn-secondary" id="presetStrictAutomationBtn">Preset Estricto</button>
             <button type="button" class="btn btn-primary" id="saveAutomationBtn">Guardar Automatización</button>
         </div>
     `;
+
+    const presetSoftBtn = document.getElementById('presetSoftAutomationBtn');
+    const presetStrictBtn = document.getElementById('presetStrictAutomationBtn');
+    if (presetSoftBtn) {
+        presetSoftBtn.addEventListener('click', () => {
+            const softPreset = {
+                antiSpamEnabled: true,
+                spamMessages: '8',
+                spamWindow: '12',
+                antiLinksEnabled: false,
+                antiCapsEnabled: false,
+                antiInvitesEnabled: true,
+                antiFloodAttachments: false,
+                maxMentions: '8',
+                raidMode: 'soft',
+                punishmentMode: 'warn'
+            };
+            setServerPreference(guildId, 'automation', softPreset);
+            showToast('Preset suave aplicado', 'success');
+            loadAutomationPanel(guildId);
+        });
+    }
+    if (presetStrictBtn) {
+        presetStrictBtn.addEventListener('click', () => {
+            const strictPreset = {
+                antiSpamEnabled: true,
+                spamMessages: '4',
+                spamWindow: '8',
+                antiLinksEnabled: true,
+                antiCapsEnabled: true,
+                antiInvitesEnabled: true,
+                antiFloodAttachments: true,
+                maxMentions: '3',
+                raidMode: 'strict',
+                punishmentMode: 'mute'
+            };
+            setServerPreference(guildId, 'automation', strictPreset);
+            showToast('Preset estricto aplicado', 'success');
+            loadAutomationPanel(guildId);
+        });
+    }
 
     const saveBtn = document.getElementById('saveAutomationBtn');
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             const values = collectPanelValues('automationContainer');
             setServerPreference(guildId, 'automation', values);
-            showToast('Opciones de automatización guardadas', 'success');
+            showToast('Opciones de automatizacion guardadas', 'success');
         });
     }
 }
@@ -1672,7 +1740,9 @@ async function loadSecurityPanel(guildId) {
         memberAgeMinutes: '15',
         highRiskWordsEnabled: true,
         suspiciousLinkScan: true,
-        emergencyLockdown: false
+        emergencyLockdown: false,
+        antiVpnProxy: false,
+        joinRateThreshold: '7'
     };
     const prefs = getServerPreference(guildId, 'security', defaults);
 
@@ -1681,14 +1751,14 @@ async function loadSecurityPanel(guildId) {
     const verificationLevel = String(info?.verificationLevel ?? 'unknown');
 
     container.innerHTML = `
-        <h3 class="welcome-panel-title">Security Center</h3>
-        <p class="welcome-panel-subtitle">Refuerza la entrada de usuarios y activa chequeos de seguridad del servidor.</p>
+        <h3 class="welcome-panel-title">Centro de seguridad</h3>
+        <p class="welcome-panel-subtitle">Refuerza el ingreso de usuarios y define umbrales de proteccion para intentos de raid.</p>
         <div class="control-grid">
             <div class="control-card">
                 <h4>Entrada de miembros</h4>
-                <p style="color:var(--text-secondary); margin-bottom:0.5rem;">Nivel verificación Discord: <strong>${escapeHtml(verificationLevel)}</strong></p>
+                <p style="color:var(--text-secondary); margin-bottom:0.5rem;">Nivel verificacion Discord: <strong>${escapeHtml(verificationLevel)}</strong></p>
                 <div class="form-group">
-                    <label>Edad mínima de cuenta (días)</label>
+                    <label>Edad minima de cuenta (dias)</label>
                     <input type="number" min="0" max="90" class="form-control" data-pref-key="accountAgeDays" value="${escapeHtmlForValue(prefs.accountAgeDays)}">
                 </div>
                 <div class="form-group">
@@ -1697,10 +1767,15 @@ async function loadSecurityPanel(guildId) {
                 </div>
             </div>
             <div class="control-card">
-                <h4>Detección</h4>
+                <h4>Deteccion</h4>
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="highRiskWordsEnabled" ${prefs.highRiskWordsEnabled ? 'checked' : ''}> Filtro de palabras de alto riesgo</label>
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="suspiciousLinkScan" ${prefs.suspiciousLinkScan ? 'checked' : ''}> Escaneo de enlaces sospechosos</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiVpnProxy" ${prefs.antiVpnProxy ? 'checked' : ''}> Bloquear IPs con VPN/Proxy (referencial)</label>
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="emergencyLockdown" ${prefs.emergencyLockdown ? 'checked' : ''}> Activar modo lockdown de emergencia</label>
+                <div class="form-group" style="margin-top:0.55rem;">
+                    <label>Umbral de joins por minuto</label>
+                    <input type="number" min="2" max="50" class="form-control" data-pref-key="joinRateThreshold" value="${escapeHtmlForValue(prefs.joinRateThreshold)}">
+                </div>
             </div>
         </div>
         <div class="form-actions" style="margin-top:1rem;">
@@ -1728,7 +1803,9 @@ async function loadNotificationsPanel(guildId) {
         moderationActions: true,
         ticketAlerts: true,
         levelingAlerts: false,
-        streamAlerts: false
+        streamAlerts: false,
+        dailyDigest: false,
+        digestHour: '21'
     };
     const prefs = getServerPreference(guildId, 'notifications', defaults);
 
@@ -1738,8 +1815,8 @@ async function loadNotificationsPanel(guildId) {
         : [];
 
     container.innerHTML = `
-        <h3 class="welcome-panel-title">Notifications Center</h3>
-        <p class="welcome-panel-subtitle">Define qué eventos quieres notificar y en qué canal centralizarlos.</p>
+        <h3 class="welcome-panel-title">Centro de notificaciones</h3>
+        <p class="welcome-panel-subtitle">Define que eventos quieres notificar y en que canal centralizarlos.</p>
         <div class="control-grid">
             <div class="control-card">
                 <h4>Canal principal</h4>
@@ -1758,14 +1835,28 @@ async function loadNotificationsPanel(guildId) {
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="ticketAlerts" ${prefs.ticketAlerts ? 'checked' : ''}> Alertas de tickets</label>
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="levelingAlerts" ${prefs.levelingAlerts ? 'checked' : ''}> Subidas de nivel</label>
                 <label class="checkbox-inline"><input type="checkbox" data-pref-key="streamAlerts" ${prefs.streamAlerts ? 'checked' : ''}> Twitch / YouTube</label>
+                <label class="checkbox-inline"><input type="checkbox" data-pref-key="dailyDigest" ${prefs.dailyDigest ? 'checked' : ''}> Resumen diario</label>
+                <div class="form-group" style="margin-top:0.55rem;">
+                    <label>Hora del resumen (0-23)</label>
+                    <input type="number" min="0" max="23" class="form-control" data-pref-key="digestHour" value="${escapeHtmlForValue(prefs.digestHour)}">
+                </div>
             </div>
         </div>
         <div class="form-actions" style="margin-top:1rem;">
+            <button type="button" class="btn btn-secondary" id="testNotificationsBtn">Enviar prueba visual</button>
             <button type="button" class="btn btn-primary" id="saveNotificationsBtn">Guardar Notificaciones</button>
         </div>
     `;
 
     const saveBtn = document.getElementById('saveNotificationsBtn');
+    const testBtn = document.getElementById('testNotificationsBtn');
+    if (testBtn) {
+        testBtn.addEventListener('click', () => {
+            const values = collectPanelValues('notificationsContainer');
+            const channelId = values.notifyChannelId ? `#${values.notifyChannelId}` : 'sin canal';
+            showToast(`Prueba enviada (simulada) en ${channelId}`, 'success');
+        });
+    }
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             const values = collectPanelValues('notificationsContainer');
@@ -3029,8 +3120,9 @@ window.selectGuild = async function(guildId) {
     setServerFeaturesNavigationVisible(true);
     updateDashboardButtonState();
 
-    showSection('embedSection');
-    await loadGuildsForEmbed();
+    showSection('serverSection');
+    await loadGuildsForServer();
+    switchServerPane('serverPaneOverview');
 
     saveState();
 };

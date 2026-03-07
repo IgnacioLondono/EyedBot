@@ -1150,6 +1150,16 @@ body {
     font-size: 0.8rem;
 }
 
+.side-menu-search {
+    margin: 0.75rem 0 0.45rem;
+}
+
+.side-menu-search .form-control {
+    height: 36px;
+    font-size: 0.82rem;
+    border-radius: 10px;
+}
+
 .side-menu-group {
     margin-top: 0.95rem;
 }
@@ -1160,6 +1170,10 @@ body {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+}
+
+.side-menu-group h4.hidden {
+    display: none;
 }
 
 .side-menu-btn {
@@ -1189,8 +1203,20 @@ body {
     box-shadow: var(--shadow-blue);
 }
 
+.side-menu-btn.hidden {
+    display: none;
+}
+
 .server-content-area {
     min-width: 0;
+}
+
+.server-pane {
+    display: none;
+}
+
+.server-pane.active {
+    display: block;
 }
 
 .control-grid {
