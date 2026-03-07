@@ -7,6 +7,7 @@ const MusicSystem = require('./cogs/music');
 const config = require('./config');
 const { safeReply, isUnknownInteractionError } = require('./utils/interactions');
 const { handleReturnInteraction } = require('./utils/fun-return');
+const guildMemberAddEvent = require('./events/guildMemberAdd');
 require('dotenv').config();
 
 let webPanel = null;
@@ -26,6 +27,7 @@ const GUILD_ID = process.env.GUILD_ID;
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates
@@ -75,6 +77,14 @@ client.once('clientReady', () => {
     if (webPanel?.setBotClient) {
         webPanel.setBotClient(client);
         console.log('🔗 Panel web conectado al cliente del bot.');
+    }
+});
+
+client.on('guildMemberAdd', async (member) => {
+    try {
+        await guildMemberAddEvent.execute(member);
+    } catch (error) {
+        console.error('Error en guildMemberAdd:', error);
     }
 });
 
