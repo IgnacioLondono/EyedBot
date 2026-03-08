@@ -9,6 +9,7 @@ const guildMemberRemoveEvent = require('./events/guildMemberRemove');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
 const { handleTicketButton, handleTicketModal } = require('./events/ticket-interaction');
 const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
+const { handleVoiceStateUpdate } = require('./events/temp-voice');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 require('dotenv').config();
@@ -118,6 +119,14 @@ client.on('guildMemberRemove', async (member) => {
         await guildMemberRemoveEvent.execute(member);
     } catch (error) {
         console.error('Error en guildMemberRemove:', error);
+    }
+});
+
+client.on('voiceStateUpdate', async (oldState, newState) => {
+    try {
+        await handleVoiceStateUpdate(oldState, newState);
+    } catch (error) {
+        console.error('Error en voiceStateUpdate (temp voice):', error);
     }
 });
 
