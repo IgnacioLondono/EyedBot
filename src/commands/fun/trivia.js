@@ -2,6 +2,36 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const axios = require('axios');
 const config = require('../../config');
 
+const decodeHtml = (text = '') => {
+    return text
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ');
+};
+
+const difficultyLabels = {
+    easy: 'Facil',
+    medium: 'Media',
+    hard: 'Dificil'
+};
+
+async function translateToSpanish(text) {
+    if (!text || typeof text !== 'string') return text;
+
+    try {
+        const response = await axios.get(
+            `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|es`
+        );
+        const translated = response?.data?.responseData?.translatedText;
+        return translated ? decodeHtml(translated) : text;
+    } catch {
+        return text;
+    }
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('trivia')
@@ -22,36 +52,39 @@ module.exports = {
         const difficulty = interaction.options.getString('dificultad') || 'medium';
 
         try {
-            const response = await axios.get(`https://opentdb.com/api.php?amount=1&difficulty=${difficulty}&type=multiple&lang=es`);
+            const response = await axios.get(`https://opentdb.com/api.php?amount=1&difficulty=${difficulty}&type=multiple`);
             const question = response.data.results[0];
 
-            // Decodificar HTML entities en todas las respuestas
-            const decodeHtml = (text) => {
-                return text
-                    .replace(/&quot;/g, '"')
-                    .replace(/&#039;/g, "'")
-                    .replace(/&amp;/g, '&')
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>')
-                    .replace(/&nbsp;/g, ' ');
-            };
-
+            const decodedQuestion = decodeHtml(question.question);
+            const decodedCategory = decodeHtml(question.category);
             const decodedIncorrect = question.incorrect_answers.map(decodeHtml);
             const decodedCorrect = decodeHtml(question.correct_answer);
-            const answers = [...decodedIncorrect, decodedCorrect].sort(() => Math.random() - 0.5);
+            const shuffledAnswers = [...decodedIncorrect, decodedCorrect].sort(() => Math.random() - 0.5);
+            const correctIndex = shuffledAnswers.indexOf(decodedCorrect);
+
+            const translatedPayload = await Promise.all([
+                translateToSpanish(decodedQuestion),
+                translateToSpanish(decodedCategory),
+                ...shuffledAnswers.map((answer) => translateToSpanish(answer))
+            ]);
+
+            const translatedQuestion = translatedPayload[0] || decodedQuestion;
+            const translatedCategory = translatedPayload[1] || decodedCategory;
+            const translatedAnswers = translatedPayload.slice(2).map((answer, index) => answer || shuffledAnswers[index]);
+            const translatedCorrect = translatedAnswers[correctIndex] || decodedCorrect;
             
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
                 .setTitle('❓ Trivia')
-                .setDescription(decodeHtml(question.question))
+                .setDescription(translatedQuestion)
                 .addFields(
-                    { name: 'Categoría', value: decodeHtml(question.category), inline: true },
-                    { name: 'Dificultad', value: question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1), inline: true }
+                    { name: 'Categoria', value: translatedCategory, inline: true },
+                    { name: 'Dificultad', value: difficultyLabels[question.difficulty] || question.difficulty, inline: true }
                 )
                 .setFooter({ text: 'Tienes 30 segundos para responder' });
 
             // Limpiar las respuestas para los botones (máximo 80 caracteres)
-            const cleanAnswers = answers.map(a => decodeHtml(a).substring(0, 80));
+            const cleanAnswers = translatedAnswers.map((answer) => answer.substring(0, 80));
             
             const row = new ActionRowBuilder()
                 .addComponents(
@@ -66,9 +99,9 @@ module.exports = {
             // Guardar respuesta correcta temporalmente (decodificada)
             interaction.client.triviaAnswers = interaction.client.triviaAnswers || {};
             interaction.client.triviaAnswers[interaction.id] = {
-                correct: decodedCorrect,
-                answers: answers,
-                correctIndex: answers.indexOf(decodedCorrect)
+                correct: translatedCorrect,
+                answers: translatedAnswers,
+                correctIndex
             };
 
             setTimeout(() => {

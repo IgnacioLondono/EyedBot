@@ -3,6 +3,27 @@ const welcomeStore = require('../utils/welcome-config-store');
 const fs = require('fs');
 const path = require('path');
 
+// Queue welcome sends by channel so simultaneous joins are processed one by one.
+const welcomeSendQueues = new Map();
+
+function enqueueWelcomeSend(queueKey, task) {
+    const previous = welcomeSendQueues.get(queueKey) || Promise.resolve();
+    const next = previous
+        .catch(() => null)
+        .then(() => task());
+
+    welcomeSendQueues.set(
+        queueKey,
+        next.finally(() => {
+            if (welcomeSendQueues.get(queueKey) === next) {
+                welcomeSendQueues.delete(queueKey);
+            }
+        })
+    );
+
+    return next;
+}
+
 function applyTemplate(text, member) {
     return String(text || '')
         .replace(/\{user\}/gi, `${member}`)
@@ -48,6 +69,8 @@ module.exports = {
 
         if (welcomeConfig && welcomeConfig.enabled === false) return;
 
+        const queueKey = `${member.guild.id}:${channel.id}`;
+
         if (welcomeConfig) {
             const { EmbedBuilder } = require('discord.js');
             const embed = new EmbedBuilder()
@@ -75,7 +98,7 @@ module.exports = {
             }
 
             const content = welcomeConfig.mentionUser === false ? null : `${member}`;
-            await channel.send({ content, embeds: [embed], files }).catch(() => null);
+            await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files })).catch(() => null);
 
             if (welcomeConfig.dmEnabled && welcomeConfig.dmMessage) {
                 await member.send({ content: applyTemplate(welcomeConfig.dmMessage, member) }).catch(() => null);
@@ -91,7 +114,7 @@ module.exports = {
         );
         embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
 
-        await channel.send({ embeds: [embed] }).catch(() => null);
+        await enqueueWelcomeSend(queueKey, () => channel.send({ embeds: [embed] })).catch(() => null);
     }
 };
 
