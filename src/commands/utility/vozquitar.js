@@ -77,7 +77,7 @@ module.exports = {
         try {
             await channel.permissionOverwrites.delete(targetMember.id).catch(async () => {
                 await channel.permissionOverwrites.edit(targetMember.id, {
-                    ViewChannel: false,
+                    ViewChannel: true,
                     Connect: false,
                     Speak: false,
                     Stream: false,
