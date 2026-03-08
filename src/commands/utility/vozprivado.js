@@ -53,7 +53,7 @@ module.exports = {
         try {
             if (activate) {
                 await channel.permissionOverwrites.edit(guildId, {
-                    ViewChannel: false,
+                    ViewChannel: true,
                     Connect: false
                 });
 
