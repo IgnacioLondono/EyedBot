@@ -53,7 +53,7 @@ module.exports = {
                         moderation: ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce'],
                         music: ['play', 'search', 'pause', 'resume', 'stop', 'skip', 'queue', 'nowplaying', 'volume', 'shuffle', 'remove', 'loop', 'seek', 'filters'],
                         fun: ['gif', 'hug', 'kiss', 'slap', 'pat', 'punch', 'wink', 'meme', '8ball', 'coinflip', 'dice', 'avatar', 'userinfo', 'serverinfo', 'rate', 'choose', 'poll', 'emojify', 'cat', 'dog', 'trivia', 'ascii'],
-                        utility: ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre'],
+                        utility: ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre', 'vozprivado', 'vozinvitar'],
                         config: ['setwelcome', 'setprefix', 'autoresponder']
                     };
 
@@ -76,7 +76,7 @@ module.exports = {
             const moderationCmds = ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce'];
             const musicCmds = ['play', 'search', 'pause', 'resume', 'stop', 'skip', 'queue', 'nowplaying', 'volume', 'shuffle', 'remove', 'loop', 'seek', 'filters'];
             const funCmds = ['gif', 'hug', 'kiss', 'slap', 'pat', 'punch', 'wink', 'meme', '8ball', 'coinflip', 'dice', 'avatar', 'userinfo', 'serverinfo', 'rate', 'choose', 'poll', 'emojify', 'cat', 'dog', 'trivia', 'ascii'];
-            const utilityCmds = ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre'];
+            const utilityCmds = ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre', 'vozprivado', 'vozinvitar'];
 
             const modCount = Array.from(commands.values()).filter(c => moderationCmds.includes(c.data.name)).length;
             const musicCount = Array.from(commands.values()).filter(c => musicCmds.includes(c.data.name)).length;

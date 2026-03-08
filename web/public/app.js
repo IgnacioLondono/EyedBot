@@ -1744,7 +1744,9 @@ async function loadVoiceCreatorPanel(guildId) {
                     <p style="color:var(--text-secondary); margin-bottom:0.65rem;">1. El usuario entra al canal creador.</p>
                     <p style="color:var(--text-secondary); margin-bottom:0.65rem;">2. Se crea su canal privado temporal.</p>
                     <p style="color:var(--text-secondary); margin-bottom:0.65rem;">3. Cuando se vacía, se elimina solo.</p>
-                    <p style="color:var(--text-secondary); margin-top:0.8rem;">Para nombre personalizado usa <code>/voznombre nombre:&lt;tu nombre&gt;</code>.</p>
+                    <p style="color:var(--text-secondary); margin-top:0.8rem;">Nombre personalizado: <code>/voznombre nombre:&lt;tu nombre&gt;</code>.</p>
+                    <p style="color:var(--text-secondary); margin-top:0.45rem;">Privado/público: <code>/vozprivado activar:true|false</code>.</p>
+                    <p style="color:var(--text-secondary); margin-top:0.45rem;">Invitar a privado: <code>/vozinvitar usuario:@alguien</code>.</p>
                 </div>
             </div>
         `;
