@@ -449,33 +449,40 @@ async function checkAuth() {
     try {
         const response = await fetchWithCredentials('/api/user');
         if (response.ok) {
+            const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+            if (!contentType.includes('application/json')) {
+                window.location.replace('/login.html');
+                return false;
+            }
+
             const data = await response.json();
+            if (!data || !data.user) {
+                window.location.replace('/login.html');
+                return false;
+            }
+
             currentUser = data.user;
             currentGuilds = data.guilds || [];
             updateUserUI();
             return true;
-        } else if (response.status === 401) {
-            // No autenticado, redirigir a login solo una vez
+        }
+
+        if (response.status === 401) {
             const data = await response.json().catch(() => ({}));
-            if (data.redirect) {
-                window.location.href = data.redirect;
-            } else {
-                window.location.href = '/login';
-            }
-            return false;
-        } else {
-            console.error('Error verificando autenticación:', response.status);
-            // Solo redirigir si no estamos ya en la página de login
-            if (!window.location.pathname.includes('login')) {
-                window.location.href = '/login';
-            }
+            const target = data.redirect || '/login.html';
+            window.location.replace(target);
             return false;
         }
+
+        console.error('Error verificando autenticación:', response.status);
+        if (!window.location.pathname.includes('login')) {
+            window.location.replace('/login.html');
+        }
+        return false;
     } catch (error) {
         console.error('Error verificando autenticación:', error);
-        // Solo redirigir si no estamos ya en la página de login
         if (!window.location.pathname.includes('login')) {
-            window.location.href = '/login';
+            window.location.replace('/login.html');
         }
         return false;
     }
