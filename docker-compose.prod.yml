@@ -1,25 +1,49 @@
-# docker-compose.prod.yml - Configuracion para produccion
+# docker-compose.prod.yml - Configuracion para produccion estable (Portainer)
 # Usar: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
   lavalink:
+    profiles: ["music"]
     restart: always
+    cpus: "0.75"
+    mem_limit: 768m
+    mem_reservation: 256m
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1G
+          cpus: '0.75'
+          memory: 768M
         reservations:
           cpus: '0.25'
           memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   bot:
     restart: always
+    cpus: "1.50"
+    mem_limit: 1536m
+    mem_reservation: 512m
+    stop_grace_period: 20s
+    init: true
+    depends_on: []
+    environment:
+      - MUSIC_ENABLED=false
+      - LAVALINK_ENABLED=false
+      - GEMINI_API_KEY=
+      - TENOR_API_KEY=
+      - DB_RETRY_COOLDOWN_MS=15000
+      - CONFIG_CACHE_TTL_MS=180000
+      - SLOW_COMMAND_WARN_MS=1200
+      - NODE_OPTIONS=--max-old-space-size=1024
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 2G
+          cpus: '1.50'
+          memory: 1536M
         reservations:
           cpus: '0.5'
           memory: 512M
@@ -29,4 +53,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
