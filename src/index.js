@@ -10,6 +10,7 @@ const antiRaidGuard = require('./events/anti-raid-guard');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
 const { handleTicketButton, handleTicketModal } = require('./events/ticket-interaction');
 const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
+const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate } = require('./events/temp-voice');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
@@ -101,6 +102,7 @@ client.once('clientReady', () => {
 
 client.on('messageCreate', async (message) => {
     try {
+        await handleCountingMessage(message);
         await handleMessageCreate(message);
         await antiRaidGuard.handleMessageCreate(message);
     } catch (error) {
