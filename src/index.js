@@ -6,6 +6,7 @@ const { safeReply, isUnknownInteractionError } = require('./utils/interactions')
 const { handleReturnInteraction } = require('./utils/fun-return');
 const guildMemberAddEvent = require('./events/guildMemberAdd');
 const guildMemberRemoveEvent = require('./events/guildMemberRemove');
+const antiRaidGuard = require('./events/anti-raid-guard');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
 const { handleTicketButton, handleTicketModal } = require('./events/ticket-interaction');
 const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
@@ -101,6 +102,7 @@ client.once('clientReady', () => {
 client.on('messageCreate', async (message) => {
     try {
         await handleMessageCreate(message);
+        await antiRaidGuard.handleMessageCreate(message);
     } catch (error) {
         console.error('Error en leveling messageCreate:', error);
     }
@@ -109,8 +111,41 @@ client.on('messageCreate', async (message) => {
 client.on('guildMemberAdd', async (member) => {
     try {
         await guildMemberAddEvent.execute(member);
+        await antiRaidGuard.handleGuildMemberAdd(member);
     } catch (error) {
         console.error('Error en guildMemberAdd:', error);
+    }
+});
+
+client.on('channelCreate', async (channel) => {
+    try {
+        await antiRaidGuard.handleChannelCreate(channel);
+    } catch (error) {
+        console.error('Error en channelCreate (anti-raid):', error);
+    }
+});
+
+client.on('channelDelete', async (channel) => {
+    try {
+        await antiRaidGuard.handleChannelDelete(channel);
+    } catch (error) {
+        console.error('Error en channelDelete (anti-raid):', error);
+    }
+});
+
+client.on('roleCreate', async (role) => {
+    try {
+        await antiRaidGuard.handleRoleCreate(role);
+    } catch (error) {
+        console.error('Error en roleCreate (anti-raid):', error);
+    }
+});
+
+client.on('roleDelete', async (role) => {
+    try {
+        await antiRaidGuard.handleRoleDelete(role);
+    } catch (error) {
+        console.error('Error en roleDelete (anti-raid):', error);
     }
 });
 

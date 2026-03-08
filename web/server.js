@@ -15,6 +15,7 @@ const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
+const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { ticketButtonCustomIdForGuild } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
@@ -814,6 +815,68 @@ function normalizeTempVoiceConfigInput(body = {}, current = null, userId = 'unkn
         updatedBy: userId
     };
 }
+
+function normalizeAntiRaidConfigInput(body = {}, current = null, userId = 'unknown') {
+    const base = current && typeof current === 'object' ? current : antiRaidStore.defaultConfig();
+    const trustedRoleIds = Array.isArray(body.trustedRoleIds)
+        ? body.trustedRoleIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 50)
+        : (Array.isArray(base.trustedRoleIds) ? base.trustedRoleIds : []);
+
+    return {
+        enabled: body.enabled !== false,
+        antiSpamEnabled: body.antiSpamEnabled !== false,
+        spamMessages: Math.max(3, Math.min(40, Number.parseInt(body.spamMessages ?? base.spamMessages ?? 7, 10) || 7)),
+        spamWindowSec: Math.max(3, Math.min(120, Number.parseInt(body.spamWindowSec ?? base.spamWindowSec ?? 8, 10) || 8)),
+        blockInvites: body.blockInvites !== false,
+        blockLinks: body.blockLinks === true,
+        maxMentions: Math.max(1, Math.min(50, Number.parseInt(body.maxMentions ?? base.maxMentions ?? 6, 10) || 6)),
+        joinRateThreshold: Math.max(2, Math.min(60, Number.parseInt(body.joinRateThreshold ?? base.joinRateThreshold ?? 8, 10) || 8)),
+        accountAgeDays: Math.max(0, Math.min(365, Number.parseInt(body.accountAgeDays ?? base.accountAgeDays ?? 3, 10) || 3)),
+        actionMode: ['timeout', 'kick', 'ban'].includes(String(body.actionMode || base.actionMode || 'timeout'))
+            ? String(body.actionMode || base.actionMode || 'timeout')
+            : 'timeout',
+        timeoutMinutes: Math.max(1, Math.min(40320, Number.parseInt(body.timeoutMinutes ?? base.timeoutMinutes ?? 30, 10) || 30)),
+        protectChannels: body.protectChannels !== false,
+        protectRoles: body.protectRoles !== false,
+        destructiveActionThreshold: Math.max(1, Math.min(30, Number.parseInt(body.destructiveActionThreshold ?? base.destructiveActionThreshold ?? 3, 10) || 3)),
+        actionWindowSec: Math.max(10, Math.min(300, Number.parseInt(body.actionWindowSec ?? base.actionWindowSec ?? 60, 10) || 60)),
+        trustedRoleIds,
+        alertChannelId: String(body.alertChannelId ?? base.alertChannelId ?? '').trim(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: userId
+    };
+}
+
+app.get('/api/guild/:guildId/anti-raid-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await antiRaidStore.getAntiRaidConfig(guildId);
+        res.json(config || antiRaidStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo anti-raid config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración anti-raid' });
+    }
+});
+
+app.post('/api/guild/:guildId/anti-raid-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const current = await antiRaidStore.getAntiRaidConfig(guildId);
+        const config = normalizeAntiRaidConfigInput(req.body || {}, current, req.session.user?.id || 'unknown');
+        await antiRaidStore.setAntiRaidConfig(guildId, config);
+
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando anti-raid config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración anti-raid' });
+    }
+});
 
 app.get('/api/guild/:guildId/temp-voice-config', requireAuth, async (req, res) => {
     try {

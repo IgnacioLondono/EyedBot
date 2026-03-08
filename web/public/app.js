@@ -1924,61 +1924,163 @@ async function loadSecurityPanel(guildId) {
     const container = document.getElementById('securityContainer');
     if (!container) return;
 
-    const defaults = {
-        accountAgeDays: '5',
-        memberAgeMinutes: '15',
-        highRiskWordsEnabled: true,
-        suspiciousLinkScan: true,
-        emergencyLockdown: false,
-        antiVpnProxy: false,
-        joinRateThreshold: '7'
-    };
-    const prefs = getServerPreference(guildId, 'security', defaults);
+    try {
+        const [infoResponse, channelsResponse, configResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/info`),
+            fetchWithCredentials(`/api/guild/${guildId}/channels`),
+            fetchWithCredentials(`/api/guild/${guildId}/anti-raid-config`)
+        ]);
 
-    const infoResponse = await fetchWithCredentials(`/api/guild/${guildId}/info`).catch(() => null);
-    const info = infoResponse && infoResponse.ok ? await infoResponse.json() : null;
-    const verificationLevel = String(info?.verificationLevel ?? 'unknown');
+        if (!infoResponse.ok || !channelsResponse.ok || !configResponse.ok) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar la configuración anti-raid.</div>';
+            return;
+        }
 
-    container.innerHTML = `
-        <h3 class="welcome-panel-title">Centro de seguridad</h3>
-        <p class="welcome-panel-subtitle">Refuerza el ingreso de usuarios y define umbrales de proteccion para intentos de raid.</p>
-        <div class="control-grid">
-            <div class="control-card">
-                <h4>Entrada de miembros</h4>
-                <p style="color:var(--text-secondary); margin-bottom:0.5rem;">Nivel verificacion Discord: <strong>${escapeHtml(verificationLevel)}</strong></p>
-                <div class="form-group">
-                    <label>Edad minima de cuenta (dias)</label>
-                    <input type="number" min="0" max="90" class="form-control" data-pref-key="accountAgeDays" value="${escapeHtmlForValue(prefs.accountAgeDays)}">
+        const info = await infoResponse.json();
+        const cfg = await configResponse.json();
+        const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
+        const roles = (Array.isArray(info?.roles) ? info.roles : []).filter((r) => r && r.id && r.name && r.name !== '@everyone');
+        const verificationLevel = String(info?.verificationLevel ?? 'unknown');
+        const trustedSet = new Set(Array.isArray(cfg.trustedRoleIds) ? cfg.trustedRoleIds.map(String) : []);
+
+        container.innerHTML = `
+            <h3 class="welcome-panel-title">Centro de seguridad anti-raid</h3>
+            <p class="welcome-panel-subtitle">Protege contra spam, raids de joins y cambios destructivos de canales/roles en segundos.</p>
+            <div class="control-grid">
+                <div class="control-card">
+                    <h4>Estado y acción</h4>
+                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidEnabled" ${cfg.enabled !== false ? 'checked' : ''}> Activar anti-raid</label>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label>Acción automática</label>
+                        <select id="antiRaidActionMode" class="form-control">
+                            <option value="timeout" ${cfg.actionMode === 'timeout' ? 'selected' : ''}>Timeout</option>
+                            <option value="kick" ${cfg.actionMode === 'kick' ? 'selected' : ''}>Kick</option>
+                            <option value="ban" ${cfg.actionMode === 'ban' ? 'selected' : ''}>Ban</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label>Minutos timeout (si aplica)</label>
+                        <input type="number" min="1" max="40320" id="antiRaidTimeoutMinutes" class="form-control" value="${Math.max(1, Number.parseInt(cfg.timeoutMinutes || 30, 10) || 30)}">
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label>Canal de alertas</label>
+                        <select id="antiRaidAlertChannelId" class="form-control">
+                            <option value="">Sin alertas</option>
+                            ${channels.map((c) => `<option value="${c.id}" ${String(cfg.alertChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Tiempo en servidor antes de hablar (min)</label>
-                    <input type="number" min="0" max="180" class="form-control" data-pref-key="memberAgeMinutes" value="${escapeHtmlForValue(prefs.memberAgeMinutes)}">
+
+                <div class="control-card">
+                    <h4>Protección de mensajes</h4>
+                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidSpamEnabled" ${cfg.antiSpamEnabled !== false ? 'checked' : ''}> Anti spam</label>
+                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidBlockInvites" ${cfg.blockInvites !== false ? 'checked' : ''}> Bloquear invitaciones</label>
+                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidBlockLinks" ${cfg.blockLinks === true ? 'checked' : ''}> Bloquear enlaces sospechosos</label>
+                    <div class="form-grid" style="margin-top:0.45rem;">
+                        <div class="form-group">
+                            <label>Mensajes límite</label>
+                            <input type="number" min="3" max="40" id="antiRaidSpamMessages" class="form-control" value="${Math.max(3, Number.parseInt(cfg.spamMessages || 7, 10) || 7)}">
+                        </div>
+                        <div class="form-group">
+                            <label>Ventana spam (s)</label>
+                            <input type="number" min="3" max="120" id="antiRaidSpamWindowSec" class="form-control" value="${Math.max(3, Number.parseInt(cfg.spamWindowSec || 8, 10) || 8)}">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label>Máximo menciones por mensaje</label>
+                        <input type="number" min="1" max="50" id="antiRaidMaxMentions" class="form-control" value="${Math.max(1, Number.parseInt(cfg.maxMentions || 6, 10) || 6)}">
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <h4>Entrada y destrucción</h4>
+                    <p style="color:var(--text-secondary); margin-bottom:0.45rem;">Verificación Discord actual: <strong>${escapeHtml(verificationLevel)}</strong></p>
+                    <div class="form-group">
+                        <label>Joins por minuto (umbral raid)</label>
+                        <input type="number" min="2" max="60" id="antiRaidJoinRateThreshold" class="form-control" value="${Math.max(2, Number.parseInt(cfg.joinRateThreshold || 8, 10) || 8)}">
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label>Edad mínima de cuenta (días)</label>
+                        <input type="number" min="0" max="365" id="antiRaidAccountAgeDays" class="form-control" value="${Math.max(0, Number.parseInt(cfg.accountAgeDays || 3, 10) || 3)}">
+                    </div>
+                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidProtectChannels" ${cfg.protectChannels !== false ? 'checked' : ''}> Proteger canales (creación/eliminación masiva)</label>
+                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidProtectRoles" ${cfg.protectRoles !== false ? 'checked' : ''}> Proteger roles (creación/eliminación masiva)</label>
+                    <div class="form-grid" style="margin-top:0.45rem;">
+                        <div class="form-group">
+                            <label>Acciones destructivas permitidas</label>
+                            <input type="number" min="1" max="30" id="antiRaidDestructiveActionThreshold" class="form-control" value="${Math.max(1, Number.parseInt(cfg.destructiveActionThreshold || 3, 10) || 3)}">
+                        </div>
+                        <div class="form-group">
+                            <label>Ventana (s)</label>
+                            <input type="number" min="10" max="300" id="antiRaidActionWindowSec" class="form-control" value="${Math.max(10, Number.parseInt(cfg.actionWindowSec || 60, 10) || 60)}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <h4>Roles confiables</h4>
+                    <p style="color:var(--text-secondary); margin-bottom:0.45rem;">Estos roles quedan exentos del anti-raid.</p>
+                    <select id="antiRaidTrustedRoles" class="form-control" multiple style="min-height:180px;">
+                        ${roles.map((role) => `<option value="${role.id}" ${trustedSet.has(String(role.id)) ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
+                    </select>
                 </div>
             </div>
-            <div class="control-card">
-                <h4>Deteccion</h4>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="highRiskWordsEnabled" ${prefs.highRiskWordsEnabled ? 'checked' : ''}> Filtro de palabras de alto riesgo</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="suspiciousLinkScan" ${prefs.suspiciousLinkScan ? 'checked' : ''}> Escaneo de enlaces sospechosos</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiVpnProxy" ${prefs.antiVpnProxy ? 'checked' : ''}> Bloquear IPs con VPN/Proxy (referencial)</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="emergencyLockdown" ${prefs.emergencyLockdown ? 'checked' : ''}> Activar modo lockdown de emergencia</label>
-                <div class="form-group" style="margin-top:0.55rem;">
-                    <label>Umbral de joins por minuto</label>
-                    <input type="number" min="2" max="50" class="form-control" data-pref-key="joinRateThreshold" value="${escapeHtmlForValue(prefs.joinRateThreshold)}">
-                </div>
-            </div>
-        </div>
-        <div class="form-actions" style="margin-top:1rem;">
-            <button type="button" class="btn btn-primary" id="saveSecurityBtn">Guardar Seguridad</button>
-        </div>
-    `;
 
-    const saveBtn = document.getElementById('saveSecurityBtn');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            const values = collectPanelValues('securityContainer');
-            setServerPreference(guildId, 'security', values);
-            showToast('Opciones de seguridad guardadas', 'success');
-        });
+            <div class="form-actions" style="margin-top:1rem;">
+                <button type="button" class="btn btn-primary" id="saveAntiRaidBtn">Guardar Anti-Raid</button>
+            </div>
+        `;
+
+        const saveBtn = document.getElementById('saveAntiRaidBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                const trustedRolesEl = document.getElementById('antiRaidTrustedRoles');
+                const trustedRoleIds = trustedRolesEl
+                    ? Array.from(trustedRolesEl.selectedOptions || []).map((opt) => opt.value)
+                    : [];
+
+                const payload = {
+                    enabled: document.getElementById('antiRaidEnabled')?.checked ?? true,
+                    antiSpamEnabled: document.getElementById('antiRaidSpamEnabled')?.checked ?? true,
+                    spamMessages: Number.parseInt(document.getElementById('antiRaidSpamMessages')?.value || '7', 10) || 7,
+                    spamWindowSec: Number.parseInt(document.getElementById('antiRaidSpamWindowSec')?.value || '8', 10) || 8,
+                    blockInvites: document.getElementById('antiRaidBlockInvites')?.checked ?? true,
+                    blockLinks: document.getElementById('antiRaidBlockLinks')?.checked ?? false,
+                    maxMentions: Number.parseInt(document.getElementById('antiRaidMaxMentions')?.value || '6', 10) || 6,
+                    joinRateThreshold: Number.parseInt(document.getElementById('antiRaidJoinRateThreshold')?.value || '8', 10) || 8,
+                    accountAgeDays: Number.parseInt(document.getElementById('antiRaidAccountAgeDays')?.value || '3', 10) || 3,
+                    actionMode: document.getElementById('antiRaidActionMode')?.value || 'timeout',
+                    timeoutMinutes: Number.parseInt(document.getElementById('antiRaidTimeoutMinutes')?.value || '30', 10) || 30,
+                    protectChannels: document.getElementById('antiRaidProtectChannels')?.checked ?? true,
+                    protectRoles: document.getElementById('antiRaidProtectRoles')?.checked ?? true,
+                    destructiveActionThreshold: Number.parseInt(document.getElementById('antiRaidDestructiveActionThreshold')?.value || '3', 10) || 3,
+                    actionWindowSec: Number.parseInt(document.getElementById('antiRaidActionWindowSec')?.value || '60', 10) || 60,
+                    trustedRoleIds,
+                    alertChannelId: document.getElementById('antiRaidAlertChannelId')?.value || ''
+                };
+
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/anti-raid-config`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.error || 'No se pudo guardar anti-raid', 'error');
+                        return;
+                    }
+                    showToast('Configuración anti-raid guardada', 'success');
+                    await loadSecurityPanel(guildId);
+                } catch (error) {
+                    console.error('Error guardando anti-raid:', error);
+                    showToast('Error guardando anti-raid', 'error');
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error cargando anti-raid:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando centro de seguridad anti-raid.</div>';
     }
 }
 
