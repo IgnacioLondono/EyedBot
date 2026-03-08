@@ -1747,6 +1747,7 @@ async function loadVoiceCreatorPanel(guildId) {
                     <p style="color:var(--text-secondary); margin-top:0.8rem;">Nombre personalizado: <code>/voznombre nombre:&lt;tu nombre&gt;</code>.</p>
                     <p style="color:var(--text-secondary); margin-top:0.45rem;">Privado/público: <code>/vozprivado activar:true|false</code>.</p>
                     <p style="color:var(--text-secondary); margin-top:0.45rem;">Invitar a privado: <code>/vozinvitar usuario:@alguien</code>.</p>
+                    <p style="color:var(--text-secondary); margin-top:0.45rem;">Quitar del privado: <code>/vozquitar usuario:@alguien</code>.</p>
                 </div>
             </div>
         `;
