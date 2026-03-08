@@ -53,7 +53,7 @@ module.exports = {
                         moderation: ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce'],
                         music: ['play', 'search', 'pause', 'resume', 'stop', 'skip', 'queue', 'nowplaying', 'volume', 'shuffle', 'remove', 'loop', 'seek', 'filters'],
                         fun: ['gif', 'hug', 'kiss', 'slap', 'pat', 'punch', 'wink', 'meme', '8ball', 'coinflip', 'dice', 'avatar', 'userinfo', 'serverinfo', 'rate', 'choose', 'poll', 'emojify', 'cat', 'dog', 'trivia', 'ascii'],
-                        utility: ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync'],
+                        utility: ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre'],
                         config: ['setwelcome', 'setprefix', 'autoresponder']
                     };
 
@@ -76,10 +76,12 @@ module.exports = {
             const moderationCmds = ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce'];
             const musicCmds = ['play', 'search', 'pause', 'resume', 'stop', 'skip', 'queue', 'nowplaying', 'volume', 'shuffle', 'remove', 'loop', 'seek', 'filters'];
             const funCmds = ['gif', 'hug', 'kiss', 'slap', 'pat', 'punch', 'wink', 'meme', '8ball', 'coinflip', 'dice', 'avatar', 'userinfo', 'serverinfo', 'rate', 'choose', 'poll', 'emojify', 'cat', 'dog', 'trivia', 'ascii'];
+            const utilityCmds = ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre'];
 
             const modCount = Array.from(commands.values()).filter(c => moderationCmds.includes(c.data.name)).length;
             const musicCount = Array.from(commands.values()).filter(c => musicCmds.includes(c.data.name)).length;
             const funCount = Array.from(commands.values()).filter(c => funCmds.includes(c.data.name)).length;
+            const utilityCount = Array.from(commands.values()).filter(c => utilityCmds.includes(c.data.name)).length;
 
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
@@ -88,7 +90,8 @@ module.exports = {
                 .addFields(
                     { name: categories.moderation, value: `${modCount} comandos`, inline: true },
                     { name: categories.music, value: `${musicCount} comandos`, inline: true },
-                    { name: categories.fun, value: `${funCount} comandos`, inline: true }
+                    { name: categories.fun, value: `${funCount} comandos`, inline: true },
+                    { name: categories.utility, value: `${utilityCount} comandos`, inline: true }
                 )
                 .setFooter({ text: `Prefijo: ${config.prefix}` });
 

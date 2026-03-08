@@ -150,7 +150,7 @@ function clearServerBoundSectionState() {
         serverSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
     }
 
-    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer', 'levelsContainer', 'automationContainer', 'securityContainer', 'notificationsContainer'];
+    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer', 'levelsContainer', 'voiceCreatorContainer', 'automationContainer', 'securityContainer', 'notificationsContainer'];
     containerIds.forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = '';
@@ -1514,6 +1514,7 @@ async function selectServerGuild(guildId) {
     const verifyContainer = document.getElementById('verifyContainer');
     const ticketContainer = document.getElementById('ticketContainer');
     const levelsContainer = document.getElementById('levelsContainer');
+    const voiceCreatorContainer = document.getElementById('voiceCreatorContainer');
     const automationContainer = document.getElementById('automationContainer');
     const securityContainer = document.getElementById('securityContainer');
     const notificationsContainer = document.getElementById('notificationsContainer');
@@ -1530,6 +1531,7 @@ async function selectServerGuild(guildId) {
         if (verifyContainer) verifyContainer.innerHTML = '';
         if (ticketContainer) ticketContainer.innerHTML = '';
         if (levelsContainer) levelsContainer.innerHTML = '';
+        if (voiceCreatorContainer) voiceCreatorContainer.innerHTML = '';
         if (automationContainer) automationContainer.innerHTML = '';
         if (securityContainer) securityContainer.innerHTML = '';
         if (notificationsContainer) notificationsContainer.innerHTML = '';
@@ -1559,6 +1561,9 @@ async function selectServerGuild(guildId) {
     if (levelsContainer) {
         levelsContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de niveles...</p></div>';
     }
+    if (voiceCreatorContainer) {
+        voiceCreatorContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando canales de voz temporales...</p></div>';
+    }
     if (automationContainer) {
         automationContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando opciones de automatización...</p></div>';
     }
@@ -1575,6 +1580,7 @@ async function selectServerGuild(guildId) {
     await loadVerifyPanel(guildId);
     await loadTicketPanel(guildId);
     await loadLevelsPanel(guildId);
+    await loadVoiceCreatorPanel(guildId);
     await loadAutomationPanel(guildId);
     await loadSecurityPanel(guildId);
     await loadNotificationsPanel(guildId);
@@ -1591,6 +1597,7 @@ async function loadGuildsForServer() {
         const verifyContainer = document.getElementById('verifyContainer');
         const ticketContainer = document.getElementById('ticketContainer');
         const levelsContainer = document.getElementById('levelsContainer');
+        const voiceCreatorContainer = document.getElementById('voiceCreatorContainer');
         const automationContainer = document.getElementById('automationContainer');
         const securityContainer = document.getElementById('securityContainer');
         const notificationsContainer = document.getElementById('notificationsContainer');
@@ -1602,6 +1609,7 @@ async function loadGuildsForServer() {
         if (verifyContainer) verifyContainer.innerHTML = '';
         if (ticketContainer) ticketContainer.innerHTML = '';
         if (levelsContainer) levelsContainer.innerHTML = '';
+        if (voiceCreatorContainer) voiceCreatorContainer.innerHTML = '';
         if (automationContainer) automationContainer.innerHTML = '';
         if (securityContainer) securityContainer.innerHTML = '';
         if (notificationsContainer) notificationsContainer.innerHTML = '';
@@ -1660,6 +1668,127 @@ function collectPanelValues(containerId) {
         }
     });
     return values;
+}
+
+async function loadVoiceCreatorPanel(guildId) {
+    const container = document.getElementById('voiceCreatorContainer');
+    if (!container) return;
+
+    try {
+        const [channelsResponse, configResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/channels`),
+            fetchWithCredentials(`/api/guild/${guildId}/temp-voice-config`)
+        ]);
+
+        if (!channelsResponse.ok || !configResponse.ok) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar el sistema de voz temporal.</div>';
+            return;
+        }
+
+        const channels = await channelsResponse.json();
+        const config = await configResponse.json();
+
+        const voiceChannels = (Array.isArray(channels) ? channels : []).filter((c) => c.type === 2);
+        const categories = (Array.isArray(channels) ? channels : []).filter((c) => c.type === 4);
+
+        container.innerHTML = `
+            <h3 class="welcome-panel-title">Canales de Voz Temporales</h3>
+            <p class="welcome-panel-subtitle">Al entrar al canal creador, el bot genera automáticamente tu canal de voz y lo elimina cuando queda vacío.</p>
+            <div class="welcome-layout">
+                <div class="welcome-editor">
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="tempVoiceEnabled" ${config.enabled ? 'checked' : ''}> <span>Activar sistema de voz temporal</span></label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="tempVoiceAllowCustomNames" ${config.allowCustomNames !== false ? 'checked' : ''}> <span>Permitir nombre personalizado por usuario</span></label>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="tempVoiceCreatorChannel">Canal creador (voz)</label>
+                            <select id="tempVoiceCreatorChannel" class="form-control">
+                                <option value="">Selecciona un canal de voz</option>
+                                ${voiceChannels.map((c) => `<option value="${c.id}" ${String(config.creatorChannelId || '') === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="tempVoiceCategory">Categoría para canales creados</label>
+                            <select id="tempVoiceCategory" class="form-control">
+                                <option value="">Usar categoría del canal creador</option>
+                                ${categories.map((c) => `<option value="${c.id}" ${String(config.categoryId || '') === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="tempVoiceTemplate">Formato del nombre automático</label>
+                            <input type="text" id="tempVoiceTemplate" class="form-control" value="${escapeHtmlForValue(config.channelNameTemplate || 'Canal de {username}')}" placeholder="Canal de {username}">
+                            <small style="color:var(--text-muted);">Variables: <code>{username}</code>, <code>{displayName}</code></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="tempVoiceUserLimit">Límite de usuarios (0 = sin límite)</label>
+                            <input type="number" min="0" max="99" id="tempVoiceUserLimit" class="form-control" value="${Math.max(0, Number.parseInt(config.userLimit || 0, 10) || 0)}">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="saveTempVoiceBtn" class="btn btn-primary">Guardar sistema de voz temporal</button>
+                    </div>
+                </div>
+
+                <div class="welcome-preview-panel">
+                    <h4>Como usarlo</h4>
+                    <p style="color:var(--text-secondary); margin-bottom:0.65rem;">1. El usuario entra al canal creador.</p>
+                    <p style="color:var(--text-secondary); margin-bottom:0.65rem;">2. Se crea su canal privado temporal.</p>
+                    <p style="color:var(--text-secondary); margin-bottom:0.65rem;">3. Cuando se vacía, se elimina solo.</p>
+                    <p style="color:var(--text-secondary); margin-top:0.8rem;">Para nombre personalizado usa <code>/voznombre nombre:&lt;tu nombre&gt;</code>.</p>
+                </div>
+            </div>
+        `;
+
+        const saveBtn = document.getElementById('saveTempVoiceBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                const payload = {
+                    enabled: document.getElementById('tempVoiceEnabled')?.checked ?? false,
+                    allowCustomNames: document.getElementById('tempVoiceAllowCustomNames')?.checked ?? true,
+                    creatorChannelId: document.getElementById('tempVoiceCreatorChannel')?.value || '',
+                    categoryId: document.getElementById('tempVoiceCategory')?.value || '',
+                    channelNameTemplate: document.getElementById('tempVoiceTemplate')?.value || 'Canal de {username}',
+                    userLimit: Math.max(0, Math.min(99, Number.parseInt(document.getElementById('tempVoiceUserLimit')?.value || '0', 10) || 0))
+                };
+
+                if (!payload.creatorChannelId) {
+                    showToast('Selecciona el canal creador de voz', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/temp-voice-config`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.error || 'No se pudo guardar el sistema de voz temporal', 'error');
+                        return;
+                    }
+                    showToast('Sistema de voz temporal guardado', 'success');
+                    await loadVoiceCreatorPanel(guildId);
+                } catch (error) {
+                    console.error('Error guardando voz temporal:', error);
+                    showToast('Error guardando voz temporal', 'error');
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error cargando sistema de voz temporal:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de voz temporal.</div>';
+    }
 }
 
 async function loadAutomationPanel(guildId) {

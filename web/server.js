@@ -14,6 +14,7 @@ const welcomeStore = require('../src/utils/welcome-config-store');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
+const tempVoiceStore = require('../src/utils/temp-voice-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { ticketButtonCustomIdForGuild } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
@@ -410,12 +411,12 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
         }
 
         const channels = guild.channels.cache
-            .filter(channel => channel.type === 0 || channel.type === 2) // Solo texto y voz
+            .filter(channel => channel.type === 0 || channel.type === 2 || channel.type === 4) // Texto, voz y categorías
             .map(channel => ({
                 id: channel.id,
                 name: channel.name,
                 type: channel.type,
-                typeName: channel.type === 0 ? 'texto' : 'voz'
+                typeName: channel.type === 0 ? 'texto' : (channel.type === 2 ? 'voz' : 'categoria')
             }));
 
         res.json(channels);
@@ -792,6 +793,62 @@ function normalizeLevelingConfigInput(body = {}, current = null, userId = 'unkno
         updatedBy: userId
     };
 }
+
+function normalizeTempVoiceConfigInput(body = {}, current = null, userId = 'unknown') {
+    const base = current && typeof current === 'object' ? current : tempVoiceStore.defaultConfig();
+
+    const template = String(body.channelNameTemplate ?? base.channelNameTemplate ?? 'Canal de {username}')
+        .replace(/[\n\r\t]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 95);
+
+    return {
+        enabled: body.enabled === true,
+        creatorChannelId: String(body.creatorChannelId ?? base.creatorChannelId ?? '').trim(),
+        categoryId: String(body.categoryId ?? base.categoryId ?? '').trim(),
+        channelNameTemplate: template || 'Canal de {username}',
+        allowCustomNames: body.allowCustomNames !== false,
+        userLimit: Math.max(0, Math.min(99, Number.parseInt(body.userLimit ?? base.userLimit ?? 0, 10) || 0)),
+        updatedAt: new Date().toISOString(),
+        updatedBy: userId
+    };
+}
+
+app.get('/api/guild/:guildId/temp-voice-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await tempVoiceStore.getTempVoiceConfig(guildId);
+        res.json(config || tempVoiceStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo temp voice config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de voz temporal' });
+    }
+});
+
+app.post('/api/guild/:guildId/temp-voice-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const current = await tempVoiceStore.getTempVoiceConfig(guildId);
+        const config = normalizeTempVoiceConfigInput(req.body || {}, current, req.session.user?.id || 'unknown');
+
+        if (!config.creatorChannelId) {
+            return res.status(400).json({ error: 'Debes seleccionar un canal creador de voz' });
+        }
+
+        await tempVoiceStore.setTempVoiceConfig(guildId, config);
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando temp voice config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de voz temporal' });
+    }
+});
 
 app.get('/api/guild/:guildId/leveling-config', requireAuth, async (req, res) => {
     try {
