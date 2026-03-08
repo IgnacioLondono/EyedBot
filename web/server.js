@@ -207,6 +207,11 @@ function setBotClient(client) {
 
 // Rutas de autenticación
 app.get('/login', (req, res) => {
+    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.redirect(`/login.html${query}`);
+});
+
+app.get('/auth/discord', (req, res) => {
     if (!CLIENT_ID) {
         return res.status(500).send(`
             <html>
@@ -225,13 +230,20 @@ app.get('/login', (req, res) => {
         // Generar URL de autorización con estado para prevenir CSRF
         const state = Math.random().toString(36).substring(7);
         req.session.oauthState = state; // Guardar estado en sesión
-        
-        const url = oauth.generateAuthUrl({
-            scope: ['identify', 'guilds'],
-            state: state
+
+        req.session.save((sessionError) => {
+            if (sessionError) {
+                console.error('❌ Error guardando estado OAuth en sesión:', sessionError);
+                return res.redirect('/login.html?error=session_error');
+            }
+
+            const url = oauth.generateAuthUrl({
+                scope: ['identify', 'guilds'],
+                state: state
+            });
+            console.log('🔗 Redirigiendo a Discord OAuth2...');
+            res.redirect(url);
         });
-        console.log(`🔗 Redirigiendo a Discord OAuth2...`);
-        res.redirect(url);
     } catch (error) {
         console.error('❌ Error generando URL de autorización:', error);
         res.status(500).send(`
@@ -255,24 +267,24 @@ app.get('/callback', async (req, res) => {
         // Si Discord devuelve un error
         if (error) {
             console.error('❌ Error de Discord OAuth2:', error);
-            return res.redirect('/login?error=discord_error');
+            return res.redirect('/login.html?error=discord_error');
         }
 
         if (!code) {
             console.error('❌ No se recibió código de autorización');
-            return res.redirect('/login?error=no_code');
+            return res.redirect('/login.html?error=no_code');
         }
 
         // Verificar que CLIENT_SECRET esté configurado
         if (!CLIENT_SECRET) {
             console.error('❌ CLIENT_SECRET no está configurado en .env');
-            return res.redirect('/login?error=config_error');
+            return res.redirect('/login.html?error=config_error');
         }
 
         // Verificar estado (CSRF protection) - opcional pero recomendado
         if (state && req.session.oauthState && state !== req.session.oauthState) {
             console.error('❌ Estado OAuth no coincide - posible ataque CSRF');
-            return res.redirect('/login?error=auth_failed');
+            return res.redirect('/login.html?error=auth_failed');
         }
 
         console.log('🔐 Intercambiando código por token...');
@@ -288,7 +300,7 @@ app.get('/callback', async (req, res) => {
 
         if (!tokenData || !tokenData.access_token) {
             console.error('❌ No se recibió token de acceso');
-            return res.redirect('/login?error=auth_failed');
+            return res.redirect('/login.html?error=auth_failed');
         }
 
         console.log('👤 Obteniendo información del usuario...');
@@ -297,7 +309,7 @@ app.get('/callback', async (req, res) => {
 
         if (!user || !user.id) {
             console.error('❌ No se pudo obtener información del usuario');
-            return res.redirect('/login?error=auth_failed');
+            return res.redirect('/login.html?error=auth_failed');
         }
 
         // Guardar en sesión
@@ -310,7 +322,7 @@ app.get('/callback', async (req, res) => {
         req.session.save((err) => {
             if (err) {
                 console.error('❌ Error guardando sesión:', err);
-                return res.redirect('/login?error=session_error');
+                return res.redirect('/login.html?error=session_error');
             }
             console.log(`✅ Usuario autenticado: ${user.username}#${user.discriminator} (${user.id})`);
             console.log(`   Servidores: ${guilds?.length || 0}`);
@@ -328,23 +340,27 @@ app.get('/callback', async (req, res) => {
             console.error('   1. CLIENT_SECRET en .env coincide con Discord Developer Portal');
             console.error('   2. Redirect URI coincide exactamente: ' + redirectUri);
             console.error('   3. La aplicación OAuth2 está habilitada en Discord');
-            return res.redirect('/login?error=invalid_secret');
+            return res.redirect('/login.html?error=invalid_secret');
         }
-        
-        res.redirect('/login?error=auth_failed');
+
+        res.redirect('/login.html?error=auth_failed');
     }
 });
 
 app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/');
+    req.session.destroy(() => {
+        res.redirect('/login.html');
+    });
 });
 
 // Middleware para verificar autenticación
 function requireAuth(req, res, next) {
     if (!req.session || !req.session.user) {
         console.log('⚠️ Intento de acceso sin autenticación a:', req.path);
-        return res.redirect('/login');
+        if (req.path.startsWith('/api/')) {
+            return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+        }
+        return res.redirect('/login.html');
     }
     next();
 }
