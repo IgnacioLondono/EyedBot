@@ -21,12 +21,24 @@ const difficultyLabels = {
 async function translateToSpanish(text) {
     if (!text || typeof text !== 'string') return text;
 
+    const looksLikeTranslationError = (value) => {
+        if (!value || typeof value !== 'string') return true;
+        const normalized = value.toLowerCase();
+        return normalized.includes('invalid source language')
+            || normalized.includes('example: langpair=')
+            || normalized.includes('translated.net');
+    };
+
     try {
         const response = await axios.get(
-            `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|es`
+            `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|es`
         );
         const translated = response?.data?.responseData?.translatedText;
-        return translated ? decodeHtml(translated) : text;
+        if (!translated || looksLikeTranslationError(translated)) {
+            return text;
+        }
+
+        return decodeHtml(translated);
     } catch {
         return text;
     }
