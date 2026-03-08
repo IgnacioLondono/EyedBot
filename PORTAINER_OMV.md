@@ -74,3 +74,37 @@ Esto conserva conteos y logs entre reinicios.
 - Si no conecta Discord: revisa `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`
 - Si musica falla por stream: revisa red/salida a YouTube y prueba bajar filtros con `/filters reset`
 - Si Stack no levanta: revisa logs de `eyedbot` y `eyedbot-lavalink`
+
+## 8. Tuning del host (OMV/Debian)
+
+Si buscas menor latencia y menos caidas, aplica tuning en el host antes de hacer deploy.
+
+Script incluido:
+
+- `docker/host-tuning-omv.sh`
+
+Que ajusta:
+
+- `sysctl` (swappiness bajo, colas y file descriptors)
+- limites `nofile`
+- swap persistente (`/swapfile`)
+- Docker daemon (`live-restore` + rotacion de logs)
+
+Ejecucion:
+
+```bash
+cd /ruta/de/EyedBot-main
+sudo bash docker/host-tuning-omv.sh
+```
+
+Opcional (no tocar daemon.json):
+
+```bash
+sudo APPLY_DOCKER_DAEMON=0 bash docker/host-tuning-omv.sh
+```
+
+Despues del tuning:
+
+1. En Portainer, redeploy del stack.
+2. Verifica estado `healthy` del contenedor `eyedbot`.
+3. Revisa uso de RAM/CPU por 24h y eventos de restart.

@@ -23,6 +23,10 @@ const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math'
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ ok: true, service: 'web-panel' });
+});
+
 function envValue(name, fallback = '') {
     const raw = process.env[name];
     if (raw === undefined || raw === null) return fallback;
