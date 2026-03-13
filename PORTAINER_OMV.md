@@ -17,6 +17,21 @@ Esta guia deja el bot corriendo desde un Stack en Portainer usando este reposito
 5. Compose path: `docker-compose.yml`
 6. Branch: `main`
 
+### Opcion Host mode (evita conflicto MAC/red)
+
+Si quieres usar `network_mode: host`, en Portainer usa este compose del repo:
+
+- Compose path: `docker-compose.host.yml`
+
+Este archivo ya viene preparado sin `mac_address`, sin `ports` y sin `networks` para evitar el error:
+
+- `conflicting options: mac-address and the network mode`
+
+Notas:
+
+- En host mode, para musica en el mismo host, usa `LAVALINK_HOST=127.0.0.1`.
+- En host mode, define `DB_HOST` con IP/host real de tu MySQL (por defecto: `127.0.0.1`).
+
 ## 3. Variables de entorno del Stack
 
 En la seccion **Environment variables** agrega al menos:
