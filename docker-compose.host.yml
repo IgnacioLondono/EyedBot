@@ -1,0 +1,97 @@
+# docker-compose.host.yml - Host mode para Portainer/OMV
+# Uso recomendado en Portainer (Repository stack):
+#   Compose path: docker-compose.host.yml
+#
+# NOTAS IMPORTANTES:
+# - En host mode NO usar mac_address, ports ni networks.
+# - Si activas musica con Lavalink en el mismo host mode, usar LAVALINK_HOST=127.0.0.1.
+
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: eyedbot-lavalink
+    profiles: ["music"]
+    restart: always
+    environment:
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - SERVER_PORT=2333
+      - _JAVA_OPTIONS=-Xmx512m
+    volumes:
+      - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    network_mode: host
+    cpus: "0.75"
+    mem_limit: 768m
+    mem_reservation: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eyedbot
+    restart: always
+    init: true
+    stop_grace_period: 20s
+    network_mode: host
+    environment:
+      - NODE_ENV=production
+      - WEB_PORT=${WEB_PORT:-3000}
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID:-1451017355046948976}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - GUILD_ID=${GUILD_ID}
+      - REDIRECT_URI=${REDIRECT_URI:-http://localhost:3000/callback}
+      - SESSION_SECRET=${SESSION_SECRET:-change_this_session_secret}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-false}
+      - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
+      - LAVALINK_HOST=${LAVALINK_HOST:-127.0.0.1}
+      - LAVALINK_PORT=${LAVALINK_PORT:-2333}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - MUSIC_DEFAULT_VOLUME=${MUSIC_DEFAULT_VOLUME:-55}
+      - MUSIC_MAX_VOLUME=${MUSIC_MAX_VOLUME:-80}
+      - MUSIC_SKIP_FFMPEG=${MUSIC_SKIP_FFMPEG:-false}
+      - MUSIC_CLEAN_PROFILE_ENABLED=${MUSIC_CLEAN_PROFILE_ENABLED:-true}
+      - MUSIC_CLEAN_FILTERS=${MUSIC_CLEAN_FILTERS:-normalizer2,softlimiter}
+      - MUSIC_LEAVE_ON_EMPTY=${MUSIC_LEAVE_ON_EMPTY:-true}
+      - MUSIC_LEAVE_ON_EMPTY_COOLDOWN_MS=${MUSIC_LEAVE_ON_EMPTY_COOLDOWN_MS:-90000}
+      - MUSIC_LEAVE_ON_END=${MUSIC_LEAVE_ON_END:-true}
+      - MUSIC_LEAVE_ON_END_COOLDOWN_MS=${MUSIC_LEAVE_ON_END_COOLDOWN_MS:-180000}
+      - MUSIC_LEAVE_ON_STOP=${MUSIC_LEAVE_ON_STOP:-true}
+      - MUSIC_LEAVE_ON_STOP_COOLDOWN_MS=${MUSIC_LEAVE_ON_STOP_COOLDOWN_MS:-30000}
+      - MUSIC_BUFFERING_TIMEOUT_MS=${MUSIC_BUFFERING_TIMEOUT_MS:-7000}
+      - MUSIC_CONNECTION_TIMEOUT_MS=${MUSIC_CONNECTION_TIMEOUT_MS:-45000}
+      - MUSIC_STRICT_ARTIST_MATCH=${MUSIC_STRICT_ARTIST_MATCH:-true}
+      - MUSIC_ENABLED=${MUSIC_ENABLED:-false}
+      - CONFIG_CACHE_TTL_MS=${CONFIG_CACHE_TTL_MS:-120000}
+      - SLOW_COMMAND_WARN_MS=${SLOW_COMMAND_WARN_MS:-800}
+      - DB_HOST=${DB_HOST:-127.0.0.1}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER:-tulabot}
+      - DB_PASSWORD=${DB_PASSWORD:-tulabot_password}
+      - DB_NAME=${DB_NAME:-tulabot}
+      - DB_RETRY_COOLDOWN_MS=${DB_RETRY_COOLDOWN_MS:-5000}
+      - TENOR_API_KEY=${TENOR_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=768 --dns-result-order=ipv4first}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    cpus: "1.50"
+    mem_limit: 1536m
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
