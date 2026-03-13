@@ -50,7 +50,7 @@ module.exports = {
                 // Si no encontramos por require, usar nombres de comandos
                 if (categoryCommands.length === 0) {
                     const categoryMap = {
-                        moderation: ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce'],
+                        moderation: ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce', 'vozocultar'],
                         music: ['play', 'search', 'pause', 'resume', 'stop', 'skip', 'queue', 'nowplaying', 'volume', 'shuffle', 'remove', 'loop', 'seek', 'filters'],
                         fun: ['gif', 'hug', 'kiss', 'slap', 'pat', 'punch', 'wink', 'meme', '8ball', 'coinflip', 'dice', 'avatar', 'userinfo', 'serverinfo', 'rate', 'choose', 'poll', 'emojify', 'cat', 'dog', 'trivia', 'ascii'],
                         utility: ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre', 'vozprivado', 'vozinvitar', 'vozquitar'],
@@ -73,7 +73,7 @@ module.exports = {
             }
 
             // Contar comandos por categoría
-            const moderationCmds = ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce'];
+            const moderationCmds = ['ban', 'kick', 'mute', 'unmute', 'warn', 'warnings', 'clearwarns', 'clear', 'purge', 'lock', 'unlock', 'slowmode', 'nick', 'unban', 'role', 'announce', 'vozocultar'];
             const musicCmds = ['play', 'search', 'pause', 'resume', 'stop', 'skip', 'queue', 'nowplaying', 'volume', 'shuffle', 'remove', 'loop', 'seek', 'filters'];
             const funCmds = ['gif', 'hug', 'kiss', 'slap', 'pat', 'punch', 'wink', 'meme', '8ball', 'coinflip', 'dice', 'avatar', 'userinfo', 'serverinfo', 'rate', 'choose', 'poll', 'emojify', 'cat', 'dog', 'trivia', 'ascii'];
             const utilityCmds = ['help', 'ping', 'stats', 'invite', 'translate', 'weather', 'remind', 'urban', 'qrcode', 'color', 'sync', 'voznombre', 'vozprivado', 'vozinvitar', 'vozquitar'];

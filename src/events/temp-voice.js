@@ -32,6 +32,9 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config) {
     if (existingChannelId) {
         const existing = guild.channels.cache.get(existingChannelId) || await guild.channels.fetch(existingChannelId).catch(() => null);
         if (existing && existing.type === ChannelType.GuildVoice) {
+            await existing.permissionOverwrites.edit(member.id, {
+                ManageChannels: false
+            }).catch(() => null);
             return existing;
         }
         await tempVoiceStore.clearActiveChannel(guild.id, member.id, existingChannelId);
@@ -64,8 +67,7 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config) {
                     PermissionsBitField.Flags.UseVAD,
                     PermissionsBitField.Flags.MoveMembers,
                     PermissionsBitField.Flags.MuteMembers,
-                    PermissionsBitField.Flags.DeafenMembers,
-                    PermissionsBitField.Flags.ManageChannels
+                    PermissionsBitField.Flags.DeafenMembers
                 ]
             }
         ]

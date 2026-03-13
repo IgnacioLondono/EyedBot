@@ -66,7 +66,7 @@ module.exports = {
                     MoveMembers: true,
                     MuteMembers: true,
                     DeafenMembers: true,
-                    ManageChannels: true
+                    ManageChannels: false
                 });
 
                 return interaction.reply({
