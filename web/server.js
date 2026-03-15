@@ -16,6 +16,7 @@ const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
 const antiRaidStore = require('../src/utils/anti-raid-config-store');
+const streamAlertStore = require('../src/utils/stream-alert-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { ticketButtonCustomIdForGuild } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
@@ -850,18 +851,62 @@ function normalizeAntiRaidConfigInput(body = {}, current = null, userId = 'unkno
         blockInvites: body.blockInvites !== false,
         blockLinks: body.blockLinks === true,
         maxMentions: Math.max(1, Math.min(50, Number.parseInt(body.maxMentions ?? base.maxMentions ?? 6, 10) || 6)),
+        maxRoleMentions: Math.max(1, Math.min(25, Number.parseInt(body.maxRoleMentions ?? base.maxRoleMentions ?? 3, 10) || 3)),
         joinRateThreshold: Math.max(2, Math.min(60, Number.parseInt(body.joinRateThreshold ?? base.joinRateThreshold ?? 8, 10) || 8)),
+        raidJoinHardThreshold: Math.max(4, Math.min(120, Number.parseInt(body.raidJoinHardThreshold ?? base.raidJoinHardThreshold ?? 15, 10) || 15)),
         accountAgeDays: Math.max(0, Math.min(365, Number.parseInt(body.accountAgeDays ?? base.accountAgeDays ?? 3, 10) || 3)),
         actionMode: ['timeout', 'kick', 'ban'].includes(String(body.actionMode || base.actionMode || 'timeout'))
             ? String(body.actionMode || base.actionMode || 'timeout')
             : 'timeout',
         timeoutMinutes: Math.max(1, Math.min(40320, Number.parseInt(body.timeoutMinutes ?? base.timeoutMinutes ?? 30, 10) || 30)),
+        actionCooldownSec: Math.max(5, Math.min(600, Number.parseInt(body.actionCooldownSec ?? base.actionCooldownSec ?? 30, 10) || 30)),
+        duplicateMessageThreshold: Math.max(2, Math.min(12, Number.parseInt(body.duplicateMessageThreshold ?? base.duplicateMessageThreshold ?? 3, 10) || 3)),
+        duplicateWindowSec: Math.max(3, Math.min(120, Number.parseInt(body.duplicateWindowSec ?? base.duplicateWindowSec ?? 20, 10) || 20)),
         protectChannels: body.protectChannels !== false,
         protectRoles: body.protectRoles !== false,
         destructiveActionThreshold: Math.max(1, Math.min(30, Number.parseInt(body.destructiveActionThreshold ?? base.destructiveActionThreshold ?? 3, 10) || 3)),
         actionWindowSec: Math.max(10, Math.min(300, Number.parseInt(body.actionWindowSec ?? base.actionWindowSec ?? 60, 10) || 60)),
         trustedRoleIds,
         alertChannelId: String(body.alertChannelId ?? base.alertChannelId ?? '').trim(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: userId
+    };
+}
+
+function normalizeStreamAlertConfigInput(body = {}, current = null, userId = 'unknown') {
+    const base = current && typeof current === 'object' ? current : streamAlertStore.defaultConfig();
+    const rawSources = Array.isArray(body.sources)
+        ? body.sources
+        : (Array.isArray(base.sources) ? base.sources : []);
+
+    const sources = rawSources
+        .map((source, index) => {
+            const fallbackId = String(source?.id || `src_${Date.now()}_${index}`);
+            const platform = String(source?.platform || 'custom').toLowerCase();
+            return {
+                id: fallbackId.slice(0, 60),
+                enabled: source?.enabled !== false,
+                platform: ['twitch', 'youtube', 'tiktok', 'custom'].includes(platform) ? platform : 'custom',
+                name: String(source?.name || 'Fuente').slice(0, 80),
+                url: String(source?.url || '').trim().slice(0, 600),
+                feedUrl: String(source?.feedUrl || '').trim().slice(0, 800),
+                imageUrl: String(source?.imageUrl || '').trim().slice(0, 800),
+                lastItemId: String(source?.lastItemId || '').slice(0, 500),
+                lastPostedAt: String(source?.lastPostedAt || '')
+            };
+        })
+        .filter((source) => Boolean(source.id))
+        .slice(0, 20);
+
+    return {
+        enabled: body.enabled === true,
+        channelId: String(body.channelId ?? base.channelId ?? '').trim(),
+        mentionText: String(body.mentionText ?? base.mentionText ?? '').slice(0, 300),
+        titleTemplate: String(body.titleTemplate ?? base.titleTemplate ?? '🔴 {platform}: {name} en directo').slice(0, 200),
+        descriptionTemplate: String(body.descriptionTemplate ?? base.descriptionTemplate ?? '{title}\n{url}').slice(0, 1500),
+        color: String(body.color ?? base.color ?? '7c4dff').replace('#', '').slice(0, 6) || '7c4dff',
+        footerText: String(body.footerText ?? base.footerText ?? 'EyedBot Stream Alerts').slice(0, 200),
+        sources,
         updatedAt: new Date().toISOString(),
         updatedBy: userId
     };
@@ -930,6 +975,104 @@ app.post('/api/guild/:guildId/temp-voice-config', requireAuth, async (req, res) 
     } catch (error) {
         console.error('Error guardando temp voice config:', error);
         res.status(500).json({ error: 'Error al guardar configuración de voz temporal' });
+    }
+});
+
+app.get('/api/guild/:guildId/stream-alert-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await streamAlertStore.getStreamAlertConfig(guildId);
+        res.json(config || streamAlertStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo stream alert config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de stream alerts' });
+    }
+});
+
+app.post('/api/guild/:guildId/stream-alert-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const current = await streamAlertStore.getStreamAlertConfig(guildId);
+        const config = normalizeStreamAlertConfigInput(req.body || {}, current, req.session.user?.id || 'unknown');
+
+        if (config.enabled && !config.channelId) {
+            return res.status(400).json({ error: 'Debes seleccionar un canal de notificaciones' });
+        }
+
+        await streamAlertStore.setStreamAlertConfig(guildId, config);
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando stream alert config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de stream alerts' });
+    }
+});
+
+app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const current = await streamAlertStore.getStreamAlertConfig(guildId);
+        const config = normalizeStreamAlertConfigInput(req.body || {}, current, req.session.user?.id || 'unknown');
+
+        const channel = guild.channels.cache.get(config.channelId)
+            || await guild.channels.fetch(config.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(400).json({ error: 'Canal de notificaciones no válido' });
+        }
+
+        const firstSource = Array.isArray(config.sources) && config.sources.length > 0
+            ? config.sources[0]
+            : {
+                platform: 'custom',
+                name: 'Fuente de prueba',
+                url: 'https://example.com/stream',
+                imageUrl: ''
+            };
+
+        const values = {
+            platform: String(firstSource.platform || 'custom').toUpperCase(),
+            name: firstSource.name || 'Fuente',
+            title: 'Stream de prueba en vivo',
+            url: firstSource.url || 'https://example.com/stream',
+            description: 'Este es un mensaje de prueba desde el panel web.'
+        };
+
+        const template = (text) => String(text || '').replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
+
+        const embed = new EmbedBuilder()
+            .setColor(`#${String(config.color || '7c4dff').replace('#', '')}`)
+            .setTitle(template(config.titleTemplate || '🔴 {platform}: {name} en directo').slice(0, 256))
+            .setDescription(template(config.descriptionTemplate || '{title}\n{url}').slice(0, 4000))
+            .setURL(values.url)
+            .setTimestamp(new Date());
+
+        const imageUrl = String(firstSource.imageUrl || '').trim();
+        if (imageUrl) embed.setImage(imageUrl);
+
+        const footerText = String(config.footerText || '').trim();
+        if (footerText) embed.setFooter({ text: footerText.slice(0, 200) });
+
+        await channel.send({
+            content: String(config.mentionText || '').trim() || undefined,
+            embeds: [embed]
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error enviando stream alert test:', error);
+        res.status(500).json({ error: 'Error al enviar prueba de stream alert' });
     }
 });
 

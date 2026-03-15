@@ -14,6 +14,7 @@ const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate } = require('./events/temp-voice');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
+const { startStreamAlertScheduler, stopStreamAlertScheduler } = require('./utils/stream-alert-scheduler');
 require('dotenv').config();
 
 let webPanel = null;
@@ -98,6 +99,7 @@ client.once('clientReady', () => {
 
     startBackupScheduler();
     startVoiceXpLoop(client);
+    startStreamAlertScheduler(client);
 });
 
 client.on('messageCreate', async (message) => {
@@ -322,6 +324,7 @@ async function gracefulShutdown(signal) {
     try {
         stopBackupScheduler();
         stopVoiceXpLoop();
+        stopStreamAlertScheduler();
         await db.close().catch(() => null);
         await client.destroy();
     } catch {
