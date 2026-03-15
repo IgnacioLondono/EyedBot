@@ -1819,6 +1819,40 @@ async function loadAutomationPanel(guildId) {
     };
     const prefs = getServerPreference(guildId, 'automation', defaults);
 
+    let textChannels = [];
+    let streamConfig = {
+        enabled: false,
+        channelId: '',
+        mentionText: '',
+        titleTemplate: '🔴 {platform}: {name} en directo',
+        descriptionTemplate: '{title}\n{url}',
+        color: '7c4dff',
+        footerText: 'EyedBot Stream Alerts',
+        sources: []
+    };
+
+    try {
+        const [channelsResponse, streamResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/channels`),
+            fetchWithCredentials(`/api/guild/${guildId}/stream-alert-config`)
+        ]);
+
+        if (channelsResponse.ok) {
+            const channels = await channelsResponse.json();
+            textChannels = (Array.isArray(channels) ? channels : []).filter((c) => c.type === 0);
+        }
+        if (streamResponse.ok) {
+            streamConfig = await streamResponse.json();
+        }
+    } catch (error) {
+        console.warn('No se pudo cargar stream alerts:', error);
+    }
+
+    const streamSources = Array.isArray(streamConfig.sources) ? streamConfig.sources.slice(0, 20) : [];
+    const channelOptionsHtml = textChannels
+        .map((c) => `<option value="${c.id}" ${String(streamConfig.channelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`)
+        .join('');
+
     container.innerHTML = `
         <h3 class="welcome-panel-title">Centro de automatizacion</h3>
         <p class="welcome-panel-subtitle">Configura reglas rapidas para prevenir spam y comportamiento abusivo sin perder control manual.</p>
@@ -1874,6 +1908,65 @@ async function loadAutomationPanel(guildId) {
             <button type="button" class="btn btn-secondary" id="presetStrictAutomationBtn">Preset Estricto</button>
             <button type="button" class="btn btn-primary" id="saveAutomationBtn">Guardar Automatización</button>
         </div>
+
+        <div style="margin-top:2rem; border-top:1px solid var(--border-color); padding-top:1.2rem;">
+            <h3 class="welcome-panel-title">Integraciones de stream (Twitch / YouTube / TikTok / RSS)</h3>
+            <p class="welcome-panel-subtitle">Publica embeds automáticos en un canal cuando detecta nuevo stream/contenido desde tus fuentes conectadas.</p>
+            <div class="control-grid">
+                <div class="control-card">
+                    <h4>Configuración del embed</h4>
+                    <label class="checkbox-inline"><input type="checkbox" id="streamAlertsEnabled" ${streamConfig.enabled ? 'checked' : ''}> Activar stream alerts</label>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label for="streamAlertsChannel">Canal destino</label>
+                        <select id="streamAlertsChannel" class="form-control">
+                            <option value="">Selecciona canal de texto</option>
+                            ${channelOptionsHtml}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label for="streamAlertsMentionText">Texto de aviso (opcional)</label>
+                        <input type="text" id="streamAlertsMentionText" class="form-control" value="${escapeHtmlForValue(streamConfig.mentionText || '')}" placeholder="@everyone ¡Nuevo directo!">
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label for="streamAlertsColor">Color del embed</label>
+                        <input type="color" id="streamAlertsColor" class="form-control color-input" value="#${String(streamConfig.color || '7c4dff').replace('#', '')}">
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label for="streamAlertsTitleTemplate">Título</label>
+                        <input type="text" id="streamAlertsTitleTemplate" class="form-control" value="${escapeHtmlForValue(streamConfig.titleTemplate || '🔴 {platform}: {name} en directo')}" placeholder="🔴 {platform}: {name} en directo">
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label for="streamAlertsDescriptionTemplate">Descripción</label>
+                        <textarea id="streamAlertsDescriptionTemplate" class="form-control" rows="3">${escapeHtmlForValue(streamConfig.descriptionTemplate || '{title}\n{url}')}</textarea>
+                    </div>
+                    <div class="form-group" style="margin-top:0.55rem;">
+                        <label for="streamAlertsFooter">Footer</label>
+                        <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot Stream Alerts')}">
+                    </div>
+                    <small style="color:var(--text-muted);">Variables: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>.</small>
+                </div>
+
+                <div class="control-card">
+                    <h4>Fuentes</h4>
+                    <div class="form-group" style="margin-bottom:0.65rem;">
+                        <label for="streamSourcesSearch">Buscar fuente</label>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <span style="color:var(--text-muted); font-size:1rem;">🔍</span>
+                            <input type="text" id="streamSourcesSearch" class="form-control" placeholder="Buscar por nombre o URL...">
+                        </div>
+                    </div>
+                    <div id="streamSourcesList"></div>
+                    <div class="form-actions" style="margin-top:0.75rem;">
+                        <button type="button" class="btn btn-secondary" id="addStreamSourceBtn">Añadir fuente</button>
+                    </div>
+                    <small style="color:var(--text-muted);">Para YouTube puedes usar URL de canal o feed RSS. Para TikTok/custom añade feed RSS. Twitch funciona con URL del canal (live) o feed.</small>
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:1rem;">
+                <button type="button" class="btn btn-secondary" id="testStreamAlertsBtn">Enviar prueba</button>
+                <button type="button" class="btn btn-primary" id="saveStreamAlertsBtn">Guardar Stream Alerts</button>
+            </div>
+        </div>
     `;
 
     const presetSoftBtn = document.getElementById('presetSoftAutomationBtn');
@@ -1923,6 +2016,196 @@ async function loadAutomationPanel(guildId) {
             const values = collectPanelValues('automationContainer');
             setServerPreference(guildId, 'automation', values);
             showToast('Opciones de automatizacion guardadas', 'success');
+        });
+    }
+
+    const streamState = {
+        sources: streamSources.length
+            ? streamSources.map((source) => ({ ...source }))
+            : [{ id: `src_${Date.now()}`, enabled: true, platform: 'youtube', name: 'Canal principal', url: '', feedUrl: '', imageUrl: '' }]
+    };
+    let streamSourcesSearchQuery = '';
+
+    const sourceCardHtml = (source, index) => `
+        <div class="stream-source-card" data-index="${index}" style="border:1px solid var(--border-color); border-radius:10px; padding:0.75rem; margin-bottom:0.65rem; background:rgba(8,6,16,0.4);">
+            <div class="form-row">
+                <div class="form-group checkbox-group"><label><input type="checkbox" class="stream-source-enabled" ${source.enabled !== false ? 'checked' : ''}> <span>Activa</span></label></div>
+                <div class="form-group" style="display:flex; justify-content:flex-end;"><button type="button" class="btn btn-secondary stream-remove-source-btn" data-remove-index="${index}">Quitar</button></div>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Plataforma</label>
+                    <select class="form-control stream-source-platform">
+                        <option value="twitch" ${String(source.platform || '') === 'twitch' ? 'selected' : ''}>Twitch</option>
+                        <option value="youtube" ${String(source.platform || '') === 'youtube' ? 'selected' : ''}>YouTube</option>
+                        <option value="tiktok" ${String(source.platform || '') === 'tiktok' ? 'selected' : ''}>TikTok</option>
+                        <option value="custom" ${String(source.platform || '') === 'custom' ? 'selected' : ''}>Custom/RSS</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" class="form-control stream-source-name" value="${escapeHtmlForValue(source.name || '')}" placeholder="Nombre de fuente">
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:0.5rem;">
+                <label>URL canal/perfil</label>
+                <input type="url" class="form-control stream-source-url" value="${escapeHtmlForValue(source.url || '')}" placeholder="https://...">
+            </div>
+            <div class="form-group" style="margin-top:0.5rem;">
+                <label>Feed RSS/Atom (opcional)</label>
+                <input type="url" class="form-control stream-source-feed" value="${escapeHtmlForValue(source.feedUrl || '')}" placeholder="https://.../feed.xml">
+            </div>
+            <div class="form-group" style="margin-top:0.5rem;">
+                <label>Imagen fallback (opcional)</label>
+                <input type="url" class="form-control stream-source-image" value="${escapeHtmlForValue(source.imageUrl || '')}" placeholder="https://.../image.jpg">
+            </div>
+            <input type="hidden" class="stream-source-id" value="${escapeHtmlForValue(source.id || `src_${Date.now()}_${index}`)}">
+        </div>
+    `;
+
+    function renderStreamSources() {
+        const listEl = document.getElementById('streamSourcesList');
+        if (!listEl) return;
+
+        listEl.innerHTML = streamState.sources.map((source, index) => sourceCardHtml(source, index)).join('');
+        listEl.querySelectorAll('.stream-remove-source-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const index = Number.parseInt(button.getAttribute('data-remove-index') || '-1', 10);
+                if (index < 0) return;
+                streamState.sources.splice(index, 1);
+                if (!streamState.sources.length) {
+                    streamState.sources.push({ id: `src_${Date.now()}`, enabled: true, platform: 'custom', name: 'Fuente', url: '', feedUrl: '', imageUrl: '' });
+                }
+                renderStreamSources();
+            });
+        });
+
+        applyStreamSourcesFilter(streamSourcesSearchQuery);
+    }
+
+    function applyStreamSourcesFilter(query = '') {
+        const normalizedQuery = String(query || '').trim().toLowerCase();
+        document.querySelectorAll('#streamSourcesList .stream-source-card').forEach((card) => {
+            if (!normalizedQuery) {
+                card.style.display = 'block';
+                return;
+            }
+
+            const name = String(card.querySelector('.stream-source-name')?.value || '').toLowerCase();
+            const url = String(card.querySelector('.stream-source-url')?.value || '').toLowerCase();
+            const feed = String(card.querySelector('.stream-source-feed')?.value || '').toLowerCase();
+            const platform = String(card.querySelector('.stream-source-platform')?.value || '').toLowerCase();
+            const haystack = `${name} ${url} ${feed} ${platform}`;
+            card.style.display = haystack.includes(normalizedQuery) ? 'block' : 'none';
+        });
+    }
+
+    function collectStreamSourcesFromDom() {
+        const cards = Array.from(document.querySelectorAll('#streamSourcesList .stream-source-card'));
+        return cards.map((card, index) => ({
+            id: card.querySelector('.stream-source-id')?.value || `src_${Date.now()}_${index}`,
+            enabled: card.querySelector('.stream-source-enabled')?.checked ?? true,
+            platform: card.querySelector('.stream-source-platform')?.value || 'custom',
+            name: card.querySelector('.stream-source-name')?.value || 'Fuente',
+            url: card.querySelector('.stream-source-url')?.value || '',
+            feedUrl: card.querySelector('.stream-source-feed')?.value || '',
+            imageUrl: card.querySelector('.stream-source-image')?.value || ''
+        }));
+    }
+
+    function collectStreamConfigPayload() {
+        return {
+            enabled: document.getElementById('streamAlertsEnabled')?.checked ?? false,
+            channelId: document.getElementById('streamAlertsChannel')?.value || '',
+            mentionText: document.getElementById('streamAlertsMentionText')?.value || '',
+            titleTemplate: document.getElementById('streamAlertsTitleTemplate')?.value || '🔴 {platform}: {name} en directo',
+            descriptionTemplate: document.getElementById('streamAlertsDescriptionTemplate')?.value || '{title}\n{url}',
+            color: (document.getElementById('streamAlertsColor')?.value || '#7c4dff').replace('#', ''),
+            footerText: document.getElementById('streamAlertsFooter')?.value || 'EyedBot Stream Alerts',
+            sources: collectStreamSourcesFromDom()
+        };
+    }
+
+    renderStreamSources();
+
+    const streamSourcesSearchInput = document.getElementById('streamSourcesSearch');
+    if (streamSourcesSearchInput) {
+        streamSourcesSearchInput.addEventListener('input', (event) => {
+            streamSourcesSearchQuery = String(event.target?.value || '');
+            applyStreamSourcesFilter(streamSourcesSearchQuery);
+        });
+    }
+
+    const addSourceBtn = document.getElementById('addStreamSourceBtn');
+    if (addSourceBtn) {
+        addSourceBtn.addEventListener('click', () => {
+            streamState.sources.push({
+                id: `src_${Date.now()}_${streamState.sources.length}`,
+                enabled: true,
+                platform: 'custom',
+                name: 'Nueva fuente',
+                url: '',
+                feedUrl: '',
+                imageUrl: ''
+            });
+            renderStreamSources();
+        });
+    }
+
+    const saveStreamBtn = document.getElementById('saveStreamAlertsBtn');
+    if (saveStreamBtn) {
+        saveStreamBtn.addEventListener('click', async () => {
+            const payload = collectStreamConfigPayload();
+            if (payload.enabled && !payload.channelId) {
+                showToast('Selecciona un canal para las alertas', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetchWithCredentials(`/api/guild/${guildId}/stream-alert-config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    showToast(data.error || 'No se pudo guardar stream alerts', 'error');
+                    return;
+                }
+                showToast('Stream alerts guardadas', 'success');
+                await loadAutomationPanel(guildId);
+            } catch (error) {
+                console.error('Error guardando stream alerts:', error);
+                showToast('Error guardando stream alerts', 'error');
+            }
+        });
+    }
+
+    const testStreamBtn = document.getElementById('testStreamAlertsBtn');
+    if (testStreamBtn) {
+        testStreamBtn.addEventListener('click', async () => {
+            const payload = collectStreamConfigPayload();
+            if (!payload.channelId) {
+                showToast('Selecciona un canal para enviar la prueba', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetchWithCredentials(`/api/guild/${guildId}/stream-alert-test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    showToast(data.error || 'No se pudo enviar la prueba', 'error');
+                    return;
+                }
+                showToast('Prueba de stream alert enviada', 'success');
+            } catch (error) {
+                console.error('Error enviando prueba stream alerts:', error);
+                showToast('Error enviando prueba', 'error');
+            }
         });
     }
 }
