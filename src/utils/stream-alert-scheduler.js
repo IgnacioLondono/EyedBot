@@ -7,6 +7,7 @@ const FETCH_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.STREAM_ALERT
 let intervalRef = null;
 let running = false;
 const liveState = new Map();
+const liveSessionState = new Map();
 
 function applyTemplate(template = '', values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => {
@@ -146,11 +147,17 @@ async function resolveTwitchLive(source) {
 
         if (!uptimeText || uptimeText.includes('offline')) {
             liveState.set(stateKey, false);
+            liveSessionState.delete(stateKey);
             return null;
         }
 
         const wasLive = liveState.get(stateKey) === true;
         liveState.set(stateKey, true);
+        let sessionId = liveSessionState.get(stateKey);
+        if (!sessionId) {
+            sessionId = `twitch-live-${login}-${Date.now()}`;
+            liveSessionState.set(stateKey, sessionId);
+        }
 
         let liveTitle = '';
         try {
@@ -164,7 +171,7 @@ async function resolveTwitchLive(source) {
         }
 
         return {
-            itemId: `twitch-live-${login}`,
+            itemId: sessionId,
             title: liveTitle || `${source.name || login} está en directo`,
             description: `En vivo en Twitch (${uptimeRaw.trim()})`,
             url: String(source.url || `https://twitch.tv/${login}`),
@@ -260,6 +267,16 @@ async function processGuildConfig(client, guildId, config) {
 
         const currentLast = String(source.lastItemId || '');
         if (!currentLast) {
+            if (String(source.platform || '').toLowerCase() === 'twitch') {
+                const posted = await postAlert(client, guildId, config, source, item).catch(() => false);
+                if (posted) {
+                    source.lastItemId = item.itemId;
+                    source.lastPostedAt = new Date().toISOString();
+                    updated = true;
+                }
+                continue;
+            }
+
             source.lastItemId = item.itemId;
             updated = true;
             continue;
