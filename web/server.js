@@ -1050,10 +1050,12 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
         };
 
         const template = (text) => String(text || '').replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
+        const templateTitle = template(config.titleTemplate || '🔴 {platform}: {name} en directo').trim();
+        const finalTitle = String(values.title || templateTitle || 'Directo detectado').slice(0, 256);
 
         const embed = new EmbedBuilder()
             .setColor(`#${String(config.color || '7c4dff').replace('#', '')}`)
-            .setTitle(template(config.titleTemplate || '🔴 {platform}: {name} en directo').slice(0, 256))
+            .setTitle(finalTitle)
             .setDescription(template(config.descriptionTemplate || '{title}\n{url}').slice(0, 4000))
             .setURL(values.url)
             .setTimestamp(new Date());

@@ -152,9 +152,20 @@ async function resolveTwitchLive(source) {
         const wasLive = liveState.get(stateKey) === true;
         liveState.set(stateKey, true);
 
+        let liveTitle = '';
+        try {
+            const titleRaw = await fetchWithTimeout(`https://decapi.me/twitch/title/${encodeURIComponent(login)}`);
+            const normalizedTitle = String(titleRaw || '').trim();
+            if (normalizedTitle && !normalizedTitle.toLowerCase().includes('offline')) {
+                liveTitle = normalizedTitle;
+            }
+        } catch {
+            // fallback title below
+        }
+
         return {
             itemId: `twitch-live-${login}`,
-            title: `${source.name || login} está en directo`,
+            title: liveTitle || `${source.name || login} está en directo`,
             description: `En vivo en Twitch (${uptimeRaw.trim()})`,
             url: String(source.url || `https://twitch.tv/${login}`),
             imageUrl: source.imageUrl || `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`,
@@ -193,7 +204,9 @@ function buildEmbed(config, source, item) {
         description: item.description || ''
     };
 
-    const title = applyTemplate(config.titleTemplate || '🔴 {platform}: {name} en directo', values).slice(0, 256);
+    const titleFromTemplate = applyTemplate(config.titleTemplate || '🔴 {platform}: {name} en directo', values).trim();
+    const streamTitle = String(item.title || '').trim();
+    const title = (streamTitle || titleFromTemplate || 'Directo detectado').slice(0, 256);
     const description = applyTemplate(config.descriptionTemplate || '{title}\n{url}', values).slice(0, 4000);
 
     const embed = new EmbedBuilder()
