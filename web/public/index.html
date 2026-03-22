@@ -13,6 +13,7 @@
     <!-- Background Effects -->
     <div class="bg-pattern"></div>
     <div class="bg-glow"></div>
+    <div class="bg-lines" aria-hidden="true"></div>
 
     <!-- Navbar -->
     <nav class="navbar">
@@ -101,6 +102,28 @@
 
     <!-- Main Content -->
     <main class="main-content">
+        <div id="contextStrip" class="context-strip" aria-hidden="true">
+            <div class="context-left">
+                <img id="contextGuildIcon" class="context-guild-icon" alt="Servidor" src="" style="display:none;">
+                <div class="context-text">
+                    <div class="context-label">Servidor activo</div>
+                    <div id="contextGuildName" class="context-name">Sin servidor seleccionado</div>
+                </div>
+            </div>
+            <div class="context-right">
+                <button type="button" id="changeServerBtn" class="chip-btn" title="Cambiar servidor">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M21 12a9 9 0 0 1-9 9"></path>
+                        <path d="M3 12a9 9 0 0 1 9-9"></path>
+                        <path d="M3 12h4"></path>
+                        <path d="M17 12h4"></path>
+                        <path d="M12 3v4"></path>
+                        <path d="M12 17v4"></path>
+                    </svg>
+                    <span>Cambiar</span>
+                </button>
+            </div>
+        </div>
         <!-- Dashboard -->
         <section id="dashboard" class="section active">
             <div class="container">
@@ -131,12 +154,19 @@
         <!-- Embed Sender -->
         <section id="embedSection" class="section">
             <div class="container">
-                <div class="section-header">
-                    <button type="button" id="backToServerFromEmbed" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
-                        <
-                    </button>
-                    <h2 class="section-title">Enviar Embed</h2>
-                    <div class="title-accent"></div>
+                <div class="section-header section-header--split">
+                    <div class="section-heading">
+                        <h2 class="section-title">Enviar Embed</h2>
+                        <div class="title-accent"></div>
+                    </div>
+                    <div class="section-tools">
+                        <button type="button" id="backToServerFromEmbed" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M15 18l-6-6 6-6"></path>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="embed-form-container">
                     <div class="form-grid">
@@ -371,12 +401,19 @@
         <!-- Stats -->
         <section id="statsSection" class="section">
             <div class="container">
-                <div class="section-header">
-                    <button type="button" id="backToServerFromStats" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
-                        <
-                    </button>
-                    <h2 class="section-title">Estadísticas del Bot</h2>
-                    <div class="title-accent"></div>
+                <div class="section-header section-header--split">
+                    <div class="section-heading">
+                        <h2 class="section-title">Estadísticas del Bot</h2>
+                        <div class="title-accent"></div>
+                    </div>
+                    <div class="section-tools">
+                        <button type="button" id="backToServerFromStats" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M15 18l-6-6 6-6"></path>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                    </div>
                 </div>
                 <div id="statsContainer" class="stats-grid">
                     <div class="stat-card">
@@ -453,28 +490,35 @@
         <!-- Logs -->
         <section id="logsSection" class="section">
             <div class="container">
-                <div class="section-header">
-                    <button type="button" id="backToServerFromLogs" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
-                        <
-                    </button>
-                    <h2 class="section-title">Logs del Bot</h2>
-                    <div class="title-accent"></div>
-                    <div class="logs-controls">
-                        <select id="logLevelFilter" class="form-control" style="width: auto; display: inline-block;">
-                            <option value="">Todos los niveles</option>
-                            <option value="info">Info</option>
-                            <option value="warn">Warning</option>
-                            <option value="error">Error</option>
-                        </select>
-                        <button id="clearLogsBtn" class="btn btn-secondary" style="margin-left: 1rem;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                <div class="section-header section-header--split">
+                    <div class="section-heading">
+                        <h2 class="section-title">Logs del Bot</h2>
+                        <div class="title-accent"></div>
+                        <div class="section-subtools">
+                            <select id="logLevelFilter" class="form-control log-filter">
+                                <option value="">Todos los niveles</option>
+                                <option value="info">Info</option>
+                                <option value="warn">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="section-tools">
+                        <button type="button" id="backToServerFromLogs" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M15 18l-6-6 6-6"></path>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <button id="clearLogsBtn" class="btn btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                             </svg>
                             <span>Limpiar</span>
                         </button>
-                        <button id="autoScrollBtn" class="btn btn-secondary" style="margin-left: 1rem;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                        <button id="autoScrollBtn" class="btn btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
                             <span id="autoScrollText">Auto-scroll: ON</span>
@@ -522,8 +566,9 @@
                             <input type="text" id="serverTabSearch" class="form-control" placeholder="Buscar pestana...">
                         </div>
 
-                        <div class="side-menu-group">
-                            <h4>Panel</h4>
+                        <div class="side-menu-group" data-group="panel">
+                            <h4 class="side-menu-group-title" role="button" tabindex="0">Panel</h4>
+                            <div class="side-menu-items">
                             <button type="button" class="side-menu-btn active" data-server-pane="serverPaneOverview">
                                 <span class="side-menu-btn-inner">
                                     <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -542,10 +587,12 @@
                                     <span class="side-menu-label">Configuración del servidor</span>
                                 </span>
                             </button>
+                            </div>
                         </div>
 
-                        <div class="side-menu-group">
-                            <h4>Módulos</h4>
+                        <div class="side-menu-group" data-group="modules">
+                            <h4 class="side-menu-group-title" role="button" tabindex="0">Módulos</h4>
+                            <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-server-pane="serverPaneWelcome">
                                 <span class="side-menu-btn-inner">
                                     <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -608,10 +655,12 @@
                                     <span class="side-menu-label">Automatización</span>
                                 </span>
                             </button>
+                            </div>
                         </div>
 
-                        <div class="side-menu-group">
-                            <h4>Moderación</h4>
+                        <div class="side-menu-group" data-group="moderation">
+                            <h4 class="side-menu-group-title" role="button" tabindex="0">Moderación</h4>
+                            <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-server-pane="serverPaneModeration">
                                 <span class="side-menu-btn-inner">
                                     <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -630,10 +679,12 @@
                                     <span class="side-menu-label">Centro de seguridad</span>
                                 </span>
                             </button>
+                            </div>
                         </div>
 
-                        <div class="side-menu-group">
-                            <h4>Notificaciones</h4>
+                        <div class="side-menu-group" data-group="notifications">
+                            <h4 class="side-menu-group-title" role="button" tabindex="0">Notificaciones</h4>
+                            <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-server-pane="serverPaneNotifications">
                                 <span class="side-menu-btn-inner">
                                     <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -643,10 +694,12 @@
                                     <span class="side-menu-label">Centro de notificaciones</span>
                                 </span>
                             </button>
+                            </div>
                         </div>
 
-                        <div class="side-menu-group">
-                            <h4>Atajos rápidos</h4>
+                        <div class="side-menu-group" data-group="shortcuts">
+                            <h4 class="side-menu-group-title" role="button" tabindex="0">Atajos rápidos</h4>
+                            <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-quick-section="embedSection">
                                 <span class="side-menu-btn-inner">
                                     <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -686,6 +739,7 @@
                                     <span class="side-menu-label">Comandos</span>
                                 </span>
                             </button>
+                            </div>
                         </div>
                     </aside>
 
