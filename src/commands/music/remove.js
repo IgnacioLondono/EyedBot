@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getQueueOrReply, userInSameVoice } = require('./_common');
+const { getQueueOrReply, userCanControlMusic } = require('./_common');
 const config = require('../../config');
 
 module.exports = {
@@ -13,7 +13,7 @@ module.exports = {
     async execute(interaction) {
         const { queue, error } = getQueueOrReply(interaction);
         if (!queue) return interaction.reply({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Error').setDescription(error)], flags: 64 });
-        const voiceCheck = userInSameVoice(interaction, queue);
+        const voiceCheck = await userCanControlMusic(interaction, queue);
         if (!voiceCheck.ok) return interaction.reply({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Error').setDescription(voiceCheck.error)], flags: 64 });
 
         const index = interaction.options.getInteger('posicion') - 1;
@@ -23,10 +23,13 @@ module.exports = {
         }
 
         const removed = tracks[index];
-        queue.removeTrack(index);
+        if (queue?.tracks?.removeTrack) {
+            queue.tracks.removeTrack(index);
+        } else if (queue?.removeTrack) {
+            queue.removeTrack(index);
+        }
 
         return interaction.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setTitle('🗑️ Canción eliminada').setDescription(`**${removed.title}**`)] });
     }
 };
-
 

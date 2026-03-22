@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getQueueOrReply, userInSameVoice } = require('./_common');
+const { getQueueOrReply, userCanControlMusic } = require('./_common');
 
 const FILTERS = ['studio', 'vocal', 'bassboost', 'nightcore', 'vaporwave', 'clean', 'reset'];
 const PRESETS = {
@@ -24,7 +24,7 @@ module.exports = {
     async execute(interaction) {
         const { queue, error } = getQueueOrReply(interaction);
         if (!queue) return interaction.reply({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Error').setDescription(error)], flags: 64 });
-        const voiceCheck = userInSameVoice(interaction, queue);
+        const voiceCheck = await userCanControlMusic(interaction, queue);
         if (!voiceCheck.ok) return interaction.reply({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Error').setDescription(voiceCheck.error)], flags: 64 });
 
         const filter = interaction.options.getString('filtro');

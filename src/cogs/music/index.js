@@ -3,6 +3,7 @@
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    PermissionsBitField,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle
@@ -11,6 +12,7 @@ const { useQueue, QueueRepeatMode, GuildQueueEvent } = require('discord-player')
 const YouTube = require('youtube-sr').default;
 const axios = require('axios');
 const config = require('../../config');
+const { getMusicConfig } = require('../../utils/music-config-store');
 
 function normalize(input) {
     return (input || '')
@@ -242,25 +244,43 @@ class MusicSystem {
         const isPaused = queue?.node?.isPaused?.() || false;
         const loopLabel = this._repeatModeLabel(queue?.repeatMode ?? QueueRepeatMode.OFF);
 
-        const artwork = track?.thumbnail
+        const url = (track?.url || track?.uri || '').toString();
+        const youtubeId = url ? this._extractYouTubeId(url) : null;
+        const hqYoutubeThumb = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/maxresdefault.jpg` : null;
+
+        const artwork = hqYoutubeThumb
+            || track?.thumbnail
             || track?.raw?.thumbnail?.url
             || track?.raw?.thumbnail
             || null;
 
+        const album = track?.raw?.album?.name
+            || track?.raw?.album
+            || track?.raw?.track?.album?.name
+            || null;
+
+        const source = (track?.source || track?.extractor?.identifier || '').toString() || 'desconocido';
+        const requester = track?.requestedBy?.id ? `<@${track.requestedBy.id}>` : (track?.requestedBy?.username || 'Desconocido');
+        const titleText = track?.title || 'Sin titulo';
+        const titleLink = url ? `[${titleText}](${url})` : `**${titleText}**`;
+
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
-            .setTitle(isPaused ? '⏸️ Pausado' : '🎵 Reproduciendo')
-            .setDescription(`**${track?.title || 'Sin titulo'}**`)
+            .setTitle(isPaused ? '⏸️ En pausa' : '🎵 Ahora suena')
+            .setDescription(titleLink)
             .addFields(
                 { name: '👤 Artista', value: track?.author || 'Desconocido', inline: true },
-                { name: '⏱️ Duracion', value: track?.duration || 'Desconocida', inline: true },
-                { name: '🔁 Modo', value: loopLabel, inline: true },
+                { name: '💿 Álbum', value: album ? String(album).substring(0, 1024) : '—', inline: true },
+                { name: '⏱️ Duración', value: track?.duration || 'Desconocida', inline: true },
+                { name: '🔗 Fuente', value: source.substring(0, 1024), inline: true },
+                { name: '🙋 Solicitado por', value: requester, inline: true },
+                { name: '🔁 Loop', value: loopLabel, inline: true },
                 { name: '📋 En cola', value: String(queue?.tracks?.size || 0), inline: true },
                 { name: '🔊 Volumen', value: `${queue?.node?.volume ?? config.musicDefaultVolume}%`, inline: true }
             );
 
-        if (artwork) embed.setImage(artwork);
-        if (track?.url) embed.setURL(track.url);
+        if (artwork) embed.setThumbnail(artwork);
+        if (url) embed.setURL(url);
         return embed;
     }
 
@@ -728,6 +748,15 @@ class MusicSystem {
             return;
         }
 
+        const permission = await this._canControlInteraction(interaction, queue);
+        if (!permission.ok) {
+            await interaction.reply({
+                embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Sin permisos').setDescription(permission.error)],
+                flags: 64
+            }).catch(() => {});
+            return;
+        }
+
         switch (action) {
             case 'pause_resume': {
                 if (queue.node.isPaused()) {
@@ -799,6 +828,12 @@ class MusicSystem {
             return;
         }
 
+        const permission = await this._canControlInteraction(interaction, queue);
+        if (!permission.ok) {
+            await interaction.reply({ content: `❌ ${permission.error}`, flags: 64 }).catch(() => {});
+            return;
+        }
+
         const value = Number.parseInt(interaction.fields.getTextInputValue('volume_input') || '', 10);
         const maxVolume = config.musicMaxVolume || 85;
         if (!Number.isFinite(value) || value < 0 || value > maxVolume) {
@@ -809,8 +844,37 @@ class MusicSystem {
         queue.node.setVolume(value);
         await interaction.reply({ content: `🔊 Volumen: ${value}%`, flags: 64 }).catch(() => {});
     }
+
+    async _canControlInteraction(interaction, queue) {
+        const member = interaction.member;
+        if (!member) return { ok: false, error: 'No pude validar tus permisos.' };
+
+        try {
+            const perms = new PermissionsBitField(member.permissions);
+            if (perms.has(PermissionsBitField.Flags.ManageGuild)) {
+                return { ok: true, error: null };
+            }
+        } catch {
+            // ignore permissions parse errors
+        }
+
+        const cfg = await getMusicConfig(interaction.guild.id).catch(() => null);
+        const djRoleIds = cfg?.djRoleIds || [];
+        const allowRequester = cfg?.allowRequesterControl !== false;
+
+        if (djRoleIds.length && member.roles?.cache) {
+            const hasDj = djRoleIds.some((roleId) => member.roles.cache.has(roleId));
+            if (hasDj) return { ok: true, error: null };
+        }
+
+        const requesterId = queue?.currentTrack?.requestedBy?.id || null;
+        if (allowRequester && requesterId && interaction.user?.id === requesterId) {
+            return { ok: true, error: null };
+        }
+
+        const hint = djRoleIds.length ? 'o tener el rol DJ' : 'o tener permisos de servidor';
+        return { ok: false, error: `Debes ser el solicitante ${hint}.` };
+    }
 }
 
 module.exports = MusicSystem;
-
-

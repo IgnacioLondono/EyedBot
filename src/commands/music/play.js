@@ -6,6 +6,23 @@ const config = require('../../config');
 const { safeDeferReply, safeEditReply } = require('../../utils/interactions');
 const { getMusicSystem } = require('./_common');
 
+const AUTOCOMPLETE_TTL_MS = Math.max(5000, Number.parseInt(process.env.MUSIC_AUTOCOMPLETE_TTL_MS || '15000', 10));
+const autocompleteCache = new Map();
+
+function autocompleteCacheGet(key) {
+    const hit = autocompleteCache.get(key);
+    if (!hit) return null;
+    if (Date.now() > hit.expiresAt) {
+        autocompleteCache.delete(key);
+        return null;
+    }
+    return hit.value;
+}
+
+function autocompleteCacheSet(key, value) {
+    autocompleteCache.set(key, { value, expiresAt: Date.now() + AUTOCOMPLETE_TTL_MS });
+}
+
 function isUrl(input) {
     return /^https?:\/\//i.test((input || '').toString().trim());
 }
@@ -299,6 +316,13 @@ module.exports = {
             return;
         }
 
+        const cacheKey = `${interaction.guildId || 'global'}:${normalizeText(focused).slice(0, 80)}`;
+        const cached = autocompleteCacheGet(cacheKey);
+        if (cached) {
+            await interaction.respond(cached).catch(() => {});
+            return;
+        }
+
         const results = await YouTube.search(focused, {
             type: 'video',
             limit: 12,
@@ -316,6 +340,7 @@ module.exports = {
             };
         });
 
+        autocompleteCacheSet(cacheKey, options);
         await interaction.respond(options).catch(() => {});
     },
 
