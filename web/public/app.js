@@ -78,6 +78,7 @@ function updateServerMenuIdentity() {
         guildNameEl.textContent = 'Sin servidor seleccionado';
         guildIconEl.style.display = 'none';
         guildIconEl.src = '';
+        updateContextStrip();
         return;
     }
 
@@ -86,6 +87,7 @@ function updateServerMenuIdentity() {
         guildNameEl.textContent = 'Servidor activo';
         guildIconEl.style.display = 'none';
         guildIconEl.src = '';
+        updateContextStrip();
         return;
     }
 
@@ -96,6 +98,38 @@ function updateServerMenuIdentity() {
     } else {
         guildIconEl.style.display = 'none';
         guildIconEl.src = '';
+    }
+
+    updateContextStrip();
+    applySideMenuCollapsedState();
+}
+
+function updateContextStrip() {
+    const strip = document.getElementById('contextStrip');
+    const nameEl = document.getElementById('contextGuildName');
+    const iconEl = document.getElementById('contextGuildIcon');
+    if (!strip || !nameEl || !iconEl) return;
+
+    if (!hasSelectedGuildContext()) {
+        strip.classList.remove('active');
+        strip.setAttribute('aria-hidden', 'true');
+        nameEl.textContent = 'Sin servidor seleccionado';
+        iconEl.style.display = 'none';
+        iconEl.src = '';
+        return;
+    }
+
+    strip.classList.add('active');
+    strip.setAttribute('aria-hidden', 'false');
+
+    const selectedGuild = currentServerGuilds.find((g) => String(g.id) === String(currentServerGuildId));
+    nameEl.textContent = selectedGuild?.name || 'Servidor activo';
+    if (selectedGuild?.icon) {
+        iconEl.style.display = 'block';
+        iconEl.src = selectedGuild.icon;
+    } else {
+        iconEl.style.display = 'none';
+        iconEl.src = '';
     }
 }
 
@@ -177,7 +211,33 @@ function resetServerContextToDashboard() {
     updateServerMenuIdentity();
     updateBackToServerButtonsVisibility('dashboard');
     updateDashboardButtonState();
+    applySideMenuCollapsedState();
     saveState();
+}
+
+function applySideMenuCollapsedState() {
+    const menu = document.getElementById('serverSideMenu');
+    if (!menu) return;
+
+    const prefs = hasSelectedGuildContext()
+        ? getServerPreference(currentServerGuildId, 'collapsedGroups', {})
+        : {};
+
+    menu.querySelectorAll('.side-menu-group[data-group]').forEach((group) => {
+        const groupId = group.dataset.group || '';
+        const isCollapsed = Boolean(prefs[groupId]);
+        group.classList.toggle('collapsed', isCollapsed);
+    });
+}
+
+function toggleSideMenuGroupCollapsed(groupId) {
+    if (!groupId) return;
+    if (!hasSelectedGuildContext()) return;
+
+    const current = getServerPreference(currentServerGuildId, 'collapsedGroups', {});
+    current[groupId] = !current[groupId];
+    setServerPreference(currentServerGuildId, 'collapsedGroups', current);
+    applySideMenuCollapsedState();
 }
 
 function activateServerSideButton(button) {
@@ -532,6 +592,44 @@ function setupEventListeners() {
         });
     });
 
+    const changeServerBtn = document.getElementById('changeServerBtn');
+    if (changeServerBtn) {
+        changeServerBtn.addEventListener('click', async () => {
+            resetServerContextToDashboard();
+            showSection('dashboard');
+            await loadGuilds();
+        });
+    }
+
+    const serverSideMenu = document.getElementById('serverSideMenu');
+    if (serverSideMenu) {
+        serverSideMenu.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            const title = target.closest('.side-menu-group-title');
+            if (!title) return;
+
+            const group = title.closest('.side-menu-group');
+            const groupId = group?.dataset.group || '';
+            if (!groupId) return;
+            toggleSideMenuGroupCollapsed(groupId);
+        });
+
+        serverSideMenu.addEventListener('keydown', (event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            const title = target.closest('.side-menu-group-title');
+            if (!title) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+
+            const group = title.closest('.side-menu-group');
+            const groupId = group?.dataset.group || '';
+            if (!groupId) return;
+            toggleSideMenuGroupCollapsed(groupId);
+        });
+    }
+
     const guildSearch = document.getElementById('guildSearch');
     if (guildSearch) {
         guildSearch.addEventListener('input', (event) => {
@@ -569,7 +667,7 @@ function setupEventListeners() {
             });
 
             document.querySelectorAll('.side-menu-group').forEach((group) => {
-                const title = group.querySelector('h4');
+                const title = group.querySelector('.side-menu-group-title');
                 const visibleButtons = group.querySelectorAll('.side-menu-btn:not(.hidden)');
                 if (title) title.classList.toggle('hidden', visibleButtons.length === 0);
             });
