@@ -17,6 +17,8 @@ let currentGreetingMode = 'welcome';
 const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
+let dashboardGuildsCache = [];
+let dashboardGuildSearchQuery = '';
 
 const DASHBOARD_ICON = `
     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -33,6 +35,15 @@ const HOME_ICON = `
         <path d="M5 9.5V21h14V9.5"></path>
     </svg>
 `;
+
+function registerGatedNavigationButtons() {
+    const ids = ['serverBtn', 'embedBtn', 'statsBtn', 'logsBtn', 'commandsBtn'];
+    ids.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!gatedNavButtonIds.includes(id)) gatedNavButtonIds.push(id);
+    });
+}
 
 function updateDashboardButtonState() {
     const dashboardBtn = document.getElementById('dashboardBtn');
@@ -415,6 +426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return; // No cargar datos si no hay autenticación
     }
     
+    registerGatedNavigationButtons();
     setupEventListeners();
     
     // Cargar estado guardado
@@ -510,6 +522,24 @@ function setupEventListeners() {
         showSection('dashboard');
         await loadGuilds();
     });
+
+    document.querySelectorAll('.nav-link[data-section]').forEach((link) => {
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            const sectionId = link.dataset.section;
+            if (!sectionId) return;
+            showSection(sectionId);
+        });
+    });
+
+    const guildSearch = document.getElementById('guildSearch');
+    if (guildSearch) {
+        guildSearch.addEventListener('input', (event) => {
+            dashboardGuildSearchQuery = String(event.target?.value || '');
+            displayGuilds(getFilteredDashboardGuilds());
+        });
+    }
+
     document.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
@@ -666,10 +696,20 @@ function showSection(sectionId) {
         link.classList.remove('active');
     });
 
-    if (sectionId === 'dashboard') {
-        const dashboardBtn = document.getElementById('dashboardBtn');
-        if (dashboardBtn) dashboardBtn.classList.add('active');
-    } else if (sectionId === 'embedSection') {
+    const navIdBySection = {
+        dashboard: 'dashboardBtn',
+        serverSection: 'serverBtn',
+        embedSection: 'embedBtn',
+        statsSection: 'statsBtn',
+        logsSection: 'logsBtn',
+        commandsSection: 'commandsBtn'
+    };
+
+    const activeNavId = navIdBySection[sectionId] || navIdBySection.dashboard;
+    const activeNav = document.getElementById(activeNavId);
+    if (activeNav) activeNav.classList.add('active');
+
+    if (sectionId === 'embedSection') {
         loadGuildsForEmbed();
     } else if (sectionId === 'statsSection') {
         loadStats();
@@ -694,7 +734,8 @@ async function loadGuilds() {
         const response = await fetchWithCredentials('/api/guilds');
         if (response.ok) {
             const guilds = await response.json();
-            displayGuilds(guilds);
+            dashboardGuildsCache = Array.isArray(guilds) ? guilds : [];
+            displayGuilds(getFilteredDashboardGuilds());
         } else {
             showToast('Error al cargar servidores', 'error');
         }
@@ -704,12 +745,22 @@ async function loadGuilds() {
     }
 }
 
+function getFilteredDashboardGuilds() {
+    const query = String(dashboardGuildSearchQuery || '').trim().toLowerCase();
+    if (!query) return dashboardGuildsCache;
+    return dashboardGuildsCache.filter((guild) => {
+        const name = String(guild?.name || '').toLowerCase();
+        return name.includes(query);
+    });
+}
+
 // Mostrar servidores
 function displayGuilds(guilds) {
     const container = document.getElementById('guildsList');
     
     if (guilds.length === 0) {
-        container.innerHTML = '<div class="loading">No hay servidores disponibles</div>';
+        const emptyLabel = dashboardGuildSearchQuery ? 'No se encontraron servidores' : 'No hay servidores disponibles';
+        container.innerHTML = `<div class="loading">${emptyLabel}</div>`;
         return;
     }
 
@@ -3835,7 +3886,3 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-
-
-
-
