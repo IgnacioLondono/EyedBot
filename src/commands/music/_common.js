@@ -1,5 +1,7 @@
 const MusicSystem = require('../../cogs/music');
 const { useQueue, QueueRepeatMode } = require('discord-player');
+const { PermissionsBitField } = require('discord.js');
+const { getMusicConfig } = require('../../utils/music-config-store');
 
 function getMusicSystem(interaction) {
     const musicSystem = interaction.client.musicSystem || new MusicSystem(interaction.client);
@@ -86,10 +88,38 @@ function requesterLabel(track) {
     return requester?.username || requester?.tag || 'Desconocido';
 }
 
+async function userCanControlMusic(interaction, queue) {
+    const voiceCheck = userInSameVoice(interaction, queue);
+    if (!voiceCheck.ok) return voiceCheck;
+
+    const member = interaction.member;
+    if (member?.permissions && new PermissionsBitField(member.permissions).has(PermissionsBitField.Flags.ManageGuild)) {
+        return { ok: true, error: null };
+    }
+
+    const cfg = await getMusicConfig(interaction.guild.id).catch(() => null);
+    const djRoleIds = cfg?.djRoleIds || [];
+    const allowRequesterControl = cfg?.allowRequesterControl !== false;
+
+    if (djRoleIds.length && member?.roles?.cache) {
+        const hasDj = djRoleIds.some((roleId) => member.roles.cache.has(roleId));
+        if (hasDj) return { ok: true, error: null };
+    }
+
+    const requesterId = queue?.currentTrack?.requestedBy?.id || null;
+    if (allowRequesterControl && requesterId && interaction.user?.id === requesterId) {
+        return { ok: true, error: null };
+    }
+
+    const djHint = djRoleIds.length ? 'o tener el rol DJ' : 'o tener permisos de servidor';
+    return { ok: false, error: `No tienes permisos para controlar la música. Debes estar en el canal del bot y ser el solicitante ${djHint}.` };
+}
+
 module.exports = {
     getMusicSystem,
     getQueueOrReply,
     userInSameVoice,
+    userCanControlMusic,
     supportsAutoplayMode,
     repeatModeLabel,
     repeatModeChoices,

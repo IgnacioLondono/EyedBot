@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { QueueRepeatMode } = require('discord-player');
-const { getQueueOrReply, userInSameVoice, supportsAutoplayMode } = require('./_common');
+const { getQueueOrReply, userCanControlMusic, supportsAutoplayMode } = require('./_common');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -31,7 +31,7 @@ module.exports = {
         const { queue, error } = getQueueOrReply(interaction);
         if (!queue) return interaction.reply({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Error').setDescription(error)], flags: 64 });
 
-        const voiceCheck = userInSameVoice(interaction, queue);
+        const voiceCheck = await userCanControlMusic(interaction, queue);
         if (!voiceCheck.ok) return interaction.reply({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Error').setDescription(voiceCheck.error)], flags: 64 });
 
         const state = interaction.options.getString('estado');
