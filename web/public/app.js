@@ -746,6 +746,49 @@ function setupEventListeners() {
     document.getElementById('previewBtn').addEventListener('click', updateEmbedPreview);
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
     document.getElementById('addFieldBtn').addEventListener('click', addField);
+    document.getElementById('addTitleFieldBtn').addEventListener('click', function() {
+        // Agrega un field con formato de título destacado
+        const container = document.getElementById('fieldsContainer');
+        const fieldId = `field_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+        const fieldHTML = `
+            <div class="field-item" id="${fieldId}">
+                <div class="field-item-header">
+                    <h5>Título Destacado</h5>
+                    <button type="button" class="btn-remove-field" onclick="removeField('${fieldId}')">Eliminar</button>
+                </div>
+                <div class="form-group">
+                    <label>Texto del título</label>
+                    <input type="text" class="form-control field-name" placeholder="Título llamativo" value="Título llamativo" oninput="updateEmbedPreview(); saveState();">
+                </div>
+                <div class="form-group">
+                    <label>Valor</label>
+                    <textarea class="form-control field-value" rows="2" placeholder="(opcional)" oninput="updateEmbedPreview(); saveState();"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" class="field-inline" onchange="updateEmbedPreview(); saveState();"> Inline
+                    </label>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', fieldHTML);
+        updateEmbedPreview();
+        saveState();
+    });
+
+    document.getElementById('addTitleDescBtn').addEventListener('click', function() {
+        // Inserta un bloque de título en la descripción usando markdown
+        const desc = document.getElementById('embedDescription');
+        const cursorPos = desc.selectionStart || desc.value.length;
+        const before = desc.value.substring(0, cursorPos);
+        const after = desc.value.substring(cursorPos);
+        const titleBlock = `\n**══════════ TÍTULO LLAMATIVO ══════════**\n`;
+        desc.value = before + titleBlock + after;
+        desc.focus();
+        desc.selectionStart = desc.selectionEnd = before.length + titleBlock.length;
+        updateEmbedPreview();
+        saveState();
+    });
     document.getElementById('saveTemplateBtn').addEventListener('click', saveEmbedTemplate);
     document.getElementById('loadTemplateBtn').addEventListener('click', loadSelectedTemplate);
     document.getElementById('deleteTemplateBtn').addEventListener('click', deleteSelectedTemplate);
