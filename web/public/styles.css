@@ -1446,6 +1446,182 @@ body {
     font-size: 0.9rem;
 }
 
+.server-switcher-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.server-switcher-modal.show {
+    display: flex;
+}
+
+.server-switcher-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 4, 20, 0.72);
+    backdrop-filter: blur(6px);
+}
+
+.server-switcher-dialog {
+    position: relative;
+    width: min(640px, calc(100vw - 2rem));
+    border-radius: 20px;
+    border: 1px solid rgba(164, 118, 255, 0.4);
+    background: linear-gradient(165deg, rgba(36, 18, 78, 0.94), rgba(22, 10, 54, 0.95));
+    box-shadow: 0 30px 80px rgba(5, 2, 12, 0.6);
+    padding: 1rem;
+    animation: serverSwitcherIn 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.server-switcher-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+}
+
+.server-switcher-head h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+}
+
+.server-switcher-close {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.server-switcher-close svg {
+    width: 16px;
+    height: 16px;
+}
+
+.server-switcher-carousel {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.server-switcher-arrow {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(203, 183, 246, 0.24);
+    background: rgba(154, 109, 255, 0.12);
+    color: var(--lavender);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.server-switcher-arrow:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 120, 209, 0.5);
+    background: rgba(255, 120, 209, 0.18);
+}
+
+.server-switcher-arrow svg {
+    width: 20px;
+    height: 20px;
+}
+
+.server-switcher-viewport {
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(203, 183, 246, 0.18);
+    background: rgba(255, 255, 255, 0.03);
+    touch-action: pan-y;
+    user-select: none;
+}
+
+.server-switcher-track {
+    display: flex;
+    width: 100%;
+    transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.server-switcher-slide {
+    min-width: 100%;
+    padding: 1rem;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.server-switcher-server {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.server-switcher-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    border: 1px solid rgba(154, 109, 255, 0.3);
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.server-switcher-icon--fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fate-red);
+}
+
+.server-switcher-icon--fallback svg {
+    width: 28px;
+    height: 28px;
+}
+
+.server-switcher-name {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.server-switcher-meta {
+    margin: 0;
+    font-size: 0.84rem;
+    color: var(--text-muted);
+}
+
+.server-switcher-foot {
+    margin-top: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.server-switcher-counter {
+    color: var(--text-muted);
+    font-size: 0.84rem;
+}
+
+@keyframes serverSwitcherIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .server-side-header h3 {
     margin: 0;
     font-size: 0.92rem;
@@ -1637,6 +1813,32 @@ body {
         animation: none !important;
         transition-duration: 0.001ms !important;
         scroll-behavior: auto !important;
+    }
+}
+
+@media (max-width: 700px) {
+    .server-switcher-dialog {
+        width: calc(100vw - 1.2rem);
+        padding: 0.8rem;
+    }
+
+    .server-switcher-carousel {
+        grid-template-columns: 38px 1fr 38px;
+        gap: 0.5rem;
+    }
+
+    .server-switcher-arrow {
+        width: 38px;
+        height: 38px;
+    }
+
+    .server-switcher-slide {
+        padding: 0.85rem;
+    }
+
+    .server-switcher-icon {
+        width: 48px;
+        height: 48px;
     }
 }
 

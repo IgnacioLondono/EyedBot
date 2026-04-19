@@ -22,6 +22,10 @@ let dashboardGuildSearchQuery = '';
 let serverActivityChart = null;
 let serverActivityChartMode = 'week';
 let botInviteUrl = '';
+let serverSwitcherGuilds = [];
+let serverSwitcherIndex = 0;
+let serverSwitcherTouchStartX = 0;
+let serverSwitcherTouchDeltaX = 0;
 
 const DASHBOARD_ICON = `
     <span class="nav-icon-shell">
@@ -258,8 +262,12 @@ function switchServerPane(paneId, button = null) {
     const panes = document.querySelectorAll('.server-pane');
     panes.forEach((pane) => pane.classList.remove('active'));
 
-    const targetPane = document.getElementById(paneId);
-    if (!targetPane) return;
+    let targetPane = document.getElementById(paneId);
+    if (!targetPane) {
+        paneId = 'serverPaneOverview';
+        targetPane = document.getElementById(paneId);
+        if (!targetPane) return;
+    }
     targetPane.classList.add('active');
     currentServerPaneId = paneId;
 
@@ -267,7 +275,12 @@ function switchServerPane(paneId, button = null) {
     if (contentArea) contentArea.scrollTop = 0;
     targetPane.scrollTop = 0;
 
-    if (button) activateServerSideButton(button);
+    if (button) {
+        activateServerSideButton(button);
+    } else {
+        const targetButton = document.querySelector(`.side-menu-btn[data-server-pane="${paneId}"]`);
+        activateServerSideButton(targetButton);
+    }
 }
 
 function handleServerSideAction(button) {
@@ -290,6 +303,153 @@ function handleServerSideAction(button) {
             showToast(`Abriendo atajo rapido: ${quickName}`, 'success');
         }
     }
+}
+
+function getServerSwitcherGuildIcon(guild) {
+    if (guild?.icon) {
+        return `<img class="server-switcher-icon" src="${guild.icon}" alt="${escapeHtml(guild.name || 'Servidor')}">`;
+    }
+
+    return `
+        <span class="server-switcher-icon server-switcher-icon--fallback" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+        </span>
+    `;
+}
+
+function renderServerSwitcherSlides() {
+    const track = document.getElementById('serverSwitcherTrack');
+    const currentIndexEl = document.getElementById('serverSwitcherCurrentIndex');
+    const totalEl = document.getElementById('serverSwitcherTotal');
+    const selectBtn = document.getElementById('serverSwitcherSelect');
+    if (!track || !currentIndexEl || !totalEl || !selectBtn) return;
+
+    const total = serverSwitcherGuilds.length;
+    if (!total) {
+        track.innerHTML = '<div class="server-switcher-slide"><p class="server-switcher-meta">No hay servidores disponibles.</p></div>';
+        currentIndexEl.textContent = '0';
+        totalEl.textContent = '0';
+        selectBtn.disabled = true;
+        return;
+    }
+
+    track.innerHTML = serverSwitcherGuilds.map((guild) => {
+        const memberCount = guild?.botGuild?.memberCount || 0;
+        return `
+            <article class="server-switcher-slide" data-guild-id="${guild.id}">
+                <div class="server-switcher-server">
+                    ${getServerSwitcherGuildIcon(guild)}
+                    <div>
+                        <h4 class="server-switcher-name">${escapeHtml(guild.name || 'Servidor')}</h4>
+                        <p class="server-switcher-meta">${memberCount} miembros</p>
+                    </div>
+                </div>
+            </article>
+        `;
+    }).join('');
+
+    serverSwitcherIndex = Math.max(0, Math.min(serverSwitcherIndex, total - 1));
+    track.style.transform = `translateX(-${serverSwitcherIndex * 100}%)`;
+    currentIndexEl.textContent = String(serverSwitcherIndex + 1);
+    totalEl.textContent = String(total);
+    selectBtn.disabled = false;
+}
+
+function moveServerSwitcher(direction = 1) {
+    if (!serverSwitcherGuilds.length) return;
+    const total = serverSwitcherGuilds.length;
+    serverSwitcherIndex = (serverSwitcherIndex + direction + total) % total;
+
+    const track = document.getElementById('serverSwitcherTrack');
+    const currentIndexEl = document.getElementById('serverSwitcherCurrentIndex');
+    if (track) {
+        track.style.transform = `translateX(-${serverSwitcherIndex * 100}%)`;
+    }
+    if (currentIndexEl) {
+        currentIndexEl.textContent = String(serverSwitcherIndex + 1);
+    }
+}
+
+function startServerSwitcherSwipe(touchX) {
+    serverSwitcherTouchStartX = Number(touchX) || 0;
+    serverSwitcherTouchDeltaX = 0;
+}
+
+function updateServerSwitcherSwipe(touchX) {
+    const currentX = Number(touchX) || 0;
+    serverSwitcherTouchDeltaX = currentX - serverSwitcherTouchStartX;
+}
+
+function endServerSwitcherSwipe() {
+    const threshold = 42;
+    if (Math.abs(serverSwitcherTouchDeltaX) < threshold) {
+        serverSwitcherTouchStartX = 0;
+        serverSwitcherTouchDeltaX = 0;
+        return;
+    }
+
+    if (serverSwitcherTouchDeltaX < 0) {
+        moveServerSwitcher(1);
+    } else {
+        moveServerSwitcher(-1);
+    }
+
+    serverSwitcherTouchStartX = 0;
+    serverSwitcherTouchDeltaX = 0;
+}
+
+function closeServerSwitcherModal() {
+    const modal = document.getElementById('serverSwitcherModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+async function openServerSwitcherModal() {
+    try {
+        const response = await fetchWithCredentials('/api/guilds');
+        if (!response.ok) {
+            showToast('No se pudieron cargar los servidores', 'error');
+            return;
+        }
+
+        const guilds = await response.json();
+        serverSwitcherGuilds = Array.isArray(guilds) ? guilds : [];
+        currentServerGuilds = serverSwitcherGuilds;
+
+        if (!serverSwitcherGuilds.length) {
+            showToast('No hay servidores disponibles', 'warning');
+            return;
+        }
+
+        const selectedIndex = serverSwitcherGuilds.findIndex((g) => String(g.id) === String(currentServerGuildId));
+        serverSwitcherIndex = selectedIndex >= 0 ? selectedIndex : 0;
+        renderServerSwitcherSlides();
+
+        const modal = document.getElementById('serverSwitcherModal');
+        if (!modal) return;
+        modal.classList.add('show');
+        modal.setAttribute('aria-hidden', 'false');
+    } catch (error) {
+        console.error('Error abriendo selector de servidores:', error);
+        showToast('No se pudo abrir el selector de servidores', 'error');
+    }
+}
+
+async function confirmServerSwitcherSelection() {
+    const selectedGuild = serverSwitcherGuilds[serverSwitcherIndex];
+    if (!selectedGuild) {
+        showToast('Servidor no valido', 'warning');
+        return;
+    }
+
+    closeServerSwitcherModal();
+    await window.selectGuild(selectedGuild.id);
 }
 
 // Función auxiliar para fetch con credenciales
@@ -682,11 +842,82 @@ function setupEventListeners() {
     const changeServerBtn = document.getElementById('changeServerBtn');
     if (changeServerBtn) {
         changeServerBtn.addEventListener('click', async () => {
-            resetServerContextToDashboard();
-            showSection('dashboard');
-            await loadGuilds();
+            await openServerSwitcherModal();
         });
     }
+
+    const serverSwitcherClose = document.getElementById('serverSwitcherClose');
+    if (serverSwitcherClose) {
+        serverSwitcherClose.addEventListener('click', closeServerSwitcherModal);
+    }
+
+    const serverSwitcherPrev = document.getElementById('serverSwitcherPrev');
+    if (serverSwitcherPrev) {
+        serverSwitcherPrev.addEventListener('click', () => moveServerSwitcher(-1));
+    }
+
+    const serverSwitcherNext = document.getElementById('serverSwitcherNext');
+    if (serverSwitcherNext) {
+        serverSwitcherNext.addEventListener('click', () => moveServerSwitcher(1));
+    }
+
+    const serverSwitcherSelect = document.getElementById('serverSwitcherSelect');
+    if (serverSwitcherSelect) {
+        serverSwitcherSelect.addEventListener('click', () => {
+            confirmServerSwitcherSelection();
+        });
+    }
+
+    const serverSwitcherModal = document.getElementById('serverSwitcherModal');
+    if (serverSwitcherModal) {
+        serverSwitcherModal.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (target.closest('[data-close-server-switcher="true"]')) {
+                closeServerSwitcherModal();
+            }
+        });
+    }
+
+    const serverSwitcherViewport = document.querySelector('.server-switcher-viewport');
+    if (serverSwitcherViewport) {
+        serverSwitcherViewport.addEventListener('touchstart', (event) => {
+            const touch = event.touches?.[0];
+            if (!touch) return;
+            startServerSwitcherSwipe(touch.clientX);
+        }, { passive: true });
+
+        serverSwitcherViewport.addEventListener('touchmove', (event) => {
+            const touch = event.touches?.[0];
+            if (!touch) return;
+            updateServerSwitcherSwipe(touch.clientX);
+        }, { passive: true });
+
+        serverSwitcherViewport.addEventListener('touchend', () => {
+            endServerSwitcherSwipe();
+        });
+    }
+
+    document.addEventListener('keydown', (event) => {
+        const modal = document.getElementById('serverSwitcherModal');
+        if (!modal || !modal.classList.contains('show')) return;
+
+        if (event.key === 'Escape') {
+            closeServerSwitcherModal();
+            return;
+        }
+
+        if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            moveServerSwitcher(-1);
+            return;
+        }
+
+        if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            moveServerSwitcher(1);
+        }
+    });
 
     const serverSideMenu = document.getElementById('serverSideMenu');
     if (serverSideMenu) {
@@ -739,7 +970,7 @@ function setupEventListeners() {
         if (!btn) return;
         btn.addEventListener('click', () => {
             showSection('serverSection');
-            switchServerPane('serverPaneSettings');
+            switchServerPane('serverPaneOverview');
         });
     });
 
@@ -1904,8 +2135,8 @@ async function loadGuildsForServer() {
         const notificationsContainer = document.getElementById('notificationsContainer');
         
         // Limpiar contenedores
-        serverInfoContainer.innerHTML = '';
-        moderationContainer.innerHTML = '';
+        if (serverInfoContainer) serverInfoContainer.innerHTML = '';
+        if (moderationContainer) moderationContainer.innerHTML = '';
         if (welcomeContainer) welcomeContainer.innerHTML = '';
         if (verifyContainer) verifyContainer.innerHTML = '';
         if (ticketContainer) ticketContainer.innerHTML = '';
@@ -1932,19 +2163,27 @@ async function loadGuildsForServer() {
 
             const selectedGuild = guilds.find((g) => String(g.id) === String(currentServerGuildId));
             if (!selectedGuild) {
-                select.disabled = true;
-                select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+                if (select) {
+                    select.disabled = true;
+                    select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+                }
                 return;
             }
 
-            select.disabled = true;
-            select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
-            select.value = selectedGuild.id;
-            renderServerTabs([selectedGuild], selectedGuild.id);
+            if (select) {
+                select.disabled = true;
+                select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
+                select.value = selectedGuild.id;
+            }
+            if (tabsContainer) {
+                renderServerTabs([selectedGuild], selectedGuild.id);
+            }
             await selectServerGuild(selectedGuild.id);
         } else {
             const error = await response.json().catch(() => ({ error: 'Error al cargar servidores' }));
-            select.innerHTML = '<option value="">Error al cargar servidores</option>';
+            if (select) {
+                select.innerHTML = '<option value="">Error al cargar servidores</option>';
+            }
             showToast(error.error || 'Error al cargar servidores', 'error');
         }
     } catch (error) {
