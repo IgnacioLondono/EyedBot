@@ -292,32 +292,49 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
 
     await db.set(`ticket_report_${reportId}`, reportData).catch(() => null);
 
+    const cfg = await resolveConfig(guild.id).catch(() => null);
+    const receiptHistoryChannelId = String(cfg?.receiptHistoryChannelId || '').trim();
+    const receiptHistoryChannel = receiptHistoryChannelId
+        ? (guild.channels.cache.get(receiptHistoryChannelId) || await guild.channels.fetch(receiptHistoryChannelId).catch(() => null))
+        : null;
+
+    const transcriptText = buildTranscriptText(channel, messages);
+    const fileName = `ticket-${channel.id}-${reportId}.txt`;
+
+    const createTranscriptFile = () => new AttachmentBuilder(
+        Buffer.from(transcriptText, 'utf8'),
+        { name: fileName }
+    );
+
+    const buildReportEmbed = () => new EmbedBuilder()
+        .setColor('2b90d9')
+        .setTitle('Informe de cierre de ticket')
+        .setDescription('Tu ticket fue cerrado. Te compartimos un resumen e historial reciente.')
+        .addFields(
+            { name: 'ID del informe', value: reportId, inline: true },
+            { name: 'Servidor', value: guild.name.slice(0, 1024), inline: true },
+            { name: 'Canal', value: `#${channel.name}`.slice(0, 1024), inline: true },
+            { name: 'Categoria', value: String(category).slice(0, 1024), inline: true },
+            { name: 'Caso', value: String(common).slice(0, 1024), inline: true },
+            { name: 'Cerrado por', value: closerTag.slice(0, 1024), inline: true }
+        )
+        .setTimestamp();
+
     let dmSent = false;
     if (ownerId) {
         const ownerUser = await interaction.client.users.fetch(ownerId).catch(() => null);
         if (ownerUser) {
-            const transcriptText = buildTranscriptText(channel, messages);
-            const fileName = `ticket-${channel.id}-${reportId}.txt`;
-            const transcriptFile = new AttachmentBuilder(Buffer.from(transcriptText, 'utf8'), { name: fileName });
-
-            const reportEmbed = new EmbedBuilder()
-                .setColor('2b90d9')
-                .setTitle('Informe de cierre de ticket')
-                .setDescription('Tu ticket fue cerrado. Te compartimos un resumen e historial reciente.')
-                .addFields(
-                    { name: 'ID del informe', value: reportId, inline: true },
-                    { name: 'Servidor', value: guild.name.slice(0, 1024), inline: true },
-                    { name: 'Canal', value: `#${channel.name}`.slice(0, 1024), inline: true },
-                    { name: 'Categoria', value: String(category).slice(0, 1024), inline: true },
-                    { name: 'Caso', value: String(common).slice(0, 1024), inline: true },
-                    { name: 'Cerrado por', value: closerTag.slice(0, 1024), inline: true }
-                )
-                .setTimestamp();
-
-            await ownerUser.send({ embeds: [reportEmbed], files: [transcriptFile] }).then(() => {
+            await ownerUser.send({ embeds: [buildReportEmbed()], files: [createTranscriptFile()] }).then(() => {
                 dmSent = true;
             }).catch(() => null);
         }
+    }
+
+    if (receiptHistoryChannel?.isTextBased?.()) {
+        await receiptHistoryChannel.send({
+            embeds: [buildReportEmbed()],
+            files: [createTranscriptFile()]
+        }).catch(() => null);
     }
 
     return { reportId, dmSent };
