@@ -1024,6 +1024,30 @@ body {
     scrollbar-gutter: stable;
 }
 
+.reveal-on-scroll {
+    opacity: 0;
+    transform: translate3d(0, 30px, 0) scale(0.985);
+    transition: opacity 0.75s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.75s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform, opacity;
+}
+
+.reveal-on-scroll[data-reveal="left"] {
+    transform: translate3d(-34px, 0, 0) scale(0.985);
+}
+
+.reveal-on-scroll[data-reveal="right"] {
+    transform: translate3d(34px, 0, 0) scale(0.985);
+}
+
+.reveal-on-scroll[data-reveal="zoom"] {
+    transform: translate3d(0, 18px, 0) scale(0.94);
+}
+
+.reveal-on-scroll.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+}
+
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -4236,24 +4260,367 @@ body {
     }
 }
 
-/* Control Center info blocks + server cards redesign */
-.control-center-shell {
-    gap: 1rem;
+/* About section + commands discovery */
+.about-shell {
+    display: grid;
+    gap: 1.2rem;
 }
 
-.control-info-grid .dashboard-launcher-card--info {
-    cursor: default;
-    min-height: 138px;
+.about-hero,
+.about-info-card,
+.about-carousel-wrap,
+.about-story-block,
+.commands-toolbar,
+.commands-empty {
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(34, 20, 61, 0.72), rgba(18, 11, 35, 0.9));
+    border: 1px solid rgba(154, 109, 255, 0.2);
+    box-shadow: 0 18px 54px rgba(5, 2, 11, 0.42);
 }
 
-.control-info-grid .dashboard-launcher-card--info:hover {
-    transform: none;
-    box-shadow: 0 16px 40px rgba(6, 2, 15, 0.35);
-    border-color: rgba(186, 155, 255, 0.28);
+.about-hero {
+    padding: 1.2rem;
+    display: grid;
+    gap: 0.9rem;
 }
 
-.control-info-grid .dashboard-launcher-card--info::before {
-    opacity: 0.6;
+.about-hero h2 {
+    margin: 0;
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(1.45rem, 2.2vw, 2.1rem);
+    line-height: 1.25;
+    color: var(--text-primary);
+}
+
+.about-hero p {
+    margin: 0;
+    color: rgba(203, 183, 246, 0.95);
+    max-width: 960px;
+    line-height: 1.65;
+}
+
+.about-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.about-kpi-card {
+    border-radius: 16px;
+    border: 1px solid rgba(190, 155, 255, 0.25);
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.85rem;
+    display: grid;
+    gap: 0.22rem;
+}
+
+.about-kpi-label {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.about-kpi-value {
+    color: var(--text-primary);
+    font-size: clamp(1.05rem, 1.8vw, 1.7rem);
+    line-height: 1.2;
+}
+
+.about-kpi-caption {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.about-info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.about-info-card {
+    padding: 0.95rem;
+}
+
+.about-info-card h3 {
+    margin: 0 0 0.45rem;
+    font-size: 1.02rem;
+    color: var(--text-primary);
+}
+
+.about-info-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.about-carousel-wrap {
+    padding: 0.95rem;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.about-carousel-head h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.05rem;
+}
+
+.about-carousel-head p {
+    margin: 0.22rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+}
+
+.about-carousel {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.about-carousel-arrow {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    border: 1px solid rgba(190, 155, 255, 0.28);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.about-carousel-arrow:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 120, 209, 0.45);
+    box-shadow: 0 12px 30px rgba(124, 77, 255, 0.22);
+}
+
+.about-carousel-arrow svg {
+    width: 18px;
+    height: 18px;
+}
+
+.about-carousel-viewport {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    padding-bottom: 0.2rem;
+}
+
+.about-carousel-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(230px, 32%);
+    gap: 0.7rem;
+}
+
+.about-carousel-card {
+    scroll-snap-align: start;
+    border-radius: 16px;
+    border: 1px solid rgba(190, 155, 255, 0.24);
+    background: linear-gradient(150deg, rgba(124, 77, 255, 0.2), rgba(255, 120, 209, 0.08));
+    padding: 0.85rem;
+    min-height: 170px;
+    transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.about-carousel-card:hover {
+    transform: translateY(-4px) rotate(-0.4deg);
+    border-color: rgba(255, 120, 209, 0.45);
+    box-shadow: 0 18px 42px rgba(124, 77, 255, 0.25);
+}
+
+.about-carousel-card h4 {
+    margin: 0 0 0.45rem;
+    color: var(--text-primary);
+    font-size: 0.98rem;
+}
+
+.about-carousel-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    line-height: 1.55;
+}
+
+.about-story {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.about-story-block {
+    padding: 0.95rem;
+}
+
+.about-story-block h3 {
+    margin: 0 0 0.35rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.about-story-block p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.55;
+}
+
+.commands-toolbar {
+    padding: 0.7rem;
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 0.9rem;
+}
+
+.commands-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.commands-filter-btn {
+    border: 1px solid rgba(190, 155, 255, 0.22);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.commands-filter-btn strong {
+    color: var(--text-primary);
+    font-size: 0.76rem;
+}
+
+.commands-filter-btn.active,
+.commands-filter-btn:hover {
+    color: var(--text-primary);
+    border-color: rgba(255, 120, 209, 0.4);
+    background: rgba(154, 109, 255, 0.16);
+}
+
+.command-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
+}
+
+.command-group-head h3 {
+    margin: 0;
+    font-size: 1.02rem;
+    color: var(--text-primary);
+}
+
+.command-group-count {
+    border-radius: 999px;
+    border: 1px solid rgba(190, 155, 255, 0.25);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    padding: 0.24rem 0.54rem;
+}
+
+.command-entry {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.command-entry:first-of-type {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.command-entry-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--iris-300);
+    margin-bottom: 0.28rem;
+}
+
+.command-entry-description {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.command-options-wrap {
+    margin-top: 0.55rem;
+    padding-left: 0.7rem;
+    border-left: 2px solid rgba(255, 120, 209, 0.32);
+    display: grid;
+    gap: 0.35rem;
+}
+
+.command-options-title {
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.command-option-item {
+    display: grid;
+    gap: 0.14rem;
+}
+
+.command-option-item strong {
+    color: var(--iris-300);
+    font-size: 0.83rem;
+}
+
+.command-option-item span {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+
+.commands-empty {
+    padding: 1.4rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.commands-empty--error {
+    color: #ffc3d5;
+    border-color: rgba(255, 120, 209, 0.35);
+}
+
+@media (max-width: 1080px) {
+    .about-kpis,
+    .about-info-grid,
+    .about-story {
+        grid-template-columns: 1fr;
+    }
+
+    .about-carousel-track {
+        grid-auto-columns: minmax(240px, 72%);
+    }
+}
+
+@media (max-width: 700px) {
+    .about-carousel {
+        grid-template-columns: 1fr;
+    }
+
+    .about-carousel-arrow {
+        display: none;
+    }
+
+    .commands-toolbar {
+        padding: 0.65rem;
+    }
 }
 
 .guilds-grid {
