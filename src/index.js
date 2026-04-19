@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
@@ -32,6 +32,38 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
 const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMMAND_WARN_MS || '1200', 10));
+const MODERATION_COMMAND_NAMES = new Set([
+    'announce',
+    'ban',
+    'clear',
+    'clearwarns',
+    'kick',
+    'lock',
+    'mute',
+    'nick',
+    'purge',
+    'role',
+    'slowmode',
+    'unban',
+    'unlock',
+    'unmute',
+    'vozocultar',
+    'warn',
+    'warnings'
+]);
+
+function canUseModerationCommands(interaction) {
+    const perms = interaction.memberPermissions;
+    if (!perms) return false;
+
+    return perms.has(PermissionFlagsBits.Administrator)
+        || perms.has(PermissionFlagsBits.ManageGuild)
+        || perms.has(PermissionFlagsBits.ManageMessages)
+        || perms.has(PermissionFlagsBits.KickMembers)
+        || perms.has(PermissionFlagsBits.BanMembers)
+        || perms.has(PermissionFlagsBits.ModerateMembers)
+        || perms.has(PermissionFlagsBits.ManageChannels);
+}
 
 const client = new Client({
     intents: [
@@ -283,6 +315,14 @@ client.on('interactionCreate', async interaction => {
 
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
+
+    if (MODERATION_COMMAND_NAMES.has(interaction.commandName) && !canUseModerationCommands(interaction)) {
+        await safeReply(interaction, {
+            content: '❌ Solo moderadores o administradores pueden usar este comando.',
+            flags: 64
+        }).catch(() => {});
+        return;
+    }
 
     const startedAt = Date.now();
     try {
