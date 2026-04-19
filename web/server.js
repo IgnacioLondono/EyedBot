@@ -318,6 +318,75 @@ function resolveGuildUserTag(guild, userId) {
     return `Usuario ${String(userId).slice(-4)}`;
 }
 
+function toIsoDayKey(date) {
+    return new Date(date).toISOString().slice(0, 10);
+}
+
+function buildLast7DaysTimeline(daily = {}) {
+    const points = [];
+    const now = new Date();
+
+    for (let i = 6; i >= 0; i -= 1) {
+        const date = new Date(now);
+        date.setUTCDate(now.getUTCDate() - i);
+        const key = toIsoDayKey(date);
+        points.push({
+            date: key,
+            joins: Number.parseInt(daily[key]?.joins || 0, 10) || 0,
+            leaves: Number.parseInt(daily[key]?.leaves || 0, 10) || 0,
+            messages: Number.parseInt(daily[key]?.messages || 0, 10) || 0,
+            voiceMinutes: Number.parseInt(daily[key]?.voiceMinutes || 0, 10) || 0
+        });
+    }
+
+    return points;
+}
+
+function buildWeeklyTimeline(sinceDate, daily = {}) {
+    const start = new Date(sinceDate || Date.now());
+    const end = new Date();
+
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(0, 0, 0, 0);
+
+    const points = [];
+    let cursor = new Date(start);
+    let weekIndex = 1;
+
+    while (cursor <= end) {
+        const weekStart = new Date(cursor);
+        const weekEnd = new Date(cursor);
+        weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+        if (weekEnd > end) weekEnd.setTime(end.getTime());
+
+        const bucket = {
+            week: weekIndex,
+            start: toIsoDayKey(weekStart),
+            end: toIsoDayKey(weekEnd),
+            joins: 0,
+            leaves: 0,
+            messages: 0,
+            voiceMinutes: 0
+        };
+
+        const dayCursor = new Date(weekStart);
+        while (dayCursor <= weekEnd) {
+            const key = toIsoDayKey(dayCursor);
+            bucket.joins += Number.parseInt(daily[key]?.joins || 0, 10) || 0;
+            bucket.leaves += Number.parseInt(daily[key]?.leaves || 0, 10) || 0;
+            bucket.messages += Number.parseInt(daily[key]?.messages || 0, 10) || 0;
+            bucket.voiceMinutes += Number.parseInt(daily[key]?.voiceMinutes || 0, 10) || 0;
+            dayCursor.setUTCDate(dayCursor.getUTCDate() + 1);
+        }
+
+        points.push(bucket);
+        cursor.setUTCDate(cursor.getUTCDate() + 7);
+        weekIndex += 1;
+    }
+
+    return points;
+}
+
 // Función para inyectar el cliente del bot
 function setBotClient(client) {
     botClient = client;
@@ -2009,16 +2078,12 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
         }, null);
 
         const guildActivity = await guildActivityStore.getGuildActivity(guildId);
-        const memberFlowDaily = guildActivity?.daily || {};
-        const sortedFlowDays = Object.keys(memberFlowDaily).sort();
-        const last7Days = sortedFlowDays.slice(-7).map((day) => ({
-            date: day,
-            joins: Number.parseInt(memberFlowDaily[day]?.joins || 0, 10) || 0,
-            leaves: Number.parseInt(memberFlowDaily[day]?.leaves || 0, 10) || 0
-        }));
+        const activityDaily = guildActivity?.daily || {};
+        const last7Days = buildLast7DaysTimeline(activityDaily);
+        const weeklyTimeline = buildWeeklyTimeline(guild.createdAt, activityDaily);
 
-        const peakJoinsDay = summarizePeakDay(memberFlowDaily, 'joins');
-        const peakLeavesDay = summarizePeakDay(memberFlowDaily, 'leaves');
+        const peakJoinsDay = summarizePeakDay(activityDaily, 'joins');
+        const peakLeavesDay = summarizePeakDay(activityDaily, 'leaves');
 
         const voiceChannels = guild.channels.cache.filter((c) => c.type === 2);
         let liveVoiceUsers = 0;
@@ -2101,6 +2166,10 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                     peakJoinsDay,
                     peakLeavesDay,
                     last7Days
+                },
+                timeline: {
+                    daily: last7Days,
+                    weekly: weeklyTimeline
                 }
             }
         };
