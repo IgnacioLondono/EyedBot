@@ -8,7 +8,7 @@ const guildMemberAddEvent = require('./events/guildMemberAdd');
 const guildMemberRemoveEvent = require('./events/guildMemberRemove');
 const antiRaidGuard = require('./events/anti-raid-guard');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
-const { handleTicketButton, handleTicketModal } = require('./events/ticket-interaction');
+const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = require('./events/ticket-interaction');
 const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
 const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate } = require('./events/temp-voice');
@@ -252,6 +252,18 @@ client.on('interactionCreate', async interaction => {
             if (isUnknownInteractionError(error)) return;
             console.error('Error handling modal submit:', error);
             await safeReply(interaction, { content: '❌ Error al procesar el formulario.', flags: 64 }).catch(() => {});
+            return;
+        }
+    }
+
+    if (interaction.isStringSelectMenu()) {
+        try {
+            const ticketSelectHandled = await handleTicketSelectMenu(interaction);
+            if (ticketSelectHandled) return;
+        } catch (error) {
+            if (isUnknownInteractionError(error)) return;
+            console.error('Error handling select menu interaction:', error);
+            await safeReply(interaction, { content: '❌ Error al procesar la selección.', flags: 64 }).catch(() => {});
             return;
         }
     }

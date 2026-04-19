@@ -7,13 +7,46 @@ const {
     TextInputBuilder,
     TextInputStyle,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    StringSelectMenuBuilder
 } = require('discord.js');
 const ticketStore = require('../utils/ticket-config-store');
 
 const OPEN_PREFIX = 'ticket_open_';
 const MODAL_PREFIX = 'ticket_reason_';
 const CLOSE_ID = 'ticket_close';
+const CATEGORY_SELECT_PREFIX = 'ticket_cat_';
+const COMMON_SELECT_PREFIX = 'ticket_common_';
+const MINECRAFT_SELECT_PREFIX = 'ticket_mc_';
+const CONTINUE_PREFIX = 'ticket_continue_';
+const CANCEL_PREFIX = 'ticket_cancel_';
+const DRAFT_TTL_MS = 15 * 60 * 1000;
+
+const DEFAULT_CATEGORIES = [
+    { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
+    { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
+    { value: 'compras-y-rangos', label: 'Compras y rangos', description: 'Pagos, rangos y beneficios' },
+    { value: 'minecraft', label: 'Minecraft', description: 'Problemas relacionados con Minecraft' },
+    { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
+];
+
+const DEFAULT_COMMON_ISSUES = [
+    { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
+    { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
+    { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
+    { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
+    { value: 'otro', label: 'Otro', description: 'Mi caso no aparece en esta lista' }
+];
+
+const DEFAULT_MINECRAFT_SERVERS = [
+    { value: 'no-aplica', label: 'No aplica', description: 'Mi solicitud no es sobre Minecraft' },
+    { value: 'survival', label: 'Survival', description: 'Soporte del servidor Survival' },
+    { value: 'skyblock', label: 'Skyblock', description: 'Soporte del servidor Skyblock' },
+    { value: 'practice', label: 'Practice/PvP', description: 'Soporte de modos PvP o Practice' },
+    { value: 'lobby', label: 'Lobby/Network', description: 'Problemas de conexion o lobby' }
+];
+
+const ticketDrafts = new Map();
 
 async function sendEphemeral(interaction, content) {
     if (interaction.deferred || interaction.replied) {
@@ -58,6 +91,205 @@ function parseTicketOwner(topic = '') {
     return match?.[1] || '';
 }
 
+function draftKey(guildId, userId) {
+    return `${guildId}:${userId}`;
+}
+
+function toOptionValue(text, fallback) {
+    const safe = String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80);
+    return safe || fallback;
+}
+
+function normalizeConfiguredOptions(raw, defaults, prefix) {
+    const source = Array.isArray(raw) && raw.length ? raw : defaults;
+    const usedValues = new Set();
+    const built = [];
+
+    source.slice(0, 25).forEach((entry, index) => {
+        const asObject = entry && typeof entry === 'object' && !Array.isArray(entry)
+            ? entry
+            : { label: String(entry || '').trim() };
+
+        const label = String(asObject.label || asObject.name || '').trim().slice(0, 100);
+        if (!label) return;
+
+        let value = toOptionValue(asObject.value || label, `${prefix}-${index + 1}`).slice(0, 100);
+        if (!value) value = `${prefix}-${index + 1}`;
+
+        if (usedValues.has(value)) {
+            value = `${value}-${index + 1}`.slice(0, 100);
+        }
+        usedValues.add(value);
+
+        const description = String(asObject.description || '').trim().slice(0, 100);
+        built.push({ value, label, description });
+    });
+
+    return built.length ? built : defaults;
+}
+
+function buildSelectionConfig(cfg) {
+    const categories = normalizeConfiguredOptions(cfg?.ticketCategories, DEFAULT_CATEGORIES, 'cat');
+    const commonIssues = normalizeConfiguredOptions(cfg?.commonProblems, DEFAULT_COMMON_ISSUES, 'issue');
+    const minecraftServers = normalizeConfiguredOptions(cfg?.minecraftServers, DEFAULT_MINECRAFT_SERVERS, 'mc');
+
+    if (!minecraftServers.some((item) => item.value === 'no-aplica')) {
+        minecraftServers.unshift(DEFAULT_MINECRAFT_SERVERS[0]);
+    }
+
+    return { categories, commonIssues, minecraftServers };
+}
+
+function cleanupDrafts() {
+    const now = Date.now();
+    for (const [key, value] of ticketDrafts.entries()) {
+        if (!value || now - Number(value.updatedAt || 0) > DRAFT_TTL_MS) {
+            ticketDrafts.delete(key);
+        }
+    }
+}
+
+function getDraftForUser(guildId, userId, optionsConfig) {
+    cleanupDrafts();
+    const key = draftKey(guildId, userId);
+    const existing = ticketDrafts.get(key);
+
+    const categoryValues = new Set(optionsConfig.categories.map((item) => item.value));
+    const issueValues = new Set(optionsConfig.commonIssues.map((item) => item.value));
+    const mcValues = new Set(optionsConfig.minecraftServers.map((item) => item.value));
+
+    const draft = {
+        category: categoryValues.has(existing?.category) ? existing.category : optionsConfig.categories[0].value,
+        commonIssue: issueValues.has(existing?.commonIssue) ? existing.commonIssue : optionsConfig.commonIssues[0].value,
+        minecraftServer: mcValues.has(existing?.minecraftServer) ? existing.minecraftServer : optionsConfig.minecraftServers[0].value,
+        updatedAt: Date.now()
+    };
+
+    ticketDrafts.set(key, draft);
+    return draft;
+}
+
+function clearDraftForUser(guildId, userId) {
+    ticketDrafts.delete(draftKey(guildId, userId));
+}
+
+function optionLabelByValue(options, value) {
+    return options.find((item) => item.value === value)?.label || 'No especificado';
+}
+
+function buildSetupContent(optionsConfig, draft) {
+    const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
+    const issueLabel = optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue);
+    const mcLabel = optionLabelByValue(optionsConfig.minecraftServers, draft.minecraftServer);
+
+    return [
+        'Configura tu ticket antes de enviarlo:',
+        `Categoria: ${categoryLabel}`,
+        `Problema comun: ${issueLabel}`,
+        `Servidor de Minecraft: ${mcLabel}`,
+        '',
+        'Cuando termines, presiona "Continuar" para escribir el motivo.'
+    ].join('\n');
+}
+
+function buildSelectMenu(customId, placeholder, options, selectedValue) {
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder(placeholder)
+        .setMinValues(1)
+        .setMaxValues(1);
+
+    menu.addOptions(
+        options.map((item) => ({
+            label: item.label,
+            value: item.value,
+            description: item.description || undefined,
+            default: item.value === selectedValue
+        }))
+    );
+
+    return menu;
+}
+
+function buildSetupComponents(guildId, optionsConfig, draft) {
+    const categorySelect = buildSelectMenu(
+        `${CATEGORY_SELECT_PREFIX}${guildId}`,
+        'Selecciona una categoria',
+        optionsConfig.categories,
+        draft.category
+    );
+    const issueSelect = buildSelectMenu(
+        `${COMMON_SELECT_PREFIX}${guildId}`,
+        'Selecciona un problema frecuente',
+        optionsConfig.commonIssues,
+        draft.commonIssue
+    );
+    const minecraftSelect = buildSelectMenu(
+        `${MINECRAFT_SELECT_PREFIX}${guildId}`,
+        'Selecciona un servidor de Minecraft',
+        optionsConfig.minecraftServers,
+        draft.minecraftServer
+    );
+
+    const continueButton = new ButtonBuilder()
+        .setCustomId(`${CONTINUE_PREFIX}${guildId}`)
+        .setLabel('Continuar')
+        .setStyle(ButtonStyle.Success);
+
+    const cancelButton = new ButtonBuilder()
+        .setCustomId(`${CANCEL_PREFIX}${guildId}`)
+        .setLabel('Cancelar')
+        .setStyle(ButtonStyle.Secondary);
+
+    return [
+        new ActionRowBuilder().addComponents(categorySelect),
+        new ActionRowBuilder().addComponents(issueSelect),
+        new ActionRowBuilder().addComponents(minecraftSelect),
+        new ActionRowBuilder().addComponents(cancelButton, continueButton)
+    ];
+}
+
+async function showTicketPresetSelector(interaction, guildId) {
+    const cfg = await resolveConfig(guildId);
+    if (!cfg) {
+        await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+        return;
+    }
+
+    const optionsConfig = buildSelectionConfig(cfg);
+    const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+
+    await interaction.reply({
+        content: buildSetupContent(optionsConfig, draft),
+        components: buildSetupComponents(guildId, optionsConfig, draft),
+        flags: 64
+    }).catch(() => null);
+}
+
+async function updateTicketPresetSelector(interaction, guildId, updater) {
+    const cfg = await resolveConfig(guildId);
+    if (!cfg) {
+        await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+        return;
+    }
+
+    const optionsConfig = buildSelectionConfig(cfg);
+    const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+
+    if (typeof updater === 'function') updater(draft, optionsConfig);
+    draft.updatedAt = Date.now();
+
+    await interaction.update({
+        content: buildSetupContent(optionsConfig, draft),
+        components: buildSetupComponents(guildId, optionsConfig, draft)
+    }).catch(() => null);
+}
+
 async function showTicketReasonModal(interaction, guildId) {
     const modal = new ModalBuilder()
         .setCustomId(`${MODAL_PREFIX}${guildId}`)
@@ -89,6 +321,9 @@ async function createTicketChannel(interaction, guildId, reason) {
         return;
     }
 
+    const optionsConfig = buildSelectionConfig(cfg);
+    const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+
     const me = guild.members.me || await guild.members.fetch(interaction.client.user.id).catch(() => null);
     if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
         await sendEphemeral(interaction, 'No tengo permisos para crear canales de ticket.');
@@ -109,8 +344,13 @@ async function createTicketChannel(interaction, guildId, reason) {
         .map((id) => guild.roles.cache.get(id))
         .filter(Boolean);
 
+    const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
+    const commonIssueLabel = optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue);
+    const minecraftServerLabel = optionLabelByValue(optionsConfig.minecraftServers, draft.minecraftServer);
+
     const baseName = toSafeChannelName(interaction.user.username);
-    const ticketName = `ticket-${baseName}`.slice(0, 95);
+    const categorySlug = toSafeChannelName(categoryLabel).slice(0, 24);
+    const ticketName = `ticket-${categorySlug}-${baseName}`.slice(0, 95);
 
     const permissionOverwrites = [
         {
@@ -146,10 +386,18 @@ async function createTicketChannel(interaction, guildId, reason) {
         });
     });
 
+    const topic = [
+        `owner:${interaction.user.id}`,
+        `category:${categoryLabel}`,
+        `common:${commonIssueLabel}`,
+        `mc:${minecraftServerLabel}`,
+        `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
+    ].join(' | ').slice(0, 1000);
+
     const created = await guild.channels.create({
         name: ticketName,
         type: ChannelType.GuildText,
-        topic: `owner:${interaction.user.id} | reason:${String(reason).replace(/\|/g, '/').slice(0, 180)}`,
+        topic,
         permissionOverwrites
     }).catch(() => null);
 
@@ -162,6 +410,11 @@ async function createTicketChannel(interaction, guildId, reason) {
         .setColor((cfg.color || '7c4dff').replace('#', ''))
         .setTitle('Nuevo ticket creado')
         .setDescription(`**Usuario:** <@${interaction.user.id}>\n**Motivo:** ${String(reason).slice(0, 500)}`)
+        .addFields(
+            { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
+            { name: 'Problema comun', value: commonIssueLabel.slice(0, 1024), inline: true },
+            { name: 'Servidor Minecraft', value: minecraftServerLabel.slice(0, 1024), inline: true }
+        )
         .setFooter({ text: 'Usa el boton para cerrar cuando termines.' })
         .setTimestamp();
 
@@ -176,6 +429,7 @@ async function createTicketChannel(interaction, guildId, reason) {
         components: [new ActionRowBuilder().addComponents(closeBtn)]
     }).catch(() => null);
 
+    clearDraftForUser(guildId, interaction.user.id);
     await sendEphemeral(interaction, `Ticket creado: <#${created.id}>`);
 }
 
@@ -214,11 +468,65 @@ async function handleTicketButton(interaction) {
         return true;
     }
 
-    if (!interaction.customId.startsWith(OPEN_PREFIX)) return false;
+    if (interaction.customId.startsWith(OPEN_PREFIX)) {
+        const guildId = interaction.customId.slice(OPEN_PREFIX.length);
+        await showTicketPresetSelector(interaction, guildId);
+        return true;
+    }
 
-    const guildId = interaction.customId.slice(OPEN_PREFIX.length);
-    await showTicketReasonModal(interaction, guildId);
-    return true;
+    if (interaction.customId.startsWith(CONTINUE_PREFIX)) {
+        const guildId = interaction.customId.slice(CONTINUE_PREFIX.length);
+        await showTicketReasonModal(interaction, guildId);
+        return true;
+    }
+
+    if (interaction.customId.startsWith(CANCEL_PREFIX)) {
+        const guildId = interaction.customId.slice(CANCEL_PREFIX.length);
+        clearDraftForUser(guildId, interaction.user.id);
+        await interaction.update({
+            content: 'Solicitud cancelada. Puedes volver a abrir el formulario cuando quieras.',
+            components: []
+        }).catch(() => null);
+        return true;
+    }
+
+    return false;
+}
+
+async function handleTicketSelectMenu(interaction) {
+    if (!interaction?.isStringSelectMenu()) return false;
+
+    if (interaction.customId.startsWith(CATEGORY_SELECT_PREFIX)) {
+        const guildId = interaction.customId.slice(CATEGORY_SELECT_PREFIX.length);
+        await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
+            const selected = interaction.values?.[0] || optionsConfig.categories[0].value;
+            const valid = optionsConfig.categories.some((item) => item.value === selected);
+            draft.category = valid ? selected : optionsConfig.categories[0].value;
+        });
+        return true;
+    }
+
+    if (interaction.customId.startsWith(COMMON_SELECT_PREFIX)) {
+        const guildId = interaction.customId.slice(COMMON_SELECT_PREFIX.length);
+        await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
+            const selected = interaction.values?.[0] || optionsConfig.commonIssues[0].value;
+            const valid = optionsConfig.commonIssues.some((item) => item.value === selected);
+            draft.commonIssue = valid ? selected : optionsConfig.commonIssues[0].value;
+        });
+        return true;
+    }
+
+    if (interaction.customId.startsWith(MINECRAFT_SELECT_PREFIX)) {
+        const guildId = interaction.customId.slice(MINECRAFT_SELECT_PREFIX.length);
+        await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
+            const selected = interaction.values?.[0] || optionsConfig.minecraftServers[0].value;
+            const valid = optionsConfig.minecraftServers.some((item) => item.value === selected);
+            draft.minecraftServer = valid ? selected : optionsConfig.minecraftServers[0].value;
+        });
+        return true;
+    }
+
+    return false;
 }
 
 async function handleTicketModal(interaction) {
@@ -239,6 +547,7 @@ function ticketButtonCustomIdForGuild(guildId) {
 
 module.exports = {
     handleTicketButton,
+    handleTicketSelectMenu,
     handleTicketModal,
     ticketButtonCustomIdForGuild
 };
