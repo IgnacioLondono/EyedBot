@@ -120,6 +120,9 @@ async function registerSlashCommands() {
                 let okCount = 0;
                 const failedGuilds = [];
                 for (const guildId of targetGuildIds) {
+                    const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
+                    console.log(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
+
                     const registerOneGuild = rest.put(
                         Routes.applicationGuildCommands(appId, guildId),
                         { body: commands }
@@ -134,10 +137,10 @@ async function registerSlashCommands() {
                     try {
                         await Promise.race([registerOneGuild, timeoutOneGuild]);
                         okCount += 1;
-                        console.log(`✅ Slash registrados en guild ${guildId}.`);
+                        console.log(`✅ Slash registrados en guild ${guildName} (${guildId}).`);
                     } catch (guildError) {
                         failedGuilds.push(guildId);
-                        console.warn(`⚠️ No se pudieron registrar slash en guild ${guildId}:`, guildError?.message || guildError);
+                        console.warn(`⚠️ No se pudieron registrar slash en guild ${guildName} (${guildId}):`, guildError?.message || guildError);
                     }
                 }
 
@@ -151,7 +154,11 @@ async function registerSlashCommands() {
 
                 console.log(`✅ Comandos registrados exitosamente para app ${appId} en ${okCount}/${targetGuildIds.length} servidores.`);
                 if (failedGuilds.length) {
-                    console.warn(`⚠️ Guilds con fallo de registro: ${failedGuilds.join(', ')}`);
+                    const failedDetails = failedGuilds.map((guildId) => {
+                        const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
+                        return `${guildName} (${guildId})`;
+                    });
+                    console.warn(`⚠️ Guilds con fallo de registro: ${failedDetails.join(', ')}`);
                 }
                 return true;
             } catch (error) {
