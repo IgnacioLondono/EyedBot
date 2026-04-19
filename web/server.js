@@ -99,7 +99,17 @@ console.log(`   Session Cookie Secure: ${cookieSecure ? '✅ true' : '⚠️ fal
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: 0,
+    etag: true,
+    setHeaders: (res, filePath) => {
+        if (/\.(html|js|css)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 
 // Necesario si se usa proxy inverso para respetar cookies seguras.
 app.set('trust proxy', 1);
@@ -696,6 +706,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
                 enabled: false,
                 panelChannelId: '',
                 requestChannelId: '',
+                receiptHistoryChannelId: '',
                 adminRoleIds: [],
                 title: 'Soporte',
                 message: 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.',
@@ -712,6 +723,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
 
         res.json({
             ...cfg,
+            receiptHistoryChannelId: String(cfg.receiptHistoryChannelId || '').trim(),
             ticketCategories: Array.isArray(cfg.ticketCategories) && cfg.ticketCategories.length ? cfg.ticketCategories : defaultTicketCategories,
             commonProblems: Array.isArray(cfg.commonProblems) && cfg.commonProblems.length ? cfg.commonProblems : defaultCommonProblems,
             minecraftServers: Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultMinecraftServers,
@@ -845,6 +857,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             enabled: body.enabled === true,
             panelChannelId: String(body.panelChannelId || '').trim(),
             requestChannelId: String(body.requestChannelId || '').trim(),
+            receiptHistoryChannelId: String(body.receiptHistoryChannelId || '').trim(),
             adminRoleIds,
             title: String(body.title || 'Soporte').slice(0, 256),
             message: String(body.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.').slice(0, 2000),
