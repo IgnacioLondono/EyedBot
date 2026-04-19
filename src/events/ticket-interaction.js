@@ -678,7 +678,7 @@ function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue
 }
 
 function shouldOpenMinecraftApplication(commonIssueValue) {
-    return ['postulacion', 'whitelist', 'cuenta'].includes(String(commonIssueValue || ''));
+    return String(commonIssueValue || '') === 'postulacion';
 }
 
 async function closeTicket(interaction) {
