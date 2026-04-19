@@ -583,7 +583,7 @@ function setupEventListeners() {
         await loadGuilds();
     });
 
-    document.querySelectorAll('.nav-link[data-section]').forEach((link) => {
+    document.querySelectorAll('[data-section]').forEach((link) => {
         link.addEventListener('click', (event) => {
             event.preventDefault();
             const sectionId = link.dataset.section;

@@ -2193,3 +2193,489 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================================================
+   Modern Dashboard Refresh
+   ========================================================= */
+
+body {
+    background:
+        radial-gradient(circle at top left, rgba(124, 77, 255, 0.14), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(255, 120, 209, 0.08), transparent 32%),
+        linear-gradient(180deg, #07040d 0%, #0b0714 55%, #090512 100%);
+}
+
+.main-content {
+    max-width: 1720px;
+    padding: 2rem clamp(1rem, 2vw, 2rem) 3rem;
+}
+
+.section {
+    padding: 0.25rem 0 1rem;
+}
+
+.section-title {
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(1.85rem, 2.6vw, 2.7rem);
+    letter-spacing: -0.03em;
+    margin-bottom: 0.55rem;
+}
+
+.title-accent {
+    width: 108px;
+    height: 4px;
+    border-radius: 999px;
+    box-shadow: 0 0 22px rgba(154, 109, 255, 0.45);
+}
+
+.dashboard-shell {
+    display: grid;
+    gap: 1.4rem;
+}
+
+.dashboard-hero {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
+    gap: 1.4rem;
+    padding: clamp(1.35rem, 3vw, 2.2rem);
+    border-radius: 30px;
+    border: 1px solid rgba(154, 109, 255, 0.25);
+    background:
+        linear-gradient(140deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
+        radial-gradient(circle at top right, rgba(255, 120, 209, 0.18), transparent 38%),
+        radial-gradient(circle at bottom left, rgba(124, 77, 255, 0.18), transparent 34%),
+        rgba(13, 8, 24, 0.82);
+    box-shadow: 0 30px 80px rgba(4, 2, 10, 0.54);
+    backdrop-filter: blur(22px) saturate(170%);
+}
+
+.dashboard-hero::before,
+.dashboard-hero::after {
+    content: '';
+    position: absolute;
+    inset: auto;
+    border-radius: 999px;
+    pointer-events: none;
+}
+
+.dashboard-hero::before {
+    width: 340px;
+    height: 340px;
+    right: -110px;
+    top: -120px;
+    background: radial-gradient(circle, rgba(255, 120, 209, 0.22), transparent 68%);
+    filter: blur(8px);
+}
+
+.dashboard-hero::after {
+    width: 260px;
+    height: 260px;
+    left: -120px;
+    bottom: -100px;
+    background: radial-gradient(circle, rgba(124, 77, 255, 0.25), transparent 68%);
+    filter: blur(8px);
+}
+
+.dashboard-hero-copy,
+.dashboard-hero-panel {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(154, 109, 255, 0.22);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--lavender);
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+
+.hero-eyebrow-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--iris-300), var(--fuchsia));
+    box-shadow: 0 0 16px rgba(255, 120, 209, 0.65);
+}
+
+.dashboard-hero h2 {
+    margin: 0;
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(2rem, 3.8vw, 4rem);
+    line-height: 1.02;
+    letter-spacing: -0.05em;
+    max-width: 11ch;
+    background: linear-gradient(135deg, #ffffff 0%, var(--lavender) 48%, var(--fuchsia) 120%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dashboard-hero p {
+    margin-top: 1rem;
+    max-width: 66ch;
+    color: rgba(203, 183, 246, 0.92);
+    font-size: 1rem;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.4rem;
+}
+
+.hero-action-btn,
+.dashboard-launcher-card {
+    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.hero-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.92rem 1.1rem;
+    border-radius: 16px;
+    box-shadow: 0 14px 40px rgba(5, 2, 12, 0.32);
+    transition: transform 0.24s ease, border-color 0.24s ease, background 0.24s ease, box-shadow 0.24s ease;
+}
+
+.hero-action-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.hero-action-btn--primary {
+    background: linear-gradient(135deg, rgba(124, 77, 255, 0.95), rgba(255, 120, 209, 0.82));
+    border-color: rgba(255, 120, 209, 0.35);
+}
+
+.hero-action-btn:hover,
+.dashboard-launcher-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 120, 209, 0.42);
+    box-shadow: 0 20px 52px rgba(124, 77, 255, 0.24);
+}
+
+.dashboard-hero-panel {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+}
+
+.hero-status-card,
+.dashboard-launcher-card,
+.guild-card,
+.stat-card,
+.command-card,
+.embed-form-container,
+.server-side-menu,
+.logs-container,
+.music-container,
+.moderation-container {
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(34, 20, 61, 0.72), rgba(18, 11, 35, 0.9));
+    border: 1px solid rgba(154, 109, 255, 0.18);
+    box-shadow: 0 20px 60px rgba(4, 2, 10, 0.45);
+}
+
+.hero-status-card {
+    padding: 1.25rem;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.hero-status-label,
+.hero-metric-label {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.hero-status-value {
+    font-size: clamp(1.6rem, 2.3vw, 2.2rem);
+    font-weight: 800;
+    font-family: 'Sora', sans-serif;
+    color: var(--white);
+}
+
+.hero-status-meta {
+    color: rgba(203, 183, 246, 0.86);
+    font-size: 0.94rem;
+}
+
+.hero-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.hero-metric {
+    padding: 1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(154, 109, 255, 0.15);
+    background: rgba(255, 255, 255, 0.03);
+    display: grid;
+    gap: 0.25rem;
+}
+
+.hero-metric-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--white);
+}
+
+.dashboard-launcher {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.85rem;
+}
+
+.dashboard-launcher-card {
+    min-height: 168px;
+    padding: 1.15rem;
+    display: grid;
+    gap: 1rem;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease, background 0.24s ease;
+}
+
+.dashboard-launcher-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 35%);
+    opacity: 0;
+    transition: opacity 0.24s ease;
+}
+
+.dashboard-launcher-card:hover::before {
+    opacity: 1;
+}
+
+.launcher-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(124, 77, 255, 0.18), rgba(255, 120, 209, 0.1));
+    color: var(--iris-300);
+    box-shadow: inset 0 0 0 1px rgba(154, 109, 255, 0.12);
+}
+
+.launcher-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.launcher-icon--pink { color: var(--fuchsia); }
+.launcher-icon--gold { color: var(--lavender); }
+.launcher-icon--violet { color: var(--iris-300); }
+.launcher-icon--teal { color: #80e7ff; }
+
+.launcher-copy h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--white);
+}
+
+.launcher-copy p {
+    margin: 0;
+    color: rgba(203, 183, 246, 0.86);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.dashboard-launcher-card:hover .launcher-icon {
+    transform: translateY(-2px) scale(1.03);
+}
+
+.dashboard-search-header {
+    margin-top: 0.6rem;
+    margin-bottom: 1.8rem;
+}
+
+.dashboard-search-header .search-pill {
+    min-height: 52px;
+    padding-inline: 1rem;
+}
+
+.dashboard-search-header .search-input {
+    width: min(340px, 42vw);
+    font-size: 0.95rem;
+}
+
+.guilds-grid {
+    gap: 1.2rem;
+}
+
+.guild-card {
+    padding: 1.3rem;
+    min-height: 100%;
+}
+
+.guild-card::before {
+    background: linear-gradient(90deg, transparent, rgba(255, 120, 209, 0.08), transparent);
+}
+
+.guild-icon {
+    width: 62px;
+    height: 62px;
+    border-radius: 18px;
+}
+
+.guild-name {
+    font-size: 1.12rem;
+}
+
+.context-strip,
+.search-pill,
+.nav-tabs,
+.user-menu,
+.dropdown-menu,
+.server-side-menu,
+.embed-form-container,
+.logs-container,
+.command-card,
+.stat-card,
+.guild-card,
+.dashboard-launcher-card,
+.hero-status-card {
+    backdrop-filter: blur(18px) saturate(170%);
+}
+
+.section-header {
+    margin-bottom: 1.75rem;
+}
+
+.section-header--split {
+    align-items: center;
+}
+
+.server-shell {
+    gap: 1rem;
+}
+
+.server-side-menu {
+    top: 90px;
+}
+
+.server-pane.active {
+    animation: paneFadeScale 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes paneFadeScale {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.back-to-server-btn {
+    margin-bottom: 0;
+}
+
+.stats-grid,
+.commands-grid {
+    gap: 1rem;
+}
+
+.stat-card,
+.command-card {
+    padding: 1.4rem;
+}
+
+.stat-card:hover,
+.command-card:hover,
+.guild-card:hover {
+    transform: translateY(-6px);
+}
+
+.toast-container {
+    top: 84px;
+}
+
+@media (max-width: 1280px) {
+    .dashboard-launcher {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .dashboard-hero {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 920px) {
+    .dashboard-launcher {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hero-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-launcher {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+    }
+
+    .hero-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .dashboard-search-header .search-input {
+        width: 100%;
+    }
+
+    .toast-container {
+        right: 1rem;
+        left: 1rem;
+    }
+
+    .toast {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 540px) {
+    .dashboard-hero h2 {
+        max-width: none;
+    }
+
+    .hero-eyebrow {
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+    }
+
+    .dashboard-hero,
+    .embed-form-container,
+    .server-side-menu,
+    .logs-container,
+    .moderation-container,
+    .music-container {
+        border-radius: 18px;
+    }
+}
