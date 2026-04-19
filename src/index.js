@@ -349,26 +349,38 @@ async function main() {
         throw new Error('Falta GUILD_ID en .env');
     }
 
-    // Registrar comandos automáticamente
+    await db.init().catch((error) => {
+        console.error('❌ Error inicializando base de datos:', error?.message || error);
+        return false;
+    });
+
+    // Registrar comandos sin bloquear el arranque del bot.
     const rest = new REST({ version: '10' }).setToken(TOKEN);
+    const registerPromise = rest.put(
+        Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+        { body: commands }
+    );
 
-    try {
-        console.log('🔄 Registrando comandos en Discord...');
-        await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: commands },
-        );
-        console.log('✅ Comandos registrados exitosamente.');
-    } catch (error) {
-        console.error('❌ Error registrando comandos:', error);
-    }
+    const registerTimeoutMs = Math.max(5000, Number.parseInt(process.env.COMMAND_REGISTER_TIMEOUT_MS || '15000', 10));
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`timeout ${registerTimeoutMs}ms`)), registerTimeoutMs);
+    });
 
-    await db.init().catch(() => false);
+    console.log('🔄 Registrando comandos en Discord...');
+    Promise.race([registerPromise, timeoutPromise])
+        .then(() => {
+            console.log('✅ Comandos registrados exitosamente.');
+        })
+        .catch((error) => {
+            console.error('⚠️ Registro de comandos omitido por error/timeout:', error?.message || error);
+        });
+
     if (MUSIC_ENABLED && client.player) {
         const { DefaultExtractors } = require('@discord-player/extractor');
         await client.player.extractors.loadMulti(DefaultExtractors);
     }
-    client.login(TOKEN);
+
+    await client.login(TOKEN);
 }
 
 async function gracefulShutdown(signal) {
