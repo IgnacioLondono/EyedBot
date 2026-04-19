@@ -91,7 +91,8 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
     const runtimeClientId = String(client.user?.id || '').trim();
     const configuredClientId = String(CLIENT_ID || '').trim();
     const appIds = Array.from(new Set([configuredClientId, runtimeClientId].filter(Boolean)));
-    const perGuildTimeoutMs = Math.max(5000, Number.parseInt(options.perGuildTimeoutMs || `${COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS}`, 10));
+    const perGuildTimeoutRaw = Number.parseInt(options.perGuildTimeoutMs ?? `${COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS}`, 10);
+    const perGuildTimeoutMs = Number.isFinite(perGuildTimeoutRaw) ? perGuildTimeoutRaw : COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS;
     const retries = Math.max(1, Number.parseInt(options.retries || `${COMMAND_REGISTER_RETRIES}`, 10));
     const retryDelayMs = Math.max(1000, Number.parseInt(options.retryDelayMs || `${COMMAND_REGISTER_RETRY_DELAY_MS}`, 10));
     const cleanupGlobal = options.cleanupGlobal !== false;
@@ -137,14 +138,17 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                         { body: commands }
                     );
 
-                    const timeoutOneGuild = new Promise((_, reject) => {
-                        setTimeout(() => {
-                            reject(new Error(`timeout ${perGuildTimeoutMs}ms`));
-                        }, perGuildTimeoutMs);
-                    });
-
                     try {
-                        await Promise.race([registerOneGuild, timeoutOneGuild]);
+                        if (perGuildTimeoutMs > 0) {
+                            const timeoutOneGuild = new Promise((_, reject) => {
+                                setTimeout(() => {
+                                    reject(new Error(`timeout ${perGuildTimeoutMs}ms`));
+                                }, perGuildTimeoutMs);
+                            });
+                            await Promise.race([registerOneGuild, timeoutOneGuild]);
+                        } else {
+                            await registerOneGuild;
+                        }
                         okCount += 1;
                         console.log(`✅ Slash registrados en guild ${guildName} (${guildId}).`);
                     } catch (guildError) {
@@ -267,7 +271,7 @@ client.on('guildCreate', (guild) => {
         registerSlashCommands([guild.id], {
             retries: 5,
             retryDelayMs: 10000,
-            perGuildTimeoutMs: 60000,
+            perGuildTimeoutMs: 0,
             cleanupGlobal: false
         }).catch((error) => {
             console.error('❌ Error sincronizando slash en nuevo servidor:', error?.message || error);
