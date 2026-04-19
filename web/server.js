@@ -49,6 +49,12 @@ function timeoutAfter(ms, label = 'timeout') {
     });
 }
 
+const OAUTH_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.OAUTH_REQUEST_TIMEOUT_MS || '10000', 10) || 10000;
+
+async function withOauthTimeout(promise, label) {
+    return Promise.race([promise, timeoutAfter(OAUTH_REQUEST_TIMEOUT_MS, label)]);
+}
+
 async function safeDbGet(key, fallback = null, timeoutMs = 3000) {
     try {
         return await Promise.race([db.get(key), timeoutAfter(timeoutMs, `db.get timeout: ${key}`)]);
@@ -673,11 +679,11 @@ app.get('/callback', async (req, res) => {
         console.log(`   Client ID: ${CLIENT_ID ? '✅ Configurado' : '❌ Faltante'}`);
         console.log(`   Client Secret: ${CLIENT_SECRET ? '✅ Configurado' : '❌ Faltante'}`);
         
-        const tokenData = await oauth.tokenRequest({
+        const tokenData = await withOauthTimeout(oauth.tokenRequest({
             code,
             scope: 'identify guilds',
             grantType: 'authorization_code'
-        });
+        }), 'oauth.tokenRequest timeout');
 
         if (!tokenData || !tokenData.access_token) {
             console.error('❌ No se recibió token de acceso');
@@ -685,25 +691,20 @@ app.get('/callback', async (req, res) => {
         }
 
         console.log('👤 Obteniendo información del usuario...');
-        const user = await oauth.getUser(tokenData.access_token);
-        const guilds = await oauth.getUserGuilds(tokenData.access_token);
+        const user = await withOauthTimeout(oauth.getUser(tokenData.access_token), 'oauth.getUser timeout');
 
         if (!user || !user.id) {
             console.error('❌ No se pudo obtener información del usuario');
             return res.redirect('/login.html?error=auth_failed');
         }
 
+        const previousGuilds = Array.isArray(req.session.guilds) ? req.session.guilds : [];
+
         // Guardar en sesión
         req.session.user = user;
-        req.session.guilds = guilds || [];
+        req.session.guilds = previousGuilds;
         req.session.accessToken = tokenData.access_token;
         delete req.session.oauthState; // Limpiar estado OAuth
-
-        try {
-            await recordGlobalLoginEvent(user, guilds || []);
-        } catch (analyticsError) {
-            console.warn('⚠️ No se pudo registrar analytics global de login:', analyticsError.message);
-        }
 
         // Guardar sesión antes de redirigir
         req.session.save((err) => {
@@ -712,7 +713,28 @@ app.get('/callback', async (req, res) => {
                 return res.redirect('/login.html?error=session_error');
             }
             console.log(`✅ Usuario autenticado: ${user.username}#${user.discriminator} (${user.id})`);
-            console.log(`   Servidores: ${guilds?.length || 0}`);
+            console.log('   Servidores: sincronización diferida en segundo plano');
+
+            // Fuera del camino crítico: sincronizar guilds y analytics sin bloquear el login.
+            setImmediate(async () => {
+                try {
+                    const guilds = await withOauthTimeout(
+                        oauth.getUserGuilds(tokenData.access_token),
+                        'oauth.getUserGuilds timeout'
+                    );
+
+                    if (Array.isArray(guilds)) {
+                        req.session.guilds = guilds;
+                        req.session.guildsSyncedAt = Date.now();
+                        req.session.save(() => {});
+                    }
+
+                    await recordGlobalLoginEvent(user, Array.isArray(guilds) ? guilds : []);
+                } catch (backgroundError) {
+                    console.warn('⚠️ Sincronización post-login incompleta:', backgroundError.message);
+                }
+            });
+
             // Redirigir a la raíz en lugar de /dashboard
             res.redirect('/');
         });
