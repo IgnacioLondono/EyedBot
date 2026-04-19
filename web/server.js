@@ -704,7 +704,8 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
                 messageId: '',
                 ticketCategories: defaultTicketCategories,
                 commonProblems: defaultCommonProblems,
-                minecraftServers: defaultMinecraftServers
+                minecraftServers: defaultMinecraftServers,
+                caseRoleMap: {}
             });
         }
 
@@ -712,7 +713,8 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             ...cfg,
             ticketCategories: Array.isArray(cfg.ticketCategories) && cfg.ticketCategories.length ? cfg.ticketCategories : defaultTicketCategories,
             commonProblems: Array.isArray(cfg.commonProblems) && cfg.commonProblems.length ? cfg.commonProblems : defaultCommonProblems,
-            minecraftServers: Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultMinecraftServers
+            minecraftServers: Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultMinecraftServers,
+            caseRoleMap: cfg.caseRoleMap && typeof cfg.caseRoleMap === 'object' ? cfg.caseRoleMap : {}
         });
     } catch (error) {
         console.error('Error obteniendo ticket config:', error);
@@ -814,6 +816,26 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             'mc'
         );
 
+        const normalizeRoleMap = (raw) => {
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+            const out = {};
+            Object.entries(raw).slice(0, 40).forEach(([key, value]) => {
+                const safeKey = String(key || '').trim().slice(0, 80);
+                if (!safeKey) return;
+
+                const roleIds = (Array.isArray(value) ? value : String(value || '').split(','))
+                    .map((id) => String(id || '').trim())
+                    .filter((id) => /^\d{10,25}$/.test(id))
+                    .slice(0, 20);
+
+                if (!roleIds.length) return;
+                out[safeKey] = roleIds;
+            });
+            return out;
+        };
+
+        const caseRoleMap = normalizeRoleMap(body.caseRoleMap || currentCfg?.caseRoleMap || {});
+
         if (!minecraftServers.some((item) => item.value === 'no-aplica')) {
             minecraftServers.unshift(defaultMinecraftServers[0]);
         }
@@ -830,6 +852,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             ticketCategories,
             commonProblems,
             minecraftServers,
+            caseRoleMap,
             messageId: String(body.messageId || '').trim(),
             updatedAt: new Date().toISOString(),
             updatedBy: req.session.user?.id || 'unknown'
