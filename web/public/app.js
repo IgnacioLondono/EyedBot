@@ -2893,6 +2893,7 @@ function collectTicketConfigFromForm() {
     return {
         enabled: document.getElementById('ticketEnabled')?.checked ?? true,
         panelChannelId: document.getElementById('ticketChannelSelect')?.value || '',
+        requestChannelId: document.getElementById('ticketRequestChannelSelect')?.value || '',
         adminRoleIds,
         title: document.getElementById('ticketTitle')?.value || 'Soporte',
         message: document.getElementById('ticketMessage')?.value || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.',
@@ -3004,6 +3005,13 @@ async function loadTicketPanel(guildId) {
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="ticketRequestChannelSelect">Canal para recibir peticiones pendientes</label>
+                            <select id="ticketRequestChannelSelect" class="form-control">
+                                <option value="">Usar canal del panel</option>
+                                ${channels.map((c) => `<option value="${c.id}" ${cfg.requestChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="ticketColor">Color del embed</label>
                             <input type="color" id="ticketColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
                         </div>
@@ -3058,6 +3066,7 @@ async function loadTicketPanel(guildId) {
                 <div class="welcome-preview-panel">
                     <h4>Resumen</h4>
                     <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal: <strong>${cfg.panelChannelId ? escapeHtml(channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal de peticiones: <strong>${cfg.requestChannelId ? escapeHtml(channels.find((c) => c.id === cfg.requestChannelId)?.name || 'Desconocido') : (cfg.panelChannelId ? escapeHtml(channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Mismo canal del panel') : 'No configurado')}</strong></p>
                     <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Roles admin: <strong>${selectedRoleIds.size}</strong></p>
                     <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Boton: <strong>${escapeHtml(cfg.buttonLabel || 'Solicitar ticket')}</strong></p>
                     <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Estado: <strong>${cfg.enabled ? 'Activo' : 'Inactivo'}</strong></p>

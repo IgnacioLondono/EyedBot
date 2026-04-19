@@ -509,8 +509,9 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
         return;
     }
 
-    const panelChannel = guild.channels.cache.get(cfg.panelChannelId) || await guild.channels.fetch(cfg.panelChannelId).catch(() => null);
-    if (!panelChannel || !panelChannel.isTextBased()) {
+    const requestChannelId = String(cfg.requestChannelId || cfg.panelChannelId || '').trim();
+    const requestChannel = guild.channels.cache.get(requestChannelId) || await guild.channels.fetch(requestChannelId).catch(() => null);
+    if (!requestChannel || !requestChannel.isTextBased()) {
         await sendEphemeral(interaction, 'No se encontro el canal de tickets para dejar la solicitud pendiente.');
         return;
     }
@@ -537,7 +538,7 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
         .setLabel('Aceptar solicitud')
         .setStyle(ButtonStyle.Success);
 
-    const pendingMessage = await panelChannel.send({
+    const pendingMessage = await requestChannel.send({
         content: `<@${interaction.user.id}>`,
         embeds: [pendingEmbed],
         components: [new ActionRowBuilder().addComponents(acceptBtn)]
@@ -568,8 +569,21 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
     await db.set(pendingKey(guildId, requestId), pendingRecord).catch(() => null);
     await db.set(pendingUserKey(guildId, interaction.user.id), requestId).catch(() => null);
 
+    const userPendingEmbed = new EmbedBuilder()
+        .setColor('f5a623')
+        .setTitle('Solicitud enviada')
+        .setDescription('Tu ticket quedo en estado pendiente. Un moderador revisara y aceptara la petición.')
+        .addFields(
+            { name: 'Categoria', value: String(payload.category || 'No especificado').slice(0, 1024), inline: true },
+            { name: 'Caso', value: String(payload.commonIssue || 'No especificado').slice(0, 1024), inline: true },
+            { name: 'Estado', value: 'Pendiente de aceptación', inline: true },
+            { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
+        )
+        .setTimestamp();
+
     await interaction.editReply({
-        content: 'Tu solicitud quedo en estado pendiente. Te avisaremos cuando un moderador la acepte.',
+        content: '\u200b',
+        embeds: [userPendingEmbed],
         components: []
     }).catch(() => null);
 }
@@ -941,6 +955,26 @@ async function handleTicketButton(interaction) {
                 embeds: [acceptedEmbed],
                 components: []
             }).catch(() => null);
+
+            const panelChannel = interaction.guild.channels.cache.get(cfg.panelChannelId)
+                || await interaction.guild.channels.fetch(cfg.panelChannelId).catch(() => null);
+            if (panelChannel?.isTextBased()) {
+                const approvedForUserEmbed = new EmbedBuilder()
+                    .setColor('43b581')
+                    .setTitle('Ticket aprobado')
+                    .setDescription(`<@${pending.requesterId}>, tu solicitud fue aprobada y ya tienes un canal de ticket activo.`)
+                    .addFields(
+                        { name: 'Canal de ticket', value: `<#${created.id}>`, inline: true },
+                        { name: 'Moderador', value: `<@${interaction.user.id}>`, inline: true },
+                        { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
+                    )
+                    .setTimestamp();
+
+                await panelChannel.send({
+                    content: `<@${pending.requesterId}>`,
+                    embeds: [approvedForUserEmbed]
+                }).catch(() => null);
+            }
 
             await db.delete(pendingKey(guildId, requestId)).catch(() => null);
             await db.delete(pendingUserKey(guildId, pending.requesterId)).catch(() => null);
