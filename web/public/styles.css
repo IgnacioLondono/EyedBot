@@ -2729,3 +2729,345 @@ body {
         border-radius: 18px;
     }
 }
+
+/* =========================================================
+   Total Reconstruction v3
+   ========================================================= */
+
+:root {
+    --layout-max: 1820px;
+    --panel-radius-lg: 24px;
+    --panel-radius-md: 16px;
+    --panel-gap: 1rem;
+}
+
+.nav-link.nav-hidden {
+    display: inline-flex;
+}
+
+.main-content {
+    max-width: var(--layout-max);
+    padding: 1.1rem clamp(0.9rem, 1.6vw, 1.5rem) 1.4rem;
+}
+
+.section > .container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+}
+
+.dashboard-shell {
+    gap: 0.9rem;
+}
+
+.dashboard-hero {
+    grid-template-columns: minmax(0, 1.22fr) minmax(300px, 0.78fr);
+    min-height: 220px;
+    gap: 0.9rem;
+    padding: clamp(1rem, 1.9vw, 1.45rem);
+    border-radius: var(--panel-radius-lg);
+    border: 1px solid rgba(186, 155, 255, 0.28);
+    box-shadow: 0 20px 65px rgba(6, 3, 15, 0.48);
+}
+
+.dashboard-hero::before {
+    width: 280px;
+    height: 280px;
+    right: -90px;
+    top: -85px;
+}
+
+.dashboard-hero::after {
+    width: 220px;
+    height: 220px;
+    left: -90px;
+    bottom: -80px;
+}
+
+.dashboard-hero h2 {
+    font-size: clamp(1.45rem, 2.2vw, 2.35rem);
+    max-width: 24ch;
+    line-height: 1.15;
+    color: #f8f3ff;
+}
+
+.dashboard-hero p {
+    font-size: 0.92rem;
+    line-height: 1.5;
+    max-width: 62ch;
+}
+
+.hero-actions {
+    gap: 0.6rem;
+}
+
+.hero-action-btn {
+    min-height: 42px;
+    padding: 0.62rem 0.9rem;
+    border-radius: 12px;
+    font-size: 0.84rem;
+}
+
+.hero-status-card,
+.dashboard-launcher-card,
+.guild-card,
+.stat-card,
+.command-card,
+.embed-form-container,
+.server-side-menu,
+.logs-container,
+.music-container,
+.moderation-container,
+.server-content-area {
+    border-radius: var(--panel-radius-lg);
+    border-color: rgba(186, 155, 255, 0.23);
+}
+
+.dashboard-hero-panel {
+    gap: 0.75rem;
+}
+
+.hero-status-card {
+    padding: 0.92rem;
+}
+
+.hero-metrics-grid {
+    gap: 0.6rem;
+}
+
+.hero-metric {
+    padding: 0.62rem 0.7rem;
+    border-radius: var(--panel-radius-md);
+}
+
+.hero-metric-value {
+    font-size: 1.08rem;
+}
+
+.hero-status-label,
+.hero-metric-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+}
+
+.dashboard-launcher {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.dashboard-launcher-card {
+    min-height: 142px;
+    padding: 0.92rem;
+    gap: 0.65rem;
+}
+
+.launcher-icon {
+    width: 44px;
+    height: 44px;
+}
+
+.launcher-copy h3 {
+    font-size: 0.98rem;
+}
+
+.launcher-copy p {
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.dashboard-search-header {
+    margin-top: 0.15rem;
+    margin-bottom: 0.9rem;
+}
+
+.dashboard-search-header .search-pill {
+    min-height: 48px;
+}
+
+.dashboard-search-header .search-input {
+    width: min(380px, 44vw);
+}
+
+.guilds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.9rem;
+}
+
+.guild-card {
+    padding: 1rem;
+}
+
+.server-shell {
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: var(--panel-gap);
+    height: 100%;
+    min-height: 0;
+}
+
+.section#serverSection .server-shell {
+    min-height: 0;
+}
+
+.server-side-menu {
+    padding: 0.75rem;
+    height: 100%;
+    max-height: 100%;
+    overflow: auto;
+}
+
+.server-side-header {
+    margin-bottom: 0.55rem;
+}
+
+.side-menu-search {
+    margin: 0.45rem 0 0.3rem;
+}
+
+.side-menu-group {
+    margin-top: 0.5rem;
+}
+
+.side-menu-group-title {
+    font-size: 0.66rem;
+    margin-bottom: 0.28rem;
+}
+
+.side-menu-btn {
+    margin-bottom: 0.22rem;
+    border-radius: 10px;
+}
+
+.side-menu-btn-inner {
+    min-height: 34px;
+    padding: 0.36rem 0.52rem;
+}
+
+.side-menu-icon {
+    width: 15px;
+    height: 15px;
+}
+
+.server-content-area {
+    min-height: 0;
+    height: 100%;
+    padding: 0.65rem;
+    background: linear-gradient(180deg, rgba(27, 16, 49, 0.65), rgba(14, 8, 27, 0.88));
+    border: 1px solid rgba(186, 155, 255, 0.2);
+    overflow: hidden;
+}
+
+.server-pane {
+    height: 100%;
+    padding-right: 0.2rem;
+}
+
+.server-pane-surface {
+    min-height: 100%;
+    gap: 0.7rem;
+    padding-bottom: 0.3rem;
+}
+
+.server-info-container,
+.moderation-container,
+.music-container,
+.logs-container,
+.embed-form-container,
+.commands-grid .command-card,
+.stats-grid .stat-card {
+    border-radius: var(--panel-radius-md);
+}
+
+.section-header {
+    margin-bottom: 1.1rem;
+}
+
+.section-title {
+    font-size: clamp(1.7rem, 2.4vw, 2.35rem);
+}
+
+.title-accent {
+    width: 88px;
+}
+
+.control-grid,
+.stats-grid,
+.commands-grid {
+    gap: 0.85rem;
+}
+
+.control-card,
+.stat-card,
+.command-card {
+    padding: 1rem;
+}
+
+@media (max-width: 1480px) {
+    .dashboard-launcher {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1280px) {
+    .dashboard-hero {
+        grid-template-columns: 1fr;
+        min-height: 0;
+    }
+
+    .dashboard-launcher {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .server-shell {
+        grid-template-columns: 250px minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 980px) {
+    .main-content {
+        padding: 0.9rem 0.7rem 1.05rem;
+    }
+
+    .dashboard-launcher {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .server-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .server-side-menu {
+        height: auto;
+        max-height: 42vh;
+    }
+
+    .server-content-area {
+        min-height: 48vh;
+    }
+}
+
+@media (max-width: 700px) {
+    .dashboard-launcher {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+    }
+
+    .hero-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .dashboard-search-header .search-pill {
+        width: 100%;
+    }
+
+    .dashboard-search-header .search-input {
+        width: 100%;
+    }
+
+    .nav-tabs {
+        justify-self: stretch;
+    }
+}
