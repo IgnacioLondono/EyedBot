@@ -477,7 +477,17 @@ async function handleTicketButton(interaction) {
 
     if (interaction.customId.startsWith(OPEN_PREFIX)) {
         const guildId = interaction.customId.slice(OPEN_PREFIX.length);
-        await showTicketPresetSelector(interaction, guildId);
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+            return true;
+        }
+
+        const optionsConfig = buildSelectionConfig(cfg);
+        await showTicketReasonModal(interaction, guildId, {
+            category: optionsConfig.categories[0]?.label || 'Soporte general',
+            commonIssue: optionsConfig.commonIssues[0]?.label || 'Otro'
+        });
         return true;
     }
 
