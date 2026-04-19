@@ -21,6 +21,7 @@ let dashboardGuildsCache = [];
 let dashboardGuildSearchQuery = '';
 let serverActivityChart = null;
 let serverActivityChartMode = 'week';
+let botInviteUrl = '';
 
 const DASHBOARD_ICON = `
     <span class="nav-icon-shell">
@@ -329,7 +330,8 @@ function saveState() {
             fields: []
         },
         serverSection: {
-            selectedGuildId: document.getElementById('serverSelect')?.value || ''
+            selectedGuildId: document.getElementById('serverSelect')?.value || currentServerGuildId || '',
+            activePaneId: currentServerPaneId || 'serverPaneOverview'
         },
         logs: {
             levelFilter: document.getElementById('logLevelFilter')?.value || '',
@@ -364,6 +366,27 @@ function loadState() {
         console.warn('No se pudo cargar el estado:', e);
         return null;
     }
+}
+
+function getActiveSectionId() {
+    return document.querySelector('.section.active')?.id || 'dashboard';
+}
+
+function buildPanelHistoryState(sectionId = 'dashboard', guard = false) {
+    return { panel: true, sectionId, guard };
+}
+
+function initializePanelHistory(sectionId = 'dashboard') {
+    const currentUrl = window.location.pathname + window.location.search;
+    history.replaceState(buildPanelHistoryState(sectionId, false), '', currentUrl);
+    history.pushState(buildPanelHistoryState(sectionId, true), '', currentUrl);
+}
+
+function pushPanelHistory(sectionId = 'dashboard') {
+    const currentUrl = window.location.pathname + window.location.search;
+    const currentState = history.state;
+    if (currentState?.panel && currentState?.sectionId === sectionId && currentState?.guard) return;
+    history.pushState(buildPanelHistoryState(sectionId, true), '', currentUrl);
 }
 
 // Función auxiliar para escapar HTML (definida temprano)
@@ -475,6 +498,10 @@ function restoreLogsState(state) {
 // Restaurar estado de servidor
 function restoreServerState(state) {
     if (!state.serverSection || !state.serverSection.selectedGuildId) return;
+
+    if (state.serverSection.activePaneId) {
+        currentServerPaneId = state.serverSection.activePaneId;
+    }
     
     setTimeout(async () => {
         await loadGuildsForServer();
@@ -503,17 +530,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     const savedState = loadState();
     serverFeaturesUnlocked = false;
     currentServerGuildId = '';
+
+    if (savedState?.serverSection?.selectedGuildId) {
+        currentServerGuildId = savedState.serverSection.selectedGuildId;
+        serverFeaturesUnlocked = true;
+        if (savedState.serverSection.activePaneId) {
+            currentServerPaneId = savedState.serverSection.activePaneId;
+        }
+    }
+
     setServerFeaturesNavigationVisible(false);
+    if (serverFeaturesUnlocked) {
+        setServerFeaturesNavigationVisible(true);
+    }
     updateServerMenuIdentity();
     updateDashboardButtonState();
     
     await loadGuilds();
     await loadStats();
     
-    // Restaurar sección activa
-    if (savedState && savedState.activeSection) {
-        showSection(savedState.activeSection);
-    }
+    const initialSection = savedState?.activeSection || 'dashboard';
+    showSection(initialSection, { skipHistory: true });
+    initializePanelHistory(initialSection);
     
     // Restaurar estados específicos
     if (savedState) {
@@ -545,6 +583,7 @@ async function checkAuth() {
 
             currentUser = data.user;
             currentGuilds = data.guilds || [];
+            botInviteUrl = String(data.inviteUrl || '').trim();
             updateUserUI();
             return true;
         }
@@ -580,10 +619,38 @@ function updateUserUI() {
             document.getElementById('userAvatar').src = `https://cdn.discordapp.com/embed/avatars/${currentUser.discriminator % 5}.png`;
         }
     }
+
+    const addBotBtn = document.getElementById('addBotBtn');
+    if (addBotBtn) {
+        if (botInviteUrl) {
+            addBotBtn.href = botInviteUrl;
+            addBotBtn.classList.remove('is-disabled');
+            addBotBtn.setAttribute('aria-disabled', 'false');
+        } else {
+            addBotBtn.href = '#';
+            addBotBtn.classList.add('is-disabled');
+            addBotBtn.setAttribute('aria-disabled', 'true');
+        }
+    }
 }
 
 // Configurar event listeners
 function setupEventListeners() {
+    window.addEventListener('popstate', (event) => {
+        const state = event.state;
+        if (state?.panel && state?.sectionId) {
+            showSection(state.sectionId, { skipHistory: true });
+            if (!state.guard) {
+                pushPanelHistory(state.sectionId);
+            }
+            return;
+        }
+
+        // Evita volver al login de Discord con la flecha atrás.
+        const activeSection = getActiveSectionId();
+        history.pushState(buildPanelHistoryState(activeSection, true), '', window.location.pathname + window.location.search);
+    });
+
     // Navegación
     document.getElementById('dashboardBtn').addEventListener('click', async () => {
         if (hasSelectedGuildContext()) {
@@ -601,6 +668,16 @@ function setupEventListeners() {
             showSection(sectionId);
         });
     });
+
+    const addBotBtn = document.getElementById('addBotBtn');
+    if (addBotBtn) {
+        addBotBtn.addEventListener('click', (event) => {
+            if (!botInviteUrl) {
+                event.preventDefault();
+                showToast('No se pudo generar el enlace de invitacion del bot', 'warning');
+            }
+        });
+    }
 
     const changeServerBtn = document.getElementById('changeServerBtn');
     if (changeServerBtn) {
@@ -832,7 +909,7 @@ function setupEventListeners() {
 }
 
 // Mostrar sección
-function showSection(sectionId) {
+function showSection(sectionId, options = {}) {
     if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'commandsSection', 'logsSection', 'serverSection'].includes(sectionId)) {
         showToast('Primero selecciona un servidor en el dashboard', 'warning');
         sectionId = 'dashboard';
@@ -878,6 +955,9 @@ function showSection(sectionId) {
     
     // Guardar sección activa
     saveState();
+    if (!options.skipHistory) {
+        pushPanelHistory(sectionId);
+    }
 }
 
 // Cargar servidores
