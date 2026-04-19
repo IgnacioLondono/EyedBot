@@ -142,13 +142,13 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(120deg, rgba(124, 77, 255, 0.28) 0%, rgba(40, 79, 255, 0.22) 48%, rgba(255, 120, 209, 0.2) 100%);
-    backdrop-filter: blur(20px) saturate(180%);
+    background: transparent;
+    backdrop-filter: none;
     border-bottom: none;
     z-index: 1000;
     padding: 0 2rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 10px 30px rgba(124, 77, 255, 0.18);
+    box-shadow: none;
 }
 
 .navbar::after {
