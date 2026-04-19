@@ -471,9 +471,11 @@ async function updateTicketPresetSelector(interaction, guildId, updater) {
 }
 
 async function showTicketReasonModal(interaction, guildId, preset = {}) {
+    const modalCustomId = `${MODAL_PREFIX}${guildId}_${Date.now()}`;
+
     if (String(preset.categoryValue || '') === 'solicitud-ingreso-minecraft') {
         const modal = new ModalBuilder()
-            .setCustomId(`${MODAL_PREFIX}${guildId}`)
+            .setCustomId(modalCustomId)
             .setTitle('Ingreso a Minecraft');
 
         const whyInput = new TextInputBuilder()
@@ -503,7 +505,7 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
     }
 
     const modal = new ModalBuilder()
-        .setCustomId(`${MODAL_PREFIX}${guildId}`)
+        .setCustomId(modalCustomId)
         .setTitle('Cuentanos tu caso');
 
     const selectedCategory = String(preset.category || 'Soporte general').trim();
@@ -811,7 +813,8 @@ async function handleTicketModal(interaction) {
 
     await interaction.deferReply({ flags: 64 }).catch(() => null);
 
-    const guildId = interaction.customId.slice(MODAL_PREFIX.length);
+    const modalPayload = interaction.customId.slice(MODAL_PREFIX.length);
+    const guildId = modalPayload.split('_')[0];
     const reason = safeGetField(interaction, 'ticket_reason_input', 'Sin motivo');
     const mcWhy = safeGetField(interaction, 'ticket_mc_why_input_v2', '');
     const mcNick = safeGetField(interaction, 'ticket_mc_nick_input_v2', '');
