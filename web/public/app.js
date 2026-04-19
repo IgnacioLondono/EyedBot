@@ -27,6 +27,7 @@ let serverSwitcherIndex = 0;
 let serverSwitcherTouchStartX = 0;
 let serverSwitcherTouchDeltaX = 0;
 let themeSettings = null;
+let currentSettingsPaneId = 'settingsPaneTheme';
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 
@@ -831,6 +832,38 @@ function resetThemeSettings() {
     showToast('Personalizacion restablecida', 'success');
 }
 
+function switchSettingsPane(paneId, options = {}) {
+    const pane = document.getElementById(paneId);
+    if (!pane) return;
+
+    currentSettingsPaneId = paneId;
+
+    document.querySelectorAll('.settings-pane').forEach((el) => {
+        el.classList.toggle('active', el.id === paneId);
+    });
+
+    document.querySelectorAll('.settings-side-btn').forEach((button) => {
+        button.classList.toggle('active', button.dataset.settingsPane === paneId);
+    });
+
+    if (!options.silent) {
+        const container = document.querySelector('#profileSettingsSection > .container');
+        if (container) container.scrollTop = 0;
+    }
+}
+
+function bindSettingsPaneNavigation() {
+    document.querySelectorAll('.settings-side-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const paneId = button.dataset.settingsPane;
+            if (!paneId) return;
+            switchSettingsPane(paneId);
+        });
+    });
+
+    switchSettingsPane(currentSettingsPaneId, { silent: true });
+}
+
 function bindThemeControls() {
     const controlIds = [
         'themeAccentPrimary',
@@ -1188,6 +1221,7 @@ function updateUserUI() {
 
 // Configurar event listeners
 function setupEventListeners() {
+    bindSettingsPaneNavigation();
     bindThemeControls();
 
     window.addEventListener('popstate', (event) => {
@@ -1408,6 +1442,7 @@ function setupEventListeners() {
             event.stopPropagation();
             document.getElementById('dropdownMenu').classList.remove('show');
             updateProfileSettingsData();
+            switchSettingsPane(currentSettingsPaneId, { silent: true });
             showSection('profileSettingsSection');
         });
     }
@@ -1591,6 +1626,9 @@ function showSection(sectionId, options = {}) {
     } else if (sectionId === 'serverSection') {
         loadGuildsForServer();
         switchServerPane(currentServerPaneId || 'serverPaneOverview');
+    } else if (sectionId === 'profileSettingsSection') {
+        updateProfileSettingsData();
+        switchSettingsPane(currentSettingsPaneId, { silent: true });
     }
 
     updateBackToServerButtonsVisibility(sectionId);
