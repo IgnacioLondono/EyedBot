@@ -912,19 +912,30 @@ function displayGuilds(guilds) {
 
     container.innerHTML = guilds.map(guild => `
         <div class="guild-card" onclick="selectGuild('${guild.id}')">
-            <div class="guild-icon">
-                ${guild.icon ? `<img src="${guild.icon}" alt="${guild.name}" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">` : `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px; color: var(--fate-red);">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                `}
+            <div class="guild-card-top">
+                <div class="guild-icon">
+                    ${guild.icon ? `<img src="${guild.icon}" alt="${guild.name}" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">` : `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; color: var(--fate-red);">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    `}
+                </div>
+                <span class="guild-pill">Listo para configurar</span>
             </div>
             <div class="guild-name">${escapeHtml(guild.name)}</div>
-            <div class="guild-info">
-                ${guild.botGuild?.memberCount || 0} miembros
+            <div class="guild-info">Espacio principal del servidor en el panel</div>
+            <div class="guild-meta">
+                <span class="guild-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                    </svg>
+                    ${(guild.botGuild?.memberCount || 0)} miembros
+                </span>
+                <span class="guild-meta-item guild-meta-item--ghost">ID • ${String(guild.id).slice(-4)}</span>
             </div>
         </div>
     `).join('');

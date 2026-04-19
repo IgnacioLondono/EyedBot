@@ -3243,3 +3243,101 @@ body {
         position: static;
     }
 }
+
+/* Control Center info blocks + server cards redesign */
+.control-center-shell {
+    gap: 1rem;
+}
+
+.control-info-grid .dashboard-launcher-card--info {
+    cursor: default;
+    min-height: 138px;
+}
+
+.control-info-grid .dashboard-launcher-card--info:hover {
+    transform: none;
+    box-shadow: 0 16px 40px rgba(6, 2, 15, 0.35);
+    border-color: rgba(186, 155, 255, 0.28);
+}
+
+.control-info-grid .dashboard-launcher-card--info::before {
+    opacity: 0.6;
+}
+
+.guilds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    align-items: stretch;
+}
+
+.guild-card {
+    padding: 1rem 1rem 0.95rem;
+    border-radius: 18px;
+    display: grid;
+    gap: 0.65rem;
+}
+
+.guild-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.guild-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    margin-bottom: 0;
+}
+
+.guild-name {
+    margin-bottom: 0;
+    font-size: 1.05rem;
+}
+
+.guild-info {
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: rgba(203, 183, 246, 0.9);
+}
+
+.guild-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0.22rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(154, 109, 255, 0.28);
+    background: rgba(154, 109, 255, 0.12);
+    color: var(--lavender);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.guild-meta {
+    margin-top: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.guild-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    color: rgba(203, 183, 246, 0.92);
+    font-size: 0.76rem;
+}
+
+.guild-meta-item svg {
+    width: 13px;
+    height: 13px;
+    opacity: 0.85;
+}
+
+.guild-meta-item--ghost {
+    color: rgba(164, 143, 208, 0.95);
+}
