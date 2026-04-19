@@ -37,7 +37,9 @@ function normalizeMetric(value) {
 function normalizeDailyEntry(raw = {}) {
     return {
         joins: normalizeMetric(raw.joins),
-        leaves: normalizeMetric(raw.leaves)
+        leaves: normalizeMetric(raw.leaves),
+        messages: normalizeMetric(raw.messages),
+        voiceMinutes: normalizeMetric(raw.voiceMinutes)
     };
 }
 
@@ -54,7 +56,9 @@ function normalizeActivity(raw = {}) {
         updatedAt: raw.updatedAt || new Date().toISOString(),
         totals: {
             joins: normalizeMetric(raw.totals?.joins),
-            leaves: normalizeMetric(raw.totals?.leaves)
+            leaves: normalizeMetric(raw.totals?.leaves),
+            messages: normalizeMetric(raw.totals?.messages),
+            voiceMinutes: normalizeMetric(raw.totals?.voiceMinutes)
         },
         daily
     };
@@ -109,7 +113,7 @@ async function setGuildActivity(guildId, activity) {
 
 async function incrementGuildMetric(guildId, metric, amount = 1, when = new Date()) {
     const safeMetric = String(metric || '').trim();
-    if (!['joins', 'leaves'].includes(safeMetric)) return null;
+    if (!['joins', 'leaves', 'messages', 'voiceMinutes'].includes(safeMetric)) return null;
 
     const increment = Math.max(1, Number.parseInt(amount || 1, 10) || 1);
     const activity = await getGuildActivity(guildId);

@@ -1,5 +1,6 @@
 const { ChannelType, PermissionsBitField } = require('discord.js');
 const levelingStore = require('../utils/leveling-store');
+const guildActivityStore = require('../utils/guild-activity-store');
 const { getLevelFromXp, sanitizeDifficulty } = require('../utils/leveling-math');
 
 const messageCooldownMap = new Map();
@@ -66,6 +67,13 @@ async function awardXpToMember(member, amount, source = 'message') {
     if (source === 'voice') nextState.voiceMinutes = Math.max(0, Number.parseInt(state.voiceMinutes || 0, 10) || 0) + 1;
 
     await levelingStore.setUserState(guildId, userId, nextState);
+
+    if (source === 'message') {
+        await guildActivityStore.incrementGuildMetric(guildId, 'messages', 1).catch(() => null);
+    }
+    if (source === 'voice') {
+        await guildActivityStore.incrementGuildMetric(guildId, 'voiceMinutes', 1).catch(() => null);
+    }
 
     if (newLevel > oldLevel) {
         const rewards = parseRoleRewards(cfg.roleRewards);

@@ -3452,3 +3452,61 @@ body {
     font-weight: 700;
     background: rgba(154, 109, 255, 0.16);
 }
+
+.summary-card--chart {
+    grid-column: 1 / -1;
+    gap: 0.7rem;
+}
+
+.summary-chart-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.summary-chart-select {
+    min-width: 220px;
+    padding: 0.5rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid rgba(154, 109, 255, 0.3);
+    background: rgba(14, 8, 28, 0.9);
+    color: var(--lavender);
+    font-size: 0.82rem;
+}
+
+.summary-chart-wrap {
+    position: relative;
+    height: 290px;
+    border-radius: 12px;
+    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: linear-gradient(180deg, rgba(18, 11, 34, 0.88), rgba(12, 7, 24, 0.92));
+    padding: 0.7rem;
+}
+
+.summary-chart-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 1rem;
+    font-size: 0.88rem;
+}
+
+@media (max-width: 720px) {
+    .summary-chart-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .summary-chart-select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .summary-chart-wrap {
+        height: 240px;
+    }
+}

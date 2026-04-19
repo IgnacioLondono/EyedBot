@@ -19,6 +19,8 @@ let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
 let dashboardGuildsCache = [];
 let dashboardGuildSearchQuery = '';
+let serverActivityChart = null;
+let serverActivityChartMode = 'week';
 
 const DASHBOARD_ICON = `
     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3396,6 +3398,158 @@ function formatIsoDate(value) {
     return date.toLocaleDateString('es-ES');
 }
 
+function formatChartShortDate(value) {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+}
+
+function createServerActivityChartDatasets(points = []) {
+    return {
+        labels: points.map((point) => point.label),
+        datasets: [
+            {
+                label: 'Entradas',
+                data: points.map((point) => point.joins),
+                borderColor: '#5da8ff',
+                backgroundColor: 'rgba(93, 168, 255, 0.15)',
+                pointRadius: 2.5,
+                tension: 0.35,
+                borderWidth: 2
+            },
+            {
+                label: 'Salidas',
+                data: points.map((point) => point.leaves),
+                borderColor: '#ff7ccf',
+                backgroundColor: 'rgba(255, 124, 207, 0.12)',
+                pointRadius: 2.5,
+                tension: 0.35,
+                borderWidth: 2
+            },
+            {
+                label: 'Mensajes',
+                data: points.map((point) => point.messages),
+                borderColor: '#b68dff',
+                backgroundColor: 'rgba(182, 141, 255, 0.12)',
+                pointRadius: 2.5,
+                tension: 0.35,
+                borderWidth: 2
+            },
+            {
+                label: 'Voz (min)',
+                data: points.map((point) => point.voiceMinutes),
+                borderColor: '#ffa968',
+                backgroundColor: 'rgba(255, 169, 104, 0.12)',
+                pointRadius: 2.5,
+                tension: 0.35,
+                borderWidth: 2
+            }
+        ]
+    };
+}
+
+function buildServerActivityPoints(info, mode = 'week') {
+    if (mode === 'since') {
+        const weekly = Array.isArray(info?.activity?.timeline?.weekly) ? info.activity.timeline.weekly : [];
+        return weekly.map((entry) => ({
+            label: `Sem ${entry.week}`,
+            joins: Number.parseInt(entry.joins || 0, 10) || 0,
+            leaves: Number.parseInt(entry.leaves || 0, 10) || 0,
+            messages: Number.parseInt(entry.messages || 0, 10) || 0,
+            voiceMinutes: Number.parseInt(entry.voiceMinutes || 0, 10) || 0
+        }));
+    }
+
+    const daily = Array.isArray(info?.activity?.timeline?.daily) ? info.activity.timeline.daily : [];
+    return daily.map((entry) => ({
+        label: formatChartShortDate(entry.date),
+        joins: Number.parseInt(entry.joins || 0, 10) || 0,
+        leaves: Number.parseInt(entry.leaves || 0, 10) || 0,
+        messages: Number.parseInt(entry.messages || 0, 10) || 0,
+        voiceMinutes: Number.parseInt(entry.voiceMinutes || 0, 10) || 0
+    }));
+}
+
+function renderServerActivityChart(info) {
+    const canvas = document.getElementById('serverActivityChart');
+    const rangeSelect = document.getElementById('serverActivityRange');
+    const emptyState = document.getElementById('serverActivityChartEmpty');
+    if (!canvas || !rangeSelect) return;
+
+    if (typeof Chart === 'undefined') {
+        if (emptyState) {
+            emptyState.style.display = 'block';
+            emptyState.textContent = 'No se pudo cargar la libreria de graficas.';
+        }
+        return;
+    }
+
+    const renderByMode = (mode) => {
+        serverActivityChartMode = mode;
+        const points = buildServerActivityPoints(info, mode);
+        const hasData = points.some((point) => point.joins > 0 || point.leaves > 0 || point.messages > 0 || point.voiceMinutes > 0);
+
+        if (serverActivityChart) {
+            serverActivityChart.destroy();
+            serverActivityChart = null;
+        }
+
+        if (!hasData) {
+            if (emptyState) {
+                emptyState.style.display = 'block';
+                emptyState.textContent = mode === 'since'
+                    ? 'Sin datos historicos suficientes desde la creacion.'
+                    : 'Aun no hay actividad registrada en los ultimos 7 dias.';
+            }
+            return;
+        }
+
+        if (emptyState) emptyState.style.display = 'none';
+
+        const chartData = createServerActivityChartDatasets(points);
+        serverActivityChart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#cbb7f6',
+                            boxWidth: 12,
+                            boxHeight: 12
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#a48fd0' },
+                        grid: { color: 'rgba(154, 109, 255, 0.12)' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a48fd0' },
+                        grid: { color: 'rgba(154, 109, 255, 0.12)' }
+                    }
+                }
+            }
+        });
+    };
+
+    rangeSelect.value = serverActivityChartMode;
+    rangeSelect.onchange = (event) => {
+        renderByMode(event.target.value);
+    };
+
+    renderByMode(serverActivityChartMode);
+}
+
 function displayServerInfo(info) {
     const container = document.getElementById('serverInfoContainer');
     
@@ -3512,8 +3666,27 @@ function displayServerInfo(info) {
                 <div class="summary-value">${createdDate}</div>
                 <div class="summary-subvalue">Emojis ${info.emojis || 0} • Stickers ${info.stickers || 0}</div>
             </article>
+
+            <article class="summary-card summary-card--chart">
+                <div class="summary-chart-head">
+                    <div>
+                        <div class="summary-label">Graficas de actividad</div>
+                        <div class="summary-subvalue">Lineas de entradas, salidas, mensajes y voz</div>
+                    </div>
+                    <select id="serverActivityRange" class="summary-chart-select">
+                        <option value="week">Por semana (7 dias)</option>
+                        <option value="since">Desde creacion (por semanas)</option>
+                    </select>
+                </div>
+                <div class="summary-chart-wrap">
+                    <canvas id="serverActivityChart"></canvas>
+                    <div id="serverActivityChartEmpty" class="summary-chart-empty" style="display:none;"></div>
+                </div>
+            </article>
         </div>
     `;
+
+    renderServerActivityChart(info);
 }
 
 // Cargar miembros del servidor
