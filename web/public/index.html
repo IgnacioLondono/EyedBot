@@ -102,28 +102,6 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <div id="contextStrip" class="context-strip" aria-hidden="true">
-            <div class="context-left">
-                <img id="contextGuildIcon" class="context-guild-icon" alt="Servidor" src="" style="display:none;">
-                <div class="context-text">
-                    <div class="context-label">Servidor activo</div>
-                    <div id="contextGuildName" class="context-name">Sin servidor seleccionado</div>
-                </div>
-            </div>
-            <div class="context-right">
-                <button type="button" id="changeServerBtn" class="chip-btn" title="Cambiar servidor">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M21 12a9 9 0 0 1-9 9"></path>
-                        <path d="M3 12a9 9 0 0 1 9-9"></path>
-                        <path d="M3 12h4"></path>
-                        <path d="M17 12h4"></path>
-                        <path d="M12 3v4"></path>
-                        <path d="M12 17v4"></path>
-                    </svg>
-                    <span>Cambiar</span>
-                </button>
-            </div>
-        </div>
         <!-- Dashboard -->
         <section id="dashboard" class="section active">
             <div class="container dashboard-shell">
@@ -702,6 +680,17 @@
                                     <div id="serverMenuGuildName" class="server-side-guild-name">Sin servidor seleccionado</div>
                                 </div>
                             </div>
+                            <button type="button" id="changeServerBtn" class="server-side-action chip-btn" title="Cambiar servidor">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M21 12a9 9 0 0 1-9 9"></path>
+                                    <path d="M3 12a9 9 0 0 1 9-9"></path>
+                                    <path d="M3 12h4"></path>
+                                    <path d="M17 12h4"></path>
+                                    <path d="M12 3v4"></path>
+                                    <path d="M12 17v4"></path>
+                                </svg>
+                                <span>Cambiar</span>
+                            </button>
                         </div>
 
                         <div class="side-menu-search">
