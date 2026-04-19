@@ -764,15 +764,43 @@ function requireOwner(req, res, next) {
     next();
 }
 
+const GUILDS_SESSION_SYNC_TTL_MS = 30 * 1000;
+
+async function syncSessionGuilds(req, options = {}) {
+    const force = options.force === true;
+    const currentGuilds = Array.isArray(req.session?.guilds) ? req.session.guilds : [];
+
+    if (!req.session?.accessToken) return currentGuilds;
+
+    const lastSyncedAt = Number.parseInt(req.session.guildsSyncedAt || 0, 10) || 0;
+    if (!force && (Date.now() - lastSyncedAt) < GUILDS_SESSION_SYNC_TTL_MS) {
+        return currentGuilds;
+    }
+
+    try {
+        const freshGuilds = await oauth.getUserGuilds(req.session.accessToken);
+        if (!Array.isArray(freshGuilds)) return currentGuilds;
+
+        req.session.guilds = freshGuilds;
+        req.session.guildsSyncedAt = Date.now();
+        req.session.save(() => {});
+        return freshGuilds;
+    } catch (error) {
+        console.warn('⚠️ No se pudo sincronizar la lista de servidores del usuario:', error.message);
+        return currentGuilds;
+    }
+}
+
 // Rutas protegidas
-app.get('/api/user', requireAuth, (req, res) => {
+app.get('/api/user', requireAuth, async (req, res) => {
+    const guilds = await syncSessionGuilds(req);
     const inviteUrl = CLIENT_ID
         ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&permissions=8&scope=bot%20applications.commands`
         : '';
 
     res.json({
         user: req.session.user,
-        guilds: req.session.guilds,
+        guilds,
         inviteUrl,
         isOwner: isOwnerUser(req.session.user)
     });
@@ -836,7 +864,7 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
 
 app.get('/api/guilds', requireAuth, async (req, res) => {
     try {
-        const guilds = req.session.guilds || [];
+        const guilds = await syncSessionGuilds(req, { force: true });
         
         // Filtrar solo servidores donde el bot está presente
         const botGuilds = [];
