@@ -3388,35 +3388,53 @@ function displayServerInfo(info) {
         return;
     }
     
+    const ownerTag = escapeHtml(info.owner?.tag || 'Desconocido');
+    const ownerAvatar = info.owner?.avatar
+        ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
+        : `<div class="summary-owner-avatar summary-owner-avatar--placeholder">${ownerTag.charAt(0).toUpperCase()}</div>`;
+
     container.innerHTML = `
-        <div class="server-info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
-            <div class="info-item" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Propietario</div>
-                <div style="color: var(--fate-gold); font-size: 1.2rem; font-weight: 600;">${escapeHtml(info.owner?.tag || 'Desconocido')}</div>
-            </div>
-            <div class="info-item" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Miembros</div>
-                <div style="color: var(--fate-gold); font-size: 1.2rem; font-weight: 600;">${info.memberCount || 0}</div>
-            </div>
-            <div class="info-item" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Canales</div>
-                <div style="color: var(--fate-gold); font-size: 1.2rem; font-weight: 600;">
-                    ${info.channelCount || 0} 
-                    ${info.channels ? `(${info.channels.text || 0} texto, ${info.channels.voice || 0} voz)` : ''}
+        <div class="server-summary-grid">
+            <article class="summary-card summary-card--owner">
+                <div class="summary-label">Propietario</div>
+                <div class="summary-owner-row">
+                    ${ownerAvatar}
+                    <div>
+                        <div class="summary-value">${ownerTag}</div>
+                        <div class="summary-subvalue">ID • ${escapeHtml(String(info.owner?.id || 'N/A'))}</div>
+                    </div>
                 </div>
-            </div>
-            <div class="info-item" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Roles</div>
-                <div style="color: var(--fate-gold); font-size: 1.2rem; font-weight: 600;">${info.roleCount || 0}</div>
-            </div>
-            <div class="info-item" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Emojis</div>
-                <div style="color: var(--fate-gold); font-size: 1.2rem; font-weight: 600;">${info.emojis || 0}</div>
-            </div>
-            <div class="info-item" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Creado</div>
-                <div style="color: var(--fate-gold); font-size: 1.2rem; font-weight: 600;">${info.createdAt ? new Date(info.createdAt).toLocaleDateString('es-ES') : 'N/A'}</div>
-            </div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Miembros</div>
+                <div class="summary-value">${info.memberCount || 0}</div>
+                <div class="summary-subvalue">Comunidad total del servidor</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Entradas de Canales</div>
+                <div class="summary-value">${info.channelCount || 0}</div>
+                <div class="summary-subvalue">${info.channels?.text || 0} texto • ${info.channels?.voice || 0} voz • ${info.channels?.category || 0} categorias</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Roles</div>
+                <div class="summary-value">${info.roleCount || 0}</div>
+                <div class="summary-subvalue">Gestion de permisos y jerarquia</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Estadisticas</div>
+                <div class="summary-value">Nivel ${Number(info.premiumTier || 0)}</div>
+                <div class="summary-subvalue">Boosts ${Number(info.premiumSubscriptionCount || 0)} • Verificacion ${escapeHtml(String(info.verificationLevel ?? 'N/A'))}</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Creado</div>
+                <div class="summary-value">${info.createdAt ? new Date(info.createdAt).toLocaleDateString('es-ES') : 'N/A'}</div>
+                <div class="summary-subvalue">Emojis ${info.emojis || 0} • Stickers ${info.stickers || 0}</div>
+            </article>
         </div>
     `;
 }

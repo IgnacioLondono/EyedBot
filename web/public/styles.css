@@ -3341,3 +3341,114 @@ body {
 .guild-meta-item--ghost {
     color: rgba(164, 143, 208, 0.95);
 }
+
+/* Embed compact mode */
+#embedSection .section-header {
+    margin-bottom: 0.85rem;
+}
+
+#embedSection .embed-form-container {
+    padding: 0.9rem 1rem;
+}
+
+#embedSection .form-grid {
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+#embedSection .embed-builder {
+    gap: 0.95rem;
+    margin-top: 0.9rem;
+}
+
+#embedSection .form-group {
+    margin-bottom: 0.9rem;
+}
+
+#embedSection .form-group label {
+    margin-bottom: 0.45rem;
+    font-size: 0.84rem;
+}
+
+#embedSection .form-control {
+    padding: 0.66rem 0.82rem;
+    font-size: 0.9rem;
+}
+
+#embedSection textarea.form-control {
+    min-height: 96px;
+}
+
+#embedSection .embed-preview {
+    min-height: 240px;
+    padding: 1rem;
+}
+
+#embedSection .embed-placeholder {
+    min-height: 185px;
+    padding: 1.6rem;
+}
+
+#embedSection .form-actions {
+    margin-top: 1rem;
+}
+
+/* Enhanced server summary */
+.server-summary-grid {
+    margin-top: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0.95rem;
+}
+
+.summary-card {
+    border: 1px solid rgba(154, 109, 255, 0.24);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(33, 20, 60, 0.7), rgba(19, 11, 35, 0.88));
+    padding: 1rem;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.summary-label {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.summary-value {
+    color: var(--lavender);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.summary-subvalue {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.summary-owner-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.summary-owner-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid rgba(190, 155, 255, 0.45);
+    box-shadow: 0 8px 20px rgba(6, 2, 16, 0.45);
+}
+
+.summary-owner-avatar--placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--lavender);
+    font-weight: 700;
+    background: rgba(154, 109, 255, 0.16);
+}
