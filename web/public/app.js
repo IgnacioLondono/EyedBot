@@ -1307,10 +1307,6 @@ function setupEventListeners() {
             event.preventDefault();
             await openServerSwitcherModal();
         });
-        changeServerBtn.onclick = async (event) => {
-            event.preventDefault();
-            await openServerSwitcherModal();
-        };
     }
 
     const serverSwitcherClose = document.getElementById('serverSwitcherClose');
