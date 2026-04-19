@@ -26,7 +26,7 @@ const DRAFT_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_CATEGORIES = [
     { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
     { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-    { value: 'solicitud-ingreso-minecraft', label: 'Minecraft, Solicitud para ingresar al servidor de la comunidad.', description: 'Postulacion o solicitud de acceso al servidor de la comunidad' },
+    { value: 'solicitud-ingreso-minecraft', label: 'Minecraft', description: 'Solicitud para ingresar al servidor premium de la comunidad' },
     { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
 ];
 
@@ -288,8 +288,49 @@ function normalizeConfiguredOptions(raw, defaults, prefix) {
     return built.length ? built : defaults;
 }
 
+function sanitizeCategories(categories = []) {
+    const normalized = [];
+    const used = new Set();
+
+    categories.forEach((item) => {
+        const rawLabel = String(item?.label || '').trim();
+        const rawValue = String(item?.value || '').trim();
+
+        if (rawValue === 'compras-y-rangos' || /compras\s*y\s*rangos/i.test(rawLabel)) return;
+
+        const isMinecraft = rawValue === 'minecraft' || rawValue === 'solicitud-ingreso-minecraft' || /minecraft/i.test(rawLabel);
+        const value = isMinecraft ? 'solicitud-ingreso-minecraft' : rawValue;
+        const label = isMinecraft ? 'Minecraft' : rawLabel;
+        const description = isMinecraft
+            ? 'Solicitud para ingresar al servidor premium de la comunidad'
+            : String(item?.description || '').trim();
+
+        if (!value || !label || used.has(value)) return;
+        used.add(value);
+        normalized.push({ value, label, description: description.slice(0, 100) });
+    });
+
+    if (!normalized.some((item) => item.value === 'solicitud-ingreso-minecraft')) {
+        normalized.push({
+            value: 'solicitud-ingreso-minecraft',
+            label: 'Minecraft',
+            description: 'Solicitud para ingresar al servidor premium de la comunidad'
+        });
+    }
+
+    return normalized.length ? normalized.slice(0, 25) : DEFAULT_CATEGORIES;
+}
+
+function safeGetField(interaction, fieldId, fallback = '') {
+    try {
+        return interaction.fields.getTextInputValue(fieldId) || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 function buildSelectionConfig(cfg) {
-    const categories = normalizeConfiguredOptions(cfg?.ticketCategories, DEFAULT_CATEGORIES, 'cat');
+    const categories = sanitizeCategories(normalizeConfiguredOptions(cfg?.ticketCategories, DEFAULT_CATEGORIES, 'cat'));
     const commonIssues = normalizeConfiguredOptions(cfg?.commonProblems, DEFAULT_COMMON_ISSUES, 'issue');
     return { categories, commonIssues };
 }
@@ -430,6 +471,46 @@ async function updateTicketPresetSelector(interaction, guildId, updater) {
 }
 
 async function showTicketReasonModal(interaction, guildId, preset = {}) {
+    if (String(preset.categoryValue || '') === 'solicitud-ingreso-minecraft') {
+        const modal = new ModalBuilder()
+            .setCustomId(`${MODAL_PREFIX}${guildId}`)
+            .setTitle('Ingreso a Minecraft');
+
+        const whyInput = new TextInputBuilder()
+            .setCustomId('ticket_mc_why_input')
+            .setLabel('Por que quieres ingresar?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMinLength(5)
+            .setMaxLength(500)
+            .setPlaceholder('Cuentanos por que quieres entrar al servidor premium.');
+
+        const nickInput = new TextInputBuilder()
+            .setCustomId('ticket_mc_nick_input')
+            .setLabel('Nick de Minecraft')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMinLength(2)
+            .setMaxLength(32)
+            .setPlaceholder('Ej: Steve123');
+
+        const extraInput = new TextInputBuilder()
+            .setCustomId('ticket_mc_extra_input')
+            .setLabel('Datos extra (version, experiencia, etc)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(180)
+            .setPlaceholder('Ej: Java 1.20, juego desde 2021, builder/pvp');
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(whyInput),
+            new ActionRowBuilder().addComponents(nickInput),
+            new ActionRowBuilder().addComponents(extraInput)
+        );
+        await interaction.showModal(modal);
+        return;
+    }
+
     const modal = new ModalBuilder()
         .setCustomId(`${MODAL_PREFIX}${guildId}`)
         .setTitle('Cuentanos tu caso');
@@ -598,7 +679,8 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     await sendEphemeral(interaction, `Ticket creado: <#${created.id}>`);
 }
 
-function shouldOpenDetailModal(commonIssueValue, commonIssueLabel) {
+function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue) {
+    if (String(categoryValue || '') === 'solicitud-ingreso-minecraft') return true;
     if (String(commonIssueValue) === 'otro') return true;
     return /no aparece en esta lista/i.test(String(commonIssueLabel || ''));
 }
@@ -669,10 +751,11 @@ async function handleTicketButton(interaction) {
         const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
         const commonIssueLabel = optionLabelByValue(categoryIssues, draft.commonIssue);
 
-        if (shouldOpenDetailModal(draft.commonIssue, commonIssueLabel)) {
+        if (shouldOpenDetailModal(draft.commonIssue, commonIssueLabel, draft.category)) {
             await showTicketReasonModal(interaction, guildId, {
                 category: categoryLabel,
-                commonIssue: commonIssueLabel
+                commonIssue: commonIssueLabel,
+                categoryValue: draft.category
             });
             return true;
         }
@@ -738,7 +821,10 @@ async function handleTicketModal(interaction) {
     await interaction.deferReply({ flags: 64 }).catch(() => null);
 
     const guildId = interaction.customId.slice(MODAL_PREFIX.length);
-    const reason = interaction.fields.getTextInputValue('ticket_reason_input') || 'Sin motivo';
+    const reason = safeGetField(interaction, 'ticket_reason_input', 'Sin motivo');
+    const mcWhy = safeGetField(interaction, 'ticket_mc_why_input', '');
+    const mcNick = safeGetField(interaction, 'ticket_mc_nick_input', '');
+    const mcExtra = safeGetField(interaction, 'ticket_mc_extra_input', '');
 
     let category = 'Soporte general';
     let commonIssue = 'Mi caso no aparece en esta lista';
@@ -753,12 +839,18 @@ async function handleTicketModal(interaction) {
         commonIssue = optionLabelByValue(categoryIssues, selectedDraft.commonIssue);
     }
 
-    await createTicketChannel(interaction, guildId, reason, {
+    const finalReason = mcWhy
+        ? [`Motivo ingreso: ${mcWhy}`, `Nick Minecraft: ${mcNick || 'No especificado'}`, mcExtra ? `Datos extra: ${mcExtra}` : '']
+            .filter(Boolean)
+            .join('\n')
+        : reason;
+
+    await createTicketChannel(interaction, guildId, finalReason, {
         category,
         commonIssue,
         categoryValue: selectedDraft?.category,
         commonIssueValue: selectedDraft?.commonIssue,
-        noMatchIssue: reason
+        noMatchIssue: mcWhy || reason
     });
     return true;
 }
