@@ -6,21 +6,21 @@
     <title>Login - EyedBot Panel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --saber-blue-dark: #291956;
-            --saber-blue: #7c4dff;
-            --saber-blue-light: #be9bff;
-            --saber-gold: #ff78d1;
-            --saber-gold-light: #ffd2ef;
-            --bg-primary: #090512;
-            --bg-secondary: #150c26;
-            --bg-card: #1a1030;
-            --text-primary: #F8FAFC;
-            --text-secondary: #CBD5E1;
-            --text-muted: #94A3B8;
-            --border-color: rgba(154, 109, 255, 0.28);
+            --saber-blue-dark: #9f5424;
+            --saber-blue: #d98a54;
+            --saber-blue-light: #ffb36f;
+            --saber-gold: #ffd59b;
+            --saber-gold-light: #ffe8c8;
+            --bg-primary: #0d0806;
+            --bg-secondary: #1b120f;
+            --bg-card: rgba(33, 24, 20, 0.9);
+            --text-primary: #fff4ec;
+            --text-secondary: #d8c2b4;
+            --text-muted: #ad9182;
+            --border-color: rgba(255, 188, 138, 0.18);
         }
 
         * {
@@ -31,7 +31,11 @@
 
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background: var(--bg-primary);
+            background:
+                radial-gradient(circle at 18% 12%, rgba(255, 177, 111, 0.12), transparent 28%),
+                radial-gradient(circle at 80% 18%, rgba(255, 120, 86, 0.10), transparent 24%),
+                radial-gradient(circle at 65% 84%, rgba(138, 74, 41, 0.15), transparent 34%),
+                linear-gradient(180deg, #0d0806 0%, #130d0a 45%, #090504 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -50,8 +54,8 @@
             width: 100%;
             height: 100%;
             background: 
-                radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(212, 175, 55, 0.05) 0%, transparent 50%);
+                radial-gradient(circle at 20% 30%, rgba(255, 179, 111, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 120, 86, 0.06) 0%, transparent 50%);
             animation: patternFloat 30s ease-in-out infinite;
             z-index: 0;
         }
@@ -63,7 +67,7 @@
             left: 50%;
             width: 600px;
             height: 600px;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(255, 179, 111, 0.12) 0%, transparent 70%);
             transform: translate(-50%, -50%);
             animation: glowPulse 20s ease-in-out infinite;
             z-index: 0;
@@ -93,14 +97,14 @@
         }
 
         .login-container {
-            background: rgba(30, 41, 59, 0.9);
+            background: linear-gradient(180deg, rgba(40, 28, 22, 0.94), rgba(18, 12, 10, 0.94));
             backdrop-filter: blur(20px) saturate(180%);
             border: 1px solid var(--border-color);
             border-radius: 24px;
             padding: 4rem 3rem;
             max-width: 480px;
             width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 40px rgba(59, 130, 246, 0.15);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), 0 0 40px rgba(255, 179, 111, 0.16);
             text-align: center;
             position: relative;
             z-index: 1;
@@ -128,27 +132,27 @@
             width: 72px;
             height: 72px;
             color: var(--saber-blue);
-            filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.5));
+            filter: drop-shadow(0 0 16px rgba(255, 179, 111, 0.42));
             animation: iconGlow 3s ease-in-out infinite;
             transition: all 0.3s ease;
         }
 
         .logo-container:hover .logo-icon {
             color: var(--saber-gold);
-            filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.6));
+            filter: drop-shadow(0 0 20px rgba(255, 213, 155, 0.6));
         }
 
         @keyframes iconGlow {
             0%, 100% { 
-                filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.5));
+                filter: drop-shadow(0 0 16px rgba(255, 179, 111, 0.42));
             }
             50% { 
-                filter: drop-shadow(0 0 24px rgba(59, 130, 246, 0.7)) drop-shadow(0 0 32px rgba(212, 175, 55, 0.4));
+                filter: drop-shadow(0 0 24px rgba(255, 179, 111, 0.64)) drop-shadow(0 0 32px rgba(255, 120, 86, 0.34));
             }
         }
 
         h1 {
-            font-family: 'Sora', sans-serif;
+            font-family: 'Cormorant Garamond', 'Sora', serif;
             background: linear-gradient(135deg, var(--saber-blue-light), var(--saber-gold));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -172,7 +176,7 @@
             justify-content: center;
             gap: 0.75rem;
             background: linear-gradient(135deg, var(--saber-blue), var(--saber-blue-dark));
-            color: white;
+            color: #1d120d;
             padding: 1.125rem 2.5rem;
             border-radius: 12px;
             text-decoration: none;
@@ -184,7 +188,7 @@
             width: 100%;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 8px 32px rgba(225, 114, 58, 0.24);
         }
 
         .login-btn::before {
@@ -207,7 +211,7 @@
 
         .login-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.5);
+            box-shadow: 0 12px 40px rgba(225, 114, 58, 0.32);
             background: linear-gradient(135deg, var(--saber-blue-light), var(--saber-blue));
         }
 
@@ -222,8 +226,8 @@
         }
 
         .error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.24);
             border-radius: 12px;
             padding: 1.125rem;
             margin-bottom: 1.5rem;
