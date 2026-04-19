@@ -37,6 +37,7 @@ function envValue(name, fallback = '') {
 
 const CLIENT_ID = envValue('CLIENT_ID');
 const CLIENT_SECRET = envValue('CLIENT_SECRET');
+const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID', '399740358101303316');
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 8 * 1024 * 1024 }
@@ -265,6 +266,102 @@ function extFromMimeOrName(mimeType = '', originalName = '') {
 
     const fromName = path.extname(String(originalName).toLowerCase());
     return ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(fromName) ? (fromName === '.jpeg' ? '.jpg' : fromName) : '.jpg';
+}
+
+const LOGIN_ANALYTICS_KEY = 'web:analytics:global_logins_v1';
+const LOGIN_ANALYTICS_VERSION = 1;
+
+function isOwnerUser(user = null) {
+    return String(user?.id || '') === String(OWNER_DISCORD_ID);
+}
+
+function sanitizeGuildSnapshot(guild) {
+    return {
+        name: String(guild?.name || 'Servidor sin nombre').slice(0, 120),
+        idSuffix: String(guild?.id || '').slice(-4)
+    };
+}
+
+function normalizeLoginAnalytics(raw) {
+    const base = {
+        version: LOGIN_ANALYTICS_VERSION,
+        totals: {
+            totalLogins: 0,
+            uniqueUsers: 0,
+            uniqueGuildsSeen: 0
+        },
+        users: {},
+        updatedAt: null
+    };
+
+    if (!raw || typeof raw !== 'object') return base;
+    if (!raw.users || typeof raw.users !== 'object') raw.users = {};
+    if (!raw.totals || typeof raw.totals !== 'object') raw.totals = {};
+
+    return {
+        version: raw.version || LOGIN_ANALYTICS_VERSION,
+        totals: {
+            totalLogins: Number(raw.totals.totalLogins) || 0,
+            uniqueUsers: Number(raw.totals.uniqueUsers) || 0,
+            uniqueGuildsSeen: Number(raw.totals.uniqueGuildsSeen) || 0
+        },
+        users: raw.users,
+        updatedAt: raw.updatedAt || null
+    };
+}
+
+function summarizeAnalytics(analytics) {
+    const users = Object.values(analytics.users || {});
+    const uniqueGuildNames = new Set();
+
+    users.forEach((entry) => {
+        (entry.guilds || []).forEach((g) => {
+            if (!g?.name) return;
+            uniqueGuildNames.add(String(g.name).toLowerCase());
+        });
+    });
+
+    return {
+        totalLogins: users.reduce((acc, u) => acc + (Number(u.loginCount) || 0), 0),
+        uniqueUsers: users.length,
+        uniqueGuildsSeen: uniqueGuildNames.size
+    };
+}
+
+async function recordGlobalLoginEvent(user, guilds = []) {
+    if (!user?.id) return;
+
+    const analytics = normalizeLoginAnalytics(await safeDbGet(LOGIN_ANALYTICS_KEY, null));
+    const userId = String(user.id);
+    const nowIso = new Date().toISOString();
+    const guildList = Array.isArray(guilds) ? guilds : [];
+    const sanitizedGuilds = guildList.slice(0, 60).map(sanitizeGuildSnapshot);
+
+    const current = analytics.users[userId] || {
+        userId,
+        username: String(user.username || 'Usuario'),
+        globalName: String(user.global_name || user.username || 'Usuario'),
+        avatar: user.avatar || null,
+        loginCount: 0,
+        firstLoginAt: nowIso,
+        lastLoginAt: nowIso,
+        guildCount: 0,
+        guilds: []
+    };
+
+    current.username = String(user.username || current.username || 'Usuario');
+    current.globalName = String(user.global_name || user.username || current.globalName || 'Usuario');
+    current.avatar = user.avatar || null;
+    current.loginCount = (Number(current.loginCount) || 0) + 1;
+    current.lastLoginAt = nowIso;
+    current.guildCount = guildList.length;
+    current.guilds = sanitizedGuilds;
+
+    analytics.users[userId] = current;
+    analytics.totals = summarizeAnalytics(analytics);
+    analytics.updatedAt = nowIso;
+
+    await safeDbSet(LOGIN_ANALYTICS_KEY, analytics);
 }
 
 function extractUploadPath(rawUrl = '') {
@@ -505,6 +602,12 @@ app.get('/callback', async (req, res) => {
         req.session.accessToken = tokenData.access_token;
         delete req.session.oauthState; // Limpiar estado OAuth
 
+        try {
+            await recordGlobalLoginEvent(user, guilds || []);
+        } catch (analyticsError) {
+            console.warn('⚠️ No se pudo registrar analytics global de login:', analyticsError.message);
+        }
+
         // Guardar sesión antes de redirigir
         req.session.save((err) => {
             if (err) {
@@ -552,6 +655,18 @@ function requireAuth(req, res, next) {
     next();
 }
 
+function requireOwner(req, res, next) {
+    if (!req.session || !req.session.user) {
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+    }
+
+    if (!isOwnerUser(req.session.user)) {
+        return res.status(403).json({ error: 'Acceso restringido al creador del bot' });
+    }
+
+    next();
+}
+
 // Rutas protegidas
 app.get('/api/user', requireAuth, (req, res) => {
     const inviteUrl = CLIENT_ID
@@ -561,8 +676,50 @@ app.get('/api/user', requireAuth, (req, res) => {
     res.json({
         user: req.session.user,
         guilds: req.session.guilds,
-        inviteUrl
+        inviteUrl,
+        isOwner: isOwnerUser(req.session.user)
     });
+});
+
+app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
+    try {
+        const analytics = normalizeLoginAnalytics(await safeDbGet(LOGIN_ANALYTICS_KEY, null));
+        const users = Object.values(analytics.users || {})
+            .map((entry) => ({
+                userId: String(entry.userId || ''),
+                username: String(entry.username || 'Usuario'),
+                globalName: String(entry.globalName || entry.username || 'Usuario'),
+                avatar: entry.avatar || null,
+                loginCount: Number(entry.loginCount) || 0,
+                firstLoginAt: entry.firstLoginAt || null,
+                lastLoginAt: entry.lastLoginAt || null,
+                guildCount: Number(entry.guildCount) || 0,
+                guilds: Array.isArray(entry.guilds)
+                    ? entry.guilds.map((g) => ({
+                        name: String(g?.name || 'Servidor sin nombre').slice(0, 120),
+                        idSuffix: String(g?.idSuffix || '').slice(-4)
+                    }))
+                    : []
+            }))
+            .sort((a, b) => {
+                const aTime = new Date(a.lastLoginAt || 0).getTime();
+                const bTime = new Date(b.lastLoginAt || 0).getTime();
+                return bTime - aTime;
+            });
+
+        res.json({
+            summary: {
+                totalLogins: Number(analytics.totals.totalLogins) || 0,
+                uniqueUsers: Number(analytics.totals.uniqueUsers) || 0,
+                uniqueGuildsSeen: Number(analytics.totals.uniqueGuildsSeen) || 0,
+                updatedAt: analytics.updatedAt || null
+            },
+            users
+        });
+    } catch (error) {
+        console.error('Error obteniendo registro global de logins:', error);
+        res.status(500).json({ error: 'Error al obtener registro global' });
+    }
 });
 
 app.get('/api/guilds', requireAuth, async (req, res) => {
@@ -1891,6 +2048,10 @@ app.delete('/api/embed-templates/:guildId/:templateId', requireAuth, (req, res) 
 
 // Ruta para obtener estadísticas del bot
 app.get('/api/stats', requireAuth, (req, res) => {
+    if (!isOwnerUser(req.session.user)) {
+        return res.status(403).json({ error: 'Estadisticas disponibles solo para el creador' });
+    }
+
     if (!botClient) {
         return res.status(500).json({ error: 'Bot no disponible' });
     }
@@ -1951,6 +2112,10 @@ console.warn = function(...args) {
 
 // Ruta para obtener logs
 app.get('/api/logs', requireAuth, (req, res) => {
+    if (!isOwnerUser(req.session.user)) {
+        return res.status(403).json({ error: 'Logs disponibles solo para el creador' });
+    }
+
     const limit = parseInt(req.query.limit) || 100;
     const level = req.query.level;
     
@@ -1964,6 +2129,10 @@ app.get('/api/logs', requireAuth, (req, res) => {
 
 // Server-Sent Events para logs en tiempo real
 app.get('/api/logs/stream', requireAuth, (req, res) => {
+    if (!isOwnerUser(req.session.user)) {
+        return res.status(403).json({ error: 'Logs en tiempo real disponibles solo para el creador' });
+    }
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
