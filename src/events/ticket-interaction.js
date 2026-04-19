@@ -683,7 +683,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
 
     setTimeout(() => {
         interaction.deleteReply().catch(() => null);
-    }, 3000);
+    }, 60000);
 }
 
 function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue) {
