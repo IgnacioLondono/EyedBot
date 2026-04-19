@@ -843,6 +843,7 @@ function showSection(sectionId) {
 
     const navIdBySection = {
         dashboard: 'dashboardBtn',
+        controlCenterSection: 'controlCenterBtn',
         serverSection: 'serverBtn',
         embedSection: 'embedBtn',
         statsSection: 'statsBtn',

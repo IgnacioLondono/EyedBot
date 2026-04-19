@@ -35,10 +35,20 @@
                     </svg>
                     <span>Dashboard</span>
                 </a>
-            </div>
-            <div class="nav-workspace" aria-label="Entorno actual">
-                <span class="nav-workspace-dot"></span>
-                <span>Control Center</span>
+                <a href="#" id="controlCenterBtn" class="nav-link" data-section="controlCenterSection" title="Control Center">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 2v3"></path>
+                        <path d="M12 19v3"></path>
+                        <path d="M4.93 4.93l2.12 2.12"></path>
+                        <path d="M16.95 16.95l2.12 2.12"></path>
+                        <path d="M2 12h3"></path>
+                        <path d="M19 12h3"></path>
+                        <path d="M4.93 19.07l2.12-2.12"></path>
+                        <path d="M16.95 7.05l2.12-2.12"></path>
+                    </svg>
+                    <span>Control Center</span>
+                </a>
             </div>
             <div class="nav-actions">
                 <div class="user-menu" id="userMenu">
@@ -67,66 +77,6 @@
         <!-- Dashboard -->
         <section id="dashboard" class="section active">
             <div class="container dashboard-shell">
-                <div class="dashboard-hero">
-                    <div class="dashboard-hero-copy">
-                        <div class="hero-eyebrow">
-                            <span class="hero-eyebrow-dot"></span>
-                            Centro de mando
-                        </div>
-                        <h2>Un panel más limpio, más rápido y más visual</h2>
-                        <p>
-                            Administra servidor, embeds, estadísticas y logs desde un flujo tipo consola premium.
-                            Cada bloque fue pensado como una pantalla propia, con accesos directos y jerarquía clara.
-                        </p>
-                        <div class="hero-actions">
-                            <button type="button" class="hero-action-btn hero-action-btn--primary" data-section="serverSection">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path d="M21 16V8"></path>
-                                    <path d="M17 16V8"></path>
-                                    <path d="M14 16H2"></path>
-                                    <path d="M14 8H2"></path>
-                                </svg>
-                                <span>Configurar servidor</span>
-                            </button>
-                            <button type="button" class="hero-action-btn" data-section="embedSection">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path d="M22 2L11 13"></path>
-                                    <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
-                                </svg>
-                                <span>Diseñar embed</span>
-                            </button>
-                            <button type="button" class="hero-action-btn" data-section="statsSection">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path d="M3 3v18h18"></path>
-                                    <path d="M7 14l4-4 4 4 6-7"></path>
-                                </svg>
-                                <span>Ver métricas</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="dashboard-hero-panel">
-                        <div class="hero-status-card">
-                            <div class="hero-status-label">Estado del sistema</div>
-                            <div class="hero-status-value">Operativo</div>
-                            <div class="hero-status-meta">OAuth, MySQL y registros en vivo activos</div>
-                        </div>
-                        <div class="hero-metrics-grid">
-                            <div class="hero-metric">
-                                <span class="hero-metric-value">5</span>
-                                <span class="hero-metric-label">Módulos visibles</span>
-                            </div>
-                            <div class="hero-metric">
-                                <span class="hero-metric-value">1</span>
-                                <span class="hero-metric-label">Servidor enlazado</span>
-                            </div>
-                            <div class="hero-metric">
-                                <span class="hero-metric-value">60+</span>
-                                <span class="hero-metric-label">Comandos cargados</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="dashboard-launcher">
                     <button type="button" class="dashboard-launcher-card" data-section="serverSection">
                         <div class="launcher-icon">
@@ -214,6 +164,70 @@
                     <div class="loading">
                         <div class="loading-spinner"></div>
                         <p>Cargando servidores...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="controlCenterSection" class="section">
+            <div class="container dashboard-shell control-center-shell">
+                <div class="dashboard-hero">
+                    <div class="dashboard-hero-copy">
+                        <div class="hero-eyebrow">
+                            <span class="hero-eyebrow-dot"></span>
+                            Centro de mando
+                        </div>
+                        <h2>Un panel más limpio, más rápido y más visual</h2>
+                        <p>
+                            Administra servidor, embeds, estadísticas y logs desde un flujo tipo consola premium.
+                            Cada bloque fue pensado como una pantalla propia, con accesos directos y jerarquía clara.
+                        </p>
+                        <div class="hero-actions">
+                            <button type="button" class="hero-action-btn hero-action-btn--primary" data-section="serverSection">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M21 16V8"></path>
+                                    <path d="M17 16V8"></path>
+                                    <path d="M14 16H2"></path>
+                                    <path d="M14 8H2"></path>
+                                </svg>
+                                <span>Configurar servidor</span>
+                            </button>
+                            <button type="button" class="hero-action-btn" data-section="embedSection">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M22 2L11 13"></path>
+                                    <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                                </svg>
+                                <span>Diseñar embed</span>
+                            </button>
+                            <button type="button" class="hero-action-btn" data-section="statsSection">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M3 3v18h18"></path>
+                                    <path d="M7 14l4-4 4 4 6-7"></path>
+                                </svg>
+                                <span>Ver métricas</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="dashboard-hero-panel">
+                        <div class="hero-status-card">
+                            <div class="hero-status-label">Estado del sistema</div>
+                            <div class="hero-status-value">Operativo</div>
+                            <div class="hero-status-meta">OAuth, MySQL y registros en vivo activos</div>
+                        </div>
+                        <div class="hero-metrics-grid">
+                            <div class="hero-metric">
+                                <span class="hero-metric-value">5</span>
+                                <span class="hero-metric-label">Módulos visibles</span>
+                            </div>
+                            <div class="hero-metric">
+                                <span class="hero-metric-value">1</span>
+                                <span class="hero-metric-label">Servidor enlazado</span>
+                            </div>
+                            <div class="hero-metric">
+                                <span class="hero-metric-value">60+</span>
+                                <span class="hero-metric-label">Comandos cargados</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
