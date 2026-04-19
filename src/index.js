@@ -83,7 +83,7 @@ const client = new Client({
 
 let slashRegisterInFlight = null;
 
-async function registerSlashCommands() {
+async function registerSlashCommands(targetGuildIds = null, options = {}) {
     if (slashRegisterInFlight) return slashRegisterInFlight;
 
     slashRegisterInFlight = (async () => {
@@ -91,35 +91,44 @@ async function registerSlashCommands() {
     const runtimeClientId = String(client.user?.id || '').trim();
     const configuredClientId = String(CLIENT_ID || '').trim();
     const appIds = Array.from(new Set([configuredClientId, runtimeClientId].filter(Boolean)));
+    const perGuildTimeoutMs = Math.max(5000, Number.parseInt(options.perGuildTimeoutMs || `${COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS}`, 10));
+    const retries = Math.max(1, Number.parseInt(options.retries || `${COMMAND_REGISTER_RETRIES}`, 10));
+    const retryDelayMs = Math.max(1000, Number.parseInt(options.retryDelayMs || `${COMMAND_REGISTER_RETRY_DELAY_MS}`, 10));
+    const cleanupGlobal = options.cleanupGlobal !== false;
 
     if (!appIds.length) {
         console.error('❌ No se puede registrar slash: falta CLIENT_ID y no hay ID runtime.');
         return false;
     }
 
-    let targetGuildIds = [];
-    try {
-        const fetchedGuilds = await client.guilds.fetch();
-        targetGuildIds = Array.from(fetchedGuilds.keys());
-    } catch {
-        targetGuildIds = Array.from(client.guilds.cache.keys());
+    let resolvedTargetGuildIds = Array.isArray(targetGuildIds) && targetGuildIds.length
+        ? targetGuildIds
+        : null;
+
+    if (!resolvedTargetGuildIds) {
+        try {
+            const fetchedGuilds = await client.guilds.fetch();
+            resolvedTargetGuildIds = Array.from(fetchedGuilds.keys());
+        } catch {
+            resolvedTargetGuildIds = Array.from(client.guilds.cache.keys());
+        }
     }
 
-    targetGuildIds = Array.from(new Set(targetGuildIds.filter(Boolean)));
+    resolvedTargetGuildIds = Array.from(new Set(resolvedTargetGuildIds.filter(Boolean)));
 
-    if (!targetGuildIds.length) {
+    if (!resolvedTargetGuildIds.length) {
         console.error('❌ No se puede registrar slash: el bot no tiene servidores disponibles.');
         return false;
     }
 
     for (const appId of appIds) {
-        for (let attempt = 1; attempt <= COMMAND_REGISTER_RETRIES; attempt++) {
+        for (let attempt = 1; attempt <= retries; attempt++) {
             try {
-                console.log(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${COMMAND_REGISTER_RETRIES})...`);
+                console.log(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${retries})...`);
 
                 let okCount = 0;
                 const failedGuilds = [];
-                for (const guildId of targetGuildIds) {
+                for (const guildId of resolvedTargetGuildIds) {
                     const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
                     console.log(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
 
@@ -130,8 +139,8 @@ async function registerSlashCommands() {
 
                     const timeoutOneGuild = new Promise((_, reject) => {
                         setTimeout(() => {
-                            reject(new Error(`timeout ${COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS}ms`));
-                        }, COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS);
+                            reject(new Error(`timeout ${perGuildTimeoutMs}ms`));
+                        }, perGuildTimeoutMs);
                     });
 
                     try {
@@ -148,11 +157,13 @@ async function registerSlashCommands() {
                     throw new Error('No se pudo registrar en ningún servidor conectado.');
                 }
 
-                await rest.put(Routes.applicationCommands(appId), { body: [] }).catch((cleanupError) => {
-                    console.warn('⚠️ No se pudieron limpiar comandos globales obsoletos:', cleanupError?.message || cleanupError);
-                });
+                if (cleanupGlobal) {
+                    await rest.put(Routes.applicationCommands(appId), { body: [] }).catch((cleanupError) => {
+                        console.warn('⚠️ No se pudieron limpiar comandos globales obsoletos:', cleanupError?.message || cleanupError);
+                    });
+                }
 
-                console.log(`✅ Comandos registrados exitosamente para app ${appId} en ${okCount}/${targetGuildIds.length} servidores.`);
+                console.log(`✅ Comandos registrados exitosamente para app ${appId} en ${okCount}/${resolvedTargetGuildIds.length} servidores.`);
                 if (failedGuilds.length) {
                     const failedDetails = failedGuilds.map((guildId) => {
                         const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
@@ -163,8 +174,8 @@ async function registerSlashCommands() {
                 return true;
             } catch (error) {
                 console.error(`⚠️ Falló registro de comandos (app ${appId}, intento ${attempt}):`, error?.message || error);
-                if (attempt < COMMAND_REGISTER_RETRIES) {
-                    await new Promise((resolve) => setTimeout(resolve, COMMAND_REGISTER_RETRY_DELAY_MS));
+                if (attempt < retries) {
+                    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
                 }
             }
         }
@@ -252,9 +263,16 @@ client.once('clientReady', () => {
 
 client.on('guildCreate', (guild) => {
     console.log(`➕ Bot agregado a nuevo servidor: ${guild.id}. Sincronizando slash...`);
-    registerSlashCommands().catch((error) => {
-        console.error('❌ Error sincronizando slash en nuevo servidor:', error?.message || error);
-    });
+    setTimeout(() => {
+        registerSlashCommands([guild.id], {
+            retries: 5,
+            retryDelayMs: 10000,
+            perGuildTimeoutMs: 60000,
+            cleanupGlobal: false
+        }).catch((error) => {
+            console.error('❌ Error sincronizando slash en nuevo servidor:', error?.message || error);
+        });
+    }, Math.max(10000, COMMAND_REGISTER_POST_READY_DELAY_MS));
 });
 
 client.on('messageCreate', async (message) => {
