@@ -1001,24 +1001,19 @@ async function handleTicketButton(interaction) {
                 components: []
             }).catch(() => null);
 
-            const panelChannel = interaction.guild.channels.cache.get(cfg.panelChannelId)
-                || await interaction.guild.channels.fetch(cfg.panelChannelId).catch(() => null);
-            if (panelChannel?.isTextBased()) {
-                const approvedForUserEmbed = new EmbedBuilder()
-                    .setColor('43b581')
-                    .setTitle('Ticket aprobado')
-                    .setDescription(`<@${pending.requesterId}>, tu solicitud fue aprobada y ya tienes un canal de ticket activo.`)
-                    .addFields(
-                        { name: 'Canal de ticket', value: `<#${created.id}>`, inline: true },
-                        { name: 'Moderador', value: `<@${interaction.user.id}>`, inline: true },
-                        { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
-                    )
-                    .setTimestamp();
+            const approvedForUserEmbed = new EmbedBuilder()
+                .setColor('43b581')
+                .setTitle('Ticket aprobado')
+                .setDescription('Tu solicitud fue aprobada y ya tienes un canal de ticket activo. Este aviso es privado para ti.')
+                .addFields(
+                    { name: 'Canal de ticket', value: `<#${created.id}>`, inline: true },
+                    { name: 'Moderador', value: `<@${interaction.user.id}>`, inline: true },
+                    { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
+                )
+                .setTimestamp();
 
-                await panelChannel.send({
-                    content: `<@${pending.requesterId}>`,
-                    embeds: [approvedForUserEmbed]
-                }).catch(() => null);
+            if (requesterUser) {
+                await requesterUser.send({ embeds: [approvedForUserEmbed] }).catch(() => null);
             }
 
             await clearPendingRequest(guildId, requestId, pending.requesterId);
