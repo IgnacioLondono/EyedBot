@@ -32,6 +32,8 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
 const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMMAND_WARN_MS || '1200', 10));
+const COMMAND_REGISTER_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.COMMAND_REGISTER_TIMEOUT_MS || '15000', 10));
+const COMMAND_REGISTER_RETRIES = Math.max(1, Number.parseInt(process.env.COMMAND_REGISTER_RETRIES || '3', 10));
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',
     'ban',
@@ -76,6 +78,56 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
+
+async function registerSlashCommands() {
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+    const runtimeClientId = String(client.user?.id || '').trim();
+    const configuredClientId = String(CLIENT_ID || '').trim();
+    const appIds = Array.from(new Set([configuredClientId, runtimeClientId].filter(Boolean)));
+
+    if (!GUILD_ID) {
+        console.error('❌ No se puede registrar slash: falta GUILD_ID.');
+        return false;
+    }
+
+    if (!appIds.length) {
+        console.error('❌ No se puede registrar slash: falta CLIENT_ID y no hay ID runtime.');
+        return false;
+    }
+
+    for (const appId of appIds) {
+        for (let attempt = 1; attempt <= COMMAND_REGISTER_RETRIES; attempt++) {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error(`timeout ${COMMAND_REGISTER_TIMEOUT_MS}ms`)), COMMAND_REGISTER_TIMEOUT_MS);
+            });
+
+            try {
+                console.log(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${COMMAND_REGISTER_RETRIES})...`);
+                const registerPromise = rest.put(
+                    Routes.applicationGuildCommands(appId, GUILD_ID),
+                    { body: commands }
+                );
+
+                await Promise.race([registerPromise, timeoutPromise]);
+
+                await Promise.race([
+                    rest.put(Routes.applicationCommands(appId), { body: [] }),
+                    timeoutPromise
+                ]).catch((cleanupError) => {
+                    console.warn('⚠️ No se pudieron limpiar comandos globales obsoletos:', cleanupError?.message || cleanupError);
+                });
+
+                console.log(`✅ Comandos registrados exitosamente para app ${appId}.`);
+                return true;
+            } catch (error) {
+                console.error(`⚠️ Falló registro de comandos (app ${appId}, intento ${attempt}):`, error?.message || error);
+            }
+        }
+    }
+
+    console.error('❌ No se pudieron registrar comandos slash después de varios intentos.');
+    return false;
+}
 
 if (MUSIC_ENABLED) {
     const { Player } = require('discord-player');
@@ -128,6 +180,10 @@ client.once('clientReady', () => {
         webPanel.setBotClient(client);
         console.log('🔗 Panel web conectado al cliente del bot.');
     }
+
+    registerSlashCommands().catch((error) => {
+        console.error('❌ Error inesperado registrando slash:', error?.message || error);
+    });
 
     startBackupScheduler();
     startVoiceXpLoop(client);
@@ -353,37 +409,6 @@ async function main() {
         console.error('❌ Error inicializando base de datos:', error?.message || error);
         return false;
     });
-
-    // Registrar comandos sin bloquear el arranque del bot.
-    const rest = new REST({ version: '10' }).setToken(TOKEN);
-    const registerPromise = rest.put(
-        Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-        { body: commands }
-    );
-
-    const registerTimeoutMs = Math.max(5000, Number.parseInt(process.env.COMMAND_REGISTER_TIMEOUT_MS || '15000', 10));
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error(`timeout ${registerTimeoutMs}ms`)), registerTimeoutMs);
-    });
-
-    console.log('🔄 Registrando comandos en Discord...');
-    Promise.race([registerPromise, timeoutPromise])
-        .then(() => {
-            console.log('✅ Comandos registrados exitosamente.');
-
-            // Limpia comandos globales obsoletos del bot sin bloquear el arranque.
-            return Promise.race([
-                rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('global cleanup timeout')), registerTimeoutMs))
-            ]).then(() => {
-                console.log('🧹 Comandos globales obsoletos limpiados.');
-            }).catch((cleanupError) => {
-                console.warn('⚠️ No se pudieron limpiar comandos globales:', cleanupError?.message || cleanupError);
-            });
-        })
-        .catch((error) => {
-            console.error('⚠️ Registro de comandos omitido por error/timeout:', error?.message || error);
-        });
 
     if (MUSIC_ENABLED && client.player) {
         const { DefaultExtractors } = require('@discord-player/extractor');
