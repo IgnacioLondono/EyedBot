@@ -647,14 +647,21 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
 
     const infoEmbed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
-        .setTitle('Nuevo ticket creado')
-        .setDescription(`**Usuario:** <@${interaction.user.id}>\n**Motivo:** ${String(reason).slice(0, 500)}`)
+        .setAuthor({
+            name: `${interaction.user.username} abrió un ticket`,
+            iconURL: interaction.user.displayAvatarURL({ size: 64 })
+        })
+        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
+        .setTitle('Nuevo ticket abierto')
+        .setDescription('Se registró una nueva solicitud. El staff revisará la información del ticket.')
         .addFields(
+            { name: 'Usuario', value: `<@${interaction.user.id}>`, inline: true },
+            { name: 'Referencia', value: `#${created.id}`, inline: true },
             { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
-            { name: 'Problema comun', value: commonIssueLabel.slice(0, 1024), inline: true },
-            { name: 'No sale mi problema', value: noMatchIssueLabel.slice(0, 1024), inline: false }
+            { name: 'Caso', value: commonIssueLabel.slice(0, 1024), inline: true },
+            { name: 'Contexto / Motivo', value: String(reason).slice(0, 1024) || 'Sin detalles', inline: false }
         )
-        .setFooter({ text: 'Usa el boton para cerrar cuando termines.' })
+        .setFooter({ text: 'Usa el boton de abajo para cerrar el ticket cuando termines.' })
         .setTimestamp();
 
     const closeBtn = new ButtonBuilder()
