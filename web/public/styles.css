@@ -4334,6 +4334,10 @@ body {
     max-width: 980px;
 }
 
+.about-hero .hero-eyebrow {
+    margin: 0 auto 0.35rem;
+}
+
 .about-hero p {
     position: relative;
     margin: 0;
@@ -4467,8 +4471,13 @@ body {
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     padding: 0.15rem 0 0.2rem;
+}
+
+.about-carousel-viewport::-webkit-scrollbar {
+    display: none;
 }
 
 .about-carousel-track {
