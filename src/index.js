@@ -85,13 +85,19 @@ async function registerSlashCommands() {
     const configuredClientId = String(CLIENT_ID || '').trim();
     const appIds = Array.from(new Set([configuredClientId, runtimeClientId].filter(Boolean)));
 
-    if (!GUILD_ID) {
-        console.error('❌ No se puede registrar slash: falta GUILD_ID.');
+    if (!appIds.length) {
+        console.error('❌ No se puede registrar slash: falta CLIENT_ID y no hay ID runtime.');
         return false;
     }
 
-    if (!appIds.length) {
-        console.error('❌ No se puede registrar slash: falta CLIENT_ID y no hay ID runtime.');
+    const connectedGuildIds = Array.from(client.guilds.cache.keys());
+    const targetGuildIds = Array.from(new Set([
+        String(GUILD_ID || '').trim(),
+        ...connectedGuildIds
+    ].filter(Boolean)));
+
+    if (!targetGuildIds.length) {
+        console.error('❌ No se puede registrar slash: el bot no tiene servidores disponibles.');
         return false;
     }
 
@@ -99,16 +105,30 @@ async function registerSlashCommands() {
         for (let attempt = 1; attempt <= COMMAND_REGISTER_RETRIES; attempt++) {
             try {
                 console.log(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${COMMAND_REGISTER_RETRIES})...`);
-                await rest.put(
-                    Routes.applicationGuildCommands(appId, GUILD_ID),
-                    { body: commands }
-                );
+
+                let okCount = 0;
+                for (const guildId of targetGuildIds) {
+                    try {
+                        await rest.put(
+                            Routes.applicationGuildCommands(appId, guildId),
+                            { body: commands }
+                        );
+                        okCount += 1;
+                        console.log(`✅ Slash registrados en guild ${guildId}.`);
+                    } catch (guildError) {
+                        console.warn(`⚠️ No se pudieron registrar slash en guild ${guildId}:`, guildError?.message || guildError);
+                    }
+                }
+
+                if (okCount === 0) {
+                    throw new Error('No se pudo registrar en ningún servidor conectado.');
+                }
 
                 await rest.put(Routes.applicationCommands(appId), { body: [] }).catch((cleanupError) => {
                     console.warn('⚠️ No se pudieron limpiar comandos globales obsoletos:', cleanupError?.message || cleanupError);
                 });
 
-                console.log(`✅ Comandos registrados exitosamente para app ${appId}.`);
+                console.log(`✅ Comandos registrados exitosamente para app ${appId} en ${okCount}/${targetGuildIds.length} servidores.`);
                 return true;
             } catch (error) {
                 console.error(`⚠️ Falló registro de comandos (app ${appId}, intento ${attempt}):`, error?.message || error);
