@@ -24,8 +24,7 @@ const DRAFT_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_CATEGORIES = [
     { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
     { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-    { value: 'compras-y-rangos', label: 'Compras y rangos', description: 'Pagos, rangos y beneficios' },
-    { value: 'solicitud-ingreso-minecraft', label: 'Solicitud para ingresar al servidor de Minecraft', description: 'Postulacion o solicitud de acceso al servidor Minecraft' },
+    { value: 'solicitud-ingreso-minecraft', label: 'Minecraft, Solicitud para ingresar al servidor de la comunidad.', description: 'Postulacion o solicitud de acceso al servidor de la comunidad' },
     { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
 ];
 
@@ -36,6 +35,33 @@ const DEFAULT_COMMON_ISSUES = [
     { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
     { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
 ];
+
+const DEFAULT_COMMON_ISSUES_BY_CATEGORY = {
+    'soporte-general': [
+        { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
+        { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
+        { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
+        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
+    ],
+    reportes: [
+        { value: 'usuario', label: 'Reportar usuario', description: 'Reporte por conducta o incumplimiento' },
+        { value: 'bug', label: 'Reportar bug', description: 'Fallos tecnicos detectados' },
+        { value: 'apelacion', label: 'Sancion o apelacion', description: 'Revisar mute, kick o ban' },
+        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
+    ],
+    'solicitud-ingreso-minecraft': [
+        { value: 'postulacion', label: 'Solicitud de ingreso', description: 'Aplicar para entrar al servidor' },
+        { value: 'whitelist', label: 'Whitelist', description: 'Agregar o corregir acceso de whitelist' },
+        { value: 'cuenta', label: 'Cuenta/Nick de Minecraft', description: 'Problemas con nick o cuenta' },
+        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
+    ],
+    sugerencias: [
+        { value: 'mejora-comunidad', label: 'Mejora de comunidad', description: 'Ideas para eventos y convivencia' },
+        { value: 'mejora-bot', label: 'Mejora del bot', description: 'Nuevos comandos o ajustes' },
+        { value: 'mejora-minecraft', label: 'Mejora de Minecraft', description: 'Ideas para el servidor Minecraft' },
+        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
+    ]
+};
 
 const ticketDrafts = new Map();
 
@@ -130,6 +156,12 @@ function buildSelectionConfig(cfg) {
     return { categories, commonIssues };
 }
 
+function getCommonIssuesForCategory(optionsConfig, categoryValue) {
+    const mapped = DEFAULT_COMMON_ISSUES_BY_CATEGORY[String(categoryValue || '')];
+    if (Array.isArray(mapped) && mapped.length) return mapped;
+    return optionsConfig.commonIssues;
+}
+
 function cleanupDrafts() {
     const now = Date.now();
     for (const [key, value] of ticketDrafts.entries()) {
@@ -145,12 +177,16 @@ function getDraftForUser(guildId, userId, optionsConfig) {
     const existing = ticketDrafts.get(key);
 
     const categoryValues = new Set(optionsConfig.categories.map((item) => item.value));
-    const issueValues = new Set(optionsConfig.commonIssues.map((item) => item.value));
+
     const draft = {
         category: categoryValues.has(existing?.category) ? existing.category : optionsConfig.categories[0].value,
-        commonIssue: issueValues.has(existing?.commonIssue) ? existing.commonIssue : optionsConfig.commonIssues[0].value,
+        commonIssue: '',
         updatedAt: Date.now()
     };
+
+    const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+    const issueValues = new Set(categoryIssues.map((item) => item.value));
+    draft.commonIssue = issueValues.has(existing?.commonIssue) ? existing.commonIssue : categoryIssues[0].value;
 
     ticketDrafts.set(key, draft);
     return draft;
@@ -188,6 +224,8 @@ function buildSelectMenu(customId, placeholder, options, selectedValue) {
 }
 
 function buildSetupComponents(guildId, optionsConfig, draft) {
+    const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+
     const categorySelect = buildSelectMenu(
         `${CATEGORY_SELECT_PREFIX}${guildId}`,
         'Selecciona una categoria',
@@ -197,7 +235,7 @@ function buildSetupComponents(guildId, optionsConfig, draft) {
     const issueSelect = buildSelectMenu(
         `${COMMON_SELECT_PREFIX}${guildId}`,
         'Selecciona un problema frecuente',
-        optionsConfig.commonIssues,
+        categoryIssues,
         draft.commonIssue
     );
     const continueButton = new ButtonBuilder()
@@ -487,7 +525,8 @@ async function handleTicketButton(interaction) {
         const optionsConfig = buildSelectionConfig(cfg);
         const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
         const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
-        const commonIssueLabel = optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue);
+        const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+        const commonIssueLabel = optionLabelByValue(categoryIssues, draft.commonIssue);
 
         if (shouldOpenDetailModal(draft.commonIssue, commonIssueLabel)) {
             await showTicketReasonModal(interaction, guildId, {
@@ -528,6 +567,9 @@ async function handleTicketSelectMenu(interaction) {
             const selected = interaction.values?.[0] || optionsConfig.categories[0].value;
             const valid = optionsConfig.categories.some((item) => item.value === selected);
             draft.category = valid ? selected : optionsConfig.categories[0].value;
+
+            const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+            draft.commonIssue = categoryIssues[0].value;
         });
         return true;
     }
@@ -535,9 +577,10 @@ async function handleTicketSelectMenu(interaction) {
     if (interaction.customId.startsWith(COMMON_SELECT_PREFIX)) {
         const guildId = interaction.customId.slice(COMMON_SELECT_PREFIX.length);
         await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
-            const selected = interaction.values?.[0] || optionsConfig.commonIssues[0].value;
-            const valid = optionsConfig.commonIssues.some((item) => item.value === selected);
-            draft.commonIssue = valid ? selected : optionsConfig.commonIssues[0].value;
+            const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+            const selected = interaction.values?.[0] || categoryIssues[0].value;
+            const valid = categoryIssues.some((item) => item.value === selected);
+            draft.commonIssue = valid ? selected : categoryIssues[0].value;
         });
         return true;
     }
