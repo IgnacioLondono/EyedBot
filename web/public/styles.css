@@ -1599,6 +1599,46 @@ body {
     scrollbar-gutter: stable;
 }
 
+.server-pane-surface {
+    display: grid;
+    gap: 1rem;
+    min-height: 100%;
+    padding: 0.15rem 0 0.6rem;
+}
+
+.server-pane-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 0.25rem 0.35rem;
+}
+
+.server-pane-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+}
+
+.server-pane-head h3 {
+    margin: 0;
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(1.2rem, 1.8vw, 1.7rem);
+    color: var(--text-primary);
+}
+
+.server-pane-head p {
+    margin: 0.35rem 0 0;
+    color: var(--text-secondary);
+    max-width: 72ch;
+    line-height: 1.5;
+}
+
 .server-pane {
     display: none;
     min-height: 100%;
@@ -1607,6 +1647,15 @@ body {
 .server-pane.active {
     display: block;
     animation: paneSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.server-pane.active .moderation-container,
+.server-pane.active .server-info-container {
+    border-radius: 20px;
+}
+
+.server-pane.active .moderation-container {
+    padding: 1.5rem;
 }
 
 @keyframes paneSlideIn {
@@ -1986,6 +2035,10 @@ body {
     .server-content-area {
         overflow-y: visible;
         padding-right: 0;
+    }
+
+    .server-pane-head {
+        padding-top: 0;
     }
 }
 

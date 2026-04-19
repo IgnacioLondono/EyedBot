@@ -887,63 +887,162 @@
 
                     <div class="server-content-area">
                         <div id="serverPaneOverview" class="server-pane active">
-                            <div id="serverInfoContainer" class="server-info-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Panel</div>
+                                        <h3>Resumen general</h3>
+                                        <p>Vista ejecutiva del servidor, estado y accesos principales.</p>
+                                    </div>
+                                </div>
+                                <div id="serverInfoContainer" class="server-info-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneSettings" class="server-pane">
-                            <div id="serverSettingsBlock" class="moderation-container">
-                                <div id="serverTabs" class="server-tabs"></div>
-                                <div class="form-group">
-                                    <label for="serverSelect">
-                                        <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="9" cy="7" r="4"></circle>
-                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                        </svg>
-                                        Servidor Activo
-                                    </label>
-                                    <select id="serverSelect" class="form-control">
-                                        <option value="">Selecciona un servidor</option>
-                                    </select>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Base</div>
+                                        <h3>Configuración del servidor</h3>
+                                        <p>Selecciona el servidor activo y navega por sus paneles internos.</p>
+                                    </div>
+                                </div>
+                                <div id="serverSettingsBlock" class="moderation-container">
+                                    <div id="serverTabs" class="server-tabs"></div>
+                                    <div class="form-group">
+                                        <label for="serverSelect">
+                                            <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                                <circle cx="9" cy="7" r="4"></circle>
+                                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                            </svg>
+                                            Servidor Activo
+                                        </label>
+                                        <select id="serverSelect" class="form-control">
+                                            <option value="">Selecciona un servidor</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <div id="serverPaneModeration" class="server-pane">
-                            <div id="moderationContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Moderación</div>
+                                        <h3>Centro de moderación</h3>
+                                        <p>Bloquea, expulsa y ordena la actividad del servidor desde una vista dedicada.</p>
+                                    </div>
+                                </div>
+                                <div id="moderationContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneWelcome" class="server-pane">
-                            <div id="welcomeContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Bienvenida y despedida</h3>
+                                        <p>Controla mensajes, imágenes y experiencia de entrada/salida.</p>
+                                    </div>
+                                </div>
+                                <div id="welcomeContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneVerify" class="server-pane">
-                            <div id="verifyContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Verificación</h3>
+                                        <p>Configura roles, reacciones y flujo de acceso de nuevos miembros.</p>
+                                    </div>
+                                </div>
+                                <div id="verifyContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneTickets" class="server-pane">
-                            <div id="ticketContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Tickets</h3>
+                                        <p>Diseña el flujo de soporte y categorías sin salir de la sección.</p>
+                                    </div>
+                                </div>
+                                <div id="ticketContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneLevels" class="server-pane">
-                            <div id="levelsContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Sistema de niveles</h3>
+                                        <p>Premios, experiencia y progresión con una vista clara y separada.</p>
+                                    </div>
+                                </div>
+                                <div id="levelsContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneVoiceCreator" class="server-pane">
-                            <div id="voiceCreatorContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Voz temporal</h3>
+                                        <p>Canales temporales, nombres automáticos y control de acceso.</p>
+                                    </div>
+                                </div>
+                                <div id="voiceCreatorContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneAutomation" class="server-pane">
-                            <div id="automationContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Automatización</h3>
+                                        <p>Reglas, anti-spam y alertas con una jerarquía visual limpia.</p>
+                                    </div>
+                                </div>
+                                <div id="automationContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneSecurity" class="server-pane">
-                            <div id="securityContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Moderación</div>
+                                        <h3>Centro de seguridad</h3>
+                                        <p>Protección, hardening y filtros con un espacio propio y estable.</p>
+                                    </div>
+                                </div>
+                                <div id="securityContainer" class="moderation-container"></div>
+                            </div>
                         </div>
 
                         <div id="serverPaneNotifications" class="server-pane">
-                            <div id="notificationsContainer" class="moderation-container"></div>
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Notificaciones</h3>
+                                        <p>Alertas y avisos centralizados para mantener todo visible.</p>
+                                    </div>
+                                </div>
+                                <div id="notificationsContainer" class="moderation-container"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
