@@ -16,7 +16,6 @@ const MODAL_PREFIX = 'ticket_reason_';
 const CLOSE_ID = 'ticket_close';
 const CATEGORY_SELECT_PREFIX = 'ticket_cat_';
 const COMMON_SELECT_PREFIX = 'ticket_common_';
-const MINECRAFT_SELECT_PREFIX = 'ticket_mc_';
 const CONTINUE_PREFIX = 'ticket_continue_';
 const CANCEL_PREFIX = 'ticket_cancel_';
 const DRAFT_TTL_MS = 15 * 60 * 1000;
@@ -25,7 +24,7 @@ const DEFAULT_CATEGORIES = [
     { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
     { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
     { value: 'compras-y-rangos', label: 'Compras y rangos', description: 'Pagos, rangos y beneficios' },
-    { value: 'minecraft', label: 'Minecraft', description: 'Problemas relacionados con Minecraft' },
+    { value: 'solicitud-ingreso-minecraft', label: 'Solicitud para ingresar al servidor de Minecraft', description: 'Postulacion o solicitud de acceso al servidor Minecraft' },
     { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
 ];
 
@@ -35,14 +34,6 @@ const DEFAULT_COMMON_ISSUES = [
     { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
     { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
     { value: 'otro', label: 'Otro', description: 'Mi caso no aparece en esta lista' }
-];
-
-const DEFAULT_MINECRAFT_SERVERS = [
-    { value: 'no-aplica', label: 'No aplica', description: 'Mi solicitud no es sobre Minecraft' },
-    { value: 'survival', label: 'Survival', description: 'Soporte del servidor Survival' },
-    { value: 'skyblock', label: 'Skyblock', description: 'Soporte del servidor Skyblock' },
-    { value: 'practice', label: 'Practice/PvP', description: 'Soporte de modos PvP o Practice' },
-    { value: 'lobby', label: 'Lobby/Network', description: 'Problemas de conexion o lobby' }
 ];
 
 const ticketDrafts = new Map();
@@ -135,13 +126,7 @@ function normalizeConfiguredOptions(raw, defaults, prefix) {
 function buildSelectionConfig(cfg) {
     const categories = normalizeConfiguredOptions(cfg?.ticketCategories, DEFAULT_CATEGORIES, 'cat');
     const commonIssues = normalizeConfiguredOptions(cfg?.commonProblems, DEFAULT_COMMON_ISSUES, 'issue');
-    const minecraftServers = normalizeConfiguredOptions(cfg?.minecraftServers, DEFAULT_MINECRAFT_SERVERS, 'mc');
-
-    if (!minecraftServers.some((item) => item.value === 'no-aplica')) {
-        minecraftServers.unshift(DEFAULT_MINECRAFT_SERVERS[0]);
-    }
-
-    return { categories, commonIssues, minecraftServers };
+    return { categories, commonIssues };
 }
 
 function cleanupDrafts() {
@@ -160,12 +145,9 @@ function getDraftForUser(guildId, userId, optionsConfig) {
 
     const categoryValues = new Set(optionsConfig.categories.map((item) => item.value));
     const issueValues = new Set(optionsConfig.commonIssues.map((item) => item.value));
-    const mcValues = new Set(optionsConfig.minecraftServers.map((item) => item.value));
-
     const draft = {
         category: categoryValues.has(existing?.category) ? existing.category : optionsConfig.categories[0].value,
         commonIssue: issueValues.has(existing?.commonIssue) ? existing.commonIssue : optionsConfig.commonIssues[0].value,
-        minecraftServer: mcValues.has(existing?.minecraftServer) ? existing.minecraftServer : optionsConfig.minecraftServers[0].value,
         updatedAt: Date.now()
     };
 
@@ -184,15 +166,14 @@ function optionLabelByValue(options, value) {
 function buildSetupContent(optionsConfig, draft) {
     const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
     const issueLabel = optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue);
-    const mcLabel = optionLabelByValue(optionsConfig.minecraftServers, draft.minecraftServer);
 
     return [
         'Configura tu ticket antes de enviarlo:',
-        `Categoria: ${categoryLabel}`,
+        `Categoria seleccionada: ${categoryLabel}`,
         `Problema comun: ${issueLabel}`,
-        `Servidor de Minecraft: ${mcLabel}`,
         '',
-        'Cuando termines, presiona "Continuar" para escribir el motivo.'
+        'Si no aparece tu problema, abajo podras explicarlo en detalle.',
+        'Cuando termines, presiona "Continuar" para abrir el formulario.'
     ].join('\n');
 }
 
@@ -228,13 +209,6 @@ function buildSetupComponents(guildId, optionsConfig, draft) {
         optionsConfig.commonIssues,
         draft.commonIssue
     );
-    const minecraftSelect = buildSelectMenu(
-        `${MINECRAFT_SELECT_PREFIX}${guildId}`,
-        'Selecciona un servidor de Minecraft',
-        optionsConfig.minecraftServers,
-        draft.minecraftServer
-    );
-
     const continueButton = new ButtonBuilder()
         .setCustomId(`${CONTINUE_PREFIX}${guildId}`)
         .setLabel('Continuar')
@@ -248,7 +222,6 @@ function buildSetupComponents(guildId, optionsConfig, draft) {
     return [
         new ActionRowBuilder().addComponents(categorySelect),
         new ActionRowBuilder().addComponents(issueSelect),
-        new ActionRowBuilder().addComponents(minecraftSelect),
         new ActionRowBuilder().addComponents(cancelButton, continueButton)
     ];
 }
@@ -289,7 +262,7 @@ async function updateTicketPresetSelector(interaction, guildId, updater) {
     }).catch(() => null);
 }
 
-async function showTicketReasonModal(interaction, guildId) {
+async function showTicketReasonModal(interaction, guildId, preset = {}) {
     const modal = new ModalBuilder()
         .setCustomId(`${MODAL_PREFIX}${guildId}`)
         .setTitle('Motivo del ticket');
@@ -301,7 +274,8 @@ async function showTicketReasonModal(interaction, guildId) {
         .setRequired(true)
         .setMinLength(3)
         .setMaxLength(100)
-        .setPlaceholder('Ej: Soporte general, Reporte, Compras, Minecraft');
+        .setPlaceholder('Ej: Soporte general, Reporte, Compras, Minecraft')
+        .setValue(String(preset.category || '').slice(0, 100));
 
     const commonIssueInput = new TextInputBuilder()
         .setCustomId('ticket_common_issue_input')
@@ -309,15 +283,16 @@ async function showTicketReasonModal(interaction, guildId) {
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(120)
-        .setPlaceholder('Ej: Permisos, sancion, error del bot, roles');
+        .setPlaceholder('Ej: Permisos, sancion, error del bot, roles')
+        .setValue(String(preset.commonIssue || '').slice(0, 120));
 
-    const minecraftRequestInput = new TextInputBuilder()
-        .setCustomId('ticket_minecraft_request_input')
-        .setLabel('Solicitud para ingresar a Minecraft')
+    const noMatchIssueInput = new TextInputBuilder()
+        .setCustomId('ticket_no_match_issue_input')
+        .setLabel('No sale mi problema (opcional)')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(180)
-        .setPlaceholder('Ej: Quiero ingresar a Survival, mi nick es ...');
+        .setPlaceholder('Describe aqui tu caso si no aparece en las opciones');
 
     const reasonInput = new TextInputBuilder()
         .setCustomId('ticket_reason_input')
@@ -331,7 +306,7 @@ async function showTicketReasonModal(interaction, guildId) {
     modal.addComponents(
         new ActionRowBuilder().addComponents(categoryInput),
         new ActionRowBuilder().addComponents(commonIssueInput),
-        new ActionRowBuilder().addComponents(minecraftRequestInput),
+        new ActionRowBuilder().addComponents(noMatchIssueInput),
         new ActionRowBuilder().addComponents(reasonInput)
     );
     await interaction.showModal(modal);
@@ -372,7 +347,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
 
     const categoryLabel = String(details?.category || 'Soporte general').trim().slice(0, 80) || 'Soporte general';
     const commonIssueLabel = String(details?.commonIssue || 'No especificado').trim().slice(0, 120) || 'No especificado';
-    const minecraftRequestLabel = String(details?.minecraftRequest || 'No aplica').trim().slice(0, 180) || 'No aplica';
+    const noMatchIssueLabel = String(details?.noMatchIssue || 'No especificado').trim().slice(0, 180) || 'No especificado';
 
     const baseName = toSafeChannelName(interaction.user.username);
     const categorySlug = toSafeChannelName(categoryLabel).slice(0, 24);
@@ -416,7 +391,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
         `owner:${interaction.user.id}`,
         `category:${categoryLabel}`,
         `common:${commonIssueLabel}`,
-        `mc-request:${minecraftRequestLabel}`,
+        `no-match:${noMatchIssueLabel}`,
         `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
     ].join(' | ').slice(0, 1000);
 
@@ -439,7 +414,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
         .addFields(
             { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
             { name: 'Problema comun', value: commonIssueLabel.slice(0, 1024), inline: true },
-            { name: 'Solicitud para ingresar al servidor de Minecraft', value: minecraftRequestLabel.slice(0, 1024), inline: false }
+            { name: 'No sale mi problema', value: noMatchIssueLabel.slice(0, 1024), inline: false }
         )
         .setFooter({ text: 'Usa el boton para cerrar cuando termines.' })
         .setTimestamp();
@@ -496,13 +471,24 @@ async function handleTicketButton(interaction) {
 
     if (interaction.customId.startsWith(OPEN_PREFIX)) {
         const guildId = interaction.customId.slice(OPEN_PREFIX.length);
-        await showTicketReasonModal(interaction, guildId);
+        await showTicketPresetSelector(interaction, guildId);
         return true;
     }
 
     if (interaction.customId.startsWith(CONTINUE_PREFIX)) {
         const guildId = interaction.customId.slice(CONTINUE_PREFIX.length);
-        await showTicketReasonModal(interaction, guildId);
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+            return true;
+        }
+
+        const optionsConfig = buildSelectionConfig(cfg);
+        const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+        await showTicketReasonModal(interaction, guildId, {
+            category: optionLabelByValue(optionsConfig.categories, draft.category),
+            commonIssue: optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue)
+        });
         return true;
     }
 
@@ -542,16 +528,6 @@ async function handleTicketSelectMenu(interaction) {
         return true;
     }
 
-    if (interaction.customId.startsWith(MINECRAFT_SELECT_PREFIX)) {
-        const guildId = interaction.customId.slice(MINECRAFT_SELECT_PREFIX.length);
-        await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
-            const selected = interaction.values?.[0] || optionsConfig.minecraftServers[0].value;
-            const valid = optionsConfig.minecraftServers.some((item) => item.value === selected);
-            draft.minecraftServer = valid ? selected : optionsConfig.minecraftServers[0].value;
-        });
-        return true;
-    }
-
     return false;
 }
 
@@ -564,12 +540,12 @@ async function handleTicketModal(interaction) {
     const guildId = interaction.customId.slice(MODAL_PREFIX.length);
     const category = interaction.fields.getTextInputValue('ticket_category_input') || 'Soporte general';
     const commonIssue = interaction.fields.getTextInputValue('ticket_common_issue_input') || 'No especificado';
-    const minecraftRequest = interaction.fields.getTextInputValue('ticket_minecraft_request_input') || 'No aplica';
+    const noMatchIssue = interaction.fields.getTextInputValue('ticket_no_match_issue_input') || 'No especificado';
     const reason = interaction.fields.getTextInputValue('ticket_reason_input') || 'Sin motivo';
     await createTicketChannel(interaction, guildId, reason, {
         category,
         commonIssue,
-        minecraftRequest
+        noMatchIssue
     });
     return true;
 }
