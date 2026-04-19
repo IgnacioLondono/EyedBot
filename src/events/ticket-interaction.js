@@ -477,7 +477,7 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
             .setTitle('Ingreso a Minecraft');
 
         const whyInput = new TextInputBuilder()
-            .setCustomId('ticket_mc_why_input')
+            .setCustomId('ticket_mc_why_input_v2')
             .setLabel('Por que quieres ingresar?')
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true)
@@ -486,7 +486,7 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
             .setPlaceholder('Cuentanos por que quieres entrar al servidor premium.');
 
         const nickInput = new TextInputBuilder()
-            .setCustomId('ticket_mc_nick_input')
+            .setCustomId('ticket_mc_nick_input_v2')
             .setLabel('Nick de Minecraft')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
@@ -494,18 +494,9 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
             .setMaxLength(32)
             .setPlaceholder('Ej: Steve123');
 
-        const extraInput = new TextInputBuilder()
-            .setCustomId('ticket_mc_extra_input')
-            .setLabel('Datos extra (version, experiencia, etc)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(false)
-            .setMaxLength(180)
-            .setPlaceholder('Ej: Java 1.20, juego desde 2021, builder/pvp');
-
         modal.addComponents(
             new ActionRowBuilder().addComponents(whyInput),
-            new ActionRowBuilder().addComponents(nickInput),
-            new ActionRowBuilder().addComponents(extraInput)
+            new ActionRowBuilder().addComponents(nickInput)
         );
         await interaction.showModal(modal);
         return;
@@ -822,9 +813,8 @@ async function handleTicketModal(interaction) {
 
     const guildId = interaction.customId.slice(MODAL_PREFIX.length);
     const reason = safeGetField(interaction, 'ticket_reason_input', 'Sin motivo');
-    const mcWhy = safeGetField(interaction, 'ticket_mc_why_input', '');
-    const mcNick = safeGetField(interaction, 'ticket_mc_nick_input', '');
-    const mcExtra = safeGetField(interaction, 'ticket_mc_extra_input', '');
+    const mcWhy = safeGetField(interaction, 'ticket_mc_why_input_v2', '');
+    const mcNick = safeGetField(interaction, 'ticket_mc_nick_input_v2', '');
 
     let category = 'Soporte general';
     let commonIssue = 'Mi caso no aparece en esta lista';
@@ -840,7 +830,7 @@ async function handleTicketModal(interaction) {
     }
 
     const finalReason = mcWhy
-        ? [`Motivo ingreso: ${mcWhy}`, `Nick Minecraft: ${mcNick || 'No especificado'}`, mcExtra ? `Datos extra: ${mcExtra}` : '']
+        ? [`Motivo ingreso: ${mcWhy}`, `Nick Minecraft: ${mcNick || 'No especificado'}`]
             .filter(Boolean)
             .join('\n')
         : reason;
