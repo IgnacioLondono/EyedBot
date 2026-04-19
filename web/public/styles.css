@@ -4263,8 +4263,35 @@ body {
 /* About section + commands discovery */
 .about-shell {
     display: grid;
-    gap: 1rem;
-    padding-bottom: 1.2rem;
+    gap: 1.35rem;
+    padding: 0.25rem 0 1.6rem;
+    max-width: 1140px;
+    margin: 0 auto;
+}
+
+.about-block {
+    width: 100%;
+}
+
+.about-band {
+    padding: 1.15rem;
+}
+
+.about-band-head {
+    margin-bottom: 0.9rem;
+}
+
+.about-band-head h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    font-family: 'Sora', sans-serif;
+}
+
+.about-band-head p {
+    margin: 0.35rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
 }
 
 .about-hero,
@@ -4319,7 +4346,7 @@ body {
 .about-kpis {
     display: grid;
     grid-template-columns: 1fr 1.2fr 1fr;
-    gap: 0.7rem;
+    gap: 0.82rem;
     position: relative;
 }
 
@@ -4356,7 +4383,7 @@ body {
 .about-info-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.7rem;
+    gap: 0.82rem;
 }
 
 .about-info-card {
@@ -4482,13 +4509,15 @@ body {
 
 .about-story {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.7rem;
+    grid-template-columns: 1fr;
+    gap: 0.82rem;
 }
 
 .about-story-block {
-    padding: 0.95rem 1rem;
-    border-left: 3px solid rgba(154, 109, 255, 0.55);
+    padding: 1rem 1rem 0.98rem;
+    border-left: 4px solid rgba(154, 109, 255, 0.55);
+    border-radius: 14px;
+    position: relative;
 }
 
 .about-story-block h3 {
@@ -4502,6 +4531,16 @@ body {
     color: var(--text-secondary);
     font-size: 0.88rem;
     line-height: 1.55;
+}
+
+@media (min-width: 980px) {
+    .about-story-block:nth-child(even) {
+        margin-left: 2.1rem;
+    }
+
+    .about-story-block:nth-child(odd) {
+        margin-right: 2.1rem;
+    }
 }
 
 .commands-toolbar {
@@ -4634,8 +4673,7 @@ body {
 
 @media (max-width: 1080px) {
     .about-kpis,
-    .about-info-grid,
-    .about-story {
+    .about-info-grid {
         grid-template-columns: 1fr;
     }
 
@@ -4645,6 +4683,14 @@ body {
 }
 
 @media (max-width: 700px) {
+    .about-shell {
+        gap: 1rem;
+    }
+
+    .about-band {
+        padding: 0.95rem;
+    }
+
     .about-hero {
         padding: 0.9rem;
     }
