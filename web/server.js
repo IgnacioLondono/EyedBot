@@ -667,6 +667,30 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
+        const defaultTicketCategories = [
+            { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
+            { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
+            { value: 'compras-y-rangos', label: 'Compras y rangos', description: 'Pagos, rangos y beneficios' },
+            { value: 'minecraft', label: 'Minecraft', description: 'Problemas relacionados con Minecraft' },
+            { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
+        ];
+
+        const defaultCommonProblems = [
+            { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
+            { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
+            { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
+            { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
+            { value: 'otro', label: 'Otro', description: 'Mi caso no aparece en esta lista' }
+        ];
+
+        const defaultMinecraftServers = [
+            { value: 'no-aplica', label: 'No aplica', description: 'Mi solicitud no es sobre Minecraft' },
+            { value: 'survival', label: 'Survival', description: 'Soporte del servidor Survival' },
+            { value: 'skyblock', label: 'Skyblock', description: 'Soporte del servidor Skyblock' },
+            { value: 'practice', label: 'Practice/PvP', description: 'Soporte de modos PvP o Practice' },
+            { value: 'lobby', label: 'Lobby/Network', description: 'Problemas de conexion o lobby' }
+        ];
+
         const cfg = await ticketStore.getTicketConfig(guildId);
         if (!cfg) {
             return res.json({
@@ -678,11 +702,19 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
                 color: '7c4dff',
                 footer: 'Sistema de Tickets',
                 buttonLabel: 'Solicitar ticket',
-                messageId: ''
+                messageId: '',
+                ticketCategories: defaultTicketCategories,
+                commonProblems: defaultCommonProblems,
+                minecraftServers: defaultMinecraftServers
             });
         }
 
-        res.json(cfg);
+        res.json({
+            ...cfg,
+            ticketCategories: Array.isArray(cfg.ticketCategories) && cfg.ticketCategories.length ? cfg.ticketCategories : defaultTicketCategories,
+            commonProblems: Array.isArray(cfg.commonProblems) && cfg.commonProblems.length ? cfg.commonProblems : defaultCommonProblems,
+            minecraftServers: Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultMinecraftServers
+        });
     } catch (error) {
         console.error('Error obteniendo ticket config:', error);
         res.status(500).json({ error: 'Error al obtener configuracion de tickets' });
@@ -696,9 +728,97 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
         const body = req.body || {};
+        const currentCfg = await ticketStore.getTicketConfig(guildId);
+
+        const defaultTicketCategories = [
+            { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
+            { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
+            { value: 'compras-y-rangos', label: 'Compras y rangos', description: 'Pagos, rangos y beneficios' },
+            { value: 'minecraft', label: 'Minecraft', description: 'Problemas relacionados con Minecraft' },
+            { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
+        ];
+
+        const defaultCommonProblems = [
+            { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
+            { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
+            { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
+            { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
+            { value: 'otro', label: 'Otro', description: 'Mi caso no aparece en esta lista' }
+        ];
+
+        const defaultMinecraftServers = [
+            { value: 'no-aplica', label: 'No aplica', description: 'Mi solicitud no es sobre Minecraft' },
+            { value: 'survival', label: 'Survival', description: 'Soporte del servidor Survival' },
+            { value: 'skyblock', label: 'Skyblock', description: 'Soporte del servidor Skyblock' },
+            { value: 'practice', label: 'Practice/PvP', description: 'Soporte de modos PvP o Practice' },
+            { value: 'lobby', label: 'Lobby/Network', description: 'Problemas de conexion o lobby' }
+        ];
+
+        const toOptionValue = (text, fallback) => {
+            const safe = String(text || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .slice(0, 80);
+            return safe || fallback;
+        };
+
+        const normalizeTicketOptions = (input, fallback, prefix) => {
+            const source = Array.isArray(input) && input.length
+                ? input
+                : (Array.isArray(fallback) && fallback.length ? fallback : []);
+
+            const used = new Set();
+            const normalized = [];
+
+            source.slice(0, 25).forEach((entry, index) => {
+                const asObject = entry && typeof entry === 'object' && !Array.isArray(entry)
+                    ? entry
+                    : { label: String(entry || '').trim() };
+
+                const label = String(asObject.label || asObject.name || '').trim().slice(0, 100);
+                if (!label) return;
+
+                let value = toOptionValue(asObject.value || label, `${prefix}-${index + 1}`).slice(0, 100);
+                if (used.has(value)) value = `${value}-${index + 1}`.slice(0, 100);
+                used.add(value);
+
+                normalized.push({
+                    value,
+                    label,
+                    description: String(asObject.description || '').trim().slice(0, 100)
+                });
+            });
+
+            return normalized.length ? normalized : fallback;
+        };
+
         const adminRoleIds = Array.isArray(body.adminRoleIds)
             ? body.adminRoleIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 20)
             : [];
+
+        const ticketCategories = normalizeTicketOptions(
+            body.ticketCategories,
+            currentCfg?.ticketCategories || defaultTicketCategories,
+            'cat'
+        );
+
+        const commonProblems = normalizeTicketOptions(
+            body.commonProblems,
+            currentCfg?.commonProblems || defaultCommonProblems,
+            'issue'
+        );
+
+        const minecraftServers = normalizeTicketOptions(
+            body.minecraftServers,
+            currentCfg?.minecraftServers || defaultMinecraftServers,
+            'mc'
+        );
+
+        if (!minecraftServers.some((item) => item.value === 'no-aplica')) {
+            minecraftServers.unshift(defaultMinecraftServers[0]);
+        }
 
         const config = {
             enabled: body.enabled === true,
@@ -709,6 +829,9 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
             footer: String(body.footer || '').slice(0, 300),
             buttonLabel: String(body.buttonLabel || 'Solicitar ticket').slice(0, 80),
+            ticketCategories,
+            commonProblems,
+            minecraftServers,
             messageId: String(body.messageId || '').trim(),
             updatedAt: new Date().toISOString(),
             updatedBy: req.session.user?.id || 'unknown'
