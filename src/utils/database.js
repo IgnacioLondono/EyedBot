@@ -23,6 +23,8 @@ let lastConnectionWarningAt = 0;
 
 function isConnectionError(error) {
     const code = String(error?.code || '').toUpperCase();
+    const message = String(error?.message || '').toLowerCase();
+    if (message.includes('pool is closed')) return true;
     return [
         'EAI_AGAIN',
         'ENOTFOUND',
