@@ -1,5 +1,6 @@
 const {
     ActionRowBuilder,
+    AttachmentBuilder,
     ChannelType,
     EmbedBuilder,
     ModalBuilder,
@@ -11,6 +12,7 @@ const {
     StringSelectMenuBuilder
 } = require('discord.js');
 const ticketStore = require('../utils/ticket-config-store');
+const db = require('../utils/database');
 
 const OPEN_PREFIX = 'ticket_open_';
 const MODAL_PREFIX = 'ticket_reason_';
@@ -96,16 +98,152 @@ function buildAdminRoleSet(config) {
     return new Set(ids.map((id) => String(id)));
 }
 
-function memberCanCloseTicket(member, adminRoleSet) {
+function memberCanCloseTicket(member, closerRoleSet) {
     if (!member) return false;
     if (member.permissions.has(PermissionsBitField.Flags.ManageChannels)) return true;
     if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
-    return member.roles.cache.some((role) => adminRoleSet.has(String(role.id)));
+    return member.roles.cache.some((role) => closerRoleSet.has(String(role.id)));
 }
 
 function parseTicketOwner(topic = '') {
     const match = String(topic || '').match(/owner:(\d{10,25})/);
     return match?.[1] || '';
+}
+
+function parseTopicField(topic = '', key = '') {
+    const match = String(topic || '').match(new RegExp(`${String(key)}:([^|]+)`));
+    return String(match?.[1] || '').trim();
+}
+
+function parseTopicRoleIds(topic = '', key = 'staff') {
+    const raw = parseTopicField(topic, key);
+    if (!raw) return [];
+    return raw
+        .split(',')
+        .map((id) => String(id || '').trim())
+        .filter((id) => /^\d{10,25}$/.test(id));
+}
+
+function parseMappedRoleIds(input) {
+    if (Array.isArray(input)) {
+        return input
+            .map((id) => String(id || '').trim())
+            .filter((id) => /^\d{10,25}$/.test(id));
+    }
+
+    if (typeof input === 'string') {
+        return input
+            .split(',')
+            .map((id) => String(id || '').trim())
+            .filter((id) => /^\d{10,25}$/.test(id));
+    }
+
+    return [];
+}
+
+function buildCaseRoleIds(config, details = {}) {
+    const map = config?.caseRoleMap && typeof config.caseRoleMap === 'object'
+        ? config.caseRoleMap
+        : (config?.ticketCaseRoleMap && typeof config.ticketCaseRoleMap === 'object' ? config.ticketCaseRoleMap : {});
+
+    const categoryValue = String(details.categoryValue || '').trim();
+    const commonIssueValue = String(details.commonIssueValue || '').trim();
+
+    const mapped = new Set();
+    parseMappedRoleIds(map.default).forEach((id) => mapped.add(id));
+    parseMappedRoleIds(map[categoryValue]).forEach((id) => mapped.add(id));
+    parseMappedRoleIds(map[`common:${commonIssueValue}`]).forEach((id) => mapped.add(id));
+
+    return Array.from(mapped);
+}
+
+async function nextCloseReportId(guildId) {
+    const key = `ticket_report_counter_${guildId}`;
+    const current = Number.parseInt(await db.get(key), 10) || 0;
+    const next = current + 1;
+    await db.set(key, next);
+    const padded = String(next).padStart(5, '0');
+    return `TK-${guildId}-${padded}`;
+}
+
+function buildTranscriptText(channel, messages = []) {
+    const lines = [
+        `Ticket channel: #${channel.name} (${channel.id})`,
+        `Generated at: ${new Date().toISOString()}`,
+        ''
+    ];
+
+    messages.forEach((message) => {
+        const time = new Date(message.createdTimestamp).toISOString();
+        const author = message.author?.tag || message.author?.id || 'unknown';
+        const content = String(message.content || '').replace(/\r?\n/g, ' ').trim();
+        const attachments = Array.from(message.attachments?.values?.() || [])
+            .map((a) => a.url)
+            .join(' ');
+        const merged = [content, attachments].filter(Boolean).join(' | ').slice(0, 1600);
+        lines.push(`[${time}] ${author}: ${merged || '(sin contenido)'}`);
+    });
+
+    return lines.join('\n').slice(0, 1900000);
+}
+
+async function generateAndSendCloseReport({ interaction, channel, guild, ownerId, closerTag }) {
+    const reportId = await nextCloseReportId(guild.id).catch(() => `TK-${guild.id}-${Date.now()}`);
+
+    const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+    const messages = fetched ? Array.from(fetched.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp) : [];
+    const participants = Array.from(new Set(messages.map((msg) => msg.author?.id).filter(Boolean)));
+    const category = parseTopicField(channel.topic, 'category') || 'No especificado';
+    const common = parseTopicField(channel.topic, 'common') || 'No especificado';
+    const reason = parseTopicField(channel.topic, 'reason') || 'No especificado';
+
+    const reportData = {
+        reportId,
+        guildId: guild.id,
+        channelId: channel.id,
+        channelName: channel.name,
+        ownerId: ownerId || '',
+        closedById: interaction.user.id,
+        closedByTag: closerTag,
+        category,
+        common,
+        reason,
+        messagesCount: messages.length,
+        participants,
+        createdAt: new Date().toISOString()
+    };
+
+    await db.set(`ticket_report_${reportId}`, reportData).catch(() => null);
+
+    let dmSent = false;
+    if (ownerId) {
+        const ownerUser = await interaction.client.users.fetch(ownerId).catch(() => null);
+        if (ownerUser) {
+            const transcriptText = buildTranscriptText(channel, messages);
+            const fileName = `ticket-${channel.id}-${reportId}.txt`;
+            const transcriptFile = new AttachmentBuilder(Buffer.from(transcriptText, 'utf8'), { name: fileName });
+
+            const reportEmbed = new EmbedBuilder()
+                .setColor('2b90d9')
+                .setTitle('Informe de cierre de ticket')
+                .setDescription('Tu ticket fue cerrado. Te compartimos un resumen e historial reciente.')
+                .addFields(
+                    { name: 'ID del informe', value: reportId, inline: true },
+                    { name: 'Servidor', value: guild.name.slice(0, 1024), inline: true },
+                    { name: 'Canal', value: `#${channel.name}`.slice(0, 1024), inline: true },
+                    { name: 'Categoria', value: String(category).slice(0, 1024), inline: true },
+                    { name: 'Caso', value: String(common).slice(0, 1024), inline: true },
+                    { name: 'Cerrado por', value: closerTag.slice(0, 1024), inline: true }
+                )
+                .setTimestamp();
+
+            await ownerUser.send({ embeds: [reportEmbed], files: [transcriptFile] }).then(() => {
+                dmSent = true;
+            }).catch(() => null);
+        }
+    }
+
+    return { reportId, dmSent };
 }
 
 function draftKey(guildId, userId) {
@@ -346,6 +484,11 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     const validAdminRoles = adminRoleIds
         .map((id) => guild.roles.cache.get(id))
         .filter(Boolean);
+    const caseRoleIds = buildCaseRoleIds(cfg, details);
+    const validCaseRoles = caseRoleIds
+        .filter((id) => !adminRoleIds.includes(id))
+        .map((id) => guild.roles.cache.get(id))
+        .filter(Boolean);
 
     const categoryLabel = String(details?.category || 'Soporte general').trim().slice(0, 80) || 'Soporte general';
     const commonIssueLabel = String(details?.commonIssue || 'No especificado').trim().slice(0, 120) || 'No especificado';
@@ -389,10 +532,29 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
         });
     });
 
+    validCaseRoles.forEach((role) => {
+        permissionOverwrites.push({
+            id: role.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.ManageChannels
+            ]
+        });
+    });
+
+    const closerRoleIds = Array.from(new Set([
+        ...validAdminRoles.map((role) => String(role.id)),
+        ...validCaseRoles.map((role) => String(role.id))
+    ]));
+
     const topic = [
         `owner:${interaction.user.id}`,
         `category:${categoryLabel}`,
         `common:${commonIssueLabel}`,
+        `staff:${closerRoleIds.join(',')}`,
         `no-match:${noMatchIssueLabel}`,
         `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
     ].join(' | ').slice(0, 1000);
@@ -427,7 +589,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
         .setStyle(ButtonStyle.Danger);
 
     await created.send({
-        content: `${validAdminRoles.map((r) => `<@&${r.id}>`).join(' ')} <@${interaction.user.id}>`.trim() || undefined,
+        content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${interaction.user.id}>`.trim() || undefined,
         embeds: [infoEmbed],
         components: [new ActionRowBuilder().addComponents(closeBtn)]
     }).catch(() => null);
@@ -452,20 +614,31 @@ async function closeTicket(interaction) {
     const ownerId = parseTicketOwner(channel.topic);
     const cfg = await ticketStore.getTicketConfig(guild.id);
     const adminRoleSet = buildAdminRoleSet(cfg);
+    const staffRoleSet = new Set(parseTopicRoleIds(channel.topic, 'staff'));
+    const closerRoleSet = new Set([...adminRoleSet, ...staffRoleSet]);
 
     const member = interaction.member;
-    const isOwner = ownerId && String(ownerId) === String(interaction.user.id);
-    const canClose = isOwner || memberCanCloseTicket(member, adminRoleSet);
+    const canClose = memberCanCloseTicket(member, closerRoleSet);
 
     if (!canClose) {
-        await interaction.reply({ content: 'No tienes permisos para cerrar este ticket.', flags: 64 }).catch(() => null);
+        await interaction.reply({ content: 'Solo el staff asignado y admins pueden cerrar este ticket.', flags: 64 }).catch(() => null);
         return;
     }
 
-    await interaction.reply({ content: 'Cerrando ticket en 3 segundos...', flags: 64 }).catch(() => null);
-    setTimeout(async () => {
-        await channel.delete(`Ticket cerrado por ${interaction.user.tag}`).catch(() => null);
-    }, 3000);
+    await interaction.deferReply({ flags: 64 }).catch(() => null);
+    const report = await generateAndSendCloseReport({
+        interaction,
+        channel,
+        guild,
+        ownerId,
+        closerTag: interaction.user.tag
+    }).catch(() => ({ reportId: `TK-${guild.id}-${Date.now()}`, dmSent: false }));
+
+    await interaction.editReply({
+        content: `Ticket cerrado. Informe: ${report.reportId}. ${report.dmSent ? 'Se envio un resumen por DM al usuario.' : 'No se pudo enviar DM al usuario (DMs cerrados o bloqueo).'}`
+    }).catch(() => null);
+
+    await channel.delete(`Ticket cerrado por ${interaction.user.tag} | Informe ${report.reportId}`).catch(() => null);
 }
 
 async function handleTicketButton(interaction) {
@@ -508,6 +681,8 @@ async function handleTicketButton(interaction) {
         await createTicketChannel(interaction, guildId, commonIssueLabel, {
             category: categoryLabel,
             commonIssue: commonIssueLabel,
+            categoryValue: draft.category,
+            commonIssueValue: draft.commonIssue,
             noMatchIssue: 'No aplica'
         });
         return true;
@@ -567,19 +742,22 @@ async function handleTicketModal(interaction) {
 
     let category = 'Soporte general';
     let commonIssue = 'Mi caso no aparece en esta lista';
+    let selectedDraft = null;
 
     const cfg = await resolveConfig(guildId);
     if (cfg) {
         const optionsConfig = buildSelectionConfig(cfg);
-        const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
-        const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
-        category = optionLabelByValue(optionsConfig.categories, draft.category);
-        commonIssue = optionLabelByValue(categoryIssues, draft.commonIssue);
+        selectedDraft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+        const categoryIssues = getCommonIssuesForCategory(optionsConfig, selectedDraft.category);
+        category = optionLabelByValue(optionsConfig.categories, selectedDraft.category);
+        commonIssue = optionLabelByValue(categoryIssues, selectedDraft.commonIssue);
     }
 
     await createTicketChannel(interaction, guildId, reason, {
         category,
         commonIssue,
+        categoryValue: selectedDraft?.category,
+        commonIssueValue: selectedDraft?.commonIssue,
         noMatchIssue: reason
     });
     return true;
