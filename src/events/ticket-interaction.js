@@ -7,8 +7,7 @@ const {
     TextInputBuilder,
     TextInputStyle,
     ButtonBuilder,
-    ButtonStyle,
-    StringSelectMenuBuilder
+    ButtonStyle
 } = require('discord.js');
 const ticketStore = require('../utils/ticket-config-store');
 
@@ -295,6 +294,31 @@ async function showTicketReasonModal(interaction, guildId) {
         .setCustomId(`${MODAL_PREFIX}${guildId}`)
         .setTitle('Motivo del ticket');
 
+    const categoryInput = new TextInputBuilder()
+        .setCustomId('ticket_category_input')
+        .setLabel('Categoria de tu solicitud')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMinLength(3)
+        .setMaxLength(100)
+        .setPlaceholder('Ej: Soporte general, Reporte, Compras, Minecraft');
+
+    const commonIssueInput = new TextInputBuilder()
+        .setCustomId('ticket_common_issue_input')
+        .setLabel('Problema comun (opcional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(120)
+        .setPlaceholder('Ej: Permisos, sancion, error del bot, roles');
+
+    const minecraftRequestInput = new TextInputBuilder()
+        .setCustomId('ticket_minecraft_request_input')
+        .setLabel('Solicitud para ingresar al servidor de Minecraft')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(180)
+        .setPlaceholder('Ej: Quiero ingresar a Survival, mi nick es ...');
+
     const reasonInput = new TextInputBuilder()
         .setCustomId('ticket_reason_input')
         .setLabel('Explica brevemente tu solicitud')
@@ -304,11 +328,16 @@ async function showTicketReasonModal(interaction, guildId) {
         .setMaxLength(500)
         .setPlaceholder('Ej: Necesito ayuda con permisos en el servidor');
 
-    modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(categoryInput),
+        new ActionRowBuilder().addComponents(commonIssueInput),
+        new ActionRowBuilder().addComponents(minecraftRequestInput),
+        new ActionRowBuilder().addComponents(reasonInput)
+    );
     await interaction.showModal(modal);
 }
 
-async function createTicketChannel(interaction, guildId, reason) {
+async function createTicketChannel(interaction, guildId, reason, details = {}) {
     const guild = interaction.guild;
     if (!guild || String(guild.id) !== String(guildId)) {
         await sendEphemeral(interaction, 'Este boton no corresponde a este servidor.');
@@ -320,9 +349,6 @@ async function createTicketChannel(interaction, guildId, reason) {
         await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
         return;
     }
-
-    const optionsConfig = buildSelectionConfig(cfg);
-    const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
 
     const me = guild.members.me || await guild.members.fetch(interaction.client.user.id).catch(() => null);
     if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
@@ -344,9 +370,9 @@ async function createTicketChannel(interaction, guildId, reason) {
         .map((id) => guild.roles.cache.get(id))
         .filter(Boolean);
 
-    const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
-    const commonIssueLabel = optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue);
-    const minecraftServerLabel = optionLabelByValue(optionsConfig.minecraftServers, draft.minecraftServer);
+    const categoryLabel = String(details?.category || 'Soporte general').trim().slice(0, 80) || 'Soporte general';
+    const commonIssueLabel = String(details?.commonIssue || 'No especificado').trim().slice(0, 120) || 'No especificado';
+    const minecraftRequestLabel = String(details?.minecraftRequest || 'No aplica').trim().slice(0, 180) || 'No aplica';
 
     const baseName = toSafeChannelName(interaction.user.username);
     const categorySlug = toSafeChannelName(categoryLabel).slice(0, 24);
@@ -390,7 +416,7 @@ async function createTicketChannel(interaction, guildId, reason) {
         `owner:${interaction.user.id}`,
         `category:${categoryLabel}`,
         `common:${commonIssueLabel}`,
-        `mc:${minecraftServerLabel}`,
+        `mc-request:${minecraftRequestLabel}`,
         `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
     ].join(' | ').slice(0, 1000);
 
@@ -413,7 +439,7 @@ async function createTicketChannel(interaction, guildId, reason) {
         .addFields(
             { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
             { name: 'Problema comun', value: commonIssueLabel.slice(0, 1024), inline: true },
-            { name: 'Servidor Minecraft', value: minecraftServerLabel.slice(0, 1024), inline: true }
+            { name: 'Solicitud para ingresar al servidor de Minecraft', value: minecraftRequestLabel.slice(0, 1024), inline: false }
         )
         .setFooter({ text: 'Usa el boton para cerrar cuando termines.' })
         .setTimestamp();
@@ -470,7 +496,7 @@ async function handleTicketButton(interaction) {
 
     if (interaction.customId.startsWith(OPEN_PREFIX)) {
         const guildId = interaction.customId.slice(OPEN_PREFIX.length);
-        await showTicketPresetSelector(interaction, guildId);
+        await showTicketReasonModal(interaction, guildId);
         return true;
     }
 
@@ -536,8 +562,15 @@ async function handleTicketModal(interaction) {
     await interaction.deferReply({ flags: 64 }).catch(() => null);
 
     const guildId = interaction.customId.slice(MODAL_PREFIX.length);
+    const category = interaction.fields.getTextInputValue('ticket_category_input') || 'Soporte general';
+    const commonIssue = interaction.fields.getTextInputValue('ticket_common_issue_input') || 'No especificado';
+    const minecraftRequest = interaction.fields.getTextInputValue('ticket_minecraft_request_input') || 'No aplica';
     const reason = interaction.fields.getTextInputValue('ticket_reason_input') || 'Sin motivo';
-    await createTicketChannel(interaction, guildId, reason);
+    await createTicketChannel(interaction, guildId, reason, {
+        category,
+        commonIssue,
+        minecraftRequest
+    });
     return true;
 }
 
