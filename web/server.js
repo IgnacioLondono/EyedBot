@@ -554,9 +554,14 @@ function requireAuth(req, res, next) {
 
 // Rutas protegidas
 app.get('/api/user', requireAuth, (req, res) => {
+    const inviteUrl = CLIENT_ID
+        ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&permissions=8&scope=bot%20applications.commands`
+        : '';
+
     res.json({
         user: req.session.user,
-        guilds: req.session.guilds
+        guilds: req.session.guilds,
+        inviteUrl
     });
 });
 
