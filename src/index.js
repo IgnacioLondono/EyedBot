@@ -81,7 +81,12 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+let slashRegisterInFlight = null;
+
 async function registerSlashCommands() {
+    if (slashRegisterInFlight) return slashRegisterInFlight;
+
+    slashRegisterInFlight = (async () => {
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     const runtimeClientId = String(client.user?.id || '').trim();
     const configuredClientId = String(CLIENT_ID || '').trim();
@@ -92,13 +97,15 @@ async function registerSlashCommands() {
         return false;
     }
 
-    const connectedGuildIds = Array.from(client.guilds.cache.keys());
-    const targetGuildIds = Array.from(new Set([
-        String(GUILD_ID || '').trim(),
-        ...connectedGuildIds
-    ].filter(Boolean)));
+    let targetGuildIds = [];
+    try {
+        const fetchedGuilds = await client.guilds.fetch();
+        targetGuildIds = Array.from(fetchedGuilds.keys());
+    } catch {
+        targetGuildIds = Array.from(client.guilds.cache.keys());
+    }
 
-    const configuredGuildId = String(GUILD_ID || '').trim();
+    targetGuildIds = Array.from(new Set(targetGuildIds.filter(Boolean)));
 
     if (!targetGuildIds.length) {
         console.error('❌ No se puede registrar slash: el bot no tiene servidores disponibles.');
@@ -138,10 +145,6 @@ async function registerSlashCommands() {
                     throw new Error('No se pudo registrar en ningún servidor conectado.');
                 }
 
-                if (configuredGuildId && failedGuilds.includes(configuredGuildId)) {
-                    throw new Error(`Falló el registro en el GUILD_ID configurado (${configuredGuildId}).`);
-                }
-
                 await rest.put(Routes.applicationCommands(appId), { body: [] }).catch((cleanupError) => {
                     console.warn('⚠️ No se pudieron limpiar comandos globales obsoletos:', cleanupError?.message || cleanupError);
                 });
@@ -162,6 +165,13 @@ async function registerSlashCommands() {
 
     console.error('❌ No se pudieron registrar comandos slash después de varios intentos.');
     return false;
+    })();
+
+    try {
+        return await slashRegisterInFlight;
+    } finally {
+        slashRegisterInFlight = null;
+    }
 }
 
 if (MUSIC_ENABLED) {
