@@ -473,7 +473,7 @@ async function updateTicketPresetSelector(interaction, guildId, updater) {
 async function showTicketReasonModal(interaction, guildId, preset = {}) {
     const modalCustomId = `${MODAL_PREFIX}${guildId}_${Date.now()}`;
 
-    if (String(preset.categoryValue || '') === 'solicitud-ingreso-minecraft') {
+    if (String(preset.mode || '') === 'minecraft-application') {
         const modal = new ModalBuilder()
             .setCustomId(modalCustomId)
             .setTitle('Ingreso a Minecraft');
@@ -673,9 +673,12 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
 }
 
 function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue) {
-    if (String(categoryValue || '') === 'solicitud-ingreso-minecraft') return true;
     if (String(commonIssueValue) === 'otro') return true;
     return /no aparece en esta lista/i.test(String(commonIssueLabel || ''));
+}
+
+function shouldOpenMinecraftApplication(commonIssueValue) {
+    return ['postulacion', 'whitelist', 'cuenta'].includes(String(commonIssueValue || ''));
 }
 
 async function closeTicket(interaction) {
@@ -743,6 +746,22 @@ async function handleTicketButton(interaction) {
         const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
         const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
         const commonIssueLabel = optionLabelByValue(categoryIssues, draft.commonIssue);
+
+        if (String(draft.category) === 'solicitud-ingreso-minecraft') {
+            if (shouldOpenMinecraftApplication(draft.commonIssue)) {
+                await showTicketReasonModal(interaction, guildId, {
+                    mode: 'minecraft-application'
+                });
+                return true;
+            }
+
+            await showTicketReasonModal(interaction, guildId, {
+                category: categoryLabel,
+                commonIssue: commonIssueLabel,
+                categoryValue: draft.category
+            });
+            return true;
+        }
 
         if (shouldOpenDetailModal(draft.commonIssue, commonIssueLabel, draft.category)) {
             await showTicketReasonModal(interaction, guildId, {
