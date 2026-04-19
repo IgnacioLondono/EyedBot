@@ -3405,6 +3405,35 @@ function formatChartShortDate(value) {
     return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
 }
 
+function summaryIcon(type = 'server') {
+    const icons = {
+        owner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .9-4.5 4.4 1 6.2L12 17l-5.5 2.5 1-6.2L3 8.9 9 8z"></path></svg>',
+        members: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+        channels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"></path><path d="M4 12h10"></path><path d="M4 17h16"></path><circle cx="18" cy="12" r="2"></circle></svg>',
+        roles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.6 13.4 12 22l-8.6-8.6a2 2 0 0 1 0-2.8L12 2l8.6 8.6a2 2 0 0 1 0 2.8z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>',
+        messages: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
+        voice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v4"></path><path d="M8 23h8"></path></svg>',
+        flow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h8"></path><path d="M3 16h12"></path><path d="M11 5l3 3-3 3"></path><path d="M15 13l3 3-3 3"></path></svg>',
+        peak: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17h18"></path><path d="M7 17V9"></path><path d="M12 17V5"></path><path d="M17 17v-6"></path></svg>',
+        live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="M6.34 6.34 7.76 7.76"></path><path d="M16.24 16.24 17.66 17.66"></path><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path></svg>',
+        age: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>',
+        core: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3"></path><path d="M12 18v3"></path><path d="m4.93 4.93 2.12 2.12"></path><path d="m16.95 16.95 2.12 2.12"></path><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="m4.93 19.07 2.12-2.12"></path><path d="m16.95 7.05 2.12-2.12"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+        created: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path></svg>',
+        chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>'
+    };
+
+    return icons[type] || icons.chart;
+}
+
+function summaryTitle(label, iconType, tone = 'violet') {
+    return `
+        <div class="summary-head">
+            <span class="summary-icon summary-icon--${tone}">${summaryIcon(iconType)}</span>
+            <div class="summary-label">${label}</div>
+        </div>
+    `;
+}
+
 function createServerActivityChartDatasets(points = []) {
     return {
         labels: points.map((point) => point.label),
@@ -3591,7 +3620,7 @@ function displayServerInfo(info) {
     container.innerHTML = `
         <div class="server-summary-grid">
             <article class="summary-card summary-card--owner">
-                <div class="summary-label">Propietario</div>
+                ${summaryTitle('Propietario', 'owner', 'gold')}
                 <div class="summary-owner-row">
                     ${ownerAvatar}
                     <div>
@@ -3602,67 +3631,67 @@ function displayServerInfo(info) {
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Miembros</div>
+                ${summaryTitle('Miembros', 'members', 'blue')}
                 <div class="summary-value">${formatServerMetric(info.memberCount || 0)}</div>
                 <div class="summary-subvalue">Comunidad actual del servidor</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Entradas de Canales</div>
+                ${summaryTitle('Entradas de Canales', 'channels', 'teal')}
                 <div class="summary-value">${formatServerMetric(info.channelCount || 0)}</div>
                 <div class="summary-subvalue">${info.channels?.text || 0} texto • ${info.channels?.voice || 0} voz • ${info.channels?.category || 0} categorias</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Roles</div>
+                ${summaryTitle('Roles', 'roles', 'violet')}
                 <div class="summary-value">${formatServerMetric(info.roleCount || 0)}</div>
                 <div class="summary-subvalue">Gestion de permisos y jerarquia</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Actividad (Mensajes)</div>
+                ${summaryTitle('Actividad (Mensajes)', 'messages', 'pink')}
                 <div class="summary-value">${formatServerMetric(totalMessages)} msgs</div>
                 <div class="summary-subvalue">${formatServerMetric(avgMessagesPerDay, { maximumFractionDigits: 2 })} por dia desde creacion • Top ${topMessageTag} (${formatServerMetric(topMessageCount)})</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Actividad (Voz)</div>
+                ${summaryTitle('Actividad (Voz)', 'voice', 'orange')}
                 <div class="summary-value">${formatServerMetric(totalVoiceMinutes)} min</div>
                 <div class="summary-subvalue">${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h por dia • Top ${topVoiceTag} (${formatServerMetric(topVoiceMinutes)} min)</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Entradas / Salidas</div>
+                ${summaryTitle('Entradas / Salidas', 'flow', 'blue')}
                 <div class="summary-value">${formatServerMetric(totalJoins)} / ${formatServerMetric(totalLeaves)}</div>
                 <div class="summary-subvalue">Balance ${flowNet >= 0 ? '+' : ''}${formatServerMetric(flowNet)} • Pico entradas ${formatServerMetric(peakJoinCount)} (${peakJoinDate})</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Pico de Salidas</div>
+                ${summaryTitle('Pico de Salidas', 'peak', 'pink')}
                 <div class="summary-value">${formatServerMetric(peakLeaveCount)}</div>
                 <div class="summary-subvalue">Dia con mas salidas: ${peakLeaveDate}</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Voz en Vivo</div>
+                ${summaryTitle('Voz en Vivo', 'live', 'teal')}
                 <div class="summary-value">${formatServerMetric(liveVoiceUsers)} conectados</div>
                 <div class="summary-subvalue">Canal top ahora: ${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Edad y Base</div>
+                ${summaryTitle('Edad y Base', 'age', 'orange')}
                 <div class="summary-value">${formatServerMetric(ageDays)} dias</div>
                 <div class="summary-subvalue">Creado ${createdDate} • ${formatServerMetric(trackedUsers)} usuarios con historial</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Estadisticas Core</div>
+                ${summaryTitle('Estadisticas Core', 'core', 'violet')}
                 <div class="summary-value">Nivel ${Number(info.premiumTier || 0)}</div>
                 <div class="summary-subvalue">Boosts ${Number(info.premiumSubscriptionCount || 0)} • Verificacion ${escapeHtml(String(info.verificationLevel ?? 'N/A'))}</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Creado</div>
+                ${summaryTitle('Creado', 'created', 'gold')}
                 <div class="summary-value">${createdDate}</div>
                 <div class="summary-subvalue">Emojis ${info.emojis || 0} • Stickers ${info.stickers || 0}</div>
             </article>
@@ -3670,7 +3699,7 @@ function displayServerInfo(info) {
             <article class="summary-card summary-card--chart">
                 <div class="summary-chart-head">
                     <div>
-                        <div class="summary-label">Graficas de actividad</div>
+                        ${summaryTitle('Graficas de actividad', 'chart', 'blue')}
                         <div class="summary-subvalue">Lineas de entradas, salidas, mensajes y voz</div>
                     </div>
                     <select id="serverActivityRange" class="summary-chart-select">
