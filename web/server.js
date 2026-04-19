@@ -271,16 +271,46 @@ function extFromMimeOrName(mimeType = '', originalName = '') {
 const LOGIN_ANALYTICS_KEY = 'web:analytics:global_logins_v1';
 const LOGIN_ANALYTICS_VERSION = 1;
 const LOGIN_ANALYTICS_FILE_PATH = path.join(__dirname, '..', 'data', 'web-login-registry.json');
+const PERMISSION_ADMINISTRATOR = 0x8n;
+const PERMISSION_MANAGE_GUILD = 0x20n;
 
 function isOwnerUser(user = null) {
     return String(user?.id || '') === String(OWNER_DISCORD_ID);
 }
 
 function sanitizeGuildSnapshot(guild) {
+    const guildId = String(guild?.id || '');
+    const iconHash = String(guild?.icon || '').trim();
+
     return {
         name: String(guild?.name || 'Servidor sin nombre').slice(0, 120),
-        idSuffix: String(guild?.id || '').slice(-4)
+        id: guildId,
+        idSuffix: guildId.slice(-4),
+        iconUrl: guildId && iconHash
+            ? `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.png?size=128`
+            : null
     };
+}
+
+function hasAdminOrManageGuildPermission(guild = {}) {
+    try {
+        const raw = guild?.permissions;
+        if (raw === undefined || raw === null || raw === '') return false;
+        const permissions = BigInt(String(raw));
+        return (permissions & PERMISSION_ADMINISTRATOR) !== 0n || (permissions & PERMISSION_MANAGE_GUILD) !== 0n;
+    } catch {
+        return false;
+    }
+}
+
+function filterTrackableGuilds(guilds = []) {
+    const list = Array.isArray(guilds) ? guilds : [];
+    return list.filter((guild) => {
+        if (!guild?.id) return false;
+        if (!hasAdminOrManageGuildPermission(guild)) return false;
+        if (!botClient) return false;
+        return botClient.guilds.cache.has(String(guild.id));
+    });
 }
 
 function normalizeLoginAnalytics(raw) {
@@ -375,19 +405,22 @@ async function loadLoginAnalyticsSnapshot() {
 
 function summarizeAnalytics(analytics) {
     const users = Object.values(analytics.users || {});
-    const uniqueGuildNames = new Set();
+    const uniqueGuildIds = new Set();
 
     users.forEach((entry) => {
         (entry.guilds || []).forEach((g) => {
-            if (!g?.name) return;
-            uniqueGuildNames.add(String(g.name).toLowerCase());
+            if (g?.id) {
+                uniqueGuildIds.add(String(g.id));
+                return;
+            }
+            if (g?.name) uniqueGuildIds.add(`name:${String(g.name).toLowerCase()}`);
         });
     });
 
     return {
         totalLogins: users.reduce((acc, u) => acc + (Number(u.loginCount) || 0), 0),
         uniqueUsers: users.length,
-        uniqueGuildsSeen: uniqueGuildNames.size
+        uniqueGuildsSeen: uniqueGuildIds.size
     };
 }
 
@@ -397,7 +430,7 @@ async function recordGlobalLoginEvent(user, guilds = []) {
     const analytics = await loadLoginAnalyticsSnapshot();
     const userId = String(user.id);
     const nowIso = new Date().toISOString();
-    const guildList = Array.isArray(guilds) ? guilds : [];
+    const guildList = filterTrackableGuilds(guilds);
     const sanitizedGuilds = guildList.slice(0, 60).map(sanitizeGuildSnapshot);
 
     const current = analytics.users[userId] || {
@@ -760,8 +793,10 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
                 guildCount: Number(entry.guildCount) || 0,
                 guilds: Array.isArray(entry.guilds)
                     ? entry.guilds.map((g) => ({
+                        id: String(g?.id || ''),
                         name: String(g?.name || 'Servidor sin nombre').slice(0, 120),
-                        idSuffix: String(g?.idSuffix || '').slice(-4)
+                        idSuffix: String(g?.idSuffix || '').slice(-4),
+                        iconUrl: g?.iconUrl || null
                     }))
                     : []
             }))

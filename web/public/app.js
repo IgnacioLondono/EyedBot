@@ -1211,7 +1211,9 @@ function updateUserUI() {
         '#statsBtn',
         '#logsBtn',
         '[data-section="statsSection"]',
-        '[data-section="logsSection"]'
+        '[data-section="logsSection"]',
+        '[data-quick-section="statsSection"]',
+        '[data-quick-section="logsSection"]'
     ];
 
     ownerRestrictedSelectors.forEach((selector) => {
@@ -1220,9 +1222,11 @@ function updateUserUI() {
             if (isOwnerUser) {
                 el.style.display = '';
                 el.classList.remove('owner-only-hidden');
+                el.removeAttribute('aria-hidden');
             } else {
                 el.style.display = 'none';
                 el.classList.add('owner-only-hidden');
+                el.setAttribute('aria-hidden', 'true');
             }
         });
     });
@@ -2425,23 +2429,90 @@ async function loadOwnerLoginRegistry() {
         }
 
         tableBody.innerHTML = users.map((entry) => {
-            const serverNames = (entry.guilds || []).slice(0, 5).map((g) => `${escapeHtml(g.name)} ${g.idSuffix ? `(••${escapeHtml(g.idSuffix)})` : ''}`).join(', ');
-            const moreCount = Math.max(0, (entry.guilds || []).length - 5);
+            const safeUserId = String(entry.userId || '').replace(/[^a-zA-Z0-9_-]/g, '');
             const name = escapeHtml(entry.globalName || entry.username || 'Usuario');
             const username = escapeHtml(entry.username || 'usuario');
             const profileText = `${name} (@${username})`;
             const lastSeen = entry.lastLoginAt ? new Date(entry.lastLoginAt).toLocaleString('es-ES') : 'N/A';
+            const avatarUrl = entry.avatar
+                ? `https://cdn.discordapp.com/avatars/${encodeURIComponent(entry.userId || '')}/${encodeURIComponent(entry.avatar)}.png?size=96`
+                : `https://cdn.discordapp.com/embed/avatars/${(Number(entry.userId) || 0) % 5}.png`;
+
+            const serverPreview = (entry.guilds || []).length
+                ? (entry.guilds || []).map((g) => {
+                    const icon = g.iconUrl
+                        ? `<img src="${escapeHtml(g.iconUrl)}" alt="${escapeHtml(g.name || 'Servidor')}" class="owner-server-preview-icon">`
+                        : `<div class="owner-server-preview-icon owner-server-preview-icon--fallback">${escapeHtml(String(g.name || 'S').charAt(0).toUpperCase())}</div>`;
+
+                    return `
+                        <article class="owner-server-preview-card">
+                            <div class="owner-server-preview-head">
+                                ${icon}
+                                <div>
+                                    <div class="owner-server-preview-name">${escapeHtml(g.name || 'Servidor')}</div>
+                                    <div class="owner-server-preview-meta">ID • ${escapeHtml(g.idSuffix || '----')}</div>
+                                </div>
+                            </div>
+                        </article>
+                    `;
+                }).join('')
+                : '<div class="owner-server-preview-empty">Sin servidores administrables con bot.</div>';
 
             return `
                 <tr>
-                    <td>${profileText}</td>
+                    <td>
+                        <button type="button" class="owner-analytics-profile-btn" data-owner-user-id="${safeUserId}" aria-expanded="false">
+                            ${profileText}
+                        </button>
+                    </td>
                     <td>${entry.loginCount || 0}</td>
                     <td>${entry.guildCount || 0}</td>
-                    <td>${serverNames || 'Sin servidores'}${moreCount ? ` +${moreCount} más` : ''}</td>
+                    <td>${(entry.guilds || []).length}</td>
                     <td>${lastSeen}</td>
+                </tr>
+                <tr class="owner-analytics-detail-row" data-owner-detail-row="${safeUserId}" hidden>
+                    <td colspan="5">
+                        <div class="owner-user-preview">
+                            <div class="owner-user-preview-profile">
+                                <img src="${avatarUrl}" alt="${profileText}" class="owner-user-preview-avatar">
+                                <div>
+                                    <div class="owner-user-preview-name">${profileText}</div>
+                                    <div class="owner-user-preview-meta">Servidor(es) administrable(s) con bot: ${(entry.guilds || []).length}</div>
+                                </div>
+                            </div>
+                            <div class="owner-server-preview-grid">
+                                ${serverPreview}
+                            </div>
+                        </div>
+                    </td>
                 </tr>
             `;
         }).join('');
+
+        if (!tableBody.dataset.ownerRegistryBound) {
+            tableBody.dataset.ownerRegistryBound = '1';
+            tableBody.addEventListener('click', (event) => {
+                const target = event.target;
+                if (!(target instanceof Element)) return;
+                const btn = target.closest('.owner-analytics-profile-btn');
+                if (!(btn instanceof HTMLElement)) return;
+
+                const userId = String(btn.dataset.ownerUserId || '').trim();
+                if (!userId) return;
+
+                const row = tableBody.querySelector(`tr[data-owner-detail-row="${userId}"]`);
+                if (!(row instanceof HTMLTableRowElement)) return;
+
+                const expanded = !row.hasAttribute('hidden');
+                if (expanded) {
+                    row.setAttribute('hidden', 'hidden');
+                    btn.setAttribute('aria-expanded', 'false');
+                } else {
+                    row.removeAttribute('hidden');
+                    btn.setAttribute('aria-expanded', 'true');
+                }
+            });
+        }
     } catch (error) {
         panel.style.display = 'block';
         summary.innerHTML = '<div class="owner-analytics-pill"><span>No se pudo cargar el registro global.</span></div>';
