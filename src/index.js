@@ -32,8 +32,8 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
 const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMMAND_WARN_MS || '1200', 10));
-const COMMAND_REGISTER_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.COMMAND_REGISTER_TIMEOUT_MS || '15000', 10));
 const COMMAND_REGISTER_RETRIES = Math.max(1, Number.parseInt(process.env.COMMAND_REGISTER_RETRIES || '3', 10));
+const COMMAND_REGISTER_RETRY_DELAY_MS = Math.max(1000, Number.parseInt(process.env.COMMAND_REGISTER_RETRY_DELAY_MS || '5000', 10));
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',
     'ban',
@@ -97,23 +97,14 @@ async function registerSlashCommands() {
 
     for (const appId of appIds) {
         for (let attempt = 1; attempt <= COMMAND_REGISTER_RETRIES; attempt++) {
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error(`timeout ${COMMAND_REGISTER_TIMEOUT_MS}ms`)), COMMAND_REGISTER_TIMEOUT_MS);
-            });
-
             try {
                 console.log(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${COMMAND_REGISTER_RETRIES})...`);
-                const registerPromise = rest.put(
+                await rest.put(
                     Routes.applicationGuildCommands(appId, GUILD_ID),
                     { body: commands }
                 );
 
-                await Promise.race([registerPromise, timeoutPromise]);
-
-                await Promise.race([
-                    rest.put(Routes.applicationCommands(appId), { body: [] }),
-                    timeoutPromise
-                ]).catch((cleanupError) => {
+                await rest.put(Routes.applicationCommands(appId), { body: [] }).catch((cleanupError) => {
                     console.warn('⚠️ No se pudieron limpiar comandos globales obsoletos:', cleanupError?.message || cleanupError);
                 });
 
@@ -121,6 +112,9 @@ async function registerSlashCommands() {
                 return true;
             } catch (error) {
                 console.error(`⚠️ Falló registro de comandos (app ${appId}, intento ${attempt}):`, error?.message || error);
+                if (attempt < COMMAND_REGISTER_RETRIES) {
+                    await new Promise((resolve) => setTimeout(resolve, COMMAND_REGISTER_RETRY_DELAY_MS));
+                }
             }
         }
     }
