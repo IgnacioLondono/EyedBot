@@ -35,7 +35,7 @@ const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMM
 const COMMAND_REGISTER_RETRIES = Math.max(1, Number.parseInt(process.env.COMMAND_REGISTER_RETRIES || '3', 10));
 const COMMAND_REGISTER_RETRY_DELAY_MS = Math.max(1000, Number.parseInt(process.env.COMMAND_REGISTER_RETRY_DELAY_MS || '5000', 10));
 const COMMAND_REGISTER_POST_READY_DELAY_MS = Math.max(0, Number.parseInt(process.env.COMMAND_REGISTER_POST_READY_DELAY_MS || '10000', 10));
-const COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS || '25000', 10));
+const COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS = Number.parseInt(process.env.COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS || '0', 10);
 const FORCED_SLASH_GUILD_IDS = ['1428561902086262908'];
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',
@@ -93,7 +93,7 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
     const configuredClientId = String(CLIENT_ID || '').trim();
     const appIds = Array.from(new Set([configuredClientId, runtimeClientId].filter(Boolean)));
     const perGuildTimeoutRaw = Number.parseInt(options.perGuildTimeoutMs ?? `${COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS}`, 10);
-    const perGuildTimeoutMs = Number.isFinite(perGuildTimeoutRaw) ? perGuildTimeoutRaw : COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS;
+    const perGuildTimeoutMs = Number.isFinite(perGuildTimeoutRaw) ? perGuildTimeoutRaw : 0;
     const retries = Math.max(1, Number.parseInt(options.retries || `${COMMAND_REGISTER_RETRIES}`, 10));
     const retryDelayMs = Math.max(1000, Number.parseInt(options.retryDelayMs || `${COMMAND_REGISTER_RETRY_DELAY_MS}`, 10));
     const cleanupGlobal = options.cleanupGlobal !== false;
