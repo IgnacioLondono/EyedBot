@@ -1114,6 +1114,7 @@ body {
     font-family: 'Cinzel', serif;
     display: inline-flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.6rem;
     font-size: 2.25rem;
     font-weight: 600;
@@ -1134,6 +1135,40 @@ body {
     stroke-linejoin: round;
     filter: drop-shadow(0 0 10px rgba(154, 109, 255, 0.4));
     flex-shrink: 0;
+}
+
+.owner-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 120, 209, 0.4);
+    background: linear-gradient(135deg, rgba(124, 77, 255, 0.24), rgba(255, 120, 209, 0.2));
+    color: var(--text-primary);
+    -webkit-text-fill-color: initial;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.owner-pill--inline {
+    padding: 0.28rem 0.5rem;
+    font-size: 0.62rem;
+}
+
+.owner-pill--title {
+    padding: 0.34rem 0.62rem;
+    font-size: 0.58rem;
+    transform: translateY(1px);
+}
+
+.owner-pill--mini {
+    padding: 0.24rem 0.43rem;
+    font-size: 0.56rem;
+    border-color: rgba(203, 183, 246, 0.38);
+    background: rgba(154, 109, 255, 0.2);
 }
 
 .title-accent {
@@ -2232,6 +2267,9 @@ body {
 
 .side-menu-label {
     min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .side-menu-btn:hover {
