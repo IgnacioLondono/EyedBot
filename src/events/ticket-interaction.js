@@ -313,7 +313,7 @@ async function showTicketReasonModal(interaction, guildId) {
 
     const minecraftRequestInput = new TextInputBuilder()
         .setCustomId('ticket_minecraft_request_input')
-        .setLabel('Solicitud para ingresar al servidor de Minecraft')
+        .setLabel('Solicitud para ingresar a Minecraft')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(180)
