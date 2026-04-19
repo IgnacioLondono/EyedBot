@@ -695,6 +695,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             return res.json({
                 enabled: false,
                 panelChannelId: '',
+                requestChannelId: '',
                 adminRoleIds: [],
                 title: 'Soporte',
                 message: 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.',
@@ -843,6 +844,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         const config = {
             enabled: body.enabled === true,
             panelChannelId: String(body.panelChannelId || '').trim(),
+            requestChannelId: String(body.requestChannelId || '').trim(),
             adminRoleIds,
             title: String(body.title || 'Soporte').slice(0, 256),
             message: String(body.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.').slice(0, 2000),
