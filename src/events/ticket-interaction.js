@@ -676,7 +676,14 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     }).catch(() => null);
 
     clearDraftForUser(guildId, interaction.user.id);
-    await sendEphemeral(interaction, `Ticket creado: <#${created.id}>`);
+    await interaction.editReply({
+        content: `Ticket creado correctamente. Accede aqui: <#${created.id}>`,
+        components: []
+    }).catch(() => null);
+
+    setTimeout(() => {
+        interaction.deleteReply().catch(() => null);
+    }, 3000);
 }
 
 function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue) {
