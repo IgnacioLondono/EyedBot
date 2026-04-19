@@ -73,7 +73,7 @@ function loadCommands(dir) {
         const filePath = path.join(dir, file);
         const stat = fs.statSync(filePath);
         if (stat.isDirectory()) {
-            if (!MUSIC_ENABLED && file.toLowerCase() === 'music') {
+            if (file.toLowerCase() === 'music') {
                 continue;
             }
             loadCommands(filePath);
