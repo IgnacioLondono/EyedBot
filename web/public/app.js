@@ -26,6 +26,89 @@ let serverSwitcherGuilds = [];
 let serverSwitcherIndex = 0;
 let serverSwitcherTouchStartX = 0;
 let serverSwitcherTouchDeltaX = 0;
+let themeSettings = null;
+
+const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
+
+const THEME_PRESETS = {
+    midnight: {
+        accentPrimary: '#9a6dff',
+        accentSecondary: '#ff78d1',
+        bgPrimary: '#090512',
+        bgSecondary: '#150c26',
+        bgCard: '#1a1030',
+        textPrimary: '#f4eeff',
+        textSecondary: '#cbb7f6',
+        borderColor: '#be9bff',
+        atmosphere: 55,
+        borderStrength: 28
+    },
+    aurora: {
+        accentPrimary: '#39d98a',
+        accentSecondary: '#7bdcff',
+        bgPrimary: '#071218',
+        bgSecondary: '#0f1f2f',
+        bgCard: '#13263a',
+        textPrimary: '#effeff',
+        textSecondary: '#b9e5f7',
+        borderColor: '#7bdcff',
+        atmosphere: 62,
+        borderStrength: 25
+    },
+    ember: {
+        accentPrimary: '#ff8a4c',
+        accentSecondary: '#ff4d7d',
+        bgPrimary: '#150905',
+        bgSecondary: '#27110c',
+        bgCard: '#301617',
+        textPrimary: '#fff3ed',
+        textSecondary: '#ffd1bf',
+        borderColor: '#ff8a4c',
+        atmosphere: 58,
+        borderStrength: 30
+    },
+    ocean: {
+        accentPrimary: '#4aa3ff',
+        accentSecondary: '#22d3ee',
+        bgPrimary: '#06111a',
+        bgSecondary: '#102438',
+        bgCard: '#14293d',
+        textPrimary: '#eff8ff',
+        textSecondary: '#c7e5ff',
+        borderColor: '#4aa3ff',
+        atmosphere: 60,
+        borderStrength: 26
+    },
+    forest: {
+        accentPrimary: '#48d37c',
+        accentSecondary: '#9ee37d',
+        bgPrimary: '#07150c',
+        bgSecondary: '#102517',
+        bgCard: '#153122',
+        textPrimary: '#f2fff5',
+        textSecondary: '#cdecd6',
+        borderColor: '#48d37c',
+        atmosphere: 57,
+        borderStrength: 24
+    },
+    mono: {
+        accentPrimary: '#d4d4d8',
+        accentSecondary: '#a1a1aa',
+        bgPrimary: '#0a0a0f',
+        bgSecondary: '#15151d',
+        bgCard: '#1a1a24',
+        textPrimary: '#f8fafc',
+        textSecondary: '#cbd5e1',
+        borderColor: '#cbd5e1',
+        atmosphere: 40,
+        borderStrength: 18
+    }
+};
+
+const THEME_DEFAULTS = {
+    preset: 'midnight',
+    ...THEME_PRESETS.midnight
+};
 
 const DASHBOARD_ICON = `
     <span class="nav-icon-shell">
@@ -452,6 +535,11 @@ async function confirmServerSwitcherSelection() {
     await window.selectGuild(selectedGuild.id);
 }
 
+window.openServerSwitcherModal = openServerSwitcherModal;
+window.closeServerSwitcherModal = closeServerSwitcherModal;
+window.moveServerSwitcher = moveServerSwitcher;
+window.confirmServerSwitcherSelection = confirmServerSwitcherSelection;
+
 // Función auxiliar para fetch con credenciales
 async function fetchWithCredentials(url, options = {}) {
     return fetch(url, {
@@ -531,6 +619,263 @@ function loadState() {
 function getActiveSectionId() {
     return document.querySelector('.section.active')?.id || 'dashboard';
 }
+
+function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function normalizeHexColor(value, fallback) {
+    if (typeof value !== 'string') return fallback;
+    const candidate = value.trim();
+    return /^#[0-9a-fA-F]{6}$/.test(candidate) ? candidate : fallback;
+}
+
+function hexToRgb(hex) {
+    const normalized = normalizeHexColor(hex, '#000000');
+    return {
+        r: Number.parseInt(normalized.slice(1, 3), 16),
+        g: Number.parseInt(normalized.slice(3, 5), 16),
+        b: Number.parseInt(normalized.slice(5, 7), 16)
+    };
+}
+
+function rgbaFromHex(hex, alpha) {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${clampNumber(Number(alpha) || 0, 0, 1)})`;
+}
+
+function mixHexColors(startHex, endHex, ratio = 0.5) {
+    const start = hexToRgb(startHex);
+    const end = hexToRgb(endHex);
+    const weight = clampNumber(Number(ratio) || 0, 0, 1);
+    const r = Math.round(start.r + ((end.r - start.r) * weight));
+    const g = Math.round(start.g + ((end.g - start.g) * weight));
+    const b = Math.round(start.b + ((end.b - start.b) * weight));
+    return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function loadThemeSettings() {
+    try {
+        const raw = localStorage.getItem(THEME_STORAGE_KEY);
+        if (!raw) return { ...THEME_DEFAULTS };
+        const saved = JSON.parse(raw);
+        return normalizeThemeSettings(saved);
+    } catch {
+        return { ...THEME_DEFAULTS };
+    }
+}
+
+function normalizeThemeSettings(input = {}) {
+    const presetId = Object.prototype.hasOwnProperty.call(THEME_PRESETS, input.preset) ? input.preset : THEME_DEFAULTS.preset;
+    const preset = THEME_PRESETS[presetId] || THEME_DEFAULTS;
+
+    return {
+        preset: presetId,
+        accentPrimary: normalizeHexColor(input.accentPrimary, preset.accentPrimary),
+        accentSecondary: normalizeHexColor(input.accentSecondary, preset.accentSecondary),
+        bgPrimary: normalizeHexColor(input.bgPrimary, preset.bgPrimary),
+        bgSecondary: normalizeHexColor(input.bgSecondary, preset.bgSecondary),
+        bgCard: normalizeHexColor(input.bgCard, preset.bgCard),
+        textPrimary: normalizeHexColor(input.textPrimary, preset.textPrimary),
+        textSecondary: normalizeHexColor(input.textSecondary, preset.textSecondary),
+        borderColor: normalizeHexColor(input.borderColor, preset.borderColor),
+        atmosphere: clampNumber(Number.parseInt(input.atmosphere ?? preset.atmosphere, 10) || preset.atmosphere, 0, 100),
+        borderStrength: clampNumber(Number.parseInt(input.borderStrength ?? preset.borderStrength, 10) || preset.borderStrength, 0, 100)
+    };
+}
+
+function saveThemeSettings(theme = themeSettings) {
+    const normalized = normalizeThemeSettings(theme);
+    themeSettings = normalized;
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(normalized));
+    } catch (error) {
+        console.warn('No se pudo guardar la personalizacion visual:', error);
+    }
+}
+
+function setThemeCssVariables(theme = themeSettings) {
+    const normalized = normalizeThemeSettings(theme);
+    const root = document.documentElement;
+    const patternStrength = clampNumber(normalized.atmosphere / 100, 0, 1);
+    const borderStrength = clampNumber(normalized.borderStrength / 100, 0, 1);
+
+    root.style.setProperty('--iris-900', mixHexColors(normalized.bgPrimary, '#000000', 0.12));
+    root.style.setProperty('--iris-800', mixHexColors(normalized.bgSecondary, normalized.accentPrimary, 0.06));
+    root.style.setProperty('--iris-700', mixHexColors(normalized.bgCard, normalized.accentPrimary, 0.1));
+    root.style.setProperty('--iris-500', normalized.accentPrimary);
+    root.style.setProperty('--iris-400', normalized.accentSecondary);
+    root.style.setProperty('--iris-300', mixHexColors(normalized.accentPrimary, '#ffffff', 0.45));
+    root.style.setProperty('--lavender', mixHexColors(normalized.textPrimary, normalized.accentPrimary, 0.1));
+    root.style.setProperty('--fuchsia', normalized.accentSecondary);
+    root.style.setProperty('--bg-primary', normalized.bgPrimary);
+    root.style.setProperty('--bg-secondary', normalized.bgSecondary);
+    root.style.setProperty('--bg-card', normalized.bgCard);
+    root.style.setProperty('--bg-card-hover', mixHexColors(normalized.bgCard, normalized.accentPrimary, 0.12));
+    root.style.setProperty('--bg-overlay', rgbaFromHex(normalized.bgPrimary, 0.82));
+    root.style.setProperty('--text-primary', normalized.textPrimary);
+    root.style.setProperty('--text-secondary', normalized.textSecondary);
+    root.style.setProperty('--text-muted', mixHexColors(normalized.textSecondary, '#7f6bb0', 0.45));
+    root.style.setProperty('--border-color', rgbaFromHex(normalized.borderColor, 0.16 + (borderStrength * 0.24)));
+    root.style.setProperty('--border-glow', rgbaFromHex(normalized.borderColor, 0.18 + (borderStrength * 0.25)));
+    root.style.setProperty('--accent-blue', normalized.accentPrimary);
+    root.style.setProperty('--accent-gold', normalized.accentSecondary);
+    root.style.setProperty('--shadow-blue', `0 8px 32px ${rgbaFromHex(normalized.accentPrimary, 0.22 + (borderStrength * 0.12))}`);
+    root.style.setProperty('--shadow-gold', `0 8px 32px ${rgbaFromHex(normalized.accentSecondary, 0.18 + (borderStrength * 0.1))}`);
+    root.style.setProperty('--shadow-card', `0 10px 26px ${rgbaFromHex(normalized.bgPrimary, 0.52)}`);
+    root.style.setProperty('--glow-blue', `0 0 20px ${rgbaFromHex(normalized.accentPrimary, 0.2 + (patternStrength * 0.22))}`);
+    root.style.setProperty('--glow-gold', `0 0 20px ${rgbaFromHex(normalized.accentSecondary, 0.2 + (patternStrength * 0.18))}`);
+    root.style.setProperty('--saber-blue', normalized.accentPrimary);
+    root.style.setProperty('--saber-blue-light', mixHexColors(normalized.accentPrimary, '#ffffff', 0.42));
+    root.style.setProperty('--saber-blue-dark', mixHexColors(normalized.bgSecondary, normalized.accentPrimary, 0.28));
+    root.style.setProperty('--saber-gold', normalized.accentSecondary);
+    root.style.setProperty('--fate-red', normalized.accentPrimary);
+    root.style.setProperty('--fate-gold', mixHexColors(normalized.textPrimary, normalized.accentSecondary, 0.28));
+    root.style.setProperty('--theme-pattern-primary', rgbaFromHex(normalized.accentPrimary, 0.06 + (patternStrength * 0.18)));
+    root.style.setProperty('--theme-pattern-secondary', rgbaFromHex(normalized.accentSecondary, 0.05 + (patternStrength * 0.14)));
+    root.style.setProperty('--theme-pattern-tertiary', rgbaFromHex(normalized.borderColor, 0.04 + (patternStrength * 0.1)));
+    root.style.setProperty('--theme-glow-color', rgbaFromHex(normalized.accentPrimary, 0.12 + (patternStrength * 0.32)));
+    root.style.setProperty('--theme-lines-opacity', String(0.1 + (patternStrength * 0.22)));
+
+    const pattern = document.querySelector('.bg-pattern');
+    if (pattern) {
+        pattern.style.opacity = String(0.7 + (patternStrength * 0.3));
+    }
+
+    const glow = document.querySelector('.bg-glow');
+    if (glow) {
+        glow.style.opacity = String(0.45 + (patternStrength * 0.55));
+    }
+}
+
+function getThemeControlsState() {
+    return normalizeThemeSettings({
+        preset: document.querySelector('.theme-preset-btn.active')?.dataset.themePreset || themeSettings?.preset || THEME_DEFAULTS.preset,
+        accentPrimary: document.getElementById('themeAccentPrimary')?.value,
+        accentSecondary: document.getElementById('themeAccentSecondary')?.value,
+        bgPrimary: document.getElementById('themeBgPrimary')?.value,
+        bgSecondary: document.getElementById('themeBgSecondary')?.value,
+        bgCard: document.getElementById('themeBgCard')?.value,
+        textPrimary: document.getElementById('themeTextPrimary')?.value,
+        textSecondary: document.getElementById('themeTextSecondary')?.value,
+        borderColor: document.getElementById('themeBorderColor')?.value,
+        atmosphere: document.getElementById('themeAtmosphere')?.value,
+        borderStrength: document.getElementById('themeBorderStrength')?.value
+    });
+}
+
+function syncThemeControls(theme = themeSettings) {
+    const normalized = normalizeThemeSettings(theme);
+    const controlMap = {
+        themeAccentPrimary: normalized.accentPrimary,
+        themeAccentSecondary: normalized.accentSecondary,
+        themeBgPrimary: normalized.bgPrimary,
+        themeBgSecondary: normalized.bgSecondary,
+        themeBgCard: normalized.bgCard,
+        themeTextPrimary: normalized.textPrimary,
+        themeTextSecondary: normalized.textSecondary,
+        themeBorderColor: normalized.borderColor,
+        themeAtmosphere: String(normalized.atmosphere),
+        themeBorderStrength: String(normalized.borderStrength)
+    };
+
+    Object.entries(controlMap).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el && el.value !== value) {
+            el.value = value;
+        }
+    });
+
+    const atmosphereValue = document.getElementById('themeAtmosphereValue');
+    if (atmosphereValue) atmosphereValue.textContent = `${normalized.atmosphere}%`;
+    const borderStrengthValue = document.getElementById('themeBorderStrengthValue');
+    if (borderStrengthValue) borderStrengthValue.textContent = `${normalized.borderStrength}%`;
+
+    document.querySelectorAll('.theme-preset-btn').forEach((button) => {
+        button.classList.toggle('active', button.dataset.themePreset === normalized.preset);
+    });
+
+    const swatchValues = {
+        accentPrimary: normalized.accentPrimary,
+        accentSecondary: normalized.accentSecondary,
+        bgPrimary: normalized.bgPrimary,
+        bgCard: normalized.bgCard
+    };
+
+    Object.entries(swatchValues).forEach(([name, value]) => {
+        document.querySelectorAll(`[data-theme-swatch="${name}"]`).forEach((swatch) => {
+            swatch.style.background = value;
+        });
+    });
+}
+
+function applyThemeSettings(theme = themeSettings, options = {}) {
+    const normalized = normalizeThemeSettings(theme);
+    themeSettings = normalized;
+    setThemeCssVariables(normalized);
+    syncThemeControls(normalized);
+
+    if (options.persist !== false) {
+        saveThemeSettings(normalized);
+    }
+}
+
+function setThemePreset(presetId) {
+    const preset = THEME_PRESETS[presetId] || THEME_PRESETS[THEME_DEFAULTS.preset];
+    applyThemeSettings({ preset: presetId, ...preset });
+    showToast(`Tema aplicado: ${presetId}`, 'success');
+}
+
+function resetThemeSettings() {
+    applyThemeSettings({ ...THEME_DEFAULTS }, { persist: true });
+    showToast('Personalizacion restablecida', 'success');
+}
+
+function bindThemeControls() {
+    const controlIds = [
+        'themeAccentPrimary',
+        'themeAccentSecondary',
+        'themeBgPrimary',
+        'themeBgSecondary',
+        'themeBgCard',
+        'themeTextPrimary',
+        'themeTextSecondary',
+        'themeBorderColor',
+        'themeAtmosphere',
+        'themeBorderStrength'
+    ];
+
+    controlIds.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', () => {
+            const nextTheme = getThemeControlsState();
+            applyThemeSettings(nextTheme, { persist: true });
+        });
+    });
+
+    document.querySelectorAll('.theme-preset-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            setThemePreset(button.dataset.themePreset || THEME_DEFAULTS.preset);
+        });
+    });
+
+    const saveButton = document.getElementById('themeSaveBtn');
+    if (saveButton) {
+        saveButton.addEventListener('click', () => {
+            applyThemeSettings(getThemeControlsState(), { persist: true });
+            showToast('Personalizacion guardada', 'success');
+        });
+    }
+
+    const resetButton = document.getElementById('themeResetBtn');
+    if (resetButton) {
+        resetButton.addEventListener('click', resetThemeSettings);
+    }
+}
+
+themeSettings = loadThemeSettings();
+applyThemeSettings(themeSettings, { persist: false });
 
 function buildPanelHistoryState(sectionId = 'dashboard', guard = false) {
     return { panel: true, sectionId, guard };
@@ -796,6 +1141,8 @@ function updateUserUI() {
 
 // Configurar event listeners
 function setupEventListeners() {
+    bindThemeControls();
+
     window.addEventListener('popstate', (event) => {
         const state = event.state;
         if (state?.panel && state?.sectionId) {
@@ -841,9 +1188,14 @@ function setupEventListeners() {
 
     const changeServerBtn = document.getElementById('changeServerBtn');
     if (changeServerBtn) {
-        changeServerBtn.addEventListener('click', async () => {
+        changeServerBtn.addEventListener('click', async (event) => {
+            event.preventDefault();
             await openServerSwitcherModal();
         });
+        changeServerBtn.onclick = async (event) => {
+            event.preventDefault();
+            await openServerSwitcherModal();
+        };
     }
 
     const serverSwitcherClose = document.getElementById('serverSwitcherClose');
