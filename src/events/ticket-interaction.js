@@ -7,7 +7,8 @@ const {
     TextInputBuilder,
     TextInputStyle,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    StringSelectMenuBuilder
 } = require('discord.js');
 const ticketStore = require('../utils/ticket-config-store');
 
@@ -267,6 +268,9 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
         .setCustomId(`${MODAL_PREFIX}${guildId}`)
         .setTitle('Motivo del ticket');
 
+    const prefillCategory = String(preset.category || '').trim().slice(0, 100);
+    const prefillCommonIssue = String(preset.commonIssue || '').trim().slice(0, 120);
+
     const categoryInput = new TextInputBuilder()
         .setCustomId('ticket_category_input')
         .setLabel('Categoria de tu solicitud')
@@ -274,8 +278,9 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
         .setRequired(true)
         .setMinLength(3)
         .setMaxLength(100)
-        .setPlaceholder('Ej: Soporte general, Reporte, Compras, Minecraft')
-        .setValue(String(preset.category || '').slice(0, 100));
+        .setPlaceholder('Ej: Soporte general, Reporte, Compras, Minecraft');
+
+    if (prefillCategory) categoryInput.setValue(prefillCategory);
 
     const commonIssueInput = new TextInputBuilder()
         .setCustomId('ticket_common_issue_input')
@@ -283,8 +288,9 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(120)
-        .setPlaceholder('Ej: Permisos, sancion, error del bot, roles')
-        .setValue(String(preset.commonIssue || '').slice(0, 120));
+        .setPlaceholder('Ej: Permisos, sancion, error del bot, roles');
+
+    if (prefillCommonIssue) commonIssueInput.setValue(prefillCommonIssue);
 
     const noMatchIssueInput = new TextInputBuilder()
         .setCustomId('ticket_no_match_issue_input')
