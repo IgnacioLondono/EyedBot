@@ -1956,13 +1956,17 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'No tienes acceso a este servidor' });
         }
 
+        const ownerMember = guild.members.cache.get(guild.ownerId);
+        const ownerUser = ownerMember?.user;
+
         const info = {
             id: guild.id,
             name: guild.name,
             icon: guild.iconURL({ dynamic: true, size: 256 }),
             owner: {
                 id: guild.ownerId,
-                tag: guild.members.cache.get(guild.ownerId)?.user?.tag || 'Desconocido'
+                tag: ownerUser?.tag || 'Desconocido',
+                avatar: ownerUser?.displayAvatarURL({ dynamic: true, size: 256 }) || null
             },
             memberCount: guild.memberCount,
             channelCount: guild.channels.cache.size,
