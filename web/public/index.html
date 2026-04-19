@@ -258,122 +258,142 @@
                     <div class="title-accent"></div>
                 </div>
 
-                <div class="settings-overview-grid">
-                    <article class="settings-overview-card">
-                        <h3>Cuenta</h3>
-                        <div class="settings-kv"><span>Usuario</span><strong id="settingsAccountName">-</strong></div>
-                        <div class="settings-kv"><span>ID</span><strong id="settingsAccountId">-</strong></div>
-                        <div class="settings-kv"><span>Avatar</span><strong id="settingsAccountAvatar">No disponible</strong></div>
-                    </article>
+                <div class="settings-layout" id="settingsLayout">
+                    <aside class="settings-sidebar" id="settingsSidebar">
+                        <button type="button" class="settings-side-btn active" data-settings-pane="settingsPaneAccount">
+                            <span>Cuenta</span>
+                        </button>
+                        <button type="button" class="settings-side-btn" data-settings-pane="settingsPaneWeb">
+                            <span>Web</span>
+                        </button>
+                        <button type="button" class="settings-side-btn" data-settings-pane="settingsPaneTheme">
+                            <span>Personalización</span>
+                        </button>
+                    </aside>
 
-                    <article class="settings-overview-card">
-                        <h3>Web</h3>
-                        <div class="settings-kv"><span>Host</span><strong id="settingsWebHost">-</strong></div>
-                        <div class="settings-kv"><span>Ruta</span><strong id="settingsWebPath">-</strong></div>
-                        <div class="settings-kv"><span>Navegador</span><strong id="settingsWebBrowser">-</strong></div>
-                        <div class="settings-kv"><span>Zona horaria</span><strong id="settingsWebTimezone">-</strong></div>
-                    </article>
-                </div>
+                    <div class="settings-content">
+                        <section id="settingsPaneAccount" class="settings-pane active">
+                            <article class="settings-overview-card">
+                                <h3>Cuenta</h3>
+                                <div class="settings-kv"><span>Usuario</span><strong id="settingsAccountName">-</strong></div>
+                                <div class="settings-kv"><span>ID</span><strong id="settingsAccountId">-</strong></div>
+                                <div class="settings-kv"><span>Avatar</span><strong id="settingsAccountAvatar">No disponible</strong></div>
+                            </article>
+                        </section>
 
-                <div class="theme-lab" id="themeLab">
-                    <div class="theme-lab-header">
-                        <div>
-                            <div class="theme-lab-kicker">Personalización visual</div>
-                            <h3>Diseña el panel a tu gusto</h3>
-                            <p>Elige un preset, ajusta colores y modifica la atmósfera del fondo. Los cambios se aplican al instante y quedan guardados en tu navegador.</p>
-                        </div>
-                        <div class="theme-lab-actions">
-                            <button type="button" id="themeSaveBtn" class="btn btn-primary">Guardar</button>
-                            <button type="button" id="themeResetBtn" class="btn btn-secondary">Restablecer</button>
-                        </div>
-                    </div>
+                        <section id="settingsPaneWeb" class="settings-pane">
+                            <article class="settings-overview-card">
+                                <h3>Web</h3>
+                                <div class="settings-kv"><span>Host</span><strong id="settingsWebHost">-</strong></div>
+                                <div class="settings-kv"><span>Ruta</span><strong id="settingsWebPath">-</strong></div>
+                                <div class="settings-kv"><span>Navegador</span><strong id="settingsWebBrowser">-</strong></div>
+                                <div class="settings-kv"><span>Zona horaria</span><strong id="settingsWebTimezone">-</strong></div>
+                            </article>
+                        </section>
 
-                    <div class="theme-lab-grid">
-                        <div class="theme-preview-card">
-                            <div class="theme-preview-head">
-                                <span class="theme-preview-chip">Vista previa</span>
-                                <span class="theme-preview-tag">En vivo</span>
-                            </div>
-                            <div class="theme-preview-panel">
-                                <div class="theme-preview-panel-top">
-                                    <div class="theme-preview-avatar"></div>
+                        <section id="settingsPaneTheme" class="settings-pane">
+                            <div class="theme-lab" id="themeLab">
+                                <div class="theme-lab-header">
                                     <div>
-                                        <div class="theme-preview-title">EyedBot UI</div>
-                                        <div class="theme-preview-subtitle">Panel de control personalizado</div>
+                                        <div class="theme-lab-kicker">Personalización visual</div>
+                                        <h3>Diseña el panel a tu gusto</h3>
+                                        <p>Elige un preset, ajusta colores y modifica la atmósfera del fondo. Los cambios se aplican al instante y quedan guardados en tu navegador.</p>
+                                    </div>
+                                    <div class="theme-lab-actions">
+                                        <button type="button" id="themeSaveBtn" class="btn btn-primary">Guardar</button>
+                                        <button type="button" id="themeResetBtn" class="btn btn-secondary">Restablecer</button>
                                     </div>
                                 </div>
-                                <div class="theme-preview-bars">
-                                    <span class="theme-preview-bar theme-preview-bar--primary" data-theme-swatch="accentPrimary"></span>
-                                    <span class="theme-preview-bar theme-preview-bar--secondary" data-theme-swatch="accentSecondary"></span>
-                                    <span class="theme-preview-bar theme-preview-bar--bg" data-theme-swatch="bgPrimary"></span>
-                                    <span class="theme-preview-bar theme-preview-bar--card" data-theme-swatch="bgCard"></span>
-                                </div>
-                                <div class="theme-preview-copy">
-                                    <span>Los colores del panel, los botones, el fondo y los bordes cambian según la configuración.</span>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div class="theme-controls-card">
-                            <div class="theme-preset-row" id="themePresetRow" aria-label="Presets de tema">
-                                <button type="button" class="theme-preset-btn active" data-theme-preset="midnight">Midnight</button>
-                                <button type="button" class="theme-preset-btn" data-theme-preset="aurora">Aurora</button>
-                                <button type="button" class="theme-preset-btn" data-theme-preset="ember">Ember</button>
-                                <button type="button" class="theme-preset-btn" data-theme-preset="ocean">Ocean</button>
-                                <button type="button" class="theme-preset-btn" data-theme-preset="forest">Forest</button>
-                                <button type="button" class="theme-preset-btn" data-theme-preset="mono">Mono</button>
-                            </div>
+                                <div class="theme-lab-grid">
+                                    <div class="theme-preview-card">
+                                        <div class="theme-preview-head">
+                                            <span class="theme-preview-chip">Vista previa</span>
+                                            <span class="theme-preview-tag">En vivo</span>
+                                        </div>
+                                        <div class="theme-preview-panel">
+                                            <div class="theme-preview-panel-top">
+                                                <div class="theme-preview-avatar"></div>
+                                                <div>
+                                                    <div class="theme-preview-title">EyedBot UI</div>
+                                                    <div class="theme-preview-subtitle">Panel de control personalizado</div>
+                                                </div>
+                                            </div>
+                                            <div class="theme-preview-bars">
+                                                <span class="theme-preview-bar theme-preview-bar--primary" data-theme-swatch="accentPrimary"></span>
+                                                <span class="theme-preview-bar theme-preview-bar--secondary" data-theme-swatch="accentSecondary"></span>
+                                                <span class="theme-preview-bar theme-preview-bar--bg" data-theme-swatch="bgPrimary"></span>
+                                                <span class="theme-preview-bar theme-preview-bar--card" data-theme-swatch="bgCard"></span>
+                                            </div>
+                                            <div class="theme-preview-copy">
+                                                <span>Los colores del panel, los botones, el fondo y los bordes cambian según la configuración.</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                            <div class="theme-form-grid">
-                                <div class="form-group">
-                                    <label for="themeAccentPrimary">Acento principal</label>
-                                    <input type="color" id="themeAccentPrimary" class="form-control color-input" value="#9a6dff">
-                                </div>
-                                <div class="form-group">
-                                    <label for="themeAccentSecondary">Acento secundario</label>
-                                    <input type="color" id="themeAccentSecondary" class="form-control color-input" value="#ff78d1">
-                                </div>
-                                <div class="form-group">
-                                    <label for="themeBgPrimary">Fondo principal</label>
-                                    <input type="color" id="themeBgPrimary" class="form-control color-input" value="#090512">
-                                </div>
-                                <div class="form-group">
-                                    <label for="themeBgSecondary">Fondo secundario</label>
-                                    <input type="color" id="themeBgSecondary" class="form-control color-input" value="#150c26">
-                                </div>
-                                <div class="form-group">
-                                    <label for="themeBgCard">Superficies</label>
-                                    <input type="color" id="themeBgCard" class="form-control color-input" value="#1a1030">
-                                </div>
-                                <div class="form-group">
-                                    <label for="themeTextPrimary">Texto principal</label>
-                                    <input type="color" id="themeTextPrimary" class="form-control color-input" value="#f4eeff">
-                                </div>
-                                <div class="form-group">
-                                    <label for="themeTextSecondary">Texto secundario</label>
-                                    <input type="color" id="themeTextSecondary" class="form-control color-input" value="#cbb7f6">
-                                </div>
-                                <div class="form-group">
-                                    <label for="themeBorderColor">Color de bordes</label>
-                                    <input type="color" id="themeBorderColor" class="form-control color-input" value="#be9bff">
-                                </div>
-                                <div class="form-group theme-slider-group">
-                                    <label for="themeAtmosphere">Intensidad ambiental</label>
-                                    <input type="range" id="themeAtmosphere" class="form-control" min="0" max="100" value="55" step="1">
-                                    <small id="themeAtmosphereValue">55%</small>
-                                </div>
-                                <div class="form-group theme-slider-group">
-                                    <label for="themeBorderStrength">Fuerza de bordes</label>
-                                    <input type="range" id="themeBorderStrength" class="form-control" min="0" max="100" value="28" step="1">
-                                    <small id="themeBorderStrengthValue">28%</small>
-                                </div>
-                            </div>
+                                    <div class="theme-controls-card">
+                                        <div class="theme-preset-row" id="themePresetRow" aria-label="Presets de tema">
+                                            <button type="button" class="theme-preset-btn active" data-theme-preset="midnight">Midnight</button>
+                                            <button type="button" class="theme-preset-btn" data-theme-preset="aurora">Aurora</button>
+                                            <button type="button" class="theme-preset-btn" data-theme-preset="ember">Ember</button>
+                                            <button type="button" class="theme-preset-btn" data-theme-preset="ocean">Ocean</button>
+                                            <button type="button" class="theme-preset-btn" data-theme-preset="forest">Forest</button>
+                                            <button type="button" class="theme-preset-btn" data-theme-preset="mono">Mono</button>
+                                        </div>
 
-                            <div class="theme-status-line">
-                                <span class="theme-status-dot"></span>
-                                <span>El panel se guarda automáticamente con tu navegador.</span>
+                                        <div class="theme-form-grid">
+                                            <div class="form-group">
+                                                <label for="themeAccentPrimary">Acento principal</label>
+                                                <input type="color" id="themeAccentPrimary" class="form-control color-input" value="#9a6dff">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="themeAccentSecondary">Acento secundario</label>
+                                                <input type="color" id="themeAccentSecondary" class="form-control color-input" value="#ff78d1">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="themeBgPrimary">Fondo principal</label>
+                                                <input type="color" id="themeBgPrimary" class="form-control color-input" value="#090512">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="themeBgSecondary">Fondo secundario</label>
+                                                <input type="color" id="themeBgSecondary" class="form-control color-input" value="#150c26">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="themeBgCard">Superficies</label>
+                                                <input type="color" id="themeBgCard" class="form-control color-input" value="#1a1030">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="themeTextPrimary">Texto principal</label>
+                                                <input type="color" id="themeTextPrimary" class="form-control color-input" value="#f4eeff">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="themeTextSecondary">Texto secundario</label>
+                                                <input type="color" id="themeTextSecondary" class="form-control color-input" value="#cbb7f6">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="themeBorderColor">Color de bordes</label>
+                                                <input type="color" id="themeBorderColor" class="form-control color-input" value="#be9bff">
+                                            </div>
+                                            <div class="form-group theme-slider-group">
+                                                <label for="themeAtmosphere">Intensidad ambiental</label>
+                                                <input type="range" id="themeAtmosphere" class="form-control" min="0" max="100" value="55" step="1">
+                                                <small id="themeAtmosphereValue">55%</small>
+                                            </div>
+                                            <div class="form-group theme-slider-group">
+                                                <label for="themeBorderStrength">Fuerza de bordes</label>
+                                                <input type="range" id="themeBorderStrength" class="form-control" min="0" max="100" value="28" step="1">
+                                                <small id="themeBorderStrengthValue">28%</small>
+                                            </div>
+                                        </div>
+
+                                        <div class="theme-status-line">
+                                            <span class="theme-status-dot"></span>
+                                            <span>El panel se guarda automáticamente con tu navegador.</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </section>
                     </div>
                 </div>
             </div>
