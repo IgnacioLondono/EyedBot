@@ -670,8 +670,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         const defaultTicketCategories = [
             { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
             { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'compras-y-rangos', label: 'Compras y rangos', description: 'Pagos, rangos y beneficios' },
-            { value: 'solicitud-ingreso-minecraft', label: 'Solicitud para ingresar al servidor de Minecraft', description: 'Postulacion o solicitud de acceso al servidor Minecraft' },
+            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft, Solicitud para ingresar al servidor de la comunidad.', description: 'Postulacion o solicitud de acceso al servidor de la comunidad' },
             { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
         ];
 
@@ -733,8 +732,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         const defaultTicketCategories = [
             { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
             { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'compras-y-rangos', label: 'Compras y rangos', description: 'Pagos, rangos y beneficios' },
-            { value: 'solicitud-ingreso-minecraft', label: 'Solicitud para ingresar al servidor de Minecraft', description: 'Postulacion o solicitud de acceso al servidor Minecraft' },
+            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft, Solicitud para ingresar al servidor de la comunidad.', description: 'Postulacion o solicitud de acceso al servidor de la comunidad' },
             { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
         ];
 
