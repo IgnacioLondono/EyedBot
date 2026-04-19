@@ -54,10 +54,6 @@ module.exports = {
 
             const commands = Array.from(byName.values());
 
-            if (commands.length < 5) {
-                throw new Error(`Sincronización cancelada: se cargaron muy pocos comandos (${commands.length}).`);
-            }
-
             // Construir y preparar una instancia del módulo REST
             const rest = new REST().setToken(process.env.DISCORD_TOKEN);
             const clientId = process.env.CLIENT_ID || interaction.client.user.id;
@@ -67,16 +63,21 @@ module.exports = {
                 throw new Error('No se encontró GUILD_ID para sincronizar comandos de servidor.');
             }
 
+            // Limpia primero para evitar duplicados obsoletos por scope.
+            await rest.put(
+                Routes.applicationGuildCommands(clientId, guildId),
+                { body: [] }
+            );
+
+            await rest.put(
+                Routes.applicationCommands(clientId),
+                { body: [] }
+            );
+
             // Sincronizar comandos solo en el servidor configurado.
             const data = await rest.put(
                 Routes.applicationGuildCommands(clientId, guildId),
                 { body: commands }
-            );
-
-            // Limpia globales después de registrar guild, evitando duplicados por scope.
-            await rest.put(
-                Routes.applicationCommands(clientId),
-                { body: [] }
             );
 
             const embed = new EmbedBuilder()
