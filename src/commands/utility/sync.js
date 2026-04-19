@@ -61,16 +61,22 @@ module.exports = {
             // Construir y preparar una instancia del módulo REST
             const rest = new REST().setToken(process.env.DISCORD_TOKEN);
             const clientId = process.env.CLIENT_ID || interaction.client.user.id;
-            const guildId = interaction.guildId;
+            const guildId = process.env.GUILD_ID || interaction.guildId;
 
             if (!guildId) {
-                throw new Error('Este comando solo puede usarse dentro de un servidor.');
+                throw new Error('No se encontró GUILD_ID para sincronizar comandos de servidor.');
             }
 
             // Sincronizar comandos solo en el servidor configurado.
             const data = await rest.put(
                 Routes.applicationGuildCommands(clientId, guildId),
                 { body: commands }
+            );
+
+            // Limpia globales después de registrar guild, evitando duplicados por scope.
+            await rest.put(
+                Routes.applicationCommands(clientId),
+                { body: [] }
             );
 
             const embed = new EmbedBuilder()

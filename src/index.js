@@ -356,7 +356,15 @@ async function main() {
         console.log('🔄 Registrando comandos en Discord...');
         await rest.put(
             Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+            { body: [] },
+        );
+        await rest.put(
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
             { body: commands },
+        );
+        await rest.put(
+            Routes.applicationCommands(CLIENT_ID),
+            { body: [] }
         );
         console.log('✅ Comandos registrados exitosamente.');
     } catch (error) {
