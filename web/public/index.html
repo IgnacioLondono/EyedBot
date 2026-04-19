@@ -77,74 +77,6 @@
         <!-- Dashboard -->
         <section id="dashboard" class="section active">
             <div class="container dashboard-shell">
-                <div class="dashboard-launcher">
-                    <button type="button" class="dashboard-launcher-card" data-section="serverSection">
-                        <div class="launcher-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M21 16V8"></path>
-                                <path d="M17 16V8"></path>
-                                <path d="M14 16H2"></path>
-                                <path d="M14 8H2"></path>
-                                <path d="M9 20h12"></path>
-                            </svg>
-                        </div>
-                        <div class="launcher-copy">
-                            <h3>Servidor</h3>
-                            <p>Accede a la configuración, módulos, bienvenida, seguridad y moderación.</p>
-                        </div>
-                    </button>
-                    <button type="button" class="dashboard-launcher-card" data-section="embedSection">
-                        <div class="launcher-icon launcher-icon--pink">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M22 2L11 13"></path>
-                                <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
-                            </svg>
-                        </div>
-                        <div class="launcher-copy">
-                            <h3>Embeds</h3>
-                            <p>Constructor visual con plantillas, campos y vista previa en tiempo real.</p>
-                        </div>
-                    </button>
-                    <button type="button" class="dashboard-launcher-card" data-section="statsSection">
-                        <div class="launcher-icon launcher-icon--gold">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M3 3v18h18"></path>
-                                <path d="M7 14l4-4 4 4 6-7"></path>
-                            </svg>
-                        </div>
-                        <div class="launcher-copy">
-                            <h3>Analítica</h3>
-                            <p>Consulta rendimiento, actividad y salud general del bot.</p>
-                        </div>
-                    </button>
-                    <button type="button" class="dashboard-launcher-card" data-section="logsSection">
-                        <div class="launcher-icon launcher-icon--violet">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                <path d="M14 2v6h6"></path>
-                                <path d="M8 13h8"></path>
-                                <path d="M8 17h8"></path>
-                            </svg>
-                        </div>
-                        <div class="launcher-copy">
-                            <h3>Registros</h3>
-                            <p>Filtra logs, limpia historial y vigila eventos sin salir del panel.</p>
-                        </div>
-                    </button>
-                    <button type="button" class="dashboard-launcher-card" data-section="commandsSection">
-                        <div class="launcher-icon launcher-icon--teal">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M4 17l6-6-6-6"></path>
-                                <path d="M12 19h8"></path>
-                            </svg>
-                        </div>
-                        <div class="launcher-copy">
-                            <h3>Comandos</h3>
-                            <p>Visualiza la galería de comandos y accede a cada categoría.</p>
-                        </div>
-                    </button>
-                </div>
-
                 <div class="section-header section-header--split dashboard-search-header">
                     <div class="section-heading">
                         <h2 class="section-title">Servidores</h2>
@@ -229,6 +161,74 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="dashboard-launcher control-info-grid" aria-label="Resumen informativo">
+                    <article class="dashboard-launcher-card dashboard-launcher-card--info">
+                        <div class="launcher-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M21 16V8"></path>
+                                <path d="M17 16V8"></path>
+                                <path d="M14 16H2"></path>
+                                <path d="M14 8H2"></path>
+                                <path d="M9 20h12"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Servidor</h3>
+                            <p>Accede a la configuración, módulos, bienvenida, seguridad y moderación.</p>
+                        </div>
+                    </article>
+                    <article class="dashboard-launcher-card dashboard-launcher-card--info">
+                        <div class="launcher-icon launcher-icon--pink">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M22 2L11 13"></path>
+                                <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Embeds</h3>
+                            <p>Constructor visual con plantillas, campos y vista previa en tiempo real.</p>
+                        </div>
+                    </article>
+                    <article class="dashboard-launcher-card dashboard-launcher-card--info">
+                        <div class="launcher-icon launcher-icon--gold">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M3 3v18h18"></path>
+                                <path d="M7 14l4-4 4 4 6-7"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Analítica</h3>
+                            <p>Consulta rendimiento, actividad y salud general del bot.</p>
+                        </div>
+                    </article>
+                    <article class="dashboard-launcher-card dashboard-launcher-card--info">
+                        <div class="launcher-icon launcher-icon--violet">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <path d="M14 2v6h6"></path>
+                                <path d="M8 13h8"></path>
+                                <path d="M8 17h8"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Registros</h3>
+                            <p>Filtra logs, limpia historial y vigila eventos sin salir del panel.</p>
+                        </div>
+                    </article>
+                    <article class="dashboard-launcher-card dashboard-launcher-card--info">
+                        <div class="launcher-icon launcher-icon--teal">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M4 17l6-6-6-6"></path>
+                                <path d="M12 19h8"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Comandos</h3>
+                            <p>Visualiza la galería de comandos y accede a cada categoría.</p>
+                        </div>
+                    </article>
                 </div>
             </div>
         </section>
