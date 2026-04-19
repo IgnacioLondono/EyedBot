@@ -23,13 +23,16 @@ module.exports = {
         }
 
         try {
-            const commands = [];
+            const byName = new Map();
+            const musicEnabled = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
 
             // Cargar todos los comandos
             const commandsPath = path.join(__dirname, '..');
             const commandFolders = fs.readdirSync(commandsPath);
 
             for (const folder of commandFolders) {
+                if (!musicEnabled && folder.toLowerCase() === 'music') continue;
+
                 const folderPath = path.join(commandsPath, folder);
                 if (!fs.statSync(folderPath).isDirectory()) continue;
                 
@@ -41,7 +44,7 @@ module.exports = {
                         const command = require(filePath);
                         
                         if ('data' in command && 'execute' in command) {
-                            commands.push(command.data.toJSON());
+                            byName.set(command.data.name, command.data.toJSON());
                         }
                     } catch (error) {
                         console.error(`Error cargando comando ${filePath}:`, error);
@@ -49,13 +52,31 @@ module.exports = {
                 }
             }
 
+            const commands = Array.from(byName.values());
+
             // Construir y preparar una instancia del módulo REST
             const rest = new REST().setToken(process.env.DISCORD_TOKEN);
             const clientId = process.env.CLIENT_ID || interaction.client.user.id;
+            const guildId = process.env.GUILD_ID || interaction.guildId;
 
-            // Sincronizar comandos globalmente
-            const data = await rest.put(
+            if (!guildId) {
+                throw new Error('No se encontró GUILD_ID para sincronizar comandos de servidor.');
+            }
+
+            // Limpia primero para evitar duplicados obsoletos por scope.
+            await rest.put(
+                Routes.applicationGuildCommands(clientId, guildId),
+                { body: [] }
+            );
+
+            await rest.put(
                 Routes.applicationCommands(clientId),
+                { body: [] }
+            );
+
+            // Sincronizar comandos solo en el servidor configurado.
+            const data = await rest.put(
+                Routes.applicationGuildCommands(clientId, guildId),
                 { body: commands }
             );
 
@@ -64,7 +85,7 @@ module.exports = {
                 .setTitle('✅ Comandos Sincronizados')
                 .setDescription(`Se sincronizaron **${data.length}** comandos exitosamente.`)
                 .addFields(
-                    { name: 'Comandos Globales', value: `${data.length}`, inline: true },
+                    { name: 'Comandos del servidor', value: `${data.length}`, inline: true },
                     { name: 'Servidor', value: interaction.guild.name, inline: true }
                 )
                 .setFooter({ text: `Sincronizado por ${interaction.user.tag}` })
