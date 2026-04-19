@@ -256,6 +256,10 @@ function switchServerPane(paneId, button = null) {
     targetPane.classList.add('active');
     currentServerPaneId = paneId;
 
+    const contentArea = document.querySelector('.server-content-area');
+    if (contentArea) contentArea.scrollTop = 0;
+    targetPane.scrollTop = 0;
+
     if (button) activateServerSideButton(button);
 }
 
