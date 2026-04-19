@@ -370,6 +370,16 @@ async function main() {
     Promise.race([registerPromise, timeoutPromise])
         .then(() => {
             console.log('✅ Comandos registrados exitosamente.');
+
+            // Limpia comandos globales obsoletos del bot sin bloquear el arranque.
+            return Promise.race([
+                rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('global cleanup timeout')), registerTimeoutMs))
+            ]).then(() => {
+                console.log('🧹 Comandos globales obsoletos limpiados.');
+            }).catch((cleanupError) => {
+                console.warn('⚠️ No se pudieron limpiar comandos globales:', cleanupError?.message || cleanupError);
+            });
         })
         .catch((error) => {
             console.error('⚠️ Registro de comandos omitido por error/timeout:', error?.message || error);
