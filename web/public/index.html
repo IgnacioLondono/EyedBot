@@ -27,26 +27,29 @@
             </div>
             <div class="nav-tabs" id="primaryTabs" aria-label="Navegación principal">
                 <a href="#" id="dashboardBtn" class="nav-link active">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
+                    <span class="nav-icon-shell">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 13l4-4 4 4 8-8"></path>
+                            <path d="M3 21h18"></path>
+                            <path d="M3 3v18"></path>
+                        </svg>
+                    </span>
                     <span>Dashboard</span>
                 </a>
                 <a href="#" id="controlCenterBtn" class="nav-link" data-section="controlCenterSection" title="Control Center">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M12 2v3"></path>
-                        <path d="M12 19v3"></path>
-                        <path d="M4.93 4.93l2.12 2.12"></path>
-                        <path d="M16.95 16.95l2.12 2.12"></path>
-                        <path d="M2 12h3"></path>
-                        <path d="M19 12h3"></path>
-                        <path d="M4.93 19.07l2.12-2.12"></path>
-                        <path d="M16.95 7.05l2.12-2.12"></path>
-                    </svg>
+                    <span class="nav-icon-shell">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <path d="M12 3v3"></path>
+                            <path d="M12 18v3"></path>
+                            <path d="M5.64 5.64l2.12 2.12"></path>
+                            <path d="M16.24 16.24l2.12 2.12"></path>
+                            <path d="M3 12h3"></path>
+                            <path d="M18 12h3"></path>
+                            <path d="M5.64 18.36l2.12-2.12"></path>
+                            <path d="M16.24 7.76l2.12-2.12"></path>
+                        </svg>
+                    </span>
                     <span>Control Center</span>
                 </a>
             </div>
@@ -79,7 +82,7 @@
             <div class="container dashboard-shell">
                 <div class="section-header section-header--split dashboard-search-header">
                     <div class="section-heading">
-                        <h2 class="section-title">Servidores</h2>
+                        <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13l4-4 4 4 8-8"></path><path d="M3 21h18"></path><path d="M3 3v18"></path></svg>Servidores</h2>
                         <div class="title-accent"></div>
                     </div>
                     <div class="section-tools">
@@ -238,7 +241,7 @@
             <div class="container">
                 <div class="section-header section-header--split">
                     <div class="section-heading">
-                        <h2 class="section-title">Enviar Embed</h2>
+                        <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>Enviar Embed</h2>
                         <div class="title-accent"></div>
                     </div>
                     <div class="section-tools">
@@ -499,7 +502,7 @@
             <div class="container">
                 <div class="section-header section-header--split">
                     <div class="section-heading">
-                        <h2 class="section-title">Estadísticas del Bot</h2>
+                        <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="M7 14l4-4 4 4 6-7"></path></svg>Estadísticas del Bot</h2>
                         <div class="title-accent"></div>
                     </div>
                     <div class="section-tools">
@@ -588,7 +591,7 @@
             <div class="container">
                 <div class="section-header section-header--split">
                     <div class="section-heading">
-                        <h2 class="section-title">Logs del Bot</h2>
+                        <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>Logs del Bot</h2>
                         <div class="title-accent"></div>
                         <div class="section-subtools">
                             <select id="logLevelFilter" class="form-control log-filter">
@@ -630,9 +633,12 @@
             <div class="container">
                 <div class="section-header">
                     <button type="button" id="backToServerFromCommands" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
-                        <
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M15 18l-6-6 6-6"></path>
+                        </svg>
+                        <span>Volver</span>
                     </button>
-                    <h2 class="section-title">Gestión de Comandos</h2>
+                    <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 8 4 12l4 4"></path><path d="M16 8l4 4-4 4"></path><path d="M10 19l4-14"></path></svg>Gestión de Comandos</h2>
                     <div class="title-accent"></div>
                 </div>
                 <div id="commandsContainer" class="commands-grid"></div>
@@ -643,7 +649,7 @@
         <section id="serverSection" class="section">
             <div class="container">
                 <div class="section-header">
-                    <h2 class="section-title">Configuración por Servidor</h2>
+                    <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path><path d="M9 12l2 2 4-4"></path></svg>Configuración por Servidor</h2>
                     <div class="title-accent"></div>
                 </div>
                 <div class="server-shell">
@@ -674,7 +680,7 @@
                         </div>
 
                         <div class="side-menu-group" data-group="panel">
-                            <h4 class="side-menu-group-title" role="button" tabindex="0">Panel</h4>
+                            <h4 class="side-menu-group-title" role="button" tabindex="0"><span class="side-menu-group-title-inner"><svg class="side-menu-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"></path><path d="M3 6h18"></path><path d="M3 18h18"></path></svg><span>Panel</span></span></h4>
                             <div class="side-menu-items">
                             <button type="button" class="side-menu-btn active" data-server-pane="serverPaneOverview">
                                 <span class="side-menu-btn-inner">
@@ -698,7 +704,7 @@
                         </div>
 
                         <div class="side-menu-group" data-group="modules">
-                            <h4 class="side-menu-group-title" role="button" tabindex="0">Módulos</h4>
+                            <h4 class="side-menu-group-title" role="button" tabindex="0"><span class="side-menu-group-title-inner"><svg class="side-menu-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="7" height="7"></rect><rect x="14" y="4" width="7" height="7"></rect><rect x="3" y="15" width="7" height="7"></rect><rect x="14" y="15" width="7" height="7"></rect></svg><span>Módulos</span></span></h4>
                             <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-server-pane="serverPaneWelcome">
                                 <span class="side-menu-btn-inner">
@@ -766,7 +772,7 @@
                         </div>
 
                         <div class="side-menu-group" data-group="moderation">
-                            <h4 class="side-menu-group-title" role="button" tabindex="0">Moderación</h4>
+                            <h4 class="side-menu-group-title" role="button" tabindex="0"><span class="side-menu-group-title-inner"><svg class="side-menu-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path><path d="M9 12l2 2 4-4"></path></svg><span>Moderación</span></span></h4>
                             <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-server-pane="serverPaneModeration">
                                 <span class="side-menu-btn-inner">
@@ -790,7 +796,7 @@
                         </div>
 
                         <div class="side-menu-group" data-group="notifications">
-                            <h4 class="side-menu-group-title" role="button" tabindex="0">Notificaciones</h4>
+                            <h4 class="side-menu-group-title" role="button" tabindex="0"><span class="side-menu-group-title-inner"><svg class="side-menu-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span>Notificaciones</span></span></h4>
                             <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-server-pane="serverPaneNotifications">
                                 <span class="side-menu-btn-inner">
@@ -805,7 +811,7 @@
                         </div>
 
                         <div class="side-menu-group" data-group="shortcuts">
-                            <h4 class="side-menu-group-title" role="button" tabindex="0">Atajos rápidos</h4>
+                            <h4 class="side-menu-group-title" role="button" tabindex="0"><span class="side-menu-group-title-inner"><svg class="side-menu-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h8l-1 8 11-12h-8z"></path></svg><span>Atajos rápidos</span></span></h4>
                             <div class="side-menu-items">
                             <button type="button" class="side-menu-btn" data-quick-section="embedSection">
                                 <span class="side-menu-btn-inner">
