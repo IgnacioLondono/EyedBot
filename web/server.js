@@ -270,6 +270,7 @@ function extFromMimeOrName(mimeType = '', originalName = '') {
 
 const LOGIN_ANALYTICS_KEY = 'web:analytics:global_logins_v1';
 const LOGIN_ANALYTICS_VERSION = 1;
+const LOGIN_ANALYTICS_FILE_PATH = path.join(__dirname, '..', 'data', 'web-login-registry.json');
 
 function isOwnerUser(user = null) {
     return String(user?.id || '') === String(OWNER_DISCORD_ID);
@@ -310,6 +311,68 @@ function normalizeLoginAnalytics(raw) {
     };
 }
 
+function ensureLoginAnalyticsFileStore() {
+    const dir = path.dirname(LOGIN_ANALYTICS_FILE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(LOGIN_ANALYTICS_FILE_PATH)) {
+        fs.writeFileSync(
+            LOGIN_ANALYTICS_FILE_PATH,
+            JSON.stringify(normalizeLoginAnalytics(null), null, 2),
+            'utf8'
+        );
+    }
+}
+
+function readLoginAnalyticsFromFile() {
+    try {
+        ensureLoginAnalyticsFileStore();
+        const raw = fs.readFileSync(LOGIN_ANALYTICS_FILE_PATH, 'utf8');
+        const parsed = JSON.parse(raw || '{}');
+        return normalizeLoginAnalytics(parsed);
+    } catch (error) {
+        console.warn('⚠️ No se pudo leer web-login-registry.json:', error.message);
+        return normalizeLoginAnalytics(null);
+    }
+}
+
+function writeLoginAnalyticsToFile(analytics) {
+    try {
+        ensureLoginAnalyticsFileStore();
+        fs.writeFileSync(
+            LOGIN_ANALYTICS_FILE_PATH,
+            JSON.stringify(normalizeLoginAnalytics(analytics), null, 2),
+            'utf8'
+        );
+        return true;
+    } catch (error) {
+        console.warn('⚠️ No se pudo escribir web-login-registry.json:', error.message);
+        return false;
+    }
+}
+
+async function loadLoginAnalyticsSnapshot() {
+    const dbSnapshot = normalizeLoginAnalytics(await safeDbGet(LOGIN_ANALYTICS_KEY, null));
+    const hasDbData =
+        Object.keys(dbSnapshot.users || {}).length > 0 ||
+        Number(dbSnapshot?.totals?.totalLogins || 0) > 0;
+
+    if (hasDbData) {
+        writeLoginAnalyticsToFile(dbSnapshot);
+        return dbSnapshot;
+    }
+
+    const fileSnapshot = readLoginAnalyticsFromFile();
+    const hasFileData =
+        Object.keys(fileSnapshot.users || {}).length > 0 ||
+        Number(fileSnapshot?.totals?.totalLogins || 0) > 0;
+
+    if (hasFileData) {
+        await safeDbSet(LOGIN_ANALYTICS_KEY, fileSnapshot);
+    }
+
+    return fileSnapshot;
+}
+
 function summarizeAnalytics(analytics) {
     const users = Object.values(analytics.users || {});
     const uniqueGuildNames = new Set();
@@ -331,7 +394,7 @@ function summarizeAnalytics(analytics) {
 async function recordGlobalLoginEvent(user, guilds = []) {
     if (!user?.id) return;
 
-    const analytics = normalizeLoginAnalytics(await safeDbGet(LOGIN_ANALYTICS_KEY, null));
+    const analytics = await loadLoginAnalyticsSnapshot();
     const userId = String(user.id);
     const nowIso = new Date().toISOString();
     const guildList = Array.isArray(guilds) ? guilds : [];
@@ -362,6 +425,7 @@ async function recordGlobalLoginEvent(user, guilds = []) {
     analytics.updatedAt = nowIso;
 
     await safeDbSet(LOGIN_ANALYTICS_KEY, analytics);
+    writeLoginAnalyticsToFile(analytics);
 }
 
 function extractUploadPath(rawUrl = '') {
@@ -683,7 +747,7 @@ app.get('/api/user', requireAuth, (req, res) => {
 
 app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
     try {
-        const analytics = normalizeLoginAnalytics(await safeDbGet(LOGIN_ANALYTICS_KEY, null));
+        const analytics = await loadLoginAnalyticsSnapshot();
         const users = Object.values(analytics.users || {})
             .map((entry) => ({
                 userId: String(entry.userId || ''),
