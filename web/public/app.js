@@ -1115,6 +1115,51 @@ async function checkAuth() {
 }
 
 // Actualizar UI del usuario
+function detectBrowserName() {
+    const ua = navigator.userAgent || '';
+    if (ua.includes('Edg/')) return 'Microsoft Edge';
+    if (ua.includes('Chrome/')) return 'Google Chrome';
+    if (ua.includes('Firefox/')) return 'Mozilla Firefox';
+    if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'Safari';
+    return 'Navegador no identificado';
+}
+
+function updateProfileSettingsData() {
+    const accountName = document.getElementById('settingsAccountName');
+    const accountId = document.getElementById('settingsAccountId');
+    const accountAvatar = document.getElementById('settingsAccountAvatar');
+    const webHost = document.getElementById('settingsWebHost');
+    const webPath = document.getElementById('settingsWebPath');
+    const webBrowser = document.getElementById('settingsWebBrowser');
+    const webTimezone = document.getElementById('settingsWebTimezone');
+
+    if (accountName) {
+        accountName.textContent = currentUser?.username || '-';
+    }
+    if (accountId) {
+        accountId.textContent = currentUser?.id || '-';
+    }
+    if (accountAvatar) {
+        accountAvatar.textContent = currentUser?.avatar ? 'Configurado en Discord' : 'No disponible';
+    }
+    if (webHost) {
+        webHost.textContent = window.location.host || '-';
+    }
+    if (webPath) {
+        webPath.textContent = window.location.pathname || '/';
+    }
+    if (webBrowser) {
+        webBrowser.textContent = detectBrowserName();
+    }
+    if (webTimezone) {
+        try {
+            webTimezone.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || '-';
+        } catch {
+            webTimezone.textContent = '-';
+        }
+    }
+}
+
 function updateUserUI() {
     if (currentUser) {
         document.getElementById('userName').textContent = currentUser.username;
@@ -1124,6 +1169,8 @@ function updateUserUI() {
             document.getElementById('userAvatar').src = `https://cdn.discordapp.com/embed/avatars/${currentUser.discriminator % 5}.png`;
         }
     }
+
+    updateProfileSettingsData();
 
     const addBotBtn = document.getElementById('addBotBtn');
     if (addBotBtn) {
@@ -1354,6 +1401,17 @@ function setupEventListeners() {
         document.getElementById('dropdownMenu').classList.remove('show');
     });
 
+    const profileSettingsBtn = document.getElementById('profileSettingsBtn');
+    if (profileSettingsBtn) {
+        profileSettingsBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('dropdownMenu').classList.remove('show');
+            updateProfileSettingsData();
+            showSection('profileSettingsSection');
+        });
+    }
+
     // Embed form
     document.getElementById('guildSelect').addEventListener('change', () => {
         handleGuildSelect();
@@ -1510,6 +1568,7 @@ function showSection(sectionId, options = {}) {
     const navIdBySection = {
         dashboard: 'dashboardBtn',
         controlCenterSection: 'controlCenterBtn',
+        profileSettingsSection: 'controlCenterBtn',
         serverSection: 'serverBtn',
         embedSection: 'embedBtn',
         statsSection: 'statsBtn',
