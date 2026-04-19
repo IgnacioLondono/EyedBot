@@ -50,18 +50,24 @@ const rest = new REST({ version: '10' }).setToken(token);
 (async () => {
     try {
         console.log(`🔄 Registrando ${commands.length} comandos en guild ${guildId}...`);
+
+        await rest.put(
+            Routes.applicationGuildCommands(clientId, guildId),
+            { body: [] }
+        );
+
+        await rest.put(
+            Routes.applicationCommands(clientId),
+            { body: [] }
+        );
+
         const guildData = await rest.put(
             Routes.applicationGuildCommands(clientId, guildId),
             { body: commands }
         );
         console.log(`✅ Guild actualizado: ${guildData.length} comandos.`);
 
-        // Limpia globales para evitar "duplicados" por scope.
-        const cleared = await rest.put(
-            Routes.applicationCommands(clientId),
-            { body: [] }
-        );
-        console.log(`🧹 Comandos globales limpiados: ${cleared.length}.`);
+        console.log('🧹 Limpieza de comandos obsoletos completada (guild/global).');
     } catch (error) {
         if (error?.status === 401) {
             console.error('❌ 401 Unauthorized: token invalido o regenerado.');

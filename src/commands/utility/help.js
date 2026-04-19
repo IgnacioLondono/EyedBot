@@ -69,7 +69,7 @@ module.exports = {
                         : 'No hay comandos en esta categoría.')
                     .setFooter({ text: `Total: ${categoryCommands.length} comandos` });
 
-                return interaction.reply({ embeds: [embed] });
+                return interaction.reply({ embeds: [embed], flags: 64 });
             }
 
             // Contar comandos por categoría
@@ -95,7 +95,7 @@ module.exports = {
                 )
                 .setFooter({ text: `Prefijo: ${config.prefix}` });
 
-            return interaction.reply({ embeds: [embed] });
+            return interaction.reply({ embeds: [embed], flags: 64 });
         } catch (error) {
             console.error('Error en help:', error);
             return interaction.reply({
