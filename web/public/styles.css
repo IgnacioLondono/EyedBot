@@ -3165,3 +3165,36 @@ body {
         width: calc(100vw - 1.5rem);
     }
 }
+
+/* Embed section: avoid clipping at viewport bottom */
+#embedSection .container {
+    padding-bottom: 1.25rem;
+}
+
+#embedSection .embed-form-container {
+    margin-bottom: 0.8rem;
+    padding: clamp(1rem, 1.8vw, 1.5rem);
+    overflow: visible;
+}
+
+#embedSection .embed-builder {
+    grid-template-columns: minmax(300px, 0.95fr) minmax(0, 1.05fr);
+    gap: 1.35rem;
+    align-items: start;
+}
+
+#embedSection .embed-preview-container {
+    position: sticky;
+    top: 0.35rem;
+    align-self: start;
+}
+
+@media (max-width: 1200px) {
+    #embedSection .embed-builder {
+        grid-template-columns: 1fr;
+    }
+
+    #embedSection .embed-preview-container {
+        position: static;
+    }
+}
