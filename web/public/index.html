@@ -126,8 +126,136 @@
         </div>
         <!-- Dashboard -->
         <section id="dashboard" class="section active">
-            <div class="container">
-                <div class="section-header section-header--split">
+            <div class="container dashboard-shell">
+                <div class="dashboard-hero">
+                    <div class="dashboard-hero-copy">
+                        <div class="hero-eyebrow">
+                            <span class="hero-eyebrow-dot"></span>
+                            Centro de mando
+                        </div>
+                        <h2>Un panel más limpio, más rápido y más visual</h2>
+                        <p>
+                            Administra servidor, embeds, estadísticas y logs desde un flujo tipo consola premium.
+                            Cada bloque fue pensado como una pantalla propia, con accesos directos y jerarquía clara.
+                        </p>
+                        <div class="hero-actions">
+                            <button type="button" class="hero-action-btn hero-action-btn--primary" data-section="serverSection">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M21 16V8"></path>
+                                    <path d="M17 16V8"></path>
+                                    <path d="M14 16H2"></path>
+                                    <path d="M14 8H2"></path>
+                                </svg>
+                                <span>Configurar servidor</span>
+                            </button>
+                            <button type="button" class="hero-action-btn" data-section="embedSection">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M22 2L11 13"></path>
+                                    <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                                </svg>
+                                <span>Diseñar embed</span>
+                            </button>
+                            <button type="button" class="hero-action-btn" data-section="statsSection">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M3 3v18h18"></path>
+                                    <path d="M7 14l4-4 4 4 6-7"></path>
+                                </svg>
+                                <span>Ver métricas</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="dashboard-hero-panel">
+                        <div class="hero-status-card">
+                            <div class="hero-status-label">Estado del sistema</div>
+                            <div class="hero-status-value">Operativo</div>
+                            <div class="hero-status-meta">OAuth, MySQL y registros en vivo activos</div>
+                        </div>
+                        <div class="hero-metrics-grid">
+                            <div class="hero-metric">
+                                <span class="hero-metric-value">5</span>
+                                <span class="hero-metric-label">Módulos visibles</span>
+                            </div>
+                            <div class="hero-metric">
+                                <span class="hero-metric-value">1</span>
+                                <span class="hero-metric-label">Servidor enlazado</span>
+                            </div>
+                            <div class="hero-metric">
+                                <span class="hero-metric-value">60+</span>
+                                <span class="hero-metric-label">Comandos cargados</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-launcher">
+                    <button type="button" class="dashboard-launcher-card" data-section="serverSection">
+                        <div class="launcher-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M21 16V8"></path>
+                                <path d="M17 16V8"></path>
+                                <path d="M14 16H2"></path>
+                                <path d="M14 8H2"></path>
+                                <path d="M9 20h12"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Servidor</h3>
+                            <p>Accede a la configuración, módulos, bienvenida, seguridad y moderación.</p>
+                        </div>
+                    </button>
+                    <button type="button" class="dashboard-launcher-card" data-section="embedSection">
+                        <div class="launcher-icon launcher-icon--pink">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M22 2L11 13"></path>
+                                <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Embeds</h3>
+                            <p>Constructor visual con plantillas, campos y vista previa en tiempo real.</p>
+                        </div>
+                    </button>
+                    <button type="button" class="dashboard-launcher-card" data-section="statsSection">
+                        <div class="launcher-icon launcher-icon--gold">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M3 3v18h18"></path>
+                                <path d="M7 14l4-4 4 4 6-7"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Analítica</h3>
+                            <p>Consulta rendimiento, actividad y salud general del bot.</p>
+                        </div>
+                    </button>
+                    <button type="button" class="dashboard-launcher-card" data-section="logsSection">
+                        <div class="launcher-icon launcher-icon--violet">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <path d="M14 2v6h6"></path>
+                                <path d="M8 13h8"></path>
+                                <path d="M8 17h8"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Registros</h3>
+                            <p>Filtra logs, limpia historial y vigila eventos sin salir del panel.</p>
+                        </div>
+                    </button>
+                    <button type="button" class="dashboard-launcher-card" data-section="commandsSection">
+                        <div class="launcher-icon launcher-icon--teal">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M4 17l6-6-6-6"></path>
+                                <path d="M12 19h8"></path>
+                            </svg>
+                        </div>
+                        <div class="launcher-copy">
+                            <h3>Comandos</h3>
+                            <p>Visualiza la galería de comandos y accede a cada categoría.</p>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="section-header section-header--split dashboard-search-header">
                     <div class="section-heading">
                         <h2 class="section-title">Servidores</h2>
                         <div class="title-accent"></div>
