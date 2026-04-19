@@ -746,6 +746,32 @@
                     </div>
                 </div>
                 <div id="systemInfo" class="system-info-grid" style="margin-top: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;"></div>
+
+                <div id="ownerAnalyticsPanel" class="owner-analytics-panel" style="display:none;">
+                    <div class="owner-analytics-header">
+                        <h3>Registro global de uso</h3>
+                        <p>Solo visible para el creador. Incluye métricas agregadas y perfil básico público sin información sensible.</p>
+                    </div>
+                    <div id="ownerAnalyticsSummary" class="owner-analytics-summary"></div>
+                    <div class="owner-analytics-table-wrap">
+                        <table class="owner-analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Perfil</th>
+                                    <th>Logins</th>
+                                    <th>Servidores</th>
+                                    <th>Lista de servidores</th>
+                                    <th>Ultimo acceso</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ownerAnalyticsRows">
+                                <tr>
+                                    <td colspan="5">Cargando registro global...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </section>
 

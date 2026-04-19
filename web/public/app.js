@@ -1,5 +1,6 @@
 // Estado de la aplicación
 let currentUser = null;
+let isOwnerUser = false;
 let currentGuilds = [];
 let embedFields = [];
 let currentEmbedTemplates = [];
@@ -1120,6 +1121,7 @@ async function checkAuth() {
             }
 
             currentUser = data.user;
+            isOwnerUser = Boolean(data.isOwner);
             currentGuilds = data.guilds || [];
             botInviteUrl = String(data.inviteUrl || '').trim();
             updateUserUI();
@@ -1204,6 +1206,26 @@ function updateUserUI() {
     }
 
     updateProfileSettingsData();
+
+    const ownerRestrictedSelectors = [
+        '#statsBtn',
+        '#logsBtn',
+        '[data-section="statsSection"]',
+        '[data-section="logsSection"]'
+    ];
+
+    ownerRestrictedSelectors.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((el) => {
+            if (!(el instanceof HTMLElement)) return;
+            if (isOwnerUser) {
+                el.style.display = '';
+                el.classList.remove('owner-only-hidden');
+            } else {
+                el.style.display = 'none';
+                el.classList.add('owner-only-hidden');
+            }
+        });
+    });
 
     const addBotBtn = document.getElementById('addBotBtn');
     if (addBotBtn) {
@@ -1586,6 +1608,11 @@ function setupEventListeners() {
 
 // Mostrar sección
 function showSection(sectionId, options = {}) {
+    if (!isOwnerUser && ['statsSection', 'logsSection'].includes(sectionId)) {
+        showToast('Esta seccion solo esta disponible para el creador del bot', 'warning');
+        sectionId = hasSelectedGuildContext() ? 'serverSection' : 'dashboard';
+    }
+
     if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'commandsSection', 'logsSection', 'serverSection'].includes(sectionId)) {
         showToast('Primero selecciona un servidor en el dashboard', 'warning');
         sectionId = 'dashboard';
@@ -2213,58 +2240,68 @@ async function sendEmbed() {
 
 // Cargar estadísticas
 async function loadStats() {
+    const ownerPanel = document.getElementById('ownerAnalyticsPanel');
+    if (!isOwnerUser) {
+        if (ownerPanel) ownerPanel.style.display = 'none';
+        return;
+    }
+
     try {
         const response = await fetchWithCredentials('/api/stats');
-        if (response.ok) {
-            const stats = await response.json();
-            document.getElementById('statGuilds').textContent = stats.guilds || 0;
-            document.getElementById('statUsers').textContent = stats.users || 0;
-            document.getElementById('statChannels').textContent = stats.channels || 0;
-            document.getElementById('statPing').textContent = Number.isFinite(stats.ping) && stats.ping >= 0 ? stats.ping : '--';
-            document.getElementById('statCommands').textContent = stats.commands || 0;
-            
-            // Formatear uptime
-            const uptime = stats.uptime || 0;
-            const days = Math.floor(uptime / 86400000);
-            const hours = Math.floor((uptime % 86400000) / 3600000);
-            const minutes = Math.floor((uptime % 3600000) / 60000);
-            document.getElementById('statUptime').textContent = `${days}d ${hours}h ${minutes}m`;
-            
-            // Mostrar información del sistema
-            if (stats.memory) {
-                const systemInfo = document.getElementById('systemInfo');
-                systemInfo.innerHTML = `
-                    <div class="system-info-card">
-                        <h4>Memoria</h4>
-                        <div class="system-info-item">
-                            <span class="system-info-label">Heap Usado</span>
-                            <span class="system-info-value">${(stats.memory.heapUsed / 1024 / 1024).toFixed(2)} MB</span>
-                        </div>
-                        <div class="system-info-item">
-                            <span class="system-info-label">Heap Total</span>
-                            <span class="system-info-value">${(stats.memory.heapTotal / 1024 / 1024).toFixed(2)} MB</span>
-                        </div>
-                        <div class="system-info-item">
-                            <span class="system-info-label">RSS</span>
-                            <span class="system-info-value">${(stats.memory.rss / 1024 / 1024).toFixed(2)} MB</span>
-                        </div>
-                    </div>
-                    <div class="system-info-card">
-                        <h4>Sistema</h4>
-                        <div class="system-info-item">
-                            <span class="system-info-label">Node.js</span>
-                            <span class="system-info-value">${stats.nodeVersion || 'N/A'}</span>
-                        </div>
-                        <div class="system-info-item">
-                            <span class="system-info-label">Plataforma</span>
-                            <span class="system-info-value">${stats.platform || 'N/A'}</span>
-                        </div>
-                    </div>
-                `;
-            }
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || 'Error al cargar estadísticas');
         }
+
+        const stats = await response.json();
+        document.getElementById('statGuilds').textContent = stats.guilds || 0;
+        document.getElementById('statUsers').textContent = stats.users || 0;
+        document.getElementById('statChannels').textContent = stats.channels || 0;
+        document.getElementById('statPing').textContent = Number.isFinite(stats.ping) && stats.ping >= 0 ? stats.ping : '--';
+        document.getElementById('statCommands').textContent = stats.commands || 0;
+
+        const uptime = stats.uptime || 0;
+        const days = Math.floor(uptime / 86400000);
+        const hours = Math.floor((uptime % 86400000) / 3600000);
+        const minutes = Math.floor((uptime % 3600000) / 60000);
+        document.getElementById('statUptime').textContent = `${days}d ${hours}h ${minutes}m`;
+
+        if (stats.memory) {
+            const systemInfo = document.getElementById('systemInfo');
+            systemInfo.innerHTML = `
+                <div class="system-info-card">
+                    <h4>Memoria</h4>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Heap Usado</span>
+                        <span class="system-info-value">${(stats.memory.heapUsed / 1024 / 1024).toFixed(2)} MB</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Heap Total</span>
+                        <span class="system-info-value">${(stats.memory.heapTotal / 1024 / 1024).toFixed(2)} MB</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">RSS</span>
+                        <span class="system-info-value">${(stats.memory.rss / 1024 / 1024).toFixed(2)} MB</span>
+                    </div>
+                </div>
+                <div class="system-info-card">
+                    <h4>Sistema</h4>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Node.js</span>
+                        <span class="system-info-value">${stats.nodeVersion || 'N/A'}</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Plataforma</span>
+                        <span class="system-info-value">${stats.platform || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        await loadOwnerLoginRegistry();
     } catch (error) {
         console.error('Error cargando estadísticas:', error);
+        showToast(error.message || 'Error cargando estadísticas', 'error');
     }
 }
 
@@ -2275,6 +2312,14 @@ let logsInterval = null;
 let logsListenersSetup = false;
 
 async function loadLogs() {
+    if (!isOwnerUser) {
+        const container = document.getElementById('logsContainer');
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><p>Los logs solo estan disponibles para el creador del bot.</p></div>';
+        }
+        return;
+    }
+
     const container = document.getElementById('logsContainer');
     
     try {
@@ -2344,6 +2389,63 @@ async function loadLogs() {
     } catch (error) {
         console.error('Error cargando logs:', error);
         container.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--error-color);"><p>Error al cargar logs: ${error.message}</p></div>`;
+    }
+}
+
+async function loadOwnerLoginRegistry() {
+    if (!isOwnerUser) return;
+
+    const panel = document.getElementById('ownerAnalyticsPanel');
+    const summary = document.getElementById('ownerAnalyticsSummary');
+    const tableBody = document.getElementById('ownerAnalyticsRows');
+
+    if (!panel || !summary || !tableBody) return;
+
+    try {
+        const response = await fetchWithCredentials('/api/admin/login-registry');
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || 'No se pudo cargar el registro global');
+        }
+
+        const payload = await response.json();
+        const dataSummary = payload.summary || {};
+        const users = Array.isArray(payload.users) ? payload.users : [];
+
+        panel.style.display = 'block';
+        summary.innerHTML = `
+            <div class="owner-analytics-pill"><strong>${dataSummary.totalLogins || 0}</strong><span>Inicios de sesión</span></div>
+            <div class="owner-analytics-pill"><strong>${dataSummary.uniqueUsers || 0}</strong><span>Usuarios únicos</span></div>
+            <div class="owner-analytics-pill"><strong>${dataSummary.uniqueGuildsSeen || 0}</strong><span>Servidores únicos</span></div>
+        `;
+
+        if (users.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5">Sin registros por el momento.</td></tr>';
+            return;
+        }
+
+        tableBody.innerHTML = users.map((entry) => {
+            const serverNames = (entry.guilds || []).slice(0, 5).map((g) => `${escapeHtml(g.name)} ${g.idSuffix ? `(••${escapeHtml(g.idSuffix)})` : ''}`).join(', ');
+            const moreCount = Math.max(0, (entry.guilds || []).length - 5);
+            const name = escapeHtml(entry.globalName || entry.username || 'Usuario');
+            const username = escapeHtml(entry.username || 'usuario');
+            const profileText = `${name} (@${username})`;
+            const lastSeen = entry.lastLoginAt ? new Date(entry.lastLoginAt).toLocaleString('es-ES') : 'N/A';
+
+            return `
+                <tr>
+                    <td>${profileText}</td>
+                    <td>${entry.loginCount || 0}</td>
+                    <td>${entry.guildCount || 0}</td>
+                    <td>${serverNames || 'Sin servidores'}${moreCount ? ` +${moreCount} más` : ''}</td>
+                    <td>${lastSeen}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        panel.style.display = 'block';
+        summary.innerHTML = '<div class="owner-analytics-pill"><span>No se pudo cargar el registro global.</span></div>';
+        tableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(error.message || 'Error inesperado')}</td></tr>`;
     }
 }
 
