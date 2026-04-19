@@ -294,53 +294,21 @@ async function updateTicketPresetSelector(interaction, guildId, updater) {
 async function showTicketReasonModal(interaction, guildId, preset = {}) {
     const modal = new ModalBuilder()
         .setCustomId(`${MODAL_PREFIX}${guildId}`)
-        .setTitle('Motivo del ticket');
+        .setTitle('Cuentanos tu caso');
 
-    const prefillCategory = String(preset.category || '').trim().slice(0, 100);
-    const prefillCommonIssue = String(preset.commonIssue || '').trim().slice(0, 120);
-
-    const categoryInput = new TextInputBuilder()
-        .setCustomId('ticket_category_input')
-        .setLabel('Categoria de tu solicitud')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMinLength(3)
-        .setMaxLength(100)
-        .setPlaceholder('Ej: Soporte general, Reporte, Compras, Minecraft');
-
-    if (prefillCategory) categoryInput.setValue(prefillCategory);
-
-    const commonIssueInput = new TextInputBuilder()
-        .setCustomId('ticket_common_issue_input')
-        .setLabel('Problema comun (opcional)')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
-        .setMaxLength(120)
-        .setPlaceholder('Ej: Permisos, sancion, error del bot, roles');
-
-    if (prefillCommonIssue) commonIssueInput.setValue(prefillCommonIssue);
-
-    const noMatchIssueInput = new TextInputBuilder()
-        .setCustomId('ticket_no_match_issue_input')
-        .setLabel('No sale mi problema (opcional)')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
-        .setMaxLength(180)
-        .setPlaceholder('Describe aqui tu caso si no aparece en las opciones');
+    const selectedCategory = String(preset.category || 'Soporte general').trim();
+    const detailPlaceholder = `Categoria: ${selectedCategory}`.slice(0, 90);
 
     const reasonInput = new TextInputBuilder()
         .setCustomId('ticket_reason_input')
-        .setLabel('Explica brevemente tu solicitud')
+        .setLabel('Describe tu problema y tu caso')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true)
         .setMinLength(3)
         .setMaxLength(500)
-        .setPlaceholder('Ej: Necesito ayuda con permisos en el servidor');
+        .setPlaceholder(`${detailPlaceholder}. Incluye contexto y lo que necesitas.`);
 
     modal.addComponents(
-        new ActionRowBuilder().addComponents(categoryInput),
-        new ActionRowBuilder().addComponents(commonIssueInput),
-        new ActionRowBuilder().addComponents(noMatchIssueInput),
         new ActionRowBuilder().addComponents(reasonInput)
     );
     await interaction.showModal(modal);
@@ -595,14 +563,24 @@ async function handleTicketModal(interaction) {
     await interaction.deferReply({ flags: 64 }).catch(() => null);
 
     const guildId = interaction.customId.slice(MODAL_PREFIX.length);
-    const category = interaction.fields.getTextInputValue('ticket_category_input') || 'Soporte general';
-    const commonIssue = interaction.fields.getTextInputValue('ticket_common_issue_input') || 'No especificado';
-    const noMatchIssue = interaction.fields.getTextInputValue('ticket_no_match_issue_input') || 'No especificado';
     const reason = interaction.fields.getTextInputValue('ticket_reason_input') || 'Sin motivo';
+
+    let category = 'Soporte general';
+    let commonIssue = 'Mi caso no aparece en esta lista';
+
+    const cfg = await resolveConfig(guildId);
+    if (cfg) {
+        const optionsConfig = buildSelectionConfig(cfg);
+        const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+        const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+        category = optionLabelByValue(optionsConfig.categories, draft.category);
+        commonIssue = optionLabelByValue(categoryIssues, draft.commonIssue);
+    }
+
     await createTicketChannel(interaction, guildId, reason, {
         category,
         commonIssue,
-        noMatchIssue
+        noMatchIssue: reason
     });
     return true;
 }
