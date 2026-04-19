@@ -35,6 +35,7 @@ const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMM
 const COMMAND_REGISTER_RETRIES = Math.max(1, Number.parseInt(process.env.COMMAND_REGISTER_RETRIES || '3', 10));
 const COMMAND_REGISTER_RETRY_DELAY_MS = Math.max(1000, Number.parseInt(process.env.COMMAND_REGISTER_RETRY_DELAY_MS || '5000', 10));
 const COMMAND_REGISTER_POST_READY_DELAY_MS = Math.max(0, Number.parseInt(process.env.COMMAND_REGISTER_POST_READY_DELAY_MS || '10000', 10));
+const COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS || '25000', 10));
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',
     'ban',
@@ -97,6 +98,8 @@ async function registerSlashCommands() {
         ...connectedGuildIds
     ].filter(Boolean)));
 
+    const configuredGuildId = String(GUILD_ID || '').trim();
+
     if (!targetGuildIds.length) {
         console.error('❌ No se puede registrar slash: el bot no tiene servidores disponibles.');
         return false;
@@ -108,15 +111,25 @@ async function registerSlashCommands() {
                 console.log(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${COMMAND_REGISTER_RETRIES})...`);
 
                 let okCount = 0;
+                const failedGuilds = [];
                 for (const guildId of targetGuildIds) {
+                    const registerOneGuild = rest.put(
+                        Routes.applicationGuildCommands(appId, guildId),
+                        { body: commands }
+                    );
+
+                    const timeoutOneGuild = new Promise((_, reject) => {
+                        setTimeout(() => {
+                            reject(new Error(`timeout ${COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS}ms`));
+                        }, COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS);
+                    });
+
                     try {
-                        await rest.put(
-                            Routes.applicationGuildCommands(appId, guildId),
-                            { body: commands }
-                        );
+                        await Promise.race([registerOneGuild, timeoutOneGuild]);
                         okCount += 1;
                         console.log(`✅ Slash registrados en guild ${guildId}.`);
                     } catch (guildError) {
+                        failedGuilds.push(guildId);
                         console.warn(`⚠️ No se pudieron registrar slash en guild ${guildId}:`, guildError?.message || guildError);
                     }
                 }
@@ -125,11 +138,18 @@ async function registerSlashCommands() {
                     throw new Error('No se pudo registrar en ningún servidor conectado.');
                 }
 
+                if (configuredGuildId && failedGuilds.includes(configuredGuildId)) {
+                    throw new Error(`Falló el registro en el GUILD_ID configurado (${configuredGuildId}).`);
+                }
+
                 await rest.put(Routes.applicationCommands(appId), { body: [] }).catch((cleanupError) => {
                     console.warn('⚠️ No se pudieron limpiar comandos globales obsoletos:', cleanupError?.message || cleanupError);
                 });
 
                 console.log(`✅ Comandos registrados exitosamente para app ${appId} en ${okCount}/${targetGuildIds.length} servidores.`);
+                if (failedGuilds.length) {
+                    console.warn(`⚠️ Guilds con fallo de registro: ${failedGuilds.join(', ')}`);
+                }
                 return true;
             } catch (error) {
                 console.error(`⚠️ Falló registro de comandos (app ${appId}, intento ${attempt}):`, error?.message || error);
