@@ -34,6 +34,7 @@ const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === '
 const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMMAND_WARN_MS || '1200', 10));
 const COMMAND_REGISTER_RETRIES = Math.max(1, Number.parseInt(process.env.COMMAND_REGISTER_RETRIES || '3', 10));
 const COMMAND_REGISTER_RETRY_DELAY_MS = Math.max(1000, Number.parseInt(process.env.COMMAND_REGISTER_RETRY_DELAY_MS || '5000', 10));
+const COMMAND_REGISTER_POST_READY_DELAY_MS = Math.max(0, Number.parseInt(process.env.COMMAND_REGISTER_POST_READY_DELAY_MS || '10000', 10));
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',
     'ban',
@@ -199,9 +200,24 @@ client.once('clientReady', () => {
         console.error('❌ Error inesperado registrando slash:', error?.message || error);
     });
 
+    if (COMMAND_REGISTER_POST_READY_DELAY_MS > 0) {
+        setTimeout(() => {
+            registerSlashCommands().catch((error) => {
+                console.error('❌ Error en re-sincronización automática de slash:', error?.message || error);
+            });
+        }, COMMAND_REGISTER_POST_READY_DELAY_MS);
+    }
+
     startBackupScheduler();
     startVoiceXpLoop(client);
     startStreamAlertScheduler(client);
+});
+
+client.on('guildCreate', (guild) => {
+    console.log(`➕ Bot agregado a nuevo servidor: ${guild.id}. Sincronizando slash...`);
+    registerSlashCommands().catch((error) => {
+        console.error('❌ Error sincronizando slash en nuevo servidor:', error?.message || error);
+    });
 });
 
 client.on('messageCreate', async (message) => {
