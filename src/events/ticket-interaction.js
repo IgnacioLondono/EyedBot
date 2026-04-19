@@ -34,7 +34,7 @@ const DEFAULT_COMMON_ISSUES = [
     { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
     { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
     { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
-    { value: 'otro', label: 'Otro', description: 'Mi caso no aparece en esta lista' }
+    { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
 ];
 
 const ticketDrafts = new Map();
@@ -165,17 +165,7 @@ function optionLabelByValue(options, value) {
 }
 
 function buildSetupContent(optionsConfig, draft) {
-    const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
-    const issueLabel = optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue);
-
-    return [
-        'Configura tu ticket antes de enviarlo:',
-        `Categoria seleccionada: ${categoryLabel}`,
-        `Problema comun: ${issueLabel}`,
-        '',
-        'Si no aparece tu problema, abajo podras explicarlo en detalle.',
-        'Cuando termines, presiona "Continuar" para abrir el formulario.'
-    ].join('\n');
+    return '\u200b';
 }
 
 function buildSelectMenu(customId, placeholder, options, selectedValue) {
@@ -440,6 +430,11 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     await sendEphemeral(interaction, `Ticket creado: <#${created.id}>`);
 }
 
+function shouldOpenDetailModal(commonIssueValue, commonIssueLabel) {
+    if (String(commonIssueValue) === 'otro') return true;
+    return /no aparece en esta lista/i.test(String(commonIssueLabel || ''));
+}
+
 async function closeTicket(interaction) {
     const channel = interaction.channel;
     const guild = interaction.guild;
@@ -491,9 +486,22 @@ async function handleTicketButton(interaction) {
 
         const optionsConfig = buildSelectionConfig(cfg);
         const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
-        await showTicketReasonModal(interaction, guildId, {
-            category: optionLabelByValue(optionsConfig.categories, draft.category),
-            commonIssue: optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue)
+        const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
+        const commonIssueLabel = optionLabelByValue(optionsConfig.commonIssues, draft.commonIssue);
+
+        if (shouldOpenDetailModal(draft.commonIssue, commonIssueLabel)) {
+            await showTicketReasonModal(interaction, guildId, {
+                category: categoryLabel,
+                commonIssue: commonIssueLabel
+            });
+            return true;
+        }
+
+        await interaction.deferReply({ flags: 64 }).catch(() => null);
+        await createTicketChannel(interaction, guildId, commonIssueLabel, {
+            category: categoryLabel,
+            commonIssue: commonIssueLabel,
+            noMatchIssue: 'No aplica'
         });
         return true;
     }

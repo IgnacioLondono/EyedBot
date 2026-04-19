@@ -680,7 +680,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
             { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
             { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
-            { value: 'otro', label: 'Otro', description: 'Mi caso no aparece en esta lista' }
+            { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
         ];
 
         const defaultMinecraftServers = [
@@ -743,7 +743,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
             { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
             { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
-            { value: 'otro', label: 'Otro', description: 'Mi caso no aparece en esta lista' }
+            { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
         ];
 
         const defaultMinecraftServers = [
