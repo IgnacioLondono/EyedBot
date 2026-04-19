@@ -90,7 +90,7 @@ function isConnectionError(error) {
 function isMissingTableError(error) {
     const code = String(error?.code || '').toUpperCase();
     const message = String(error?.message || '').toLowerCase();
-    return code === 'ER_NO_SUCH_TABLE' || message.includes('doesn't exist') || message.includes('does not exist');
+    return code === 'ER_NO_SUCH_TABLE' || message.includes("doesn't exist") || message.includes('does not exist');
 }
 
 function setDbUnavailable(error, context) {
