@@ -23,19 +23,23 @@ let serverActivityChart = null;
 let serverActivityChartMode = 'week';
 
 const DASHBOARD_ICON = `
-    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="7" height="7"></rect>
-        <rect x="14" y="3" width="7" height="7"></rect>
-        <rect x="14" y="14" width="7" height="7"></rect>
-        <rect x="3" y="14" width="7" height="7"></rect>
-    </svg>
+    <span class="nav-icon-shell">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 13l4-4 4 4 8-8"></path>
+            <path d="M3 21h18"></path>
+            <path d="M3 3v18"></path>
+        </svg>
+    </span>
 `;
 
 const HOME_ICON = `
-    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 10.5L12 3l9 7.5"></path>
-        <path d="M5 9.5V21h14V9.5"></path>
-    </svg>
+    <span class="nav-icon-shell">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 11l9-7 9 7"></path>
+            <path d="M5 10v10h14V10"></path>
+            <path d="M10 20v-5h4v5"></path>
+        </svg>
+    </span>
 `;
 
 function registerGatedNavigationButtons() {
