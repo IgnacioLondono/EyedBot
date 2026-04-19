@@ -17,6 +17,7 @@ const db = require('../utils/database');
 const OPEN_PREFIX = 'ticket_open_';
 const MODAL_PREFIX = 'ticket_reason_';
 const CLOSE_ID = 'ticket_close';
+const ACCEPT_PREFIX = 'ticket_accept_';
 const CATEGORY_SELECT_PREFIX = 'ticket_cat_';
 const COMMON_SELECT_PREFIX = 'ticket_common_';
 const CONTINUE_PREFIX = 'ticket_continue_';
@@ -155,6 +156,36 @@ function buildCaseRoleIds(config, details = {}) {
     parseMappedRoleIds(map[`common:${commonIssueValue}`]).forEach((id) => mapped.add(id));
 
     return Array.from(mapped);
+}
+
+function buildCaseRoleSet(config, details = {}) {
+    const adminRoleSet = buildAdminRoleSet(config);
+    const caseRoleIds = buildCaseRoleIds(config, details);
+    return new Set([...adminRoleSet, ...caseRoleIds.map((id) => String(id))]);
+}
+
+function makePendingRequestId() {
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `${Date.now().toString(36)}${rand}`;
+}
+
+function pendingKey(guildId, requestId) {
+    return `ticket_pending_${guildId}_${requestId}`;
+}
+
+function pendingUserKey(guildId, userId) {
+    return `ticket_pending_user_${guildId}_${userId}`;
+}
+
+function parseAcceptCustomId(customId = '') {
+    if (!String(customId).startsWith(ACCEPT_PREFIX)) return null;
+    const payload = String(customId).slice(ACCEPT_PREFIX.length);
+    const splitIndex = payload.indexOf('_');
+    if (splitIndex <= 0) return null;
+    const guildId = payload.slice(0, splitIndex);
+    const requestId = payload.slice(splitIndex + 1);
+    if (!guildId || !requestId) return null;
+    return { guildId, requestId };
 }
 
 async function nextCloseReportId(guildId) {
@@ -451,6 +482,98 @@ async function showTicketPresetSelector(interaction, guildId) {
     }).catch(() => null);
 }
 
+async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
+    const guild = interaction.guild;
+    if (!guild || String(guild.id) !== String(guildId)) {
+        await sendEphemeral(interaction, 'Este boton no corresponde a este servidor.');
+        return;
+    }
+
+    const cfg = await resolveConfig(guildId);
+    if (!cfg) {
+        await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+        return;
+    }
+
+    const existing = guild.channels.cache.find((ch) =>
+        ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === interaction.user.id
+    );
+    if (existing) {
+        await sendEphemeral(interaction, `Ya tienes un ticket abierto: <#${existing.id}>`);
+        return;
+    }
+
+    const userPendingId = await db.get(pendingUserKey(guildId, interaction.user.id)).catch(() => null);
+    if (userPendingId) {
+        await sendEphemeral(interaction, 'Ya tienes una solicitud pendiente. Espera a que un moderador la atienda.');
+        return;
+    }
+
+    const panelChannel = guild.channels.cache.get(cfg.panelChannelId) || await guild.channels.fetch(cfg.panelChannelId).catch(() => null);
+    if (!panelChannel || !panelChannel.isTextBased()) {
+        await sendEphemeral(interaction, 'No se encontro el canal de tickets para dejar la solicitud pendiente.');
+        return;
+    }
+
+    const requestId = makePendingRequestId();
+    const acceptId = `${ACCEPT_PREFIX}${guildId}_${requestId}`;
+
+    const pendingEmbed = new EmbedBuilder()
+        .setColor('f5a623')
+        .setTitle('Solicitud de ticket pendiente')
+        .setDescription('Un moderador debe aceptar esta solicitud para crear el canal del ticket.')
+        .addFields(
+            { name: 'Solicitante', value: `<@${interaction.user.id}>`, inline: true },
+            { name: 'Categoria', value: String(payload.category || 'No especificado').slice(0, 1024), inline: true },
+            { name: 'Caso', value: String(payload.commonIssue || 'No especificado').slice(0, 1024), inline: true },
+            { name: 'Detalle', value: String(payload.reason || 'Sin detalles').slice(0, 1024), inline: false },
+            { name: 'Estado', value: 'Pendiente de aceptación', inline: true },
+            { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
+        )
+        .setTimestamp();
+
+    const acceptBtn = new ButtonBuilder()
+        .setCustomId(acceptId)
+        .setLabel('Aceptar solicitud')
+        .setStyle(ButtonStyle.Success);
+
+    const pendingMessage = await panelChannel.send({
+        content: `<@${interaction.user.id}>`,
+        embeds: [pendingEmbed],
+        components: [new ActionRowBuilder().addComponents(acceptBtn)]
+    }).catch(() => null);
+
+    if (!pendingMessage) {
+        await sendEphemeral(interaction, 'No se pudo registrar la solicitud pendiente.');
+        return;
+    }
+
+    const pendingRecord = {
+        requestId,
+        guildId,
+        requesterId: interaction.user.id,
+        requesterTag: interaction.user.tag,
+        requesterUsername: interaction.user.username,
+        category: String(payload.category || 'Soporte general'),
+        commonIssue: String(payload.commonIssue || 'No especificado'),
+        categoryValue: String(payload.categoryValue || ''),
+        commonIssueValue: String(payload.commonIssueValue || ''),
+        noMatchIssue: String(payload.noMatchIssue || 'No aplica'),
+        reason: String(payload.reason || 'Sin motivo'),
+        messageId: pendingMessage.id,
+        channelId: pendingMessage.channelId,
+        createdAt: new Date().toISOString()
+    };
+
+    await db.set(pendingKey(guildId, requestId), pendingRecord).catch(() => null);
+    await db.set(pendingUserKey(guildId, interaction.user.id), requestId).catch(() => null);
+
+    await interaction.editReply({
+        content: 'Tu solicitud quedo en estado pendiente. Te avisaremos cuando un moderador la acepte.',
+        components: []
+    }).catch(() => null);
+}
+
 async function updateTicketPresetSelector(interaction, guildId, updater) {
     const cfg = await resolveConfig(guildId);
     if (!cfg) {
@@ -526,7 +649,7 @@ async function showTicketReasonModal(interaction, guildId, preset = {}) {
     await interaction.showModal(modal);
 }
 
-async function createTicketChannel(interaction, guildId, reason, details = {}) {
+async function createTicketChannel(interaction, guildId, reason, details = {}, options = {}) {
     const guild = interaction.guild;
     if (!guild || String(guild.id) !== String(guildId)) {
         await sendEphemeral(interaction, 'Este boton no corresponde a este servidor.');
@@ -545,8 +668,11 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
         return;
     }
 
+    const ownerUserId = String(options.ownerUserId || interaction.user.id);
+    const ownerUsername = String(options.ownerUsername || interaction.user.username || 'usuario');
+
     const existing = guild.channels.cache.find((ch) =>
-        ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === interaction.user.id
+        ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === ownerUserId
     );
 
     if (existing) {
@@ -568,7 +694,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     const commonIssueLabel = String(details?.commonIssue || 'No especificado').trim().slice(0, 120) || 'No especificado';
     const noMatchIssueLabel = String(details?.noMatchIssue || 'No especificado').trim().slice(0, 180) || 'No especificado';
 
-    const baseName = toSafeChannelName(interaction.user.username);
+    const baseName = toSafeChannelName(ownerUsername);
     const categorySlug = toSafeChannelName(categoryLabel).slice(0, 24);
     const ticketName = `ticket-${categorySlug}-${baseName}`.slice(0, 95);
 
@@ -578,7 +704,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
             deny: [PermissionsBitField.Flags.ViewChannel]
         },
         {
-            id: interaction.user.id,
+            id: ownerUserId,
             allow: [
                 PermissionsBitField.Flags.ViewChannel,
                 PermissionsBitField.Flags.SendMessages,
@@ -625,7 +751,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     ]));
 
     const topic = [
-        `owner:${interaction.user.id}`,
+        `owner:${ownerUserId}`,
         `category:${categoryLabel}`,
         `common:${commonIssueLabel}`,
         `staff:${closerRoleIds.join(',')}`,
@@ -648,14 +774,14 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     const infoEmbed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
         .setAuthor({
-            name: `${interaction.user.username} abrió un ticket`,
-            iconURL: interaction.user.displayAvatarURL({ size: 64 })
+            name: `${ownerUsername} abrió un ticket`,
+            iconURL: options.ownerAvatarURL || interaction.user.displayAvatarURL({ size: 64 })
         })
-        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
+        .setThumbnail(options.ownerAvatarURL || interaction.user.displayAvatarURL({ size: 128 }))
         .setTitle('Nuevo ticket abierto')
         .setDescription('Se registró una nueva solicitud. El staff revisará la información del ticket.')
         .addFields(
-            { name: 'Usuario', value: `<@${interaction.user.id}>`, inline: true },
+            { name: 'Usuario', value: `<@${ownerUserId}>`, inline: true },
             { name: 'Referencia', value: `#${created.id}`, inline: true },
             { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
             { name: 'Caso', value: commonIssueLabel.slice(0, 1024), inline: true },
@@ -670,12 +796,12 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
         .setStyle(ButtonStyle.Danger);
 
     await created.send({
-        content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${interaction.user.id}>`.trim() || undefined,
+        content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
         embeds: [infoEmbed],
         components: [new ActionRowBuilder().addComponents(closeBtn)]
     }).catch(() => null);
 
-    clearDraftForUser(guildId, interaction.user.id);
+    clearDraftForUser(guildId, ownerUserId);
     await interaction.editReply({
         content: `Ticket creado correctamente. Accede aqui: <#${created.id}>`,
         components: []
@@ -684,6 +810,8 @@ async function createTicketChannel(interaction, guildId, reason, details = {}) {
     setTimeout(() => {
         interaction.deleteReply().catch(() => null);
     }, 60000);
+
+    return created;
 }
 
 function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue) {
@@ -741,6 +869,90 @@ async function handleTicketButton(interaction) {
         return true;
     }
 
+    if (interaction.customId.startsWith(ACCEPT_PREFIX)) {
+        const parsed = parseAcceptCustomId(interaction.customId);
+        if (!parsed) {
+            await interaction.reply({ content: 'Solicitud invalida.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const { guildId, requestId } = parsed;
+        if (String(interaction.guildId) !== String(guildId)) {
+            await interaction.reply({ content: 'Esta solicitud no corresponde a este servidor.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const pending = await db.get(pendingKey(guildId, requestId)).catch(() => null);
+        if (!pending) {
+            await interaction.reply({ content: 'Esta solicitud ya fue gestionada o no existe.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await interaction.reply({ content: 'El sistema de tickets no esta activo.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const closerRoleSet = buildCaseRoleSet(cfg, {
+            categoryValue: pending.categoryValue,
+            commonIssueValue: pending.commonIssueValue
+        });
+
+        if (!memberCanCloseTicket(interaction.member, closerRoleSet)) {
+            await interaction.reply({ content: 'No tienes permisos para aceptar esta solicitud.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        await interaction.deferReply({ flags: 64 }).catch(() => null);
+
+        const requesterUser = await interaction.client.users.fetch(pending.requesterId).catch(() => null);
+        const created = await createTicketChannel(
+            interaction,
+            guildId,
+            pending.reason,
+            {
+                category: pending.category,
+                commonIssue: pending.commonIssue,
+                categoryValue: pending.categoryValue,
+                commonIssueValue: pending.commonIssueValue,
+                noMatchIssue: pending.noMatchIssue
+            },
+            {
+                ownerUserId: pending.requesterId,
+                ownerUsername: pending.requesterUsername || requesterUser?.username,
+                ownerAvatarURL: requesterUser?.displayAvatarURL?.({ size: 128 })
+            }
+        );
+
+        if (created) {
+            const acceptedEmbed = new EmbedBuilder()
+                .setColor('43b581')
+                .setTitle('Solicitud aceptada')
+                .setDescription(`Esta solicitud sera gestionada por <@${interaction.user.id}>.`)
+                .addFields(
+                    { name: 'Solicitante', value: `<@${pending.requesterId}>`, inline: true },
+                    { name: 'Canal creado', value: `<#${created.id}>`, inline: true },
+                    { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
+                )
+                .setTimestamp();
+
+            await interaction.message.edit({
+                embeds: [acceptedEmbed],
+                components: []
+            }).catch(() => null);
+
+            await db.delete(pendingKey(guildId, requestId)).catch(() => null);
+            await db.delete(pendingUserKey(guildId, pending.requesterId)).catch(() => null);
+
+            if (requesterUser) {
+                await requesterUser.send(`Tu solicitud fue aceptada por ${interaction.user.tag}. Canal del ticket: <#${created.id}>`).catch(() => null);
+            }
+        }
+
+        return true;
+    }
+
     if (interaction.customId.startsWith(OPEN_PREFIX)) {
         const guildId = interaction.customId.slice(OPEN_PREFIX.length);
         await showTicketPresetSelector(interaction, guildId);
@@ -787,12 +999,13 @@ async function handleTicketButton(interaction) {
         }
 
         await interaction.deferReply({ flags: 64 }).catch(() => null);
-        await createTicketChannel(interaction, guildId, commonIssueLabel, {
+        await submitPendingTicketRequest(interaction, guildId, {
             category: categoryLabel,
             commonIssue: commonIssueLabel,
             categoryValue: draft.category,
             commonIssueValue: draft.commonIssue,
-            noMatchIssue: 'No aplica'
+            noMatchIssue: 'No aplica',
+            reason: commonIssueLabel
         });
         return true;
     }
@@ -871,12 +1084,13 @@ async function handleTicketModal(interaction) {
             .join('\n')
         : reason;
 
-    await createTicketChannel(interaction, guildId, finalReason, {
+    await submitPendingTicketRequest(interaction, guildId, {
         category,
         commonIssue,
         categoryValue: selectedDraft?.category,
         commonIssueValue: selectedDraft?.commonIssue,
-        noMatchIssue: mcWhy || reason
+        noMatchIssue: mcWhy || reason,
+        reason: finalReason
     });
     return true;
 }
