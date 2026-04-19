@@ -66,6 +66,81 @@ async function safeDbSet(key, value, timeoutMs = 3000) {
     }
 }
 
+class MySqlSessionStore extends session.Store {
+    constructor(options = {}) {
+        super();
+        this.prefix = options.prefix || 'session:';
+    }
+
+    get(sid, callback) {
+        db.get(`${this.prefix}${sid}`)
+            .then((record) => {
+                if (!record || typeof record !== 'object') {
+                    return callback(null, null);
+                }
+
+                if (record.expires && new Date(record.expires).getTime() <= Date.now()) {
+                    return this.destroy(sid, () => callback(null, null));
+                }
+
+                return callback(null, record.session || null);
+            })
+            .catch((error) => callback(error));
+    }
+
+    set(sid, sessionData, callback) {
+        const expires = this.getExpiration(sessionData);
+        db.set(`${this.prefix}${sid}`, {
+            session: sessionData,
+            expires: expires ? expires.toISOString() : null
+        })
+            .then(() => callback && callback(null))
+            .catch((error) => callback && callback(error));
+    }
+
+    destroy(sid, callback) {
+        db.delete(`${this.prefix}${sid}`)
+            .then(() => callback && callback(null))
+            .catch((error) => callback && callback(error));
+    }
+
+    touch(sid, sessionData, callback) {
+        this.set(sid, sessionData, callback);
+    }
+
+    length(callback) {
+        db.all()
+            .then((entries) => {
+                const count = entries.filter((entry) => String(entry.ID || '').startsWith(this.prefix)).length;
+                callback(null, count);
+            })
+            .catch((error) => callback(error));
+    }
+
+    clear(callback) {
+        db.all()
+            .then((entries) => Promise.all(
+                entries
+                    .filter((entry) => String(entry.ID || '').startsWith(this.prefix))
+                    .map((entry) => db.delete(entry.ID))
+            ))
+            .then(() => callback && callback(null))
+            .catch((error) => callback && callback(error));
+    }
+
+    getExpiration(sessionData) {
+        if (sessionData?.cookie?.expires) {
+            return new Date(sessionData.cookie.expires);
+        }
+
+        if (sessionData?.cookie?.maxAge) {
+            return new Date(Date.now() + sessionData.cookie.maxAge);
+        }
+
+        return null;
+    }
+}
+
 // Validar variables de entorno requeridas
 if (!CLIENT_ID) {
     console.error('❌ ERROR: CLIENT_ID no está configurado en .env');
@@ -115,7 +190,9 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.set('trust proxy', 1);
 
 // Configuración de sesiones
+const sessionStore = new MySqlSessionStore();
 app.use(session({
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || 'tu-secret-super-seguro-cambiar-en-produccion',
     resave: false,
     saveUninitialized: false,
