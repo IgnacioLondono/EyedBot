@@ -68,6 +68,13 @@
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                     <div class="dropdown-menu" id="dropdownMenu">
+                        <a href="#" id="profileSettingsBtn" class="dropdown-item" data-section="profileSettingsSection">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V22a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 20.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 3.6a1.65 1.65 0 0 0 1-1.51V2a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09A1.65 1.65 0 0 0 15 3.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 20.4 9a1.65 1.65 0 0 0 1.51 1H22a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09A1.65 1.65 0 0 0 20.4 15z"></path>
+                            </svg>
+                            <span>Configuraciones</span>
+                        </a>
                         <a href="/logout" class="dropdown-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -238,6 +245,33 @@
                             <h3>Comandos</h3>
                             <p>Visualiza la galería de comandos y accede a cada categoría.</p>
                         </div>
+                    </article>
+                </div>
+
+            </div>
+        </section>
+
+        <section id="profileSettingsSection" class="section">
+            <div class="container dashboard-shell">
+                <div class="section-header">
+                    <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"></path></svg>Configuraciones</h2>
+                    <div class="title-accent"></div>
+                </div>
+
+                <div class="settings-overview-grid">
+                    <article class="settings-overview-card">
+                        <h3>Cuenta</h3>
+                        <div class="settings-kv"><span>Usuario</span><strong id="settingsAccountName">-</strong></div>
+                        <div class="settings-kv"><span>ID</span><strong id="settingsAccountId">-</strong></div>
+                        <div class="settings-kv"><span>Avatar</span><strong id="settingsAccountAvatar">No disponible</strong></div>
+                    </article>
+
+                    <article class="settings-overview-card">
+                        <h3>Web</h3>
+                        <div class="settings-kv"><span>Host</span><strong id="settingsWebHost">-</strong></div>
+                        <div class="settings-kv"><span>Ruta</span><strong id="settingsWebPath">-</strong></div>
+                        <div class="settings-kv"><span>Navegador</span><strong id="settingsWebBrowser">-</strong></div>
+                        <div class="settings-kv"><span>Zona horaria</span><strong id="settingsWebTimezone">-</strong></div>
                     </article>
                 </div>
 
