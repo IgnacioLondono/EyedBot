@@ -26,7 +26,7 @@ const DRAFT_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_CATEGORIES = [
     { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
     { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-    { value: 'solicitud-ingreso-minecraft', label: 'Minecraft', description: 'Solicitud para ingresar al servidor premium de la comunidad' },
+    { value: 'solicitud-ingreso-minecraft', label: 'Minecraft Server', description: 'Ayuda con el servidor, soporte tecnico y consultas generales' },
     { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
 ];
 
@@ -300,9 +300,9 @@ function sanitizeCategories(categories = []) {
 
         const isMinecraft = rawValue === 'minecraft' || rawValue === 'solicitud-ingreso-minecraft' || /minecraft/i.test(rawLabel);
         const value = isMinecraft ? 'solicitud-ingreso-minecraft' : rawValue;
-        const label = isMinecraft ? 'Minecraft' : rawLabel;
+        const label = isMinecraft ? 'Minecraft Server' : rawLabel;
         const description = isMinecraft
-            ? 'Solicitud para ingresar al servidor premium de la comunidad'
+            ? 'Ayuda con el servidor, soporte tecnico y consultas generales'
             : String(item?.description || '').trim();
 
         if (!value || !label || used.has(value)) return;
@@ -313,8 +313,8 @@ function sanitizeCategories(categories = []) {
     if (!normalized.some((item) => item.value === 'solicitud-ingreso-minecraft')) {
         normalized.push({
             value: 'solicitud-ingreso-minecraft',
-            label: 'Minecraft',
-            description: 'Solicitud para ingresar al servidor premium de la comunidad'
+            label: 'Minecraft Server',
+            description: 'Ayuda con el servidor, soporte tecnico y consultas generales'
         });
     }
 

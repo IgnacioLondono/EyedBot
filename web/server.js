@@ -670,7 +670,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         const defaultTicketCategories = [
             { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
             { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft', description: 'Solicitud para ingresar al servidor premium de la comunidad' },
+            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft Server', description: 'Ayuda con el servidor, soporte tecnico y consultas generales' },
             { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
         ];
 
@@ -734,7 +734,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         const defaultTicketCategories = [
             { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
             { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft', description: 'Solicitud para ingresar al servidor premium de la comunidad' },
+            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft Server', description: 'Ayuda con el servidor, soporte tecnico y consultas generales' },
             { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
         ];
 
