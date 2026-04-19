@@ -318,6 +318,10 @@ async function main() {
             Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
             { body: commands },
         );
+        await rest.put(
+            Routes.applicationCommands(CLIENT_ID),
+            { body: [] }
+        );
         console.log('✅ Comandos registrados exitosamente.');
     } catch (error) {
         console.error('❌ Error registrando comandos:', error);
