@@ -773,7 +773,7 @@ body {
 }
 
 .section#profileSettingsSection > .container {
-    overflow-y: hidden;
+    overflow-y: auto;
     overflow-x: hidden;
     scrollbar-gutter: stable;
     padding-right: 0.45rem;
