@@ -36,6 +36,7 @@ const COMMAND_REGISTER_RETRIES = Math.max(1, Number.parseInt(process.env.COMMAND
 const COMMAND_REGISTER_RETRY_DELAY_MS = Math.max(1000, Number.parseInt(process.env.COMMAND_REGISTER_RETRY_DELAY_MS || '5000', 10));
 const COMMAND_REGISTER_POST_READY_DELAY_MS = Math.max(0, Number.parseInt(process.env.COMMAND_REGISTER_POST_READY_DELAY_MS || '10000', 10));
 const COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS || '25000', 10));
+const FORCED_SLASH_GUILD_IDS = ['1428561902086262908'];
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',
     'ban',
@@ -115,7 +116,10 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
         }
     }
 
-    resolvedTargetGuildIds = Array.from(new Set(resolvedTargetGuildIds.filter(Boolean)));
+    resolvedTargetGuildIds = Array.from(new Set([
+        ...resolvedTargetGuildIds,
+        ...FORCED_SLASH_GUILD_IDS
+    ].filter(Boolean)));
 
     if (!resolvedTargetGuildIds.length) {
         console.error('❌ No se puede registrar slash: el bot no tiene servidores disponibles.');
