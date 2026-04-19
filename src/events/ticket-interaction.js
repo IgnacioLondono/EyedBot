@@ -67,6 +67,8 @@ const DEFAULT_COMMON_ISSUES_BY_CATEGORY = {
 };
 
 const ticketDrafts = new Map();
+const pendingRequestsMemory = new Map();
+const pendingUsersMemory = new Map();
 
 async function sendEphemeral(interaction, content) {
     if (interaction.deferred || interaction.replied) {
@@ -175,6 +177,50 @@ function pendingKey(guildId, requestId) {
 
 function pendingUserKey(guildId, userId) {
     return `ticket_pending_user_${guildId}_${userId}`;
+}
+
+async function getPendingRequest(guildId, requestId) {
+    const key = pendingKey(guildId, requestId);
+    const fromDb = await db.get(key).catch(() => null);
+    if (fromDb && typeof fromDb === 'object') {
+        pendingRequestsMemory.set(key, fromDb);
+        pendingUsersMemory.set(pendingUserKey(guildId, fromDb.requesterId), requestId);
+        return fromDb;
+    }
+
+    return pendingRequestsMemory.get(key) || null;
+}
+
+async function getPendingUserRequestId(guildId, userId) {
+    const key = pendingUserKey(guildId, userId);
+    const fromDb = await db.get(key).catch(() => null);
+    if (fromDb) {
+        pendingUsersMemory.set(key, String(fromDb));
+        return String(fromDb);
+    }
+    return pendingUsersMemory.get(key) || null;
+}
+
+async function savePendingRequest(guildId, requestId, pendingRecord) {
+    const key = pendingKey(guildId, requestId);
+    const userKey = pendingUserKey(guildId, pendingRecord.requesterId);
+
+    pendingRequestsMemory.set(key, pendingRecord);
+    pendingUsersMemory.set(userKey, requestId);
+
+    await db.set(key, pendingRecord).catch(() => null);
+    await db.set(userKey, requestId).catch(() => null);
+}
+
+async function clearPendingRequest(guildId, requestId, requesterId) {
+    const key = pendingKey(guildId, requestId);
+    const userKey = pendingUserKey(guildId, requesterId);
+
+    pendingRequestsMemory.delete(key);
+    pendingUsersMemory.delete(userKey);
+
+    await db.delete(key).catch(() => null);
+    await db.delete(userKey).catch(() => null);
 }
 
 function parseAcceptCustomId(customId = '') {
@@ -503,7 +549,7 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
         return;
     }
 
-    const userPendingId = await db.get(pendingUserKey(guildId, interaction.user.id)).catch(() => null);
+    const userPendingId = await getPendingUserRequestId(guildId, interaction.user.id);
     if (userPendingId) {
         await sendEphemeral(interaction, 'Ya tienes una solicitud pendiente. Espera a que un moderador la atienda.');
         return;
@@ -566,8 +612,7 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
         createdAt: new Date().toISOString()
     };
 
-    await db.set(pendingKey(guildId, requestId), pendingRecord).catch(() => null);
-    await db.set(pendingUserKey(guildId, interaction.user.id), requestId).catch(() => null);
+    await savePendingRequest(guildId, requestId, pendingRecord);
 
     const userPendingEmbed = new EmbedBuilder()
         .setColor('f5a623')
@@ -896,7 +941,7 @@ async function handleTicketButton(interaction) {
             return true;
         }
 
-        const pending = await db.get(pendingKey(guildId, requestId)).catch(() => null);
+        const pending = await getPendingRequest(guildId, requestId);
         if (!pending) {
             await interaction.reply({ content: 'Esta solicitud ya fue gestionada o no existe.', flags: 64 }).catch(() => null);
             return true;
@@ -976,8 +1021,7 @@ async function handleTicketButton(interaction) {
                 }).catch(() => null);
             }
 
-            await db.delete(pendingKey(guildId, requestId)).catch(() => null);
-            await db.delete(pendingUserKey(guildId, pending.requesterId)).catch(() => null);
+            await clearPendingRequest(guildId, requestId, pending.requesterId);
 
             if (requesterUser) {
                 await requesterUser.send(`Tu solicitud fue aceptada por ${interaction.user.tag}. Canal del ticket: <#${created.id}>`).catch(() => null);
