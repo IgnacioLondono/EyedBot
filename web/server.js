@@ -778,6 +778,19 @@ app.get('/api/user', requireAuth, (req, res) => {
     });
 });
 
+app.get('/api/about-overview', requireAuth, (req, res) => {
+    const totalServers = botClient?.guilds?.cache?.size || 0;
+    const totalCommands = botClient?.commands?.size || 0;
+    const botName = String(botClient?.user?.username || 'EyedBot');
+
+    res.json({
+        botName,
+        totalServers,
+        totalCommands,
+        purpose: 'Ayudar a gestionar comunidades de Discord con herramientas de organización, moderación y participación.'
+    });
+});
+
 app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
     try {
         const analytics = await loadLoginAnalyticsSnapshot();

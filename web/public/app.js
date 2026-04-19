@@ -29,6 +29,11 @@ let serverSwitcherTouchStartX = 0;
 let serverSwitcherTouchDeltaX = 0;
 let themeSettings = null;
 let currentSettingsPaneId = 'settingsPaneTheme';
+let aboutCarouselBound = false;
+let revealObserver = null;
+let commandsCatalog = [];
+let commandsFilterQuery = '';
+let commandsFilterCategory = 'all';
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 
@@ -230,7 +235,7 @@ function updateContextStrip() {
 }
 
 function updateBackToServerButtonsVisibility(sectionId = '') {
-    const isVisible = hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'commandsSection'].includes(sectionId);
+    const isVisible = hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection'].includes(sectionId);
     ['backToServerFromEmbed', 'backToServerFromStats', 'backToServerFromLogs', 'backToServerFromCommands'].forEach((id) => {
         const btn = document.getElementById(id);
         if (!btn) return;
@@ -1064,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     registerGatedNavigationButtons();
     setupEventListeners();
+    initializeScrollReveal();
     
     // Cargar estado guardado
     const savedState = loadState();
@@ -1087,10 +1093,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     await loadGuilds();
     await loadStats();
+    await loadAboutOverview();
     
     const initialSection = savedState?.activeSection || 'dashboard';
     showSection(initialSection, { skipHistory: true });
     initializePanelHistory(initialSection);
+    refreshActiveSectionReveal();
     
     // Restaurar estados específicos
     if (savedState) {
@@ -1415,6 +1423,28 @@ function setupEventListeners() {
         });
     }
 
+    const commandsSearchInput = document.getElementById('commandsSearchInput');
+    if (commandsSearchInput) {
+        commandsSearchInput.addEventListener('input', (event) => {
+            commandsFilterQuery = String(event.target?.value || '').trim().toLowerCase();
+            renderFilteredCommands();
+        });
+    }
+
+    const aboutCarouselPrev = document.getElementById('aboutCarouselPrev');
+    const aboutCarouselNext = document.getElementById('aboutCarouselNext');
+    const aboutCarouselViewport = document.getElementById('aboutCarouselViewport');
+    if (aboutCarouselPrev && aboutCarouselNext && aboutCarouselViewport) {
+        aboutCarouselPrev.addEventListener('click', () => {
+            const width = Math.max(260, Math.round(aboutCarouselViewport.clientWidth * 0.82));
+            aboutCarouselViewport.scrollBy({ left: -width, behavior: 'smooth' });
+        });
+        aboutCarouselNext.addEventListener('click', () => {
+            const width = Math.max(260, Math.round(aboutCarouselViewport.clientWidth * 0.82));
+            aboutCarouselViewport.scrollBy({ left: width, behavior: 'smooth' });
+        });
+    }
+
     document.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
@@ -1610,6 +1640,137 @@ function setupEventListeners() {
     }
 }
 
+function initializeScrollReveal() {
+    const elements = document.querySelectorAll('.reveal-on-scroll');
+    if (!elements.length) return;
+
+    if (!('IntersectionObserver' in window)) {
+        elements.forEach((el) => el.classList.add('is-visible'));
+        return;
+    }
+
+    if (revealObserver) {
+        revealObserver.disconnect();
+    }
+
+    revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('is-visible');
+            revealObserver.unobserve(entry.target);
+        });
+    }, {
+        threshold: 0.16,
+        rootMargin: '0px 0px -12% 0px'
+    });
+
+    elements.forEach((el) => {
+        if (!el.classList.contains('is-visible')) {
+            revealObserver.observe(el);
+        }
+    });
+}
+
+function refreshActiveSectionReveal() {
+    const active = document.querySelector('.section.active');
+    if (!active) return;
+
+    const targets = active.querySelectorAll('.reveal-on-scroll');
+    if (!targets.length) return;
+
+    const viewportHeight = window.innerHeight || 900;
+    targets.forEach((el) => {
+        if (el.classList.contains('is-visible')) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.top < viewportHeight * 0.86) {
+            el.classList.add('is-visible');
+        }
+    });
+}
+
+async function loadAboutOverview() {
+    try {
+        const response = await fetchWithCredentials('/api/about-overview');
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        const totalServers = Number(payload.totalServers) || 0;
+        const totalCommands = Number(payload.totalCommands) || 0;
+
+        const totalServersEl = document.getElementById('aboutTotalServers');
+        const totalCommandsEl = document.getElementById('aboutTotalCommands');
+
+        if (totalServersEl) {
+            totalServersEl.textContent = new Intl.NumberFormat('es-ES').format(totalServers);
+        }
+        if (totalCommandsEl) {
+            totalCommandsEl.textContent = new Intl.NumberFormat('es-ES').format(totalCommands);
+        }
+    } catch (error) {
+        console.warn('No se pudo cargar el resumen de Acerca de:', error?.message || error);
+    }
+}
+
+function buildCommandsCategoryFilters(commands = []) {
+    const container = document.getElementById('commandsCategoryFilters');
+    if (!container) return;
+
+    const counts = new Map();
+    commands.forEach((command) => {
+        const key = String(command.category || 'other').toLowerCase();
+        counts.set(key, (counts.get(key) || 0) + 1);
+    });
+
+    const categoryNames = {
+        all: 'Todos',
+        config: 'Configuración',
+        fun: 'Diversión',
+        moderation: 'Moderación',
+        music: 'Música',
+        utility: 'Utilidad',
+        other: 'Otros'
+    };
+
+    const orderedCategories = ['all', ...Array.from(counts.keys()).sort()];
+    container.innerHTML = orderedCategories
+        .filter((category, index) => index === 0 || counts.get(category) > 0)
+        .map((category) => {
+            const count = category === 'all' ? commands.length : counts.get(category) || 0;
+            const active = category === commandsFilterCategory ? 'active' : '';
+            return `
+                <button type="button" class="commands-filter-btn ${active}" data-commands-category="${category}">
+                    <span>${categoryNames[category] || category}</span>
+                    <strong>${count}</strong>
+                </button>
+            `;
+        }).join('');
+
+    container.querySelectorAll('[data-commands-category]').forEach((button) => {
+        button.addEventListener('click', () => {
+            commandsFilterCategory = button.dataset.commandsCategory || 'all';
+            buildCommandsCategoryFilters(commandsCatalog);
+            renderFilteredCommands();
+        });
+    });
+}
+
+function renderFilteredCommands() {
+    const query = commandsFilterQuery;
+    const category = commandsFilterCategory;
+
+    const filtered = commandsCatalog.filter((command) => {
+        const commandCategory = String(command.category || 'other').toLowerCase();
+        const categoryMatch = category === 'all' || category === commandCategory;
+        if (!categoryMatch) return false;
+
+        if (!query) return true;
+        const haystack = `${command.name || ''} ${command.description || ''} ${commandCategory}`.toLowerCase();
+        return haystack.includes(query);
+    });
+
+    displayCommands(filtered, { total: commandsCatalog.length });
+}
+
 // Mostrar sección
 function showSection(sectionId, options = {}) {
     if (!isOwnerUser && ['statsSection', 'logsSection'].includes(sectionId)) {
@@ -1617,7 +1778,7 @@ function showSection(sectionId, options = {}) {
         sectionId = hasSelectedGuildContext() ? 'serverSection' : 'dashboard';
     }
 
-    if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'commandsSection', 'logsSection', 'serverSection'].includes(sectionId)) {
+    if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'serverSection'].includes(sectionId)) {
         showToast('Primero selecciona un servidor en el dashboard', 'warning');
         sectionId = 'dashboard';
     }
@@ -1639,7 +1800,7 @@ function showSection(sectionId, options = {}) {
         embedSection: 'embedBtn',
         statsSection: 'statsBtn',
         logsSection: 'logsBtn',
-        commandsSection: 'commandsBtn'
+        commandsSection: 'aboutCommandsBtn'
     };
 
     const activeNavId = navIdBySection[sectionId] || navIdBySection.dashboard;
@@ -1657,9 +1818,16 @@ function showSection(sectionId, options = {}) {
     } else if (sectionId === 'serverSection') {
         loadGuildsForServer();
         switchServerPane(currentServerPaneId || 'serverPaneOverview');
+    } else if (sectionId === 'controlCenterSection') {
+        loadAboutOverview();
+        refreshActiveSectionReveal();
     } else if (sectionId === 'profileSettingsSection') {
         updateProfileSettingsData();
         switchSettingsPane(currentSettingsPaneId, { silent: true });
+    }
+
+    if (sectionId === 'commandsSection') {
+        refreshActiveSectionReveal();
     }
 
     updateBackToServerButtonsVisibility(sectionId);
@@ -2555,6 +2723,7 @@ function displayLogs(logs) {
 // Cargar comandos
 async function loadCommands() {
     const container = document.getElementById('commandsContainer');
+    if (!container) return;
     
     try {
         container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando comandos...</p></div>';
@@ -2562,26 +2731,34 @@ async function loadCommands() {
         const response = await fetchWithCredentials('/api/commands');
         if (response.ok) {
             const commands = await response.json();
-            if (commands && commands.length > 0) {
-                displayCommands(commands);
-            } else {
-                container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><p>No hay comandos disponibles</p></div>';
-            }
+            commandsCatalog = Array.isArray(commands) ? commands : [];
+            commandsFilterQuery = '';
+            commandsFilterCategory = 'all';
+
+            const searchInput = document.getElementById('commandsSearchInput');
+            if (searchInput) searchInput.value = '';
+
+            buildCommandsCategoryFilters(commandsCatalog);
+            renderFilteredCommands();
         } else {
             const error = await response.json().catch(() => ({ error: 'Error al cargar comandos' }));
-            container.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--error-color);"><p>${error.error || 'Error al cargar comandos'}</p></div>`;
+            container.innerHTML = `<div class="commands-empty commands-empty--error"><p>${escapeHtml(error.error || 'Error al cargar comandos')}</p></div>`;
         }
     } catch (error) {
         console.error('Error cargando comandos:', error);
-        container.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--error-color);"><p>Error al cargar comandos: ${error.message}</p></div>`;
+        container.innerHTML = `<div class="commands-empty commands-empty--error"><p>Error al cargar comandos: ${escapeHtml(error.message || 'Error inesperado')}</p></div>`;
     }
 }
 
-function displayCommands(commands) {
+function displayCommands(commands, meta = {}) {
     const container = document.getElementById('commandsContainer');
+    const totalCommands = Number(meta.total) || commandsCatalog.length || 0;
     
     if (!commands || commands.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><p>No hay comandos disponibles</p></div>';
+        const message = totalCommands > 0
+            ? 'No hay resultados para ese filtro.'
+            : 'No hay comandos disponibles en este momento.';
+        container.innerHTML = `<div class="commands-empty"><p>${message}</p></div>`;
         return;
     }
     
@@ -2600,43 +2777,42 @@ function displayCommands(commands) {
         categories[cat].push(cmd);
     });
     
-    if (Object.keys(categories).length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><p>No hay comandos disponibles</p></div>';
-        return;
-    }
-    
     const categoryNames = {
         'config': 'Configuración',
         'fun': 'Diversión',
         'moderation': 'Moderación',
         'music': 'Música',
-        'utility': 'Utilidades',
+        'utility': 'Utilidad',
         'other': 'Otros'
     };
     
     container.innerHTML = Object.entries(categories).map(([category, cmds]) => `
-        <div class="command-card">
-            <h3 style="color: var(--fate-red); margin-bottom: 1rem; font-family: 'Cinzel', serif; text-transform: capitalize;">
-                ${categoryNames[category] || category.charAt(0).toUpperCase() + category.slice(1)}
-            </h3>
+        <section class="command-card reveal-on-scroll" data-reveal="up">
+            <div class="command-group-head">
+                <h3>${categoryNames[category] || category.charAt(0).toUpperCase() + category.slice(1)}</h3>
+                <span class="command-group-count">${cmds.length}</span>
+            </div>
             ${cmds.map(cmd => `
-                <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <div style="font-weight: 600; color: var(--fate-gold); font-size: 1.1rem; margin-bottom: 0.5rem;">/${cmd.name || 'comando'}</div>
-                    <div style="color: var(--text-secondary); margin-bottom: 0.75rem;">${cmd.description || 'Sin descripción'}</div>
+                <article class="command-entry">
+                    <div class="command-entry-name">/${escapeHtml(cmd.name || 'comando')}</div>
+                    <div class="command-entry-description">${escapeHtml(cmd.description || 'Sin descripción')}</div>
                     ${cmd.options && cmd.options.length > 0 ? `
-                        <div style="margin-top: 0.75rem; padding-left: 1rem; border-left: 2px solid var(--fate-red);">
-                            <strong style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.5rem;">Opciones:</strong>
+                        <div class="command-options-wrap">
+                            <strong class="command-options-title">Opciones</strong>
                             ${cmd.options.map(opt => `
-                                <div style="margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">
-                                    <strong style="color: var(--fate-gold);">${opt.name || 'opción'}</strong>: ${opt.description || 'Sin descripción'}
+                                <div class="command-option-item">
+                                    <strong>${escapeHtml(opt.name || 'opción')}</strong>
+                                    <span>${escapeHtml(opt.description || 'Sin descripción')}</span>
                                 </div>
                             `).join('')}
                         </div>
                     ` : ''}
-                </div>
+                </article>
             `).join('')}
-        </div>
+        </section>
     `).join('');
+
+    refreshActiveSectionReveal();
 }
 
 // Cargar servidores para sección de servidor
