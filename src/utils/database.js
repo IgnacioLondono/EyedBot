@@ -16,6 +16,58 @@ const dbConfig = {
     keepAliveInitialDelay: 0
 };
 
+const CORE_SCHEMA_STATEMENTS = [
+    `CREATE TABLE IF NOT EXISTS key_value_store (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        \`key\` VARCHAR(255) NOT NULL UNIQUE,
+        \`value\` TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_key (\`key\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS warnings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        guild_id VARCHAR(255) NOT NULL,
+        user_id VARCHAR(255) NOT NULL,
+        moderator_id VARCHAR(255) NOT NULL,
+        reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_guild_user (guild_id, user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS guild_config (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        guild_id VARCHAR(255) NOT NULL UNIQUE,
+        prefix VARCHAR(10) DEFAULT '!',
+        welcome_channel_id VARCHAR(255),
+        autoresponder_enabled BOOLEAN DEFAULT FALSE,
+        autoresponder_responses JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_guild (guild_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS reminders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        channel_id VARCHAR(255) NOT NULL,
+        guild_id VARCHAR(255),
+        message TEXT NOT NULL,
+        remind_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user_remind (user_id, remind_at),
+        INDEX idx_remind_at (remind_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS ai_conversations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        channel_id VARCHAR(255) NOT NULL,
+        role ENUM('user', 'assistant') NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user_channel (user_id, channel_id),
+        INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+];
+
 // Pool de conexiones
 let pool = null;
 let dbUnavailableUntil = 0;
@@ -33,6 +85,12 @@ function isConnectionError(error) {
         'PROTOCOL_CONNECTION_LOST',
         'ER_CON_COUNT_ERROR'
     ].includes(code);
+}
+
+function isMissingTableError(error) {
+    const code = String(error?.code || '').toUpperCase();
+    const message = String(error?.message || '').toLowerCase();
+    return code === 'ER_NO_SUCH_TABLE' || message.includes('doesn't exist') || message.includes('does not exist');
 }
 
 function setDbUnavailable(error, context) {
@@ -72,6 +130,30 @@ async function getConnection() {
     return pool;
 }
 
+async function ensureSchema(connection) {
+    for (const statement of CORE_SCHEMA_STATEMENTS) {
+        await connection.execute(statement);
+    }
+}
+
+async function executeWithSchemaRecovery(connection, sql, params = [], context = 'query') {
+    try {
+        return await connection.execute(sql, params);
+    } catch (error) {
+        if (isMissingTableError(error)) {
+            try {
+                await ensureSchema(connection);
+                return await connection.execute(sql, params);
+            } catch (schemaError) {
+                console.error(`Error creando esquema MySQL (${context}):`, schemaError.message);
+                throw schemaError;
+            }
+        }
+
+        throw error;
+    }
+}
+
 // Función auxiliar para serializar valores
 function serializeValue(value) {
     if (value === null || value === undefined) {
@@ -105,6 +187,7 @@ const database = {
         try {
             const connection = await initPool().getConnection();
             await connection.ping();
+            await ensureSchema(connection);
             connection.release();
             console.log('✅ Conexión a MySQL establecida correctamente');
             dbUnavailableUntil = 0;
@@ -126,9 +209,11 @@ const database = {
         if (shouldSkipDbCall()) return null;
         try {
             const conn = await getConnection();
-            const [rows] = await conn.execute(
+            const [rows] = await executeWithSchemaRecovery(
+                conn,
                 'SELECT `value` FROM key_value_store WHERE `key` = ?',
-                [key]
+                [key],
+                `get:${key}`
             );
             
             if (rows.length === 0) {
@@ -152,9 +237,11 @@ const database = {
             const conn = await getConnection();
             const serialized = serializeValue(value);
             
-            await conn.execute(
+            await executeWithSchemaRecovery(
+                conn,
                 'INSERT INTO key_value_store (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
-                [key, serialized, serialized]
+                [key, serialized, serialized],
+                `set:${key}`
             );
             
             return value;
@@ -172,9 +259,11 @@ const database = {
         if (shouldSkipDbCall()) return false;
         try {
             const conn = await getConnection();
-            const [result] = await conn.execute(
+            const [result] = await executeWithSchemaRecovery(
+                conn,
                 'DELETE FROM key_value_store WHERE `key` = ?',
-                [key]
+                [key],
+                `delete:${key}`
             );
             
             return result.affectedRows > 0;
@@ -192,9 +281,11 @@ const database = {
         if (shouldSkipDbCall()) return false;
         try {
             const conn = await getConnection();
-            const [rows] = await conn.execute(
+            const [rows] = await executeWithSchemaRecovery(
+                conn,
                 'SELECT 1 FROM key_value_store WHERE `key` = ? LIMIT 1',
-                [key]
+                [key],
+                `has:${key}`
             );
             
             return rows.length > 0;
@@ -212,8 +303,11 @@ const database = {
         if (shouldSkipDbCall()) return [];
         try {
             const conn = await getConnection();
-            const [rows] = await conn.execute(
-                'SELECT `key` as ID, `value` as data FROM key_value_store'
+            const [rows] = await executeWithSchemaRecovery(
+                conn,
+                'SELECT `key` as ID, `value` as data FROM key_value_store',
+                [],
+                'all'
             );
             
             return rows.map(row => ({
@@ -237,7 +331,7 @@ const database = {
         }
         try {
             const conn = await getConnection();
-            const [rows] = await conn.execute(sql, params);
+            const [rows] = await executeWithSchemaRecovery(conn, sql, params, 'query');
             return rows;
         } catch (error) {
             if (isConnectionError(error)) {
