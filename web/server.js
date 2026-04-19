@@ -14,6 +14,7 @@ const welcomeStore = require('../src/utils/welcome-config-store');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
+const guildActivityStore = require('../src/utils/guild-activity-store');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
 const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
@@ -290,6 +291,31 @@ function resolveLocalUploadFile(rawUrl = '') {
     const absolute = path.join(__dirname, 'public', cleaned);
     if (!fs.existsSync(absolute)) return null;
     return absolute;
+}
+
+function summarizePeakDay(daily = {}, key) {
+    let bestDate = null;
+    let bestValue = 0;
+
+    Object.entries(daily || {}).forEach(([date, entry]) => {
+        const value = Math.max(0, Number.parseInt(entry?.[key] || 0, 10) || 0);
+        if (value > bestValue) {
+            bestValue = value;
+            bestDate = date;
+        }
+    });
+
+    return {
+        date: bestDate,
+        count: bestValue
+    };
+}
+
+function resolveGuildUserTag(guild, userId) {
+    if (!guild || !userId) return 'Desconocido';
+    const member = guild.members.cache.get(userId);
+    if (member?.user?.tag) return member.user.tag;
+    return `Usuario ${String(userId).slice(-4)}`;
 }
 
 // Función para inyectar el cliente del bot
@@ -1959,6 +1985,57 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
         const ownerMember = guild.members.cache.get(guild.ownerId);
         const ownerUser = ownerMember?.user;
 
+        const guildAgeDays = Math.max(1, Math.ceil((Date.now() - guild.createdTimestamp) / 86400000));
+        const trackedUsers = await levelingStore.listGuildUsers(guildId);
+        const activeTrackedUsers = trackedUsers.filter((entry) => Number.parseInt(entry.messageCount || 0, 10) > 0 || Number.parseInt(entry.voiceMinutes || 0, 10) > 0);
+
+        const totalTrackedMessages = activeTrackedUsers.reduce((sum, entry) => sum + (Number.parseInt(entry.messageCount || 0, 10) || 0), 0);
+        const totalTrackedVoiceMinutes = activeTrackedUsers.reduce((sum, entry) => sum + (Number.parseInt(entry.voiceMinutes || 0, 10) || 0), 0);
+
+        const topMessageEntry = activeTrackedUsers.reduce((best, entry) => {
+            const value = Number.parseInt(entry.messageCount || 0, 10) || 0;
+            if (!best || value > best.value) {
+                return { userId: entry.userId, value };
+            }
+            return best;
+        }, null);
+
+        const topVoiceEntry = activeTrackedUsers.reduce((best, entry) => {
+            const value = Number.parseInt(entry.voiceMinutes || 0, 10) || 0;
+            if (!best || value > best.value) {
+                return { userId: entry.userId, value };
+            }
+            return best;
+        }, null);
+
+        const guildActivity = await guildActivityStore.getGuildActivity(guildId);
+        const memberFlowDaily = guildActivity?.daily || {};
+        const sortedFlowDays = Object.keys(memberFlowDaily).sort();
+        const last7Days = sortedFlowDays.slice(-7).map((day) => ({
+            date: day,
+            joins: Number.parseInt(memberFlowDaily[day]?.joins || 0, 10) || 0,
+            leaves: Number.parseInt(memberFlowDaily[day]?.leaves || 0, 10) || 0
+        }));
+
+        const peakJoinsDay = summarizePeakDay(memberFlowDaily, 'joins');
+        const peakLeavesDay = summarizePeakDay(memberFlowDaily, 'leaves');
+
+        const voiceChannels = guild.channels.cache.filter((c) => c.type === 2);
+        let liveVoiceUsers = 0;
+        let topVoiceChannel = null;
+
+        voiceChannels.forEach((channel) => {
+            const users = channel.members.filter((m) => !m.user?.bot).size;
+            liveVoiceUsers += users;
+            if (!topVoiceChannel || users > topVoiceChannel.users) {
+                topVoiceChannel = {
+                    id: channel.id,
+                    name: channel.name,
+                    users
+                };
+            }
+        });
+
         const info = {
             id: guild.id,
             name: guild.name,
@@ -1989,7 +2066,43 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                 members: role.members.size
             })).sort((a, b) => b.position - a.position),
             emojis: guild.emojis.cache.size,
-            stickers: guild.stickers?.cache?.size || 0
+            stickers: guild.stickers?.cache?.size || 0,
+            activity: {
+                ageDays: guildAgeDays,
+                trackedUsers: activeTrackedUsers.length,
+                trackingStartedAt: guildActivity?.trackingStartedAt || null,
+                messages: {
+                    totalTracked: totalTrackedMessages,
+                    avgPerDay: Number((totalTrackedMessages / guildAgeDays).toFixed(2)),
+                    topUser: {
+                        id: topMessageEntry?.userId || null,
+                        tag: topMessageEntry?.userId ? resolveGuildUserTag(guild, topMessageEntry.userId) : 'N/A',
+                        count: topMessageEntry?.value || 0
+                    }
+                },
+                voice: {
+                    totalMinutes: totalTrackedVoiceMinutes,
+                    avgMinutesPerDay: Number((totalTrackedVoiceMinutes / guildAgeDays).toFixed(2)),
+                    avgHoursPerDay: Number(((totalTrackedVoiceMinutes / guildAgeDays) / 60).toFixed(2)),
+                    topUser: {
+                        id: topVoiceEntry?.userId || null,
+                        tag: topVoiceEntry?.userId ? resolveGuildUserTag(guild, topVoiceEntry.userId) : 'N/A',
+                        minutes: topVoiceEntry?.value || 0
+                    },
+                    live: {
+                        currentUsers: liveVoiceUsers,
+                        topChannel: topVoiceChannel
+                    }
+                },
+                memberFlow: {
+                    totalJoins: Number.parseInt(guildActivity?.totals?.joins || 0, 10) || 0,
+                    totalLeaves: Number.parseInt(guildActivity?.totals?.leaves || 0, 10) || 0,
+                    net: (Number.parseInt(guildActivity?.totals?.joins || 0, 10) || 0) - (Number.parseInt(guildActivity?.totals?.leaves || 0, 10) || 0),
+                    peakJoinsDay,
+                    peakLeavesDay,
+                    last7Days
+                }
+            }
         };
 
         res.json(info);

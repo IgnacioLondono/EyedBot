@@ -12,6 +12,7 @@ const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = requir
 const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
 const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate } = require('./events/temp-voice');
+const guildActivityStore = require('./utils/guild-activity-store');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startStreamAlertScheduler, stopStreamAlertScheduler } = require('./utils/stream-alert-scheduler');
@@ -297,6 +298,7 @@ client.on('guildMemberAdd', async (member) => {
     try {
         await guildMemberAddEvent.execute(member);
         await antiRaidGuard.handleGuildMemberAdd(member);
+        await guildActivityStore.incrementGuildMetric(member.guild.id, 'joins');
     } catch (error) {
         console.error('Error en guildMemberAdd:', error);
     }
@@ -337,6 +339,7 @@ client.on('roleDelete', async (role) => {
 client.on('guildMemberRemove', async (member) => {
     try {
         await guildMemberRemoveEvent.execute(member);
+        await guildActivityStore.incrementGuildMetric(member.guild.id, 'leaves');
     } catch (error) {
         console.error('Error en guildMemberRemove:', error);
     }

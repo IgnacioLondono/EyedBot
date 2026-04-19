@@ -3380,6 +3380,22 @@ async function loadServerInfo(guildId) {
     }
 }
 
+function formatServerMetric(value, options = {}) {
+    const numeric = Number(value || 0);
+    const digits = Number.parseInt(options.maximumFractionDigits ?? 0, 10);
+    return new Intl.NumberFormat('es-ES', {
+        maximumFractionDigits: Number.isNaN(digits) ? 0 : digits,
+        minimumFractionDigits: 0
+    }).format(Number.isFinite(numeric) ? numeric : 0);
+}
+
+function formatIsoDate(value) {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('es-ES');
+}
+
 function displayServerInfo(info) {
     const container = document.getElementById('serverInfoContainer');
     
@@ -3389,6 +3405,31 @@ function displayServerInfo(info) {
     }
     
     const ownerTag = escapeHtml(info.owner?.tag || 'Desconocido');
+    const createdDate = formatIsoDate(info.createdAt);
+    const ageDays = Number.parseInt(info.activity?.ageDays || 0, 10) || 0;
+    const trackedUsers = Number.parseInt(info.activity?.trackedUsers || 0, 10) || 0;
+
+    const totalMessages = Number.parseInt(info.activity?.messages?.totalTracked || 0, 10) || 0;
+    const avgMessagesPerDay = Number(info.activity?.messages?.avgPerDay || 0);
+    const topMessageTag = escapeHtml(info.activity?.messages?.topUser?.tag || 'N/A');
+    const topMessageCount = Number.parseInt(info.activity?.messages?.topUser?.count || 0, 10) || 0;
+
+    const totalVoiceMinutes = Number.parseInt(info.activity?.voice?.totalMinutes || 0, 10) || 0;
+    const avgVoiceHoursPerDay = Number(info.activity?.voice?.avgHoursPerDay || 0);
+    const topVoiceTag = escapeHtml(info.activity?.voice?.topUser?.tag || 'N/A');
+    const topVoiceMinutes = Number.parseInt(info.activity?.voice?.topUser?.minutes || 0, 10) || 0;
+    const liveVoiceUsers = Number.parseInt(info.activity?.voice?.live?.currentUsers || 0, 10) || 0;
+    const liveTopChannelName = escapeHtml(info.activity?.voice?.live?.topChannel?.name || 'Sin actividad');
+    const liveTopChannelUsers = Number.parseInt(info.activity?.voice?.live?.topChannel?.users || 0, 10) || 0;
+
+    const totalJoins = Number.parseInt(info.activity?.memberFlow?.totalJoins || 0, 10) || 0;
+    const totalLeaves = Number.parseInt(info.activity?.memberFlow?.totalLeaves || 0, 10) || 0;
+    const flowNet = Number.parseInt(info.activity?.memberFlow?.net || 0, 10) || 0;
+    const peakJoinDate = formatIsoDate(info.activity?.memberFlow?.peakJoinsDay?.date);
+    const peakJoinCount = Number.parseInt(info.activity?.memberFlow?.peakJoinsDay?.count || 0, 10) || 0;
+    const peakLeaveDate = formatIsoDate(info.activity?.memberFlow?.peakLeavesDay?.date);
+    const peakLeaveCount = Number.parseInt(info.activity?.memberFlow?.peakLeavesDay?.count || 0, 10) || 0;
+
     const ownerAvatar = info.owner?.avatar
         ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
         : `<div class="summary-owner-avatar summary-owner-avatar--placeholder">${ownerTag.charAt(0).toUpperCase()}</div>`;
@@ -3408,31 +3449,67 @@ function displayServerInfo(info) {
 
             <article class="summary-card">
                 <div class="summary-label">Miembros</div>
-                <div class="summary-value">${info.memberCount || 0}</div>
-                <div class="summary-subvalue">Comunidad total del servidor</div>
+                <div class="summary-value">${formatServerMetric(info.memberCount || 0)}</div>
+                <div class="summary-subvalue">Comunidad actual del servidor</div>
             </article>
 
             <article class="summary-card">
                 <div class="summary-label">Entradas de Canales</div>
-                <div class="summary-value">${info.channelCount || 0}</div>
+                <div class="summary-value">${formatServerMetric(info.channelCount || 0)}</div>
                 <div class="summary-subvalue">${info.channels?.text || 0} texto • ${info.channels?.voice || 0} voz • ${info.channels?.category || 0} categorias</div>
             </article>
 
             <article class="summary-card">
                 <div class="summary-label">Roles</div>
-                <div class="summary-value">${info.roleCount || 0}</div>
+                <div class="summary-value">${formatServerMetric(info.roleCount || 0)}</div>
                 <div class="summary-subvalue">Gestion de permisos y jerarquia</div>
             </article>
 
             <article class="summary-card">
-                <div class="summary-label">Estadisticas</div>
+                <div class="summary-label">Actividad (Mensajes)</div>
+                <div class="summary-value">${formatServerMetric(totalMessages)} msgs</div>
+                <div class="summary-subvalue">${formatServerMetric(avgMessagesPerDay, { maximumFractionDigits: 2 })} por dia desde creacion • Top ${topMessageTag} (${formatServerMetric(topMessageCount)})</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Actividad (Voz)</div>
+                <div class="summary-value">${formatServerMetric(totalVoiceMinutes)} min</div>
+                <div class="summary-subvalue">${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h por dia • Top ${topVoiceTag} (${formatServerMetric(topVoiceMinutes)} min)</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Entradas / Salidas</div>
+                <div class="summary-value">${formatServerMetric(totalJoins)} / ${formatServerMetric(totalLeaves)}</div>
+                <div class="summary-subvalue">Balance ${flowNet >= 0 ? '+' : ''}${formatServerMetric(flowNet)} • Pico entradas ${formatServerMetric(peakJoinCount)} (${peakJoinDate})</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Pico de Salidas</div>
+                <div class="summary-value">${formatServerMetric(peakLeaveCount)}</div>
+                <div class="summary-subvalue">Dia con mas salidas: ${peakLeaveDate}</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Voz en Vivo</div>
+                <div class="summary-value">${formatServerMetric(liveVoiceUsers)} conectados</div>
+                <div class="summary-subvalue">Canal top ahora: ${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Edad y Base</div>
+                <div class="summary-value">${formatServerMetric(ageDays)} dias</div>
+                <div class="summary-subvalue">Creado ${createdDate} • ${formatServerMetric(trackedUsers)} usuarios con historial</div>
+            </article>
+
+            <article class="summary-card">
+                <div class="summary-label">Estadisticas Core</div>
                 <div class="summary-value">Nivel ${Number(info.premiumTier || 0)}</div>
                 <div class="summary-subvalue">Boosts ${Number(info.premiumSubscriptionCount || 0)} • Verificacion ${escapeHtml(String(info.verificationLevel ?? 'N/A'))}</div>
             </article>
 
             <article class="summary-card">
                 <div class="summary-label">Creado</div>
-                <div class="summary-value">${info.createdAt ? new Date(info.createdAt).toLocaleDateString('es-ES') : 'N/A'}</div>
+                <div class="summary-value">${createdDate}</div>
                 <div class="summary-subvalue">Emojis ${info.emojis || 0} • Stickers ${info.stickers || 0}</div>
             </article>
         </div>
