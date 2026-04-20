@@ -744,10 +744,10 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--theme-glow-color', rgbaFromHex(normalized.accentPrimary, 0.12 + (patternStrength * 0.32)));
     root.style.setProperty('--theme-lines-opacity', String(0.1 + (patternStrength * 0.22)));
 
-    const rgbAccentPrimary = hexToRgbObject(normalized.accentPrimary);
-    const rgbAccentSecondary = hexToRgbObject(normalized.accentSecondary);
-    const rgbTextPrimary = hexToRgbObject(normalized.textPrimary);
-    const rgbBorder = hexToRgbObject(normalized.borderColor);
+    const rgbAccentPrimary = hexToRgb(normalized.accentPrimary);
+    const rgbAccentSecondary = hexToRgb(normalized.accentSecondary);
+    const rgbTextPrimary = hexToRgb(normalized.textPrimary);
+    const rgbBorder = hexToRgb(normalized.borderColor);
 
     root.style.setProperty('--color-bg1', mixHexColors(normalized.bgPrimary, normalized.accentPrimary, 0.28));
     root.style.setProperty('--color-bg2', mixHexColors(normalized.bgSecondary, normalized.accentSecondary, 0.18));
@@ -779,8 +779,8 @@ function initializeInteractiveGradient() {
     let targetY = currentY;
 
     const moveInteractive = () => {
-        currentX += (targetX - currentX) * 0.08;
-        currentY += (targetY - currentY) * 0.08;
+        currentX += (targetX - currentX) * 0.035;
+        currentY += (targetY - currentY) * 0.035;
         interactive.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(currentY)}px)`;
         requestAnimationFrame(moveInteractive);
     };
