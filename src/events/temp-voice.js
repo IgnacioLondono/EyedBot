@@ -110,7 +110,10 @@ async function sendManagementEmbed(channel, member, config) {
     const payload = buildManagementPanelPayload(channel, member.id, config);
     if (!payload) return;
 
-    await channel.send(payload).catch(() => null);
+    const sentMessage = await channel.send(payload).catch(() => null);
+    if (sentMessage && typeof sentMessage.pin === 'function') {
+        await sentMessage.pin('Panel de gestion de voz temporal').catch(() => null);
+    }
 }
 
 async function ensureOwnerChannel(guild, member, creatorChannel, config, preferredNameOverride = null) {
