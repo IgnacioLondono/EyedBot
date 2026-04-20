@@ -1486,6 +1486,7 @@ function normalizeTempVoiceConfigInput(body = {}, current = null, userId = 'unkn
         categoryId: String(body.categoryId ?? base.categoryId ?? '').trim(),
         channelNameTemplate: template || 'Canal de {username}',
         allowCustomNames: body.allowCustomNames !== false,
+        sendManageEmbed: body.sendManageEmbed === true,
         userLimit: Math.max(0, Math.min(99, Number.parseInt(body.userLimit ?? base.userLimit ?? 0, 10) || 0)),
         updatedAt: new Date().toISOString(),
         updatedBy: userId

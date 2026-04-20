@@ -1,5 +1,13 @@
-const { ChannelType, PermissionsBitField } = require('discord.js');
+const {
+    ChannelType,
+    PermissionsBitField,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require('discord.js');
 const tempVoiceStore = require('../utils/temp-voice-store');
+const { CONTROL_BUTTON_PREFIX } = require('./temp-voice-constants');
 
 function sanitizeChannelName(raw = '') {
     const cleaned = String(raw || '')
@@ -27,6 +35,64 @@ function buildChannelName(member, config, preferredName = '') {
     return sanitizeChannelName(template) || `Canal de ${username}`;
 }
 
+function buildManagementRows(channelId) {
+    const id = String(channelId || '').trim();
+
+    const rowA = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}lock_${id}`)
+            .setLabel('Bloquear')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}unlock_${id}`)
+            .setLabel('Desbloquear')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}rename_${id}`)
+            .setLabel('Renombrar')
+            .setStyle(ButtonStyle.Primary)
+    );
+
+    const rowB = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}limitdown_${id}`)
+            .setLabel('Limite -')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}limitup_${id}`)
+            .setLabel('Limite +')
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    return [rowA, rowB];
+}
+
+async function sendManagementEmbed(channel, member, config) {
+    if (!channel || typeof channel.send !== 'function') return;
+
+    const baseName = channel.name || `Canal de ${member.user?.username || 'Usuario'}`;
+    const userLimit = Math.max(0, Number.parseInt(channel.userLimit || config?.userLimit || 0, 10) || 0);
+    const everyRole = channel.guild.roles.everyone;
+    const connectOverwrite = channel.permissionOverwrites.cache.get(everyRole.id);
+    const isLocked = connectOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
+
+    const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle('Panel de gestion de canal de voz')
+        .setDescription('Usa estos botones para administrar tu canal temporal sin comandos.')
+        .addFields(
+            { name: 'Canal creado', value: `**${baseName}**`, inline: false },
+            { name: 'Modo', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },
+            { name: 'Limite', value: userLimit > 0 ? `${userLimit}` : 'Sin limite', inline: true },
+            { name: 'Propietario', value: `<@${member.id}>`, inline: true }
+        );
+
+    await channel.send({
+        embeds: [embed],
+        components: buildManagementRows(channel.id)
+    }).catch(() => null);
+}
+
 async function ensureOwnerChannel(guild, member, creatorChannel, config, preferredNameOverride = null) {
     const existingChannelId = await tempVoiceStore.getActiveChannelId(guild.id, member.id);
     if (existingChannelId) {
@@ -35,7 +101,7 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
             await existing.permissionOverwrites.edit(member.id, {
                 ManageChannels: false
             }).catch(() => null);
-            return existing;
+            return { channel: existing, created: false };
         }
         await tempVoiceStore.clearActiveChannel(guild.id, member.id, existingChannelId);
     }
@@ -76,7 +142,12 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
     });
 
     await tempVoiceStore.setActiveChannel(guild.id, member.id, channel.id);
-    return channel;
+
+    if (config?.sendManageEmbed === true) {
+        await sendManagementEmbed(channel, member, config);
+    }
+
+    return { channel, created: true };
 }
 
 async function createOrMoveMemberTempChannel(member, preferredName = null) {
@@ -105,7 +176,8 @@ async function createOrMoveMemberTempChannel(member, preferredName = null) {
         return { ok: false, reason: 'not-in-creator' };
     }
 
-    const targetChannel = await ensureOwnerChannel(guild, member, creatorChannel, config, preferredName);
+    const result = await ensureOwnerChannel(guild, member, creatorChannel, config, preferredName);
+    const targetChannel = result?.channel || null;
     if (!targetChannel) {
         return { ok: false, reason: 'channel-create-failed' };
     }
@@ -114,7 +186,7 @@ async function createOrMoveMemberTempChannel(member, preferredName = null) {
         await member.voice.setChannel(targetChannel).catch(() => null);
     }
 
-    return { ok: true, channel: targetChannel };
+    return { ok: true, channel: targetChannel, created: result?.created === true };
 }
 
 async function handleJoinCreatorChannel(newState, config) {
@@ -128,7 +200,8 @@ async function handleJoinCreatorChannel(newState, config) {
     const creatorChannel = guild.channels.cache.get(creatorChannelId) || await guild.channels.fetch(creatorChannelId).catch(() => null);
     if (!creatorChannel || creatorChannel.type !== ChannelType.GuildVoice) return;
 
-    const targetChannel = await ensureOwnerChannel(guild, member, creatorChannel, config);
+    const result = await ensureOwnerChannel(guild, member, creatorChannel, config);
+    const targetChannel = result?.channel || null;
     if (!targetChannel || targetChannel.id === newState.channelId) return;
 
     await newState.setChannel(targetChannel).catch(() => null);
