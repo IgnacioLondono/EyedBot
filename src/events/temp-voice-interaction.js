@@ -28,6 +28,28 @@ function parseControlButton(customId = '') {
     return { action, channelId };
 }
 
+async function getExistingOwnedTempChannel(guild, userId) {
+    if (!guild || !userId) return null;
+
+    const existingChannelId = await tempVoiceStore.getActiveChannelId(guild.id, userId);
+    if (!existingChannelId) return null;
+
+    const existingChannel = guild.channels.cache.get(existingChannelId)
+        || await guild.channels.fetch(existingChannelId).catch(() => null);
+
+    if (!existingChannel || existingChannel.type !== ChannelType.GuildVoice) {
+        await tempVoiceStore.clearActiveChannel(guild.id, userId, existingChannelId);
+        return null;
+    }
+
+    const ownerId = await tempVoiceStore.getOwnerByChannelId(guild.id, existingChannel.id);
+    if (String(ownerId || '') !== String(userId)) {
+        return null;
+    }
+
+    return existingChannel;
+}
+
 async function getOwnedTempVoiceChannel(interaction, channelId) {
     const guild = interaction.guild;
     if (!guild) {
@@ -54,7 +76,8 @@ async function getOwnedTempVoiceChannel(interaction, channelId) {
 async function refreshManagementMessage(message, channel, ownerId, actionLabel = '') {
     if (!message || typeof message.edit !== 'function' || !channel || !ownerId) return;
 
-    const payload = buildManagementPanelPayload(channel, ownerId, { userLimit: channel.userLimit || 0 }, {
+    const latestChannel = await channel.guild.channels.fetch(channel.id).catch(() => channel);
+    const payload = buildManagementPanelPayload(latestChannel, ownerId, { userLimit: latestChannel.userLimit || 0 }, {
         action: actionLabel
     });
     if (!payload) return;
@@ -62,10 +85,27 @@ async function refreshManagementMessage(message, channel, ownerId, actionLabel =
     await message.edit(payload).catch(() => null);
 }
 
-async function acknowledgeButtonSilently(interaction) {
+async function replyButtonError(interaction, message) {
     if (!interaction) return;
-    if (interaction.deferred || interaction.replied) return;
-    await interaction.deferUpdate().catch(() => null);
+    if (interaction.deferred || interaction.replied) {
+        await interaction.followUp({ content: message, flags: 64 }).catch(() => null);
+        return;
+    }
+
+    await interaction.reply({ content: message, flags: 64 }).catch(() => null);
+}
+
+async function refreshManagementInteraction(interaction, channel, ownerId, actionLabel = '') {
+    if (!interaction || !channel || !ownerId) return false;
+
+    const latestChannel = await channel.guild.channels.fetch(channel.id).catch(() => channel);
+    const payload = buildManagementPanelPayload(latestChannel, ownerId, { userLimit: latestChannel.userLimit || 0 }, {
+        action: actionLabel
+    });
+    if (!payload) return false;
+
+    await interaction.update(payload).catch(() => null);
+    return true;
 }
 
 async function handleTempVoiceButton(interaction) {
@@ -74,13 +114,9 @@ async function handleTempVoiceButton(interaction) {
     const controlParsed = parseControlButton(interaction.customId);
     if (controlParsed) {
         const { action, channelId } = controlParsed;
-
-        if (action !== 'rename') {
-            await acknowledgeButtonSilently(interaction);
-        }
-
         const channelResult = await getOwnedTempVoiceChannel(interaction, channelId);
         if (!channelResult.ok) {
+            await replyButtonError(interaction, channelResult.error);
             return true;
         }
 
@@ -109,7 +145,7 @@ async function handleTempVoiceButton(interaction) {
             await channel.permissionOverwrites.edit(everyoneRoleId, {
                 Connect: false
             }).catch(() => null);
-            await refreshManagementMessage(interaction.message, channel, interaction.user.id, 'Canal bloqueado');
+            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal bloqueado');
             return true;
         }
 
@@ -117,7 +153,7 @@ async function handleTempVoiceButton(interaction) {
             await channel.permissionOverwrites.edit(everyoneRoleId, {
                 Connect: null
             }).catch(() => null);
-            await refreshManagementMessage(interaction.message, channel, interaction.user.id, 'Canal desbloqueado');
+            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado');
             return true;
         }
 
@@ -128,7 +164,7 @@ async function handleTempVoiceButton(interaction) {
                 : Math.max(0, currentLimit - 1);
 
             await channel.edit({ userLimit: nextLimit }).catch(() => null);
-            await refreshManagementMessage(interaction.message, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`);
+            await refreshManagementInteraction(interaction, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`);
             return true;
         }
 
@@ -139,18 +175,27 @@ async function handleTempVoiceButton(interaction) {
 
     const guildId = String(interaction.customId.slice(CREATE_BUTTON_PREFIX.length) || '').trim();
     if (!interaction.guildId || String(interaction.guildId) !== guildId) {
-        await acknowledgeButtonSilently(interaction);
+        await interaction.deferUpdate().catch(() => null);
         return true;
     }
 
     const config = await tempVoiceStore.getTempVoiceConfig(guildId);
     if (!config || config.enabled !== true) {
-        await acknowledgeButtonSilently(interaction);
+        await interaction.deferUpdate().catch(() => null);
         return true;
     }
 
     if (config.allowCustomNames === false) {
-        await acknowledgeButtonSilently(interaction);
+        await interaction.deferUpdate().catch(() => null);
+        return true;
+    }
+
+    const existingChannel = await getExistingOwnedTempChannel(interaction.guild, interaction.user.id);
+    if (existingChannel) {
+        await interaction.reply({
+            content: `Ya tienes un canal temporal creado: <#${existingChannel.id}>.`,
+            flags: 64
+        }).catch(() => null);
         return true;
     }
 
@@ -227,6 +272,15 @@ async function handleTempVoiceModal(interaction) {
 
     if (config.allowCustomNames === false) {
         await interaction.reply({ content: 'En este servidor no se permiten nombres personalizados.', flags: 64 }).catch(() => null);
+        return true;
+    }
+
+    const existingChannel = await getExistingOwnedTempChannel(interaction.guild, interaction.user.id);
+    if (existingChannel) {
+        await interaction.reply({
+            content: `Ya tienes un canal temporal creado: <#${existingChannel.id}>.`,
+            flags: 64
+        }).catch(() => null);
         return true;
     }
 
