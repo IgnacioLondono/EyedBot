@@ -70,15 +70,25 @@ async function refreshManagementMessage(message, channel, ownerId, actionLabel =
     await message.edit(payload).catch(() => null);
 }
 
+async function acknowledgeButtonSilently(interaction) {
+    if (!interaction) return;
+    if (interaction.deferred || interaction.replied) return;
+    await interaction.deferUpdate().catch(() => null);
+}
+
 async function handleTempVoiceButton(interaction) {
     if (!interaction?.isButton()) return false;
 
     const controlParsed = parseControlButton(interaction.customId);
     if (controlParsed) {
         const { action, channelId } = controlParsed;
+
+        if (action !== 'rename' && action !== 'adduser') {
+            await acknowledgeButtonSilently(interaction);
+        }
+
         const channelResult = await getOwnedTempVoiceChannel(interaction, channelId);
         if (!channelResult.ok) {
-            await interaction.reply({ content: channelResult.error, flags: 64 }).catch(() => null);
             return true;
         }
 
@@ -126,7 +136,6 @@ async function handleTempVoiceButton(interaction) {
                 Connect: false
             }).catch(() => null);
             await refreshManagementMessage(interaction.message, channel, interaction.user.id, 'Canal bloqueado');
-            await interaction.reply({ content: 'Canal bloqueado: nadie nuevo puede entrar.', flags: 64 }).catch(() => null);
             return true;
         }
 
@@ -135,7 +144,6 @@ async function handleTempVoiceButton(interaction) {
                 Connect: null
             }).catch(() => null);
             await refreshManagementMessage(interaction.message, channel, interaction.user.id, 'Canal desbloqueado');
-            await interaction.reply({ content: 'Canal desbloqueado: cualquiera puede entrar.', flags: 64 }).catch(() => null);
             return true;
         }
 
@@ -147,14 +155,9 @@ async function handleTempVoiceButton(interaction) {
 
             await channel.edit({ userLimit: nextLimit }).catch(() => null);
             await refreshManagementMessage(interaction.message, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`);
-            await interaction.reply({
-                content: `Limite actualizado: ${nextLimit > 0 ? nextLimit : 'sin limite'}.`,
-                flags: 64
-            }).catch(() => null);
             return true;
         }
 
-        await interaction.reply({ content: 'Accion no soportada.', flags: 64 }).catch(() => null);
         return true;
     }
 
@@ -162,18 +165,18 @@ async function handleTempVoiceButton(interaction) {
 
     const guildId = String(interaction.customId.slice(CREATE_BUTTON_PREFIX.length) || '').trim();
     if (!interaction.guildId || String(interaction.guildId) !== guildId) {
-        await interaction.reply({ content: 'Este boton no corresponde a este servidor.', flags: 64 }).catch(() => null);
+        await acknowledgeButtonSilently(interaction);
         return true;
     }
 
     const config = await tempVoiceStore.getTempVoiceConfig(guildId);
     if (!config || config.enabled !== true) {
-        await interaction.reply({ content: 'El sistema de voz temporal esta desactivado.', flags: 64 }).catch(() => null);
+        await acknowledgeButtonSilently(interaction);
         return true;
     }
 
     if (config.allowCustomNames === false) {
-        await interaction.reply({ content: 'En este servidor no se permiten nombres personalizados.', flags: 64 }).catch(() => null);
+        await acknowledgeButtonSilently(interaction);
         return true;
     }
 
