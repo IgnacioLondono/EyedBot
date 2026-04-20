@@ -12,6 +12,7 @@ const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = requir
 const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
 const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate } = require('./events/temp-voice');
+const { handleTempVoiceButton, handleTempVoiceModal } = require('./events/temp-voice-interaction');
 const guildActivityStore = require('./utils/guild-activity-store');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
@@ -379,6 +380,9 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.isButton()) {
         try {
+            const tempVoiceButtonHandled = await handleTempVoiceButton(interaction);
+            if (tempVoiceButtonHandled) return;
+
             const ticketHandled = await handleTicketButton(interaction);
             if (ticketHandled) return;
 
@@ -421,6 +425,9 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.isModalSubmit()) {
         try {
+            const tempVoiceModalHandled = await handleTempVoiceModal(interaction);
+            if (tempVoiceModalHandled) return;
+
             const ticketModalHandled = await handleTicketModal(interaction);
             if (ticketModalHandled) return;
 

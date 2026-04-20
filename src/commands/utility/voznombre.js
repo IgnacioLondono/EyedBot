@@ -1,7 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../config');
 const tempVoiceStore = require('../../utils/temp-voice-store');
 const { sanitizeChannelName } = require('../../events/temp-voice');
+const { CREATE_BUTTON_PREFIX } = require('../../events/temp-voice-interaction');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,20 +22,48 @@ module.exports = {
         }
 
         const rawName = interaction.options.getString('nombre');
-        const safeName = sanitizeChannelName(rawName || '');
 
         if (!rawName) {
+            const previewDefault = `Canal de ${interaction.user.username}`;
+            const actionRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`${CREATE_BUTTON_PREFIX}${interaction.guildId}`)
+                    .setLabel('Crear Con Nombre Personalizado')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+            return interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(config.embedColor)
+                        .setTitle('🎧 Crea Tu Canal Temporal')
+                        .setDescription(
+                            [
+                                'Pulsa **Crear Con Nombre Personalizado** para abrir la pantalla de nombre.',
+                                `Si lo dejas vacio, se usara **${previewDefault}**.`
+                            ].join('\n')
+                        )
+                ],
+                components: [actionRow],
+                flags: 64
+            });
+        }
+
+        const lowered = String(rawName).trim().toLowerCase();
+        if (['reset', 'reiniciar', 'default'].includes(lowered)) {
             await tempVoiceStore.setUserCustomName(interaction.guildId, interaction.user.id, '');
             return interaction.reply({
                 embeds: [
                     new EmbedBuilder()
                         .setColor(config.embedColor)
                         .setTitle('✅ Nombre reiniciado')
-                        .setDescription('Volverás a usar el formato automático `Canal de {username}`.')
+                        .setDescription('Volverás a usar el formato automático Canal de {username}.')
                 ],
                 flags: 64
             });
         }
+
+        const safeName = sanitizeChannelName(rawName || '');
 
         if (!safeName) {
             return interaction.reply({
