@@ -113,6 +113,12 @@ async function refreshManagementInteraction(interaction, channel, ownerId, actio
     return true;
 }
 
+async function acknowledgeModalSilently(interaction) {
+    if (!interaction) return;
+    if (interaction.deferred || interaction.replied) return;
+    await interaction.deferUpdate().catch(() => null);
+}
+
 async function handleTempVoiceButton(interaction) {
     if (!interaction?.isButton()) return false;
 
@@ -273,7 +279,7 @@ async function handleTempVoiceModal(interaction) {
             await refreshManagementMessage(panelMessage, channel, interaction.user.id, `Canal renombrado: ${safeName}`);
         }
 
-        await interaction.reply({ content: `Canal renombrado a **${safeName}**.`, flags: 64 }).catch(() => null);
+        await acknowledgeModalSilently(interaction);
         return true;
     }
 
@@ -308,10 +314,7 @@ async function handleTempVoiceModal(interaction) {
             });
         }
 
-        await interaction.reply({
-            content: `Limite actualizado a **${nextLimit > 0 ? nextLimit : 'sin limite'}**.`,
-            flags: 64
-        }).catch(() => null);
+        await acknowledgeModalSilently(interaction);
         return true;
     }
 
