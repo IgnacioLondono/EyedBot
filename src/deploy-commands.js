@@ -6,6 +6,12 @@ require('dotenv').config();
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
 const guildId = process.env.GUILD_ID;
+const DISABLED_SLASH_COMMANDS = new Set([
+    'voznombre',
+    'vozprivado',
+    'vozinvitar',
+    'vozquitar'
+]);
 
 if (!token) {
     console.error('❌ Falta DISCORD_TOKEN en .env');
@@ -37,6 +43,7 @@ for (const folder of commandFolders) {
         const filePath = path.join(folderPath, file);
         const command = require(filePath);
         if (!('data' in command && 'execute' in command)) continue;
+        if (DISABLED_SLASH_COMMANDS.has(command.data.name)) continue;
 
         // Evita registrar nombres duplicados por accidente.
         byName.set(command.data.name, command.data.toJSON());
