@@ -84,13 +84,16 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
             { name: 'Canal', value: `**${baseName}**`, inline: false },
             { name: 'Estado del canal', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },
             { name: 'Limite', value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin limite', inline: true },
-            { name: 'Propietario', value: ownerHandle, inline: true },
-            {
-                name: 'Invitar usuarios',
-                value: 'Usa `/vozinvitar (nombre)`.\nPrimero debes bloquear tu canal desde este panel.',
-                inline: false
-            }
+            { name: 'Propietario', value: ownerHandle, inline: true }
         );
+
+    if (isLocked) {
+        embed.addFields({
+            name: 'Invitar usuarios',
+            value: 'Usa `/vozinvitar (nombre)` para permitir el acceso.',
+            inline: false
+        });
+    }
 
     if (ownerAvatar) {
         embed.setAuthor({

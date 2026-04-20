@@ -66,7 +66,7 @@ module.exports = {
 
         if (!isChannelPrivate(channel, interaction.guild.id)) {
             return interaction.reply({
-                content: 'Primero debes bloquear tu canal desde el panel.',
+                content: 'Primero debes bloquear tu canal.',
                 flags: 64
             });
         }
