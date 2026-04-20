@@ -3161,6 +3161,9 @@ async function loadVoiceCreatorPanel(guildId) {
                         <div class="form-group checkbox-group">
                             <label><input type="checkbox" id="tempVoiceAllowCustomNames" ${config.allowCustomNames !== false ? 'checked' : ''}> <span>Permitir nombre personalizado por usuario</span></label>
                         </div>
+                        <div class="form-group checkbox-group">
+                            <label><input type="checkbox" id="tempVoiceSendManageEmbed" ${config.sendManageEmbed === true ? 'checked' : ''}> <span>Enviar embed de gestion con botones al chat del canal creado</span></label>
+                        </div>
                     </div>
 
                     <div class="form-grid">
@@ -3216,6 +3219,7 @@ async function loadVoiceCreatorPanel(guildId) {
                 const payload = {
                     enabled: document.getElementById('tempVoiceEnabled')?.checked ?? false,
                     allowCustomNames: document.getElementById('tempVoiceAllowCustomNames')?.checked ?? true,
+                    sendManageEmbed: document.getElementById('tempVoiceSendManageEmbed')?.checked ?? false,
                     creatorChannelId: document.getElementById('tempVoiceCreatorChannel')?.value || '',
                     categoryId: document.getElementById('tempVoiceCategory')?.value || '',
                     channelNameTemplate: document.getElementById('tempVoiceTemplate')?.value || 'Canal de {username}',

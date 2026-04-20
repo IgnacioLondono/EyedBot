@@ -79,6 +79,7 @@ function defaultConfig() {
         categoryId: '',
         channelNameTemplate: 'Canal de {username}',
         allowCustomNames: true,
+        sendManageEmbed: false,
         userLimit: 0,
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'

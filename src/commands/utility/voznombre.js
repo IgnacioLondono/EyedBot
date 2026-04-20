@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const config = require('../../config');
 const tempVoiceStore = require('../../utils/temp-voice-store');
 const { sanitizeChannelName } = require('../../events/temp-voice');
-const { CREATE_BUTTON_PREFIX } = require('../../events/temp-voice-interaction');
+const { CREATE_BUTTON_PREFIX } = require('../../events/temp-voice-constants');
 
 module.exports = {
     data: new SlashCommandBuilder()
