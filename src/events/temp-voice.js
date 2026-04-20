@@ -72,9 +72,7 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
     const derivedLocked = connectOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
     const isLocked = typeof extra?.isLocked === 'boolean' ? extra.isLocked : derivedLocked;
     const ownerMember = channel.guild.members.cache.get(ownerId) || null;
-    const ownerUsername = ownerMember?.user?.username || null;
-    const ownerHandle = ownerUsername ? `@${ownerUsername}` : `<@${ownerId}>`;
-    const ownerAvatar = ownerMember?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null;
+    const ownerDisplayName = ownerMember?.displayName || `<@${ownerId}>`;
 
     const embed = new EmbedBuilder()
         .setColor(0x0099ff)
@@ -84,7 +82,7 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
             { name: 'Canal', value: `**${baseName}**`, inline: false },
             { name: 'Estado del canal', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },
             { name: 'Limite', value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin limite', inline: true },
-            { name: 'Propietario', value: ownerHandle, inline: true }
+            { name: 'Propietario', value: ownerDisplayName, inline: true }
         );
 
     if (isLocked) {
@@ -92,13 +90,6 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
             name: 'Invitar usuarios',
             value: 'Usa `/vozinvitar (nombre)` para permitir el acceso.',
             inline: false
-        });
-    }
-
-    if (ownerAvatar) {
-        embed.setAuthor({
-            name: ownerHandle,
-            iconURL: ownerAvatar
         });
     }
 
