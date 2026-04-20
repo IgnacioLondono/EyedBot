@@ -5012,6 +5012,12 @@ body {
 
 #embedSection .embed-form-container {
     padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    min-height: 0;
+    height: clamp(620px, 78vh, 860px);
+    overflow: hidden;
 }
 
 #embedSection .form-grid {
@@ -5020,8 +5026,14 @@ body {
 }
 
 #embedSection .embed-builder {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.05fr);
     gap: 0.95rem;
-    margin-top: 0.9rem;
+    margin-top: 0;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    align-items: stretch;
 }
 
 #embedSection .form-group {
@@ -5054,6 +5066,37 @@ body {
 
 #embedSection .form-actions {
     margin-top: 1rem;
+}
+
+#embedSection .embed-preview-container {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: fit-content;
+}
+
+#embedSection .embed-form {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.3rem;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-primary-rgb), 0.55) rgba(255, 255, 255, 0.03);
+}
+
+#embedSection .embed-form::-webkit-scrollbar {
+    width: 6px;
+}
+
+#embedSection .embed-form::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 999px;
+}
+
+#embedSection .embed-form::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(154, 109, 255, 0.7), rgba(255, 120, 209, 0.55));
+    border-radius: 999px;
 }
 
 /* Enhanced server summary */
@@ -5443,10 +5486,20 @@ select:focus {
 @media (max-width: 760px) {
     body {
         padding-top: 118px;
+        overflow: visible;
     }
 
     .navbar {
         padding: 0 0.6rem;
+    }
+
+    #embedSection .embed-form-container {
+        height: auto;
+    }
+
+    #embedSection .embed-form {
+        overflow: visible;
+        padding-right: 0;
     }
 
     .nav-container {
@@ -5563,6 +5616,20 @@ select:focus {
 
     .form-actions {
         flex-direction: column;
+    }
+
+    #embedSection .embed-form-container {
+        height: auto;
+        padding: 0.75rem;
+    }
+
+    #embedSection .embed-preview-container {
+        position: static;
+    }
+
+    #embedSection .embed-form {
+        overflow: visible;
+        padding-right: 0;
     }
 }
 
