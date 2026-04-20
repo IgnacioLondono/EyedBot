@@ -42,7 +42,6 @@ const FORCED_SLASH_GUILD_IDS = ['1428561902086262908'];
 const DISABLED_SLASH_COMMANDS = new Set([
     'voznombre',
     'vozprivado',
-    'vozinvitar',
     'vozquitar'
 ]);
 const MODERATION_COMMAND_NAMES = new Set([

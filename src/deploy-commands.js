@@ -9,7 +9,6 @@ const guildId = process.env.GUILD_ID;
 const DISABLED_SLASH_COMMANDS = new Set([
     'voznombre',
     'vozprivado',
-    'vozinvitar',
     'vozquitar'
 ]);
 
