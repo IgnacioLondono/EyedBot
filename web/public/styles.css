@@ -5695,3 +5695,74 @@ select:focus {
     }
 }
 
+/* Final embed layout fix (authoritative) */
+#embedSection .container {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+#embedSection .section-header {
+    flex-shrink: 0;
+}
+
+#embedSection .embed-form-container {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
+}
+
+#embedSection .form-grid {
+    flex-shrink: 0;
+    margin-bottom: 0.85rem;
+}
+
+#embedSection .embed-builder {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    align-items: stretch;
+}
+
+#embedSection .embed-preview-container {
+    position: sticky;
+    top: 0.35rem;
+    align-self: start;
+}
+
+#embedSection .embed-form {
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.35rem;
+}
+
+@media (max-width: 1200px) {
+    #embedSection .container {
+        display: block;
+        height: auto;
+        overflow-y: auto;
+    }
+
+    #embedSection .embed-form-container,
+    #embedSection .embed-builder,
+    #embedSection .embed-form {
+        height: auto;
+        max-height: none;
+        overflow: visible;
+    }
+
+    #embedSection .embed-form {
+        padding-right: 0;
+    }
+
+    #embedSection .embed-preview-container {
+        position: static;
+    }
+}
+
