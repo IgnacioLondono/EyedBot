@@ -114,7 +114,8 @@ const THEME_PRESETS = {
 
 const THEME_DEFAULTS = {
     preset: 'midnight',
-    ...THEME_PRESETS.midnight
+    ...THEME_PRESETS.midnight,
+    autoContrast: true
 };
 
 const DASHBOARD_ICON = `
@@ -661,6 +662,57 @@ function mixHexColors(startHex, endHex, ratio = 0.5) {
     return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
+function srgbToLinear(channel) {
+    const normalized = clampNumber(channel / 255, 0, 1);
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function getRelativeLuminance(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    const rl = srgbToLinear(r);
+    const gl = srgbToLinear(g);
+    const bl = srgbToLinear(b);
+    return (0.2126 * rl) + (0.7152 * gl) + (0.0722 * bl);
+}
+
+function getContrastRatio(foregroundHex, backgroundHex) {
+    const l1 = getRelativeLuminance(foregroundHex);
+    const l2 = getRelativeLuminance(backgroundHex);
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
+function ensureReadableColor(baseHex, backgroundHex, minContrast = 4.5) {
+    const initial = normalizeHexColor(baseHex, '#ffffff');
+    const background = normalizeHexColor(backgroundHex, '#000000');
+    if (getContrastRatio(initial, background) >= minContrast) return initial;
+
+    const bgLuminance = getRelativeLuminance(background);
+    const preferredTarget = bgLuminance < 0.45 ? '#ffffff' : '#000000';
+    const secondaryTarget = preferredTarget === '#ffffff' ? '#000000' : '#ffffff';
+
+    for (let step = 1; step <= 20; step += 1) {
+        const mixRatio = step / 20;
+        const candidate = mixHexColors(initial, preferredTarget, mixRatio);
+        if (getContrastRatio(candidate, background) >= minContrast) {
+            return candidate;
+        }
+    }
+
+    for (let step = 1; step <= 20; step += 1) {
+        const mixRatio = step / 20;
+        const candidate = mixHexColors(initial, secondaryTarget, mixRatio);
+        if (getContrastRatio(candidate, background) >= minContrast) {
+            return candidate;
+        }
+    }
+
+    const whiteContrast = getContrastRatio('#ffffff', background);
+    const blackContrast = getContrastRatio('#000000', background);
+    return whiteContrast >= blackContrast ? '#ffffff' : '#000000';
+}
+
 function loadThemeSettings() {
     try {
         const raw = localStorage.getItem(THEME_STORAGE_KEY);
@@ -675,6 +727,7 @@ function loadThemeSettings() {
 function normalizeThemeSettings(input = {}) {
     const presetId = Object.prototype.hasOwnProperty.call(THEME_PRESETS, input.preset) ? input.preset : THEME_DEFAULTS.preset;
     const preset = THEME_PRESETS[presetId] || THEME_DEFAULTS;
+    const autoContrastFallback = typeof preset.autoContrast === 'boolean' ? preset.autoContrast : THEME_DEFAULTS.autoContrast;
 
     return {
         preset: presetId,
@@ -687,7 +740,8 @@ function normalizeThemeSettings(input = {}) {
         textSecondary: normalizeHexColor(input.textSecondary, preset.textSecondary),
         borderColor: normalizeHexColor(input.borderColor, preset.borderColor),
         atmosphere: clampNumber(Number.parseInt(input.atmosphere ?? preset.atmosphere, 10) || preset.atmosphere, 0, 100),
-        borderStrength: clampNumber(Number.parseInt(input.borderStrength ?? preset.borderStrength, 10) || preset.borderStrength, 0, 100)
+        borderStrength: clampNumber(Number.parseInt(input.borderStrength ?? preset.borderStrength, 10) || preset.borderStrength, 0, 100),
+        autoContrast: typeof input.autoContrast === 'boolean' ? input.autoContrast : autoContrastFallback
     };
 }
 
@@ -706,6 +760,22 @@ function setThemeCssVariables(theme = themeSettings) {
     const root = document.documentElement;
     const patternStrength = clampNumber(normalized.atmosphere / 100, 0, 1);
     const borderStrength = clampNumber(normalized.borderStrength / 100, 0, 1);
+    const shouldUseAutoContrast = normalized.autoContrast !== false;
+    const textPrimaryAuto = shouldUseAutoContrast
+        ? ensureReadableColor(normalized.textPrimary, normalized.bgPrimary, 4.5)
+        : normalized.textPrimary;
+    const textSecondaryBase = shouldUseAutoContrast
+        ? ensureReadableColor(normalized.textSecondary, normalized.bgSecondary, 3.4)
+        : normalized.textSecondary;
+    const textSecondaryAuto = shouldUseAutoContrast
+        ? ensureReadableColor(textSecondaryBase, normalized.bgCard, 3.2)
+        : textSecondaryBase;
+    const textMutedSeed = shouldUseAutoContrast
+        ? mixHexColors(textSecondaryAuto, normalized.bgPrimary, 0.35)
+        : mixHexColors(normalized.textSecondary, '#7f6bb0', 0.45);
+    const textMutedAuto = shouldUseAutoContrast
+        ? ensureReadableColor(textMutedSeed, normalized.bgPrimary, 2.4)
+        : textMutedSeed;
 
     root.style.setProperty('--iris-900', mixHexColors(normalized.bgPrimary, '#000000', 0.12));
     root.style.setProperty('--iris-800', mixHexColors(normalized.bgSecondary, normalized.accentPrimary, 0.06));
@@ -713,16 +783,16 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--iris-500', normalized.accentPrimary);
     root.style.setProperty('--iris-400', normalized.accentSecondary);
     root.style.setProperty('--iris-300', mixHexColors(normalized.accentPrimary, '#ffffff', 0.45));
-    root.style.setProperty('--lavender', mixHexColors(normalized.textPrimary, normalized.accentPrimary, 0.1));
+    root.style.setProperty('--lavender', mixHexColors(textPrimaryAuto, normalized.accentPrimary, 0.1));
     root.style.setProperty('--fuchsia', normalized.accentSecondary);
     root.style.setProperty('--bg-primary', normalized.bgPrimary);
     root.style.setProperty('--bg-secondary', normalized.bgSecondary);
     root.style.setProperty('--bg-card', normalized.bgCard);
     root.style.setProperty('--bg-card-hover', mixHexColors(normalized.bgCard, normalized.accentPrimary, 0.12));
     root.style.setProperty('--bg-overlay', rgbaFromHex(normalized.bgPrimary, 0.82));
-    root.style.setProperty('--text-primary', normalized.textPrimary);
-    root.style.setProperty('--text-secondary', normalized.textSecondary);
-    root.style.setProperty('--text-muted', mixHexColors(normalized.textSecondary, '#7f6bb0', 0.45));
+    root.style.setProperty('--text-primary', textPrimaryAuto);
+    root.style.setProperty('--text-secondary', textSecondaryAuto);
+    root.style.setProperty('--text-muted', textMutedAuto);
     root.style.setProperty('--border-color', rgbaFromHex(normalized.borderColor, 0.16 + (borderStrength * 0.24)));
     root.style.setProperty('--border-glow', rgbaFromHex(normalized.borderColor, 0.18 + (borderStrength * 0.25)));
     root.style.setProperty('--accent-blue', normalized.accentPrimary);
@@ -737,7 +807,7 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--saber-blue-dark', mixHexColors(normalized.bgSecondary, normalized.accentPrimary, 0.28));
     root.style.setProperty('--saber-gold', normalized.accentSecondary);
     root.style.setProperty('--fate-red', normalized.accentPrimary);
-    root.style.setProperty('--fate-gold', mixHexColors(normalized.textPrimary, normalized.accentSecondary, 0.28));
+    root.style.setProperty('--fate-gold', mixHexColors(textPrimaryAuto, normalized.accentSecondary, 0.28));
     root.style.setProperty('--theme-pattern-primary', rgbaFromHex(normalized.accentPrimary, 0.06 + (patternStrength * 0.18)));
     root.style.setProperty('--theme-pattern-secondary', rgbaFromHex(normalized.accentSecondary, 0.05 + (patternStrength * 0.14)));
     root.style.setProperty('--theme-pattern-tertiary', rgbaFromHex(normalized.borderColor, 0.04 + (patternStrength * 0.1)));
@@ -746,7 +816,7 @@ function setThemeCssVariables(theme = themeSettings) {
 
     const rgbAccentPrimary = hexToRgb(normalized.accentPrimary);
     const rgbAccentSecondary = hexToRgb(normalized.accentSecondary);
-    const rgbTextPrimary = hexToRgb(normalized.textPrimary);
+    const rgbTextPrimary = hexToRgb(textPrimaryAuto);
     const rgbBorder = hexToRgb(normalized.borderColor);
     const rgbBgPrimary = hexToRgb(normalized.bgPrimary);
     const rgbBgCard = hexToRgb(normalized.bgCard);
@@ -812,7 +882,8 @@ function getThemeControlsState() {
         textSecondary: document.getElementById('themeTextSecondary')?.value,
         borderColor: document.getElementById('themeBorderColor')?.value,
         atmosphere: document.getElementById('themeAtmosphere')?.value,
-        borderStrength: document.getElementById('themeBorderStrength')?.value
+        borderStrength: document.getElementById('themeBorderStrength')?.value,
+        autoContrast: document.getElementById('themeAutoContrast')?.checked
     });
 }
 
@@ -837,6 +908,11 @@ function syncThemeControls(theme = themeSettings) {
             el.value = value;
         }
     });
+
+    const autoContrastInput = document.getElementById('themeAutoContrast');
+    if (autoContrastInput && autoContrastInput.checked !== normalized.autoContrast) {
+        autoContrastInput.checked = normalized.autoContrast;
+    }
 
     const atmosphereValue = document.getElementById('themeAtmosphereValue');
     if (atmosphereValue) atmosphereValue.textContent = `${normalized.atmosphere}%`;
@@ -926,7 +1002,8 @@ function bindThemeControls() {
         'themeTextSecondary',
         'themeBorderColor',
         'themeAtmosphere',
-        'themeBorderStrength'
+        'themeBorderStrength',
+        'themeAutoContrast'
     ];
 
     controlIds.forEach((id) => {
