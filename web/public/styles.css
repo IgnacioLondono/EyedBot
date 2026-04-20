@@ -5059,6 +5059,22 @@ body {
     padding: 1rem;
 }
 
+#embedSection #channelSelect.channel-select--listbox {
+    height: auto;
+    min-height: 15rem;
+    max-height: 18rem;
+    padding: 0.35rem 0.2rem;
+    line-height: 1.35;
+}
+
+#embedSection #channelSelect.channel-select--listbox option {
+    padding: 0.35rem 0.5rem;
+}
+
+#embedSection #channelSelect.channel-select--listbox:focus {
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.16);
+}
+
 #embedSection .embed-placeholder {
     min-height: 185px;
     padding: 1.6rem;
