@@ -3,7 +3,8 @@ const {
     TextInputBuilder,
     TextInputStyle,
     ActionRowBuilder,
-    ChannelType
+    ChannelType,
+    PermissionsBitField
 } = require('discord.js');
 const tempVoiceStore = require('../utils/temp-voice-store');
 const { sanitizeChannelName, createOrMoveMemberTempChannel, buildManagementPanelPayload } = require('./temp-voice');
@@ -13,7 +14,9 @@ const {
     NAME_INPUT_ID,
     CONTROL_BUTTON_PREFIX,
     RENAME_MODAL_PREFIX,
-    RENAME_INPUT_ID
+    RENAME_INPUT_ID,
+    LIMIT_MODAL_PREFIX,
+    LIMIT_INPUT_ID
 } = require('./temp-voice-constants');
 
 function parseControlButton(customId = '') {
@@ -143,36 +146,46 @@ async function handleTempVoiceButton(interaction) {
             return true;
         }
 
-        if (action === 'lock') {
-            await channel.permissionOverwrites.edit(everyoneRoleId, {
-                Connect: false
-            }).catch(() => null);
-            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal bloqueado', {
-                isLocked: true
-            });
+        if (action === 'limit') {
+            const modal = new ModalBuilder()
+                .setCustomId(`${LIMIT_MODAL_PREFIX}${interaction.guildId}_${channel.id}_${interaction.message?.id || '0'}`)
+                .setTitle('Cambiar Limite');
+
+            const limitInput = new TextInputBuilder()
+                .setCustomId(LIMIT_INPUT_ID)
+                .setLabel('Limite del canal (0-99)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setMaxLength(2)
+                .setPlaceholder('0 = sin limite')
+                .setValue(String(Math.max(0, Math.min(99, Number.parseInt(channel.userLimit || 0, 10) || 0))));
+
+            modal.addComponents(new ActionRowBuilder().addComponents(limitInput));
+            await interaction.showModal(modal).catch(() => null);
             return true;
         }
 
-        if (action === 'unlock') {
-            await channel.permissionOverwrites.edit(everyoneRoleId, {
-                Connect: null
-            }).catch(() => null);
-            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado', {
-                isLocked: false
-            });
-            return true;
-        }
+        if (action === 'locktoggle') {
+            const isLocked = channel.permissionOverwrites.cache
+                .get(everyoneRoleId)
+                ?.deny
+                ?.has(PermissionsBitField.Flags.Connect) === true;
 
-        if (action === 'limitup' || action === 'limitdown') {
-            const currentLimit = Math.max(0, Math.min(99, Number.parseInt(channel.userLimit || 0, 10) || 0));
-            const nextLimit = action === 'limitup'
-                ? Math.min(99, currentLimit + 1)
-                : Math.max(0, currentLimit - 1);
-
-            await channel.edit({ userLimit: nextLimit }).catch(() => null);
-            await refreshManagementInteraction(interaction, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`, {
-                userLimit: nextLimit
-            });
+            if (isLocked) {
+                await channel.permissionOverwrites.edit(everyoneRoleId, {
+                    Connect: null
+                }).catch(() => null);
+                await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado', {
+                    isLocked: false
+                });
+            } else {
+                await channel.permissionOverwrites.edit(everyoneRoleId, {
+                    Connect: false
+                }).catch(() => null);
+                await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal bloqueado', {
+                    isLocked: true
+                });
+            }
             return true;
         }
 
@@ -261,6 +274,44 @@ async function handleTempVoiceModal(interaction) {
         }
 
         await interaction.reply({ content: `Canal renombrado a **${safeName}**.`, flags: 64 }).catch(() => null);
+        return true;
+    }
+
+    if (interaction.customId.startsWith(LIMIT_MODAL_PREFIX)) {
+        const payload = interaction.customId.slice(LIMIT_MODAL_PREFIX.length);
+        const [guildId, channelId, messageId] = payload.split('_');
+        if (!guildId || !channelId || String(interaction.guildId) !== String(guildId)) {
+            await interaction.reply({ content: 'Formulario invalido para este servidor.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const channelResult = await getOwnedTempVoiceChannel(interaction, channelId);
+        if (!channelResult.ok) {
+            await interaction.reply({ content: channelResult.error, flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const rawLimit = String(interaction.fields.getTextInputValue(LIMIT_INPUT_ID) || '').trim();
+        if (!/^\d{1,2}$/.test(rawLimit)) {
+            await interaction.reply({ content: 'Escribe un numero valido entre 0 y 99.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const nextLimit = Math.max(0, Math.min(99, Number.parseInt(rawLimit, 10) || 0));
+        const channel = channelResult.channel;
+        await channel.edit({ userLimit: nextLimit }).catch(() => null);
+
+        if (messageId && messageId !== '0' && interaction.channel && typeof interaction.channel.messages?.fetch === 'function') {
+            const panelMessage = await interaction.channel.messages.fetch(messageId).catch(() => null);
+            await refreshManagementMessage(panelMessage, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`, {
+                userLimit: nextLimit
+            });
+        }
+
+        await interaction.reply({
+            content: `Limite actualizado a **${nextLimit > 0 ? nextLimit : 'sin limite'}**.`,
+            flags: 64
+        }).catch(() => null);
         return true;
     }
 
