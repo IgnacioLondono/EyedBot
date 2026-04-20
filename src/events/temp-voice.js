@@ -71,22 +71,34 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
     const connectOverwrite = channel.permissionOverwrites.cache.get(everyRole.id);
     const derivedLocked = connectOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
     const isLocked = typeof extra?.isLocked === 'boolean' ? extra.isLocked : derivedLocked;
+    const ownerMember = channel.guild.members.cache.get(ownerId) || null;
+    const ownerName = ownerMember?.displayName || ownerMember?.user?.username || 'Propietario';
+    const ownerTag = ownerMember?.user?.tag || `<@${ownerId}>`;
+    const ownerAvatar = ownerMember?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null;
 
     const embed = new EmbedBuilder()
         .setColor(0x0099ff)
         .setTitle('Panel de gestion de canal de voz')
-        .setDescription([
-            'Usa estos botones para administrar tu canal temporal sin comandos.',
-            '',
-            'Para invitar un usuario al canal, escribe `/vozinvitar (nombre)`.',
-            'Requisito: primero debes bloquear tu canal desde este panel.'
-        ].join('\n'))
+        .setDescription('Administra tu canal temporal desde este panel.')
         .addFields(
-            { name: 'Canal creado', value: `**${baseName}**`, inline: false },
-            { name: 'Modo', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },
-            { name: 'Limite', value: userLimit > 0 ? `${userLimit}` : 'Sin limite', inline: true },
-            { name: 'Propietario', value: `<@${ownerId}>`, inline: true }
+            { name: 'Canal', value: `**${baseName}**`, inline: false },
+            { name: 'Estado del canal', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },
+            { name: 'Limite', value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin limite', inline: true },
+            { name: 'Propietario', value: `${ownerTag}\n${ownerName}`, inline: true },
+            {
+                name: 'Invitar usuarios',
+                value: 'Usa `/vozinvitar (nombre)`.\nPrimero debes bloquear tu canal desde este panel.',
+                inline: false
+            }
         );
+
+    if (ownerAvatar) {
+        embed.setThumbnail(ownerAvatar);
+        embed.setAuthor({
+            name: ownerName,
+            iconURL: ownerAvatar
+        });
+    }
 
     if (extra && extra.action) {
         embed.setFooter({ text: `Ultima accion: ${String(extra.action).slice(0, 90)}` });
