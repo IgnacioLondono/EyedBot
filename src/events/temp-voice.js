@@ -35,17 +35,13 @@ function buildChannelName(member, config, preferredName = '') {
     return sanitizeChannelName(template) || `Canal de ${username}`;
 }
 
-function buildManagementRows(channelId) {
+function buildManagementRows(channelId, isLocked = false) {
     const id = String(channelId || '').trim();
 
     const rowA = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}lock_${id}`)
-            .setLabel('Bloquear')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}unlock_${id}`)
-            .setLabel('Desbloquear')
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}locktoggle_${id}`)
+            .setLabel(isLocked ? 'Desbloquear' : 'Bloquear')
             .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`${CONTROL_BUTTON_PREFIX}rename_${id}`)
@@ -55,12 +51,8 @@ function buildManagementRows(channelId) {
 
     const rowB = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}limitdown_${id}`)
-            .setLabel('Limite -')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}limitup_${id}`)
-            .setLabel('Limite +')
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}limit_${id}`)
+            .setLabel('Limite')
             .setStyle(ButtonStyle.Secondary)
     );
 
@@ -102,7 +94,7 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
 
     return {
         embeds: [embed],
-        components: buildManagementRows(channel.id)
+        components: buildManagementRows(channel.id, isLocked)
     };
 }
 
