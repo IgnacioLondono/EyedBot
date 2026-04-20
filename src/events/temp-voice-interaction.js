@@ -73,12 +73,13 @@ async function getOwnedTempVoiceChannel(interaction, channelId) {
     return { ok: true, channel };
 }
 
-async function refreshManagementMessage(message, channel, ownerId, actionLabel = '') {
+async function refreshManagementMessage(message, channel, ownerId, actionLabel = '', state = {}) {
     if (!message || typeof message.edit !== 'function' || !channel || !ownerId) return;
 
     const latestChannel = await channel.guild.channels.fetch(channel.id).catch(() => channel);
     const payload = buildManagementPanelPayload(latestChannel, ownerId, { userLimit: latestChannel.userLimit || 0 }, {
-        action: actionLabel
+        action: actionLabel,
+        ...state
     });
     if (!payload) return;
 
@@ -95,12 +96,13 @@ async function replyButtonError(interaction, message) {
     await interaction.reply({ content: message, flags: 64 }).catch(() => null);
 }
 
-async function refreshManagementInteraction(interaction, channel, ownerId, actionLabel = '') {
+async function refreshManagementInteraction(interaction, channel, ownerId, actionLabel = '', state = {}) {
     if (!interaction || !channel || !ownerId) return false;
 
     const latestChannel = await channel.guild.channels.fetch(channel.id).catch(() => channel);
     const payload = buildManagementPanelPayload(latestChannel, ownerId, { userLimit: latestChannel.userLimit || 0 }, {
-        action: actionLabel
+        action: actionLabel,
+        ...state
     });
     if (!payload) return false;
 
@@ -145,7 +147,9 @@ async function handleTempVoiceButton(interaction) {
             await channel.permissionOverwrites.edit(everyoneRoleId, {
                 Connect: false
             }).catch(() => null);
-            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal bloqueado');
+            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal bloqueado', {
+                isLocked: true
+            });
             return true;
         }
 
@@ -153,7 +157,9 @@ async function handleTempVoiceButton(interaction) {
             await channel.permissionOverwrites.edit(everyoneRoleId, {
                 Connect: null
             }).catch(() => null);
-            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado');
+            await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado', {
+                isLocked: false
+            });
             return true;
         }
 
@@ -164,7 +170,9 @@ async function handleTempVoiceButton(interaction) {
                 : Math.max(0, currentLimit - 1);
 
             await channel.edit({ userLimit: nextLimit }).catch(() => null);
-            await refreshManagementInteraction(interaction, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`);
+            await refreshManagementInteraction(interaction, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`, {
+                userLimit: nextLimit
+            });
             return true;
         }
 
