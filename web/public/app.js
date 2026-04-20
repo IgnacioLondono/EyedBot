@@ -744,6 +744,20 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--theme-glow-color', rgbaFromHex(normalized.accentPrimary, 0.12 + (patternStrength * 0.32)));
     root.style.setProperty('--theme-lines-opacity', String(0.1 + (patternStrength * 0.22)));
 
+    const rgbAccentPrimary = hexToRgbObject(normalized.accentPrimary);
+    const rgbAccentSecondary = hexToRgbObject(normalized.accentSecondary);
+    const rgbTextPrimary = hexToRgbObject(normalized.textPrimary);
+    const rgbBorder = hexToRgbObject(normalized.borderColor);
+
+    root.style.setProperty('--color-bg1', mixHexColors(normalized.bgPrimary, normalized.accentPrimary, 0.28));
+    root.style.setProperty('--color-bg2', mixHexColors(normalized.bgSecondary, normalized.accentSecondary, 0.18));
+    root.style.setProperty('--color1', `${rgbAccentPrimary.r}, ${rgbAccentPrimary.g}, ${rgbAccentPrimary.b}`);
+    root.style.setProperty('--color2', `${rgbAccentSecondary.r}, ${rgbAccentSecondary.g}, ${rgbAccentSecondary.b}`);
+    root.style.setProperty('--color3', `${rgbTextPrimary.r}, ${rgbTextPrimary.g}, ${rgbTextPrimary.b}`);
+    root.style.setProperty('--color4', `${rgbBorder.r}, ${rgbBorder.g}, ${rgbBorder.b}`);
+    root.style.setProperty('--color5', `${rgbAccentPrimary.r}, ${rgbAccentSecondary.g}, ${rgbTextPrimary.b}`);
+    root.style.setProperty('--color-interactive', `${rgbAccentSecondary.r}, ${rgbAccentPrimary.g}, ${rgbBorder.b}`);
+
     const pattern = document.querySelector('.bg-pattern');
     if (pattern) {
         pattern.style.opacity = String(0.7 + (patternStrength * 0.3));
@@ -753,6 +767,30 @@ function setThemeCssVariables(theme = themeSettings) {
     if (glow) {
         glow.style.opacity = String(0.45 + (patternStrength * 0.55));
     }
+}
+
+function initializeInteractiveGradient() {
+    const interactive = document.getElementById('interactiveGradient');
+    if (!(interactive instanceof HTMLElement)) return;
+
+    let currentX = window.innerWidth * 0.5;
+    let currentY = window.innerHeight * 0.5;
+    let targetX = currentX;
+    let targetY = currentY;
+
+    const moveInteractive = () => {
+        currentX += (targetX - currentX) * 0.08;
+        currentY += (targetY - currentY) * 0.08;
+        interactive.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(currentY)}px)`;
+        requestAnimationFrame(moveInteractive);
+    };
+
+    window.addEventListener('pointermove', (event) => {
+        targetX = event.clientX;
+        targetY = event.clientY;
+    }, { passive: true });
+
+    moveInteractive();
 }
 
 function getThemeControlsState() {
@@ -1060,6 +1098,8 @@ function restoreServerState(state) {
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
+    initializeInteractiveGradient();
+
     const isAuthenticated = await checkAuth();
     
     // Solo continuar si el usuario está autenticado
