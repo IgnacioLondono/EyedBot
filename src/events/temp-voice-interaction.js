@@ -7,14 +7,16 @@ const {
     PermissionsBitField
 } = require('discord.js');
 const tempVoiceStore = require('../utils/temp-voice-store');
-const { sanitizeChannelName, createOrMoveMemberTempChannel } = require('./temp-voice');
+const { sanitizeChannelName, createOrMoveMemberTempChannel, buildManagementPanelPayload } = require('./temp-voice');
 const {
     CREATE_BUTTON_PREFIX,
     NAME_MODAL_PREFIX,
     NAME_INPUT_ID,
     CONTROL_BUTTON_PREFIX,
     RENAME_MODAL_PREFIX,
-    RENAME_INPUT_ID
+    RENAME_INPUT_ID,
+    ADD_USER_MODAL_PREFIX,
+    ADD_USER_INPUT_ID
 } = require('./temp-voice-constants');
 
 function parseControlButton(customId = '') {
@@ -52,6 +54,22 @@ async function getOwnedTempVoiceChannel(interaction, channelId) {
     return { ok: true, channel };
 }
 
+function extractUserIdFromInput(raw = '') {
+    const match = String(raw || '').match(/\d{17,20}/);
+    return match ? match[0] : '';
+}
+
+async function refreshManagementMessage(message, channel, ownerId, actionLabel = '') {
+    if (!message || typeof message.edit !== 'function' || !channel || !ownerId) return;
+
+    const payload = buildManagementPanelPayload(channel, ownerId, { userLimit: channel.userLimit || 0 }, {
+        action: actionLabel
+    });
+    if (!payload) return;
+
+    await message.edit(payload).catch(() => null);
+}
+
 async function handleTempVoiceButton(interaction) {
     if (!interaction?.isButton()) return false;
 
@@ -69,7 +87,7 @@ async function handleTempVoiceButton(interaction) {
 
         if (action === 'rename') {
             const modal = new ModalBuilder()
-                .setCustomId(`${RENAME_MODAL_PREFIX}${interaction.guildId}_${channel.id}`)
+                .setCustomId(`${RENAME_MODAL_PREFIX}${interaction.guildId}_${channel.id}_${interaction.message?.id || '0'}`)
                 .setTitle('Renombrar Canal Temporal');
 
             const renameInput = new TextInputBuilder()
@@ -85,10 +103,29 @@ async function handleTempVoiceButton(interaction) {
             return true;
         }
 
+        if (action === 'adduser') {
+            const modal = new ModalBuilder()
+                .setCustomId(`${ADD_USER_MODAL_PREFIX}${interaction.guildId}_${channel.id}_${interaction.message?.id || '0'}`)
+                .setTitle('Agregar Usuario Al Canal');
+
+            const userInput = new TextInputBuilder()
+                .setCustomId(ADD_USER_INPUT_ID)
+                .setLabel('Usuario (@mencion o ID)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setMaxLength(64)
+                .setPlaceholder('@usuario o 123456789012345678');
+
+            modal.addComponents(new ActionRowBuilder().addComponents(userInput));
+            await interaction.showModal(modal).catch(() => null);
+            return true;
+        }
+
         if (action === 'lock') {
             await channel.permissionOverwrites.edit(everyoneRoleId, {
                 Connect: false
             }).catch(() => null);
+            await refreshManagementMessage(interaction.message, channel, interaction.user.id, 'Canal bloqueado');
             await interaction.reply({ content: 'Canal bloqueado: nadie nuevo puede entrar.', flags: 64 }).catch(() => null);
             return true;
         }
@@ -97,6 +134,7 @@ async function handleTempVoiceButton(interaction) {
             await channel.permissionOverwrites.edit(everyoneRoleId, {
                 Connect: null
             }).catch(() => null);
+            await refreshManagementMessage(interaction.message, channel, interaction.user.id, 'Canal desbloqueado');
             await interaction.reply({ content: 'Canal desbloqueado: cualquiera puede entrar.', flags: 64 }).catch(() => null);
             return true;
         }
@@ -108,6 +146,7 @@ async function handleTempVoiceButton(interaction) {
                 : Math.max(0, currentLimit - 1);
 
             await channel.edit({ userLimit: nextLimit }).catch(() => null);
+            await refreshManagementMessage(interaction.message, channel, interaction.user.id, `Limite ${nextLimit > 0 ? nextLimit : 'sin limite'}`);
             await interaction.reply({
                 content: `Limite actualizado: ${nextLimit > 0 ? nextLimit : 'sin limite'}.`,
                 flags: 64
@@ -161,9 +200,56 @@ async function handleTempVoiceButton(interaction) {
 async function handleTempVoiceModal(interaction) {
     if (!interaction?.isModalSubmit()) return false;
 
+    if (interaction.customId.startsWith(ADD_USER_MODAL_PREFIX)) {
+        const payload = interaction.customId.slice(ADD_USER_MODAL_PREFIX.length);
+        const [guildId, channelId, messageId] = payload.split('_');
+        if (!guildId || !channelId || String(interaction.guildId) !== String(guildId)) {
+            await interaction.reply({ content: 'Formulario invalido para este servidor.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const channelResult = await getOwnedTempVoiceChannel(interaction, channelId);
+        if (!channelResult.ok) {
+            await interaction.reply({ content: channelResult.error, flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const channel = channelResult.channel;
+        const rawUser = interaction.fields.getTextInputValue(ADD_USER_INPUT_ID) || '';
+        const targetUserId = extractUserIdFromInput(rawUser);
+        if (!targetUserId) {
+            await interaction.reply({ content: 'Debes escribir una mencion o ID valido.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        const member = await interaction.guild.members.fetch(targetUserId).catch(() => null);
+        if (!member) {
+            await interaction.reply({ content: 'No encontre ese usuario en este servidor.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
+        await channel.permissionOverwrites.edit(member.id, {
+            Connect: true,
+            Speak: true,
+            Stream: true,
+            UseVAD: true
+        }).catch(() => null);
+
+        if (messageId && messageId !== '0' && interaction.channel && typeof interaction.channel.messages?.fetch === 'function') {
+            const panelMessage = await interaction.channel.messages.fetch(messageId).catch(() => null);
+            await refreshManagementMessage(panelMessage, channel, interaction.user.id, `Usuario agregado: ${member.user.username}`);
+        }
+
+        await interaction.reply({
+            content: `Usuario agregado correctamente: <@${member.id}>.`,
+            flags: 64
+        }).catch(() => null);
+        return true;
+    }
+
     if (interaction.customId.startsWith(RENAME_MODAL_PREFIX)) {
         const payload = interaction.customId.slice(RENAME_MODAL_PREFIX.length);
-        const [guildId, channelId] = payload.split('_');
+        const [guildId, channelId, messageId] = payload.split('_');
         if (!guildId || !channelId || String(interaction.guildId) !== String(guildId)) {
             await interaction.reply({ content: 'Formulario invalido para este servidor.', flags: 64 }).catch(() => null);
             return true;
@@ -185,6 +271,12 @@ async function handleTempVoiceModal(interaction) {
         const channel = channelResult.channel;
         await channel.setName(safeName).catch(() => null);
         await tempVoiceStore.setUserCustomName(interaction.guildId, interaction.user.id, safeName);
+
+        if (messageId && messageId !== '0' && interaction.channel && typeof interaction.channel.messages?.fetch === 'function') {
+            const panelMessage = await interaction.channel.messages.fetch(messageId).catch(() => null);
+            await refreshManagementMessage(panelMessage, channel, interaction.user.id, `Canal renombrado: ${safeName}`);
+        }
+
         await interaction.reply({ content: `Canal renombrado a **${safeName}**.`, flags: 64 }).catch(() => null);
         return true;
     }
