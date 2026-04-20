@@ -5217,3 +5217,188 @@ body {
     }
 }
 
+/* =========================================================
+   Global Theme Adaptation Layer
+   ========================================================= */
+
+:root {
+    --ui-surface-1:
+        radial-gradient(circle at top right, rgba(var(--accent-primary-rgb), 0.14), transparent 52%),
+        linear-gradient(180deg, rgba(var(--bg-card-rgb), 0.8), rgba(var(--bg-primary-rgb), 0.92));
+    --ui-surface-2:
+        radial-gradient(circle at top left, rgba(var(--accent-secondary-rgb), 0.12), transparent 54%),
+        linear-gradient(170deg, rgba(var(--bg-card-rgb), 0.72), rgba(var(--bg-primary-rgb), 0.9));
+    --ui-interactive-bg: rgba(var(--accent-primary-rgb), 0.11);
+    --ui-interactive-bg-hover: rgba(var(--accent-primary-rgb), 0.18);
+    --ui-border: rgba(var(--border-rgb), 0.3);
+    --ui-border-strong: rgba(var(--border-rgb), 0.45);
+    --ui-shadow: 0 16px 44px rgba(var(--bg-primary-rgb), 0.42);
+}
+
+.hero-status-card,
+.dashboard-launcher-card,
+.guild-card,
+.stat-card,
+.command-card,
+.control-card,
+.embed-form-container,
+.server-side-menu,
+.server-content-area,
+.logs-container,
+.music-container,
+.moderation-container,
+.system-info-card,
+.settings-overview-card,
+.about-hero,
+.about-info-card,
+.about-carousel-wrap,
+.about-story-block,
+.commands-toolbar,
+.commands-empty,
+.summary-card,
+.theme-preview-card,
+.theme-controls-card,
+.owner-server-preview-card {
+    background: var(--ui-surface-1);
+    border-color: var(--ui-border);
+    box-shadow: var(--ui-shadow);
+}
+
+.server-info-container,
+.server-pane-surface,
+.summary-chart-wrap,
+.theme-lab,
+.settings-sidebar,
+.about-band,
+.theme-toggle-row {
+    background: var(--ui-surface-2);
+    border-color: var(--ui-border);
+}
+
+.btn,
+.chip-btn,
+.theme-preset-btn,
+.settings-side-btn,
+.about-carousel-arrow,
+.add-bot-btn,
+.commands-filter-btn,
+.side-menu-btn-inner,
+.nav-link,
+.guild-pill,
+.owner-pill,
+.theme-preview-chip,
+.theme-preview-tag,
+.summary-chart-select,
+.search-pill,
+.user-menu,
+.dropdown-item,
+.theme-toggle-track {
+    border-color: var(--ui-border);
+    color: var(--text-primary);
+}
+
+.btn-secondary,
+.chip-btn,
+.theme-preset-btn,
+.settings-side-btn,
+.about-carousel-arrow,
+.commands-filter-btn,
+.side-menu-btn-inner,
+.nav-link,
+.guild-pill,
+.summary-chart-select,
+.search-pill,
+.user-menu,
+.dropdown-item {
+    background: var(--ui-interactive-bg);
+}
+
+.btn-secondary:hover,
+.chip-btn:hover,
+.theme-preset-btn:hover,
+.settings-side-btn:hover,
+.about-carousel-arrow:hover,
+.commands-filter-btn:hover,
+.side-menu-btn:hover .side-menu-btn-inner,
+.nav-link:hover,
+.summary-chart-select:hover,
+.search-pill:hover,
+.user-menu:hover,
+.dropdown-item:hover {
+    background: var(--ui-interactive-bg-hover);
+    border-color: var(--ui-border-strong);
+}
+
+.btn-primary,
+.theme-preset-btn.active,
+.settings-side-btn.active,
+.commands-filter-btn.active,
+.nav-link.active,
+.hero-action-btn--primary {
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.92), rgba(var(--accent-secondary-rgb), 0.84));
+    border-color: rgba(var(--accent-secondary-rgb), 0.48);
+    color: #ffffff;
+}
+
+.form-control,
+input[type="search"],
+input[type="text"],
+input[type="url"],
+input[type="number"],
+textarea,
+select {
+    background: rgba(var(--bg-primary-rgb), 0.62);
+    border-color: var(--ui-border);
+    color: var(--text-primary);
+}
+
+.form-control:focus,
+input[type="search"]:focus,
+input[type="text"]:focus,
+input[type="url"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    border-color: rgba(var(--accent-primary-rgb), 0.65);
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.2);
+}
+
+.dropdown-menu,
+.nav-tabs,
+.context-strip,
+.theme-preview-panel,
+.theme-preview-bar,
+.theme-toggle-track {
+    background: var(--ui-surface-2);
+    border-color: var(--ui-border);
+}
+
+.section-title,
+.nav-brand h1,
+.hero-status-value,
+.summary-value,
+.about-kpi-value,
+.guild-name,
+.stat-value,
+.command-entry-name {
+    color: var(--text-primary);
+}
+
+.guild-info,
+.summary-subvalue,
+.about-info-card p,
+.about-story-block p,
+.theme-preview-copy,
+.theme-toggle-copy small,
+.command-entry-description,
+.section-subtitle,
+.theme-status-line,
+.settings-kv span {
+    color: var(--text-secondary);
+}
+
+.theme-toggle input:checked + .theme-toggle-track {
+    border-color: rgba(var(--accent-primary-rgb), 0.62);
+    box-shadow: 0 0 0 4px rgba(var(--accent-primary-rgb), 0.16);
+}
+
