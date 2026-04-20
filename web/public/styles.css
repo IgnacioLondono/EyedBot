@@ -5798,3 +5798,72 @@ select:focus {
     }
 }
 
+/* Final compact tuning (authoritative) */
+:root {
+    --circle-size: 64%;
+}
+
+.gradients-container {
+    filter: url(#goo) blur(26px);
+    opacity: 0.64;
+}
+
+.g1,
+.g2,
+.g3,
+.g4,
+.g5,
+.interactive {
+    opacity: 0.42;
+}
+
+.main-content {
+    max-width: none;
+    width: 100%;
+    padding: 0.9rem clamp(0.7rem, 1.2vw, 1.15rem) 1.1rem;
+}
+
+#commandsSection .container {
+    gap: 0.72rem;
+}
+
+#commandsSection .section-header {
+    margin-bottom: 0.8rem;
+}
+
+#commandsSection .commands-toolbar {
+    padding: 0.58rem;
+    gap: 0.52rem;
+    margin-bottom: 0.64rem;
+}
+
+#commandsSection .commands-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.72rem;
+}
+
+#commandsSection .command-card {
+    padding: 0.85rem;
+}
+
+#commandsSection .command-entry {
+    padding-top: 0.58rem;
+    margin-top: 0.58rem;
+}
+
+#commandsSection .command-entry-name {
+    font-size: 0.93rem;
+    margin-bottom: 0.18rem;
+}
+
+#commandsSection .command-entry-description {
+    font-size: 0.8rem;
+    line-height: 1.42;
+}
+
+@media (max-width: 900px) {
+    #commandsSection .commands-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
