@@ -1397,6 +1397,10 @@ function setupEventListeners() {
         history.pushState(buildPanelHistoryState(activeSection, true), '', window.location.pathname + window.location.search);
     });
 
+    window.addEventListener('resize', () => {
+        updateChannelSelectPresentation();
+    });
+
     // Navegación
     document.getElementById('dashboardBtn').addEventListener('click', async () => {
         if (hasSelectedGuildContext()) {
@@ -2074,6 +2078,7 @@ async function handleGuildSelect() {
     if (!guildId) {
         channelSelect.disabled = true;
         channelSelect.innerHTML = '<option value="">Primero selecciona un servidor</option>';
+        updateChannelSelectPresentation();
         renderTemplateSelect([]);
         return;
     }
@@ -2087,6 +2092,7 @@ async function handleGuildSelect() {
                 channels
                     .filter(ch => ch.type === 0) // Solo canales de texto
                     .map(ch => `<option value="${ch.id}"># ${ch.name}</option>`).join('');
+            updateChannelSelectPresentation();
             await loadEmbedTemplates(guildId);
         } else {
             showToast('Error al cargar canales', 'error');
@@ -2095,6 +2101,23 @@ async function handleGuildSelect() {
         console.error('Error cargando canales:', error);
         showToast('Error al cargar canales', 'error');
     }
+}
+
+function updateChannelSelectPresentation() {
+    const channelSelect = document.getElementById('channelSelect');
+    if (!channelSelect) return;
+
+    const isCompactViewport = window.matchMedia('(max-width: 760px)').matches;
+    if (isCompactViewport) {
+        channelSelect.size = 1;
+        channelSelect.classList.remove('channel-select--listbox');
+        return;
+    }
+
+    const optionCount = Array.from(channelSelect.options).filter((option) => option.value).length;
+    const visibleRows = Math.max(5, Math.min(10, optionCount + 1));
+    channelSelect.size = visibleRows;
+    channelSelect.classList.add('channel-select--listbox');
 }
 
 function renderTemplateSelect(templates) {
