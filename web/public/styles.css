@@ -4449,6 +4449,38 @@ body {
     border-radius: 999px;
 }
 
+#embedSection .embed-form .form-control {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+#embedSection .embed-form textarea.form-control {
+    white-space: pre-wrap;
+    overflow-x: hidden;
+    resize: vertical;
+}
+
+#embedSection .embed-preview,
+#embedSection .discord-embed,
+#embedSection .discord-embed-title,
+#embedSection .discord-embed-description,
+#embedSection .discord-embed-field-name,
+#embedSection .discord-embed-field-value,
+#embedSection .discord-embed-footer {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+#embedSection .discord-embed-description,
+#embedSection .discord-embed-field-value {
+    white-space: pre-wrap;
+}
+
 @media (max-width: 1200px) {
     #embedSection .embed-builder {
         grid-template-columns: 1fr;
