@@ -64,13 +64,20 @@ function buildManagementRows(channelId) {
             .setStyle(ButtonStyle.Secondary)
     );
 
-    return [rowA, rowB];
+    const rowC = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`${CONTROL_BUTTON_PREFIX}adduser_${id}`)
+            .setLabel('Agregar usuario')
+            .setStyle(ButtonStyle.Success)
+    );
+
+    return [rowA, rowB, rowC];
 }
 
-async function sendManagementEmbed(channel, member, config) {
-    if (!channel || typeof channel.send !== 'function') return;
+function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) {
+    if (!channel) return null;
 
-    const baseName = channel.name || `Canal de ${member.user?.username || 'Usuario'}`;
+    const baseName = channel.name || 'Canal temporal';
     const userLimit = Math.max(0, Number.parseInt(channel.userLimit || config?.userLimit || 0, 10) || 0);
     const everyRole = channel.guild.roles.everyone;
     const connectOverwrite = channel.permissionOverwrites.cache.get(everyRole.id);
@@ -84,13 +91,26 @@ async function sendManagementEmbed(channel, member, config) {
             { name: 'Canal creado', value: `**${baseName}**`, inline: false },
             { name: 'Modo', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },
             { name: 'Limite', value: userLimit > 0 ? `${userLimit}` : 'Sin limite', inline: true },
-            { name: 'Propietario', value: `<@${member.id}>`, inline: true }
+            { name: 'Propietario', value: `<@${ownerId}>`, inline: true }
         );
 
-    await channel.send({
+    if (extra && extra.action) {
+        embed.setFooter({ text: `Ultima accion: ${String(extra.action).slice(0, 90)}` });
+    }
+
+    return {
         embeds: [embed],
         components: buildManagementRows(channel.id)
-    }).catch(() => null);
+    };
+}
+
+async function sendManagementEmbed(channel, member, config) {
+    if (!channel || typeof channel.send !== 'function') return;
+
+    const payload = buildManagementPanelPayload(channel, member.id, config);
+    if (!payload) return;
+
+    await channel.send(payload).catch(() => null);
 }
 
 async function ensureOwnerChannel(guild, member, creatorChannel, config, preferredNameOverride = null) {
@@ -242,5 +262,6 @@ async function handleVoiceStateUpdate(oldState, newState) {
 module.exports = {
     handleVoiceStateUpdate,
     sanitizeChannelName,
-    createOrMoveMemberTempChannel
+    createOrMoveMemberTempChannel,
+    buildManagementPanelPayload
 };
