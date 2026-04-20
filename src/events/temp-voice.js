@@ -64,14 +64,7 @@ function buildManagementRows(channelId) {
             .setStyle(ButtonStyle.Secondary)
     );
 
-    const rowC = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}adduser_${id}`)
-            .setLabel('Agregar usuario')
-            .setStyle(ButtonStyle.Success)
-    );
-
-    return [rowA, rowB, rowC];
+    return [rowA, rowB];
 }
 
 function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) {
@@ -86,7 +79,11 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
     const embed = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('Panel de gestion de canal de voz')
-        .setDescription('Usa estos botones para administrar tu canal temporal sin comandos.')
+        .setDescription([
+            'Usa estos botones para administrar tu canal temporal sin comandos.',
+            '',
+            'Para invitar un usuario al canal, escribe `/vozinvitar (nombre)`.'
+        ].join('\n'))
         .addFields(
             { name: 'Canal creado', value: `**${baseName}**`, inline: false },
             { name: 'Modo', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },

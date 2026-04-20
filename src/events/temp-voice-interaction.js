@@ -3,8 +3,7 @@ const {
     TextInputBuilder,
     TextInputStyle,
     ActionRowBuilder,
-    ChannelType,
-    PermissionsBitField
+    ChannelType
 } = require('discord.js');
 const tempVoiceStore = require('../utils/temp-voice-store');
 const { sanitizeChannelName, createOrMoveMemberTempChannel, buildManagementPanelPayload } = require('./temp-voice');
@@ -14,9 +13,7 @@ const {
     NAME_INPUT_ID,
     CONTROL_BUTTON_PREFIX,
     RENAME_MODAL_PREFIX,
-    RENAME_INPUT_ID,
-    ADD_USER_MODAL_PREFIX,
-    ADD_USER_INPUT_ID
+    RENAME_INPUT_ID
 } = require('./temp-voice-constants');
 
 function parseControlButton(customId = '') {
@@ -39,7 +36,7 @@ async function getOwnedTempVoiceChannel(interaction, channelId) {
 
     const ownerId = await tempVoiceStore.getOwnerByChannelId(guild.id, channelId);
     if (!ownerId) {
-        return { ok: false, error: 'Ese canal ya no es temporal o no tiene dueño.' };
+        return { ok: false, error: 'Ese canal ya no es temporal o no tiene dueno.' };
     }
 
     if (String(ownerId) !== String(interaction.user.id)) {
@@ -52,11 +49,6 @@ async function getOwnedTempVoiceChannel(interaction, channelId) {
     }
 
     return { ok: true, channel };
-}
-
-function extractUserIdFromInput(raw = '') {
-    const match = String(raw || '').match(/\d{17,20}/);
-    return match ? match[0] : '';
 }
 
 async function refreshManagementMessage(message, channel, ownerId, actionLabel = '') {
@@ -83,7 +75,7 @@ async function handleTempVoiceButton(interaction) {
     if (controlParsed) {
         const { action, channelId } = controlParsed;
 
-        if (action !== 'rename' && action !== 'adduser') {
+        if (action !== 'rename') {
             await acknowledgeButtonSilently(interaction);
         }
 
@@ -109,24 +101,6 @@ async function handleTempVoiceButton(interaction) {
                 .setValue(String(channel.name || '').slice(0, 95));
 
             modal.addComponents(new ActionRowBuilder().addComponents(renameInput));
-            await interaction.showModal(modal).catch(() => null);
-            return true;
-        }
-
-        if (action === 'adduser') {
-            const modal = new ModalBuilder()
-                .setCustomId(`${ADD_USER_MODAL_PREFIX}${interaction.guildId}_${channel.id}_${interaction.message?.id || '0'}`)
-                .setTitle('Agregar Usuario Al Canal');
-
-            const userInput = new TextInputBuilder()
-                .setCustomId(ADD_USER_INPUT_ID)
-                .setLabel('Usuario (@mencion o ID)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setMaxLength(64)
-                .setPlaceholder('@usuario o 123456789012345678');
-
-            modal.addComponents(new ActionRowBuilder().addComponents(userInput));
             await interaction.showModal(modal).catch(() => null);
             return true;
         }
@@ -202,53 +176,6 @@ async function handleTempVoiceButton(interaction) {
 
 async function handleTempVoiceModal(interaction) {
     if (!interaction?.isModalSubmit()) return false;
-
-    if (interaction.customId.startsWith(ADD_USER_MODAL_PREFIX)) {
-        const payload = interaction.customId.slice(ADD_USER_MODAL_PREFIX.length);
-        const [guildId, channelId, messageId] = payload.split('_');
-        if (!guildId || !channelId || String(interaction.guildId) !== String(guildId)) {
-            await interaction.reply({ content: 'Formulario invalido para este servidor.', flags: 64 }).catch(() => null);
-            return true;
-        }
-
-        const channelResult = await getOwnedTempVoiceChannel(interaction, channelId);
-        if (!channelResult.ok) {
-            await interaction.reply({ content: channelResult.error, flags: 64 }).catch(() => null);
-            return true;
-        }
-
-        const channel = channelResult.channel;
-        const rawUser = interaction.fields.getTextInputValue(ADD_USER_INPUT_ID) || '';
-        const targetUserId = extractUserIdFromInput(rawUser);
-        if (!targetUserId) {
-            await interaction.reply({ content: 'Debes escribir una mencion o ID valido.', flags: 64 }).catch(() => null);
-            return true;
-        }
-
-        const member = await interaction.guild.members.fetch(targetUserId).catch(() => null);
-        if (!member) {
-            await interaction.reply({ content: 'No encontre ese usuario en este servidor.', flags: 64 }).catch(() => null);
-            return true;
-        }
-
-        await channel.permissionOverwrites.edit(member.id, {
-            Connect: true,
-            Speak: true,
-            Stream: true,
-            UseVAD: true
-        }).catch(() => null);
-
-        if (messageId && messageId !== '0' && interaction.channel && typeof interaction.channel.messages?.fetch === 'function') {
-            const panelMessage = await interaction.channel.messages.fetch(messageId).catch(() => null);
-            await refreshManagementMessage(panelMessage, channel, interaction.user.id, `Usuario agregado: ${member.user.username}`);
-        }
-
-        await interaction.reply({
-            content: `Usuario agregado correctamente: <@${member.id}>.`,
-            flags: 64
-        }).catch(() => null);
-        return true;
-    }
 
     if (interaction.customId.startsWith(RENAME_MODAL_PREFIX)) {
         const payload = interaction.customId.slice(RENAME_MODAL_PREFIX.length);
