@@ -5798,72 +5798,102 @@ select:focus {
     }
 }
 
-/* Final compact tuning (authoritative) */
-:root {
-    --circle-size: 64%;
-}
-
-.gradients-container {
-    filter: url(#goo) blur(26px);
-    opacity: 0.64;
-}
-
-.g1,
-.g2,
-.g3,
-.g4,
-.g5,
-.interactive {
-    opacity: 0.42;
-}
-
-.main-content {
-    max-width: none;
-    width: 100%;
-    padding: 0.9rem clamp(0.7rem, 1.2vw, 1.15rem) 1.1rem;
-}
-
+/* Final commands compact layout (authoritative) */
 #commandsSection .container {
-    gap: 0.72rem;
-}
-
-#commandsSection .section-header {
-    margin-bottom: 0.8rem;
+    max-width: min(1500px, 97vw);
 }
 
 #commandsSection .commands-toolbar {
-    padding: 0.58rem;
-    gap: 0.52rem;
-    margin-bottom: 0.64rem;
+    padding: 0.52rem 0.62rem;
+    gap: 0.45rem;
+    margin-bottom: 0.62rem;
+    border-radius: 14px;
+}
+
+#commandsSection .search-pill {
+    min-height: 38px;
+    padding: 0.32rem 0.6rem;
+}
+
+#commandsSection .search-input {
+    font-size: 0.9rem;
+}
+
+#commandsSection .commands-filters {
+    gap: 0.34rem;
+}
+
+#commandsSection .commands-filter-btn {
+    padding: 0.34rem 0.6rem;
+    font-size: 0.74rem;
+}
+
+#commandsSection .commands-filter-btn strong {
+    font-size: 0.72rem;
 }
 
 #commandsSection .commands-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 0.72rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.7rem;
 }
 
 #commandsSection .command-card {
-    padding: 0.85rem;
+    padding: 0.78rem 0.82rem;
+    border-radius: 14px;
+}
+
+#commandsSection .command-group-head {
+    margin-bottom: 0.62rem;
+}
+
+#commandsSection .command-group-head h3 {
+    font-size: 0.95rem;
+}
+
+#commandsSection .command-group-count {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.48rem;
 }
 
 #commandsSection .command-entry {
-    padding-top: 0.58rem;
-    margin-top: 0.58rem;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
 }
 
 #commandsSection .command-entry-name {
-    font-size: 0.93rem;
-    margin-bottom: 0.18rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
 }
 
 #commandsSection .command-entry-description {
     font-size: 0.8rem;
-    line-height: 1.42;
+    line-height: 1.35;
 }
 
-@media (max-width: 900px) {
+#commandsSection .command-options-wrap {
+    margin-top: 0.4rem;
+    padding-left: 0.55rem;
+    gap: 0.24rem;
+}
+
+#commandsSection .command-option-item strong,
+#commandsSection .command-option-item span {
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+@media (max-width: 760px) {
+    #commandsSection .container {
+        max-width: 100%;
+    }
+
+    #commandsSection .commands-toolbar {
+        padding: 0.55rem;
+    }
+
     #commandsSection .commands-grid {
         grid-template-columns: 1fr;
+        gap: 0.55rem;
     }
 }
 
