@@ -39,6 +39,12 @@ const COMMAND_REGISTER_RETRY_DELAY_MS = Math.max(1000, Number.parseInt(process.e
 const COMMAND_REGISTER_POST_READY_DELAY_MS = Math.max(0, Number.parseInt(process.env.COMMAND_REGISTER_POST_READY_DELAY_MS || '10000', 10));
 const COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS = Number.parseInt(process.env.COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS || '0', 10);
 const FORCED_SLASH_GUILD_IDS = ['1428561902086262908'];
+const DISABLED_SLASH_COMMANDS = new Set([
+    'voznombre',
+    'vozprivado',
+    'vozinvitar',
+    'vozquitar'
+]);
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',
     'ban',
@@ -237,6 +243,10 @@ function loadCommands(dir) {
         } else if (file.endsWith('.js')) {
             const command = require(filePath);
             if ('data' in command && 'execute' in command) {
+                if (DISABLED_SLASH_COMMANDS.has(command.data.name)) {
+                    console.log(`⏭️ Comando desactivado (omitido): ${command.data.name}`);
+                    continue;
+                }
                 client.commands.set(command.data.name, command);
                 commands.push(command.data.toJSON());
                 console.log(`✅ Comando cargado: ${command.data.name}`);
