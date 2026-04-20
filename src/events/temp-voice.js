@@ -27,7 +27,7 @@ function buildChannelName(member, config, preferredName = '') {
     return sanitizeChannelName(template) || `Canal de ${username}`;
 }
 
-async function ensureOwnerChannel(guild, member, creatorChannel, config) {
+async function ensureOwnerChannel(guild, member, creatorChannel, config, preferredNameOverride = null) {
     const existingChannelId = await tempVoiceStore.getActiveChannelId(guild.id, member.id);
     if (existingChannelId) {
         const existing = guild.channels.cache.get(existingChannelId) || await guild.channels.fetch(existingChannelId).catch(() => null);
@@ -40,7 +40,9 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config) {
         await tempVoiceStore.clearActiveChannel(guild.id, member.id, existingChannelId);
     }
 
-    const preferredName = await tempVoiceStore.getUserCustomName(guild.id, member.id);
+    const preferredName = typeof preferredNameOverride === 'string'
+        ? preferredNameOverride
+        : await tempVoiceStore.getUserCustomName(guild.id, member.id);
     const channelName = buildChannelName(member, config, preferredName);
 
     const categoryId = String(config.categoryId || '').trim();
@@ -75,6 +77,44 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config) {
 
     await tempVoiceStore.setActiveChannel(guild.id, member.id, channel.id);
     return channel;
+}
+
+async function createOrMoveMemberTempChannel(member, preferredName = null) {
+    const guild = member?.guild;
+    if (!guild || !member || member.user?.bot) {
+        return { ok: false, reason: 'invalid-member' };
+    }
+
+    const config = await tempVoiceStore.getTempVoiceConfig(guild.id);
+    if (!config || config.enabled !== true) {
+        return { ok: false, reason: 'system-disabled' };
+    }
+
+    const creatorChannelId = String(config.creatorChannelId || '').trim();
+    if (!creatorChannelId) {
+        return { ok: false, reason: 'missing-creator-channel' };
+    }
+
+    const creatorChannel = guild.channels.cache.get(creatorChannelId) || await guild.channels.fetch(creatorChannelId).catch(() => null);
+    if (!creatorChannel || creatorChannel.type !== ChannelType.GuildVoice) {
+        return { ok: false, reason: 'invalid-creator-channel' };
+    }
+
+    const userVoiceChannelId = String(member.voice?.channelId || '').trim();
+    if (userVoiceChannelId !== creatorChannelId) {
+        return { ok: false, reason: 'not-in-creator' };
+    }
+
+    const targetChannel = await ensureOwnerChannel(guild, member, creatorChannel, config, preferredName);
+    if (!targetChannel) {
+        return { ok: false, reason: 'channel-create-failed' };
+    }
+
+    if (targetChannel.id !== userVoiceChannelId) {
+        await member.voice.setChannel(targetChannel).catch(() => null);
+    }
+
+    return { ok: true, channel: targetChannel };
 }
 
 async function handleJoinCreatorChannel(newState, config) {
@@ -128,5 +168,6 @@ async function handleVoiceStateUpdate(oldState, newState) {
 
 module.exports = {
     handleVoiceStateUpdate,
-    sanitizeChannelName
+    sanitizeChannelName,
+    createOrMoveMemberTempChannel
 };
