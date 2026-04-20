@@ -26,7 +26,7 @@ async function getOwnedTempChannel(interaction) {
 
     const ownerId = await tempVoiceStore.getOwnerByChannelId(guild.id, channel.id);
     if (String(ownerId || '') !== String(interaction.user.id)) {
-        return { error: 'No eres el dueño del canal temporal actual.' };
+        return { error: 'No eres el dueno del canal temporal actual.' };
     }
 
     return { channel };
@@ -39,7 +39,7 @@ module.exports = {
         .addUserOption((option) =>
             option
                 .setName('usuario')
-                .setDescription('Usuario que podrá unirse a tu canal privado')
+                .setDescription('Usuario que podra unirse a tu canal privado')
                 .setRequired(true)
         ),
     cooldown: 4,
@@ -66,7 +66,7 @@ module.exports = {
 
         if (!isChannelPrivate(channel, interaction.guild.id)) {
             return interaction.reply({
-                content: 'Tu canal no está en modo privado. Usa `/vozprivado activar:true` primero.',
+                content: 'Primero debes bloquear tu canal desde el panel.',
                 flags: 64
             });
         }
@@ -91,7 +91,7 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(config.embedColor)
-                        .setTitle('✅ Usuario invitado')
+                        .setTitle('Usuario invitado')
                         .setDescription(`Ahora **${targetMember.user.tag}** puede entrar a tu canal privado.`)
                 ],
                 flags: 64
@@ -102,7 +102,7 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor('#FF0000')
-                        .setTitle('❌ Error')
+                        .setTitle('Error')
                         .setDescription('No pude invitar al usuario. Revisa permisos del bot.')
                 ],
                 flags: 64

@@ -77,12 +77,13 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
     const isLocked = connectOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
 
     const embed = new EmbedBuilder()
-        .setColor(0x5865f2)
+        .setColor(0x0099ff)
         .setTitle('Panel de gestion de canal de voz')
         .setDescription([
             'Usa estos botones para administrar tu canal temporal sin comandos.',
             '',
-            'Para invitar un usuario al canal, escribe `/vozinvitar (nombre)`.'
+            'Para invitar un usuario al canal, escribe `/vozinvitar (nombre)`.',
+            'Requisito: primero debes bloquear tu canal desde este panel.'
         ].join('\n'))
         .addFields(
             { name: 'Canal creado', value: `**${baseName}**`, inline: false },
