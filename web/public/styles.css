@@ -45,16 +45,16 @@
     --theme-glow-color: rgba(124, 77, 255, 0.2);
     --theme-lines-opacity: 0.22;
 
-    --color-bg1: rgb(108, 0, 162);
-    --color-bg2: rgb(0, 17, 82);
-    --color1: 18, 113, 255;
-    --color2: 221, 74, 255;
-    --color3: 100, 220, 255;
-    --color4: 200, 50, 50;
-    --color5: 180, 180, 50;
-    --color-interactive: 140, 100, 255;
+    --color-bg1: rgb(64, 26, 173);
+    --color-bg2: rgb(14, 41, 146);
+    --color1: 56, 126, 255;
+    --color2: 164, 98, 255;
+    --color3: 94, 198, 255;
+    --color4: 76, 98, 255;
+    --color5: 132, 77, 255;
+    --color-interactive: 98, 121, 255;
     --circle-size: 80%;
-    --blending: hard-light;
+    --blending: soft-light;
 }
 
 * {
@@ -99,6 +99,7 @@ body {
     filter: url(#goo) blur(40px);
     width: 100%;
     height: 100%;
+    opacity: 0.92;
 }
 
 .g1,
@@ -118,8 +119,8 @@ body {
     top: calc(50% - var(--circle-size) / 2);
     left: calc(50% - var(--circle-size) / 2);
     transform-origin: center center;
-    animation: moveVertical 30s ease infinite;
-    opacity: 1;
+    animation: moveVertical 72s ease-in-out infinite;
+    opacity: 0.82;
 }
 
 .g2 {
@@ -129,8 +130,8 @@ body {
     top: calc(50% - var(--circle-size) / 2);
     left: calc(50% - var(--circle-size) / 2);
     transform-origin: calc(50% - 400px);
-    animation: moveInCircle 20s reverse infinite;
-    opacity: 1;
+    animation: moveInCircle 92s linear infinite reverse;
+    opacity: 0.78;
 }
 
 .g3 {
@@ -140,8 +141,8 @@ body {
     top: calc(50% - var(--circle-size) / 2 + 200px);
     left: calc(50% - var(--circle-size) / 2 - 500px);
     transform-origin: calc(50% + 400px);
-    animation: moveInCircle 40s linear infinite;
-    opacity: 1;
+    animation: moveInCircle 118s linear infinite;
+    opacity: 0.72;
 }
 
 .g4 {
@@ -151,8 +152,8 @@ body {
     top: calc(50% - var(--circle-size) / 2);
     left: calc(50% - var(--circle-size) / 2);
     transform-origin: calc(50% - 200px);
-    animation: moveHorizontal 40s ease infinite;
-    opacity: 0.7;
+    animation: moveHorizontal 108s ease-in-out infinite;
+    opacity: 0.62;
 }
 
 .g5 {
@@ -162,8 +163,8 @@ body {
     top: calc(50% - var(--circle-size));
     left: calc(50% - var(--circle-size));
     transform-origin: calc(50% - 800px) calc(50% + 200px);
-    animation: moveInCircle 20s ease infinite;
-    opacity: 1;
+    animation: moveInCircle 132s ease-in-out infinite;
+    opacity: 0.6;
 }
 
 .interactive {
@@ -172,7 +173,7 @@ body {
     height: 100%;
     top: -50%;
     left: -50%;
-    opacity: 0.7;
+    opacity: 0.38;
 }
 
 @keyframes moveInCircle {
