@@ -71,10 +71,14 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
     if (!channel) return null;
 
     const baseName = channel.name || 'Canal temporal';
-    const userLimit = Math.max(0, Number.parseInt(channel.userLimit || config?.userLimit || 0, 10) || 0);
+    const resolvedLimit = extra && Number.isFinite(extra.userLimit)
+        ? extra.userLimit
+        : (channel.userLimit || config?.userLimit || 0);
+    const userLimit = Math.max(0, Number.parseInt(resolvedLimit, 10) || 0);
     const everyRole = channel.guild.roles.everyone;
     const connectOverwrite = channel.permissionOverwrites.cache.get(everyRole.id);
-    const isLocked = connectOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
+    const derivedLocked = connectOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
+    const isLocked = typeof extra?.isLocked === 'boolean' ? extra.isLocked : derivedLocked;
 
     const embed = new EmbedBuilder()
         .setColor(0x0099ff)
