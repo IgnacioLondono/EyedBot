@@ -20,7 +20,7 @@ let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
 let dashboardGuildsCache = [];
 let dashboardGuildSearchQuery = '';
-let serverActivityChart = null;
+const serverActivityCharts = new Map();
 let serverActivityChartMode = 'week';
 let botInviteUrl = '';
 let serverSwitcherGuilds = [];
@@ -36,6 +36,7 @@ let commandsFilterQuery = '';
 let commandsFilterCategory = 'all';
 let currentServerInfo = null;
 let currentServerInsightView = 'overview';
+let serverSummaryRefreshInterval = null;
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 
@@ -1220,6 +1221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadGuilds();
     await loadStats();
     await loadAboutOverview();
+    setupServerSummaryAutoRefresh();
     
     const initialSection = savedState?.activeSection || 'dashboard';
     showSection(initialSection, { skipHistory: true });
@@ -4611,8 +4613,9 @@ async function loadLevelsPanel(guildId) {
 }
 
 // Cargar información del servidor
-async function loadServerInfo(guildId) {
+async function loadServerInfo(guildId, options = {}) {
     const container = document.getElementById('serverInfoContainer');
+    const { silent = false } = options;
     
     try {
         const response = await fetchWithCredentials(`/api/guild/${guildId}/info`);
@@ -4651,6 +4654,77 @@ function formatChartShortDate(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'N/A';
     return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+}
+
+function formatHoursFromMinutes(minutes) {
+    const numeric = Number(minutes || 0);
+    return `${formatServerMetric(numeric / 60, { maximumFractionDigits: 2 })} h`;
+}
+
+function getServerTopUsers(info) {
+    return Array.isArray(info?.activity?.topUsers) ? info.activity.topUsers : [];
+}
+
+function renderTopUsersMarkup(topUsers = [], options = {}) {
+    const {
+        limit = topUsers.length,
+        detailed = false
+    } = options;
+
+    const usersToRender = topUsers.slice(0, limit);
+    if (!usersToRender.length) {
+        return '<div class="summary-top-users-empty">Todavia no hay usuarios con actividad registrada.</div>';
+    }
+
+    return usersToRender.map((user, index) => {
+        const safeTag = escapeHtml(user?.tag || 'Desconocido');
+        const messageCount = Number.parseInt(user?.messageCount || 0, 10) || 0;
+        const voiceMinutes = Number.parseInt(user?.voiceMinutes || 0, 10) || 0;
+        const totalScore = messageCount + voiceMinutes;
+        const avatar = user?.avatar
+            ? `<img src="${user.avatar}" alt="${safeTag}" class="summary-top-user-avatar">`
+            : `<div class="summary-top-user-avatar summary-top-user-avatar--placeholder">${safeTag.charAt(0).toUpperCase()}</div>`;
+
+        return `
+            <div class="summary-top-user-item">
+                <div class="summary-top-user-rank">#${index + 1}</div>
+                ${avatar}
+                <div class="summary-top-user-copy">
+                    <div class="summary-top-user-name">${safeTag}</div>
+                    <div class="summary-top-user-meta">
+                        ${formatServerMetric(messageCount)} msgs • ${formatServerMetric(voiceMinutes)} min voz
+                        ${detailed ? ` • ${formatHoursFromMinutes(voiceMinutes)} • Score ${formatServerMetric(totalScore)}` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function destroyServerActivityChart(canvasId = 'serverActivityChart') {
+    const existingChart = serverActivityCharts.get(canvasId);
+    if (existingChart) {
+        existingChart.destroy();
+        serverActivityCharts.delete(canvasId);
+    }
+}
+
+async function refreshServerSummaryIfVisible() {
+    const serverSection = document.getElementById('serverSection');
+    if (!serverSection || !serverSection.classList.contains('active') || !currentServerGuildId) return;
+    await loadServerInfo(currentServerGuildId, { silent: true });
+}
+
+function setupServerSummaryAutoRefresh() {
+    if (serverSummaryRefreshInterval) {
+        clearInterval(serverSummaryRefreshInterval);
+    }
+
+    serverSummaryRefreshInterval = setInterval(() => {
+        refreshServerSummaryIfVisible().catch((error) => {
+            console.warn('No se pudo refrescar el resumen del servidor:', error?.message || error);
+        });
+    }, 60000);
 }
 
 function summaryIcon(type = 'server') {
@@ -4750,7 +4824,8 @@ function buildServerActivityPoints(info, mode = 'week') {
 }
 
 function renderServerActivityChart(info, options = {}) {
-    const canvas = document.getElementById(options.canvasId || 'serverActivityChart');
+    const canvasId = options.canvasId || 'serverActivityChart';
+    const canvas = document.getElementById(canvasId);
     const rangeSelect = document.getElementById(options.selectId || 'serverActivityRange');
     const emptyState = document.getElementById(options.emptyId || 'serverActivityChartEmpty');
     if (!canvas || !rangeSelect) return;
@@ -4768,10 +4843,7 @@ function renderServerActivityChart(info, options = {}) {
         const points = buildServerActivityPoints(info, mode);
         const hasData = points.some((point) => point.joins > 0 || point.leaves > 0 || point.messages > 0 || point.voiceMinutes > 0);
 
-        if (serverActivityChart) {
-            serverActivityChart.destroy();
-            serverActivityChart = null;
-        }
+        destroyServerActivityChart(canvasId);
 
         if (!hasData) {
             if (emptyState) {
@@ -4786,7 +4858,7 @@ function renderServerActivityChart(info, options = {}) {
         if (emptyState) emptyState.style.display = 'none';
 
         const chartData = createServerActivityChartDatasets(points);
-        serverActivityChart = new Chart(canvas.getContext('2d'), {
+        const chart = new Chart(canvas.getContext('2d'), {
             type: 'line',
             data: chartData,
             options: {
@@ -4794,7 +4866,8 @@ function renderServerActivityChart(info, options = {}) {
                 maintainAspectRatio: false,
                 interaction: {
                     mode: 'index',
-                    intersect: false
+                    intersect: false,
+                    axis: 'x'
                 },
                 plugins: {
                     legend: {
@@ -4803,7 +4876,15 @@ function renderServerActivityChart(info, options = {}) {
                             boxWidth: 12,
                             boxHeight: 12
                         }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
                     }
+                },
+                hover: {
+                    mode: 'index',
+                    intersect: false
                 },
                 scales: {
                     x: {
@@ -4818,6 +4899,7 @@ function renderServerActivityChart(info, options = {}) {
                 }
             }
         });
+        serverActivityCharts.set(canvasId, chart);
     };
 
     rangeSelect.value = serverActivityChartMode;
@@ -4861,7 +4943,12 @@ function buildServerInsightDetailMarkup(info, insightId) {
     const peakJoinCount = Number.parseInt(info.activity?.memberFlow?.peakJoinsDay?.count || 0, 10) || 0;
     const peakLeaveDate = formatIsoDate(info.activity?.memberFlow?.peakLeavesDay?.date);
     const peakLeaveCount = Number.parseInt(info.activity?.memberFlow?.peakLeavesDay?.count || 0, 10) || 0;
-    const topUsers = Array.isArray(info.activity?.topUsers) ? info.activity.topUsers : [];
+    const topUsers = getServerTopUsers(info);
+    const dailyTimeline = Array.isArray(info.activity?.timeline?.daily) ? info.activity.timeline.daily : [];
+    const weeklyTimeline = Array.isArray(info.activity?.timeline?.weekly) ? info.activity.timeline.weekly : [];
+    const activeDays = dailyTimeline.filter((entry) => (Number.parseInt(entry.messages || 0, 10) || 0) > 0 || (Number.parseInt(entry.voiceMinutes || 0, 10) || 0) > 0 || (Number.parseInt(entry.joins || 0, 10) || 0) > 0 || (Number.parseInt(entry.leaves || 0, 10) || 0) > 0).length;
+    const averageVoiceMinutesPerTrackedUser = trackedUsers > 0 ? totalVoiceMinutes / trackedUsers : 0;
+    const averageMessagesPerTrackedUser = trackedUsers > 0 ? totalMessages / trackedUsers : 0;
 
     const ownerAvatar = info.owner?.avatar
         ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
@@ -4895,6 +4982,7 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Miembros totales', formatServerMetric(info.memberCount || 0), 'Comunidad actual del servidor')}
                     ${renderServerInsightStat('Usuarios con historial', formatServerMetric(trackedUsers), 'Usuarios con mensajes o voz registrados')}
                     ${renderServerInsightStat('Usuarios en voz ahora', formatServerMetric(liveVoiceUsers), `${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})`)}
+                    ${renderServerInsightStat('Dias con actividad', formatServerMetric(activeDays), 'Dias recientes con movimiento registrado')}
                 </div>
             `
         },
@@ -4928,6 +5016,7 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Mensajes totales', `${formatServerMetric(totalMessages)} msgs`, 'Solo usuarios con historial')}
                     ${renderServerInsightStat('Promedio diario', formatServerMetric(avgMessagesPerDay, { maximumFractionDigits: 2 }), 'Desde la creacion del servidor')}
                     ${renderServerInsightStat('Usuario top', topMessageTag, `${formatServerMetric(topMessageCount)} mensajes`)}
+                    ${renderServerInsightStat('Promedio por usuario', formatServerMetric(averageMessagesPerTrackedUser, { maximumFractionDigits: 2 }), 'Mensajes por usuario con historial')}
                 </div>
             `
         },
@@ -4939,6 +5028,7 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Minutos totales', `${formatServerMetric(totalVoiceMinutes)} min`, 'Tiempo acumulado de voz')}
                     ${renderServerInsightStat('Promedio diario', `${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h`, 'Horas por dia desde la creacion')}
                     ${renderServerInsightStat('Usuario top', topVoiceTag, `${formatServerMetric(topVoiceMinutes)} min`)}
+                    ${renderServerInsightStat('Promedio por usuario', `${formatServerMetric(averageVoiceMinutesPerTrackedUser, { maximumFractionDigits: 2 })} min`, 'Voz promedio por usuario con historial')}
                 </div>
             `
         },
@@ -4950,6 +5040,7 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Entradas', formatServerMetric(totalJoins), `Pico ${formatServerMetric(peakJoinCount)} el ${peakJoinDate}`)}
                     ${renderServerInsightStat('Salidas', formatServerMetric(totalLeaves), `Pico ${formatServerMetric(peakLeaveCount)} el ${peakLeaveDate}`)}
                     ${renderServerInsightStat('Balance neto', `${flowNet >= 0 ? '+' : ''}${formatServerMetric(flowNet)}`, 'Entradas menos salidas')}
+                    ${renderServerInsightStat('Semanas registradas', formatServerMetric(weeklyTimeline.length), 'Historial agregado disponible')}
                 </div>
             `
         },
@@ -5057,7 +5148,7 @@ function bindServerSummaryCardEvents() {
 
     container.querySelectorAll('[data-server-insight]').forEach((card) => {
         card.addEventListener('click', (event) => {
-            if (event.target.closest('select, option, canvas')) return;
+            if (event.target.closest('select, option, canvas, button')) return;
             openServerInsight(card.dataset.serverInsight);
         });
 
@@ -5072,6 +5163,15 @@ function bindServerSummaryCardEvents() {
     const backButton = container.querySelector('[data-server-insight-back]');
     if (backButton) {
         backButton.addEventListener('click', () => closeServerInsight());
+    }
+
+    const showMoreButton = container.querySelector('[data-server-insight-more-users]');
+    if (showMoreButton) {
+        showMoreButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openServerInsight('activity');
+        });
     }
 }
 
@@ -5088,6 +5188,16 @@ function closeServerInsight() {
 }
 
 function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar, createdDate, ageDays, trackedUsers, totalMessages, avgMessagesPerDay, topMessageTag, topMessageCount, totalVoiceMinutes, avgVoiceHoursPerDay, topVoiceTag, topVoiceMinutes, totalJoins, totalLeaves, flowNet, peakJoinCount, peakJoinDate, peakLeaveCount, peakLeaveDate, liveVoiceUsers, liveTopChannelName, liveTopChannelUsers) {
+    const topUsers = getServerTopUsers(info);
+    const topUsersPreviewMarkup = renderTopUsersMarkup(topUsers, { limit: 3 });
+    const showMoreUsersButton = topUsers.length > 3
+        ? `
+            <button type="button" class="summary-link-btn" data-server-insight-more-users>
+                Ver mas usuarios
+            </button>
+        `
+        : '';
+
     return `
         <div class="server-summary-grid">
             <article class="summary-card summary-card--owner summary-card--interactive" data-server-insight="owner" tabindex="0" role="button">
@@ -5171,8 +5281,9 @@ function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar,
                 ${summaryTitle('Usuarios Activos', 'activity', 'teal')}
                 <div class="summary-subvalue">Mensajes y tiempo de voz acumulado</div>
                 <div class="summary-top-users-list">
-                    ${topUsersMarkup}
+                    ${topUsersPreviewMarkup}
                 </div>
+                ${showMoreUsersButton}
             </article>
 
             <article class="summary-card summary-card--chart summary-card--interactive" data-server-insight="chart" tabindex="0" role="button">
