@@ -1543,6 +1543,8 @@ body {
     border-radius: 12px;
     padding: 1.5rem;
     min-height: 300px;
+    max-height: 350px;
+    overflow-y: auto;
 }
 
 .embed-placeholder {
@@ -5763,6 +5765,29 @@ select:focus {
     position: sticky;
     top: 0.35rem;
     align-self: start;
+    max-height: calc(100vh - 16rem);
+    overflow: hidden;
+}
+
+#embedSection .embed-preview {
+    max-height: calc(100vh - 19rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.5rem;
+}
+
+#embedSection .embed-preview::-webkit-scrollbar {
+    width: 8px;
+}
+
+#embedSection .embed-preview::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+}
+
+#embedSection .embed-preview::-webkit-scrollbar-thumb {
+    background: rgba(165, 120, 255, 0.55);
+    border-radius: 999px;
 }
 
 #embedSection .embed-form {
@@ -5795,6 +5820,14 @@ select:focus {
 
     #embedSection .embed-preview-container {
         position: static;
+        max-height: none;
+        overflow: visible;
+    }
+
+    #embedSection .embed-preview {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
     }
 }
 
