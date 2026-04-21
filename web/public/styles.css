@@ -5378,6 +5378,18 @@ body {
     font-size: 0.82rem;
 }
 
+.summary-chart-select option {
+    background: #203a5a;
+    color: #f4eeff;
+}
+
+.summary-chart-select option:checked,
+.summary-chart-select option:hover,
+.summary-chart-select option:focus {
+    background: #335e8c;
+    color: #ffffff;
+}
+
 .summary-chart-wrap {
     position: relative;
     height: 290px;
@@ -5399,6 +5411,95 @@ body {
     font-size: 0.88rem;
 }
 
+.summary-card--interactive {
+    cursor: pointer;
+    transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+}
+
+.summary-card--interactive:hover {
+    transform: translateY(-3px);
+    border-color: rgba(var(--accent-secondary-rgb), 0.38);
+    box-shadow: 0 20px 44px rgba(var(--bg-primary-rgb), 0.32);
+}
+
+.summary-card--interactive:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.2), 0 0 0 1px rgba(var(--accent-secondary-rgb), 0.22) inset;
+}
+
+.server-insight-view {
+    display: grid;
+    gap: 1rem;
+}
+
+.server-insight-header {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.server-insight-kicker {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.server-insight-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.45rem;
+}
+
+.server-insight-header p {
+    margin: 0;
+    color: var(--text-secondary);
+    max-width: 72ch;
+    line-height: 1.55;
+}
+
+.server-insight-body {
+    display: grid;
+    gap: 1rem;
+}
+
+.server-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+}
+
+.server-insight-stat {
+    display: grid;
+    gap: 0.22rem;
+    padding: 0.9rem;
+    border-radius: 14px;
+    border: 1px solid rgba(var(--border-rgb), 0.22);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.server-insight-stat-label {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.server-insight-stat-value {
+    color: var(--text-primary);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.server-insight-stat-detail {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.summary-chart-wrap--detail {
+    height: 360px;
+}
+
 @media (max-width: 720px) {
     .summary-chart-head {
         flex-direction: column;
@@ -5412,6 +5513,10 @@ body {
 
     .summary-chart-wrap {
         height: 240px;
+    }
+
+    .summary-chart-wrap--detail {
+        height: 260px;
     }
 
     .summary-card--top-users {
