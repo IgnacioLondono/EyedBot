@@ -5134,8 +5134,12 @@ body {
 }
 
 #embedSection .embed-preview {
-    min-height: 240px;
+    flex: 1;
+    min-height: 0;
     padding: 1rem;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 #embedSection .embed-placeholder {
@@ -5151,7 +5155,11 @@ body {
     position: sticky;
     top: 0.35rem;
     align-self: start;
-    height: fit-content;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
 }
 
 #embedSection .embed-form {
@@ -5770,10 +5778,13 @@ select:focus {
 }
 
 #embedSection .embed-preview {
-    max-height: calc(100vh - 19rem);
+    flex: 1;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 0.5rem;
+    scrollbar-gutter: stable;
 }
 
 #embedSection .embed-preview::-webkit-scrollbar {
@@ -5822,12 +5833,14 @@ select:focus {
         position: static;
         max-height: none;
         overflow: visible;
+        height: auto;
     }
 
     #embedSection .embed-preview {
         max-height: none;
         overflow: visible;
         padding-right: 0;
+        flex: none;
     }
 }
 
