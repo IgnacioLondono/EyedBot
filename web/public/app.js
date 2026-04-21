@@ -4701,6 +4701,63 @@ function renderTopUsersMarkup(topUsers = [], options = {}) {
     }).join('');
 }
 
+function renderServerProfileList(items = [], options = {}) {
+    const {
+        emptyText = 'Sin elementos disponibles.',
+        secondaryKey = 'meta'
+    } = options;
+
+    if (!items.length) {
+        return `<div class="summary-top-users-empty">${emptyText}</div>`;
+    }
+
+    return items.map((item, index) => {
+        const safeTitle = escapeHtml(String(item?.title || item?.tag || item?.name || 'Elemento'));
+        const safeMeta = escapeHtml(String(item?.[secondaryKey] || ''));
+        const avatar = item?.avatar
+            ? `<img src="${item.avatar}" alt="${safeTitle}" class="summary-top-user-avatar">`
+            : `<div class="summary-top-user-avatar summary-top-user-avatar--placeholder">${safeTitle.charAt(0).toUpperCase()}</div>`;
+
+        return `
+            <div class="summary-top-user-item">
+                <div class="summary-top-user-rank">#${index + 1}</div>
+                ${avatar}
+                <div class="summary-top-user-copy">
+                    <div class="summary-top-user-name">${safeTitle}</div>
+                    <div class="summary-top-user-meta">${safeMeta}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderServerTextList(items = [], options = {}) {
+    const { emptyText = 'Sin datos disponibles.' } = options;
+    if (!items.length) {
+        return `<div class="summary-top-users-empty">${emptyText}</div>`;
+    }
+
+    return items.map((item) => `
+        <article class="server-detail-list-item">
+            <div class="server-detail-list-title">${escapeHtml(String(item?.name || 'Sin nombre'))}</div>
+            <div class="server-detail-list-meta">${escapeHtml(String(item?.meta || ''))}</div>
+            ${item?.extra ? `<div class="server-detail-list-extra">${escapeHtml(String(item.extra))}</div>` : ''}
+        </article>
+    `).join('');
+}
+
+function renderServerChipList(items = [], emptyText = 'Sin datos adicionales.') {
+    if (!items.length) {
+        return `<div class="summary-top-users-empty">${emptyText}</div>`;
+    }
+
+    return `
+        <div class="server-chip-list">
+            ${items.map((item) => `<span class="server-chip">${escapeHtml(String(item))}</span>`).join('')}
+        </div>
+    `;
+}
+
 function destroyServerActivityChart(canvasId = 'serverActivityChart') {
     const existingChart = serverActivityCharts.get(canvasId);
     if (existingChart) {
@@ -4949,6 +5006,16 @@ function buildServerInsightDetailMarkup(info, insightId) {
     const activeDays = dailyTimeline.filter((entry) => (Number.parseInt(entry.messages || 0, 10) || 0) > 0 || (Number.parseInt(entry.voiceMinutes || 0, 10) || 0) > 0 || (Number.parseInt(entry.joins || 0, 10) || 0) > 0 || (Number.parseInt(entry.leaves || 0, 10) || 0) > 0).length;
     const averageVoiceMinutesPerTrackedUser = trackedUsers > 0 ? totalVoiceMinutes / trackedUsers : 0;
     const averageMessagesPerTrackedUser = trackedUsers > 0 ? totalMessages / trackedUsers : 0;
+    const humanMembers = Number.parseInt(info.members?.humans || 0, 10) || 0;
+    const botMembers = Number.parseInt(info.members?.bots || 0, 10) || 0;
+    const textChannels = Array.isArray(info.channels?.items?.text) ? info.channels.items.text : [];
+    const voiceChannels = Array.isArray(info.channels?.items?.voice) ? info.channels.items.voice : [];
+    const categoryChannels = Array.isArray(info.channels?.items?.category) ? info.channels.items.category : [];
+    const rolesDetailed = Array.isArray(info.roles) ? info.roles.filter((role) => role.name !== '@everyone').slice(0, 10) : [];
+    const messageLeaders = Array.isArray(info.activity?.messages?.leaders) ? info.activity.messages.leaders : [];
+    const voiceLeaders = Array.isArray(info.activity?.voice?.leaders) ? info.activity.voice.leaders : [];
+    const liveVoiceChannels = Array.isArray(info.activity?.voice?.live?.channels) ? info.activity.voice.live.channels : [];
+    const featureList = Array.isArray(info.features) ? info.features : [];
 
     const ownerAvatar = info.owner?.avatar
         ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
@@ -4971,7 +5038,10 @@ function buildServerInsightDetailMarkup(info, insightId) {
                 <div class="server-insight-grid">
                     ${renderServerInsightStat('Servidor', escapeHtml(info.name || 'Servidor'), 'Nombre visible actual')}
                     ${renderServerInsightStat('Creado', createdDate, `${formatServerMetric(ageDays)} dias de antiguedad`)}
+                    ${renderServerInsightStat('Nivel premium', `Nivel ${Number(info.premiumTier || 0)}`, `${Number(info.premiumSubscriptionCount || 0)} boosts`)}
+                    ${renderServerInsightStat('Verificacion', escapeHtml(String(info.verificationLevel ?? 'N/A')), 'Seguridad activa del servidor')}
                 </div>
+                ${renderServerChipList(featureList, 'Sin features especiales activas.')}
             `
         },
         members: {
@@ -4980,10 +5050,18 @@ function buildServerInsightDetailMarkup(info, insightId) {
             body: `
                 <div class="server-insight-grid">
                     ${renderServerInsightStat('Miembros totales', formatServerMetric(info.memberCount || 0), 'Comunidad actual del servidor')}
+                    ${renderServerInsightStat('Humanos', formatServerMetric(humanMembers), 'Usuarios reales en el servidor')}
+                    ${renderServerInsightStat('Bots', formatServerMetric(botMembers), 'Bots conectados al servidor')}
                     ${renderServerInsightStat('Usuarios con historial', formatServerMetric(trackedUsers), 'Usuarios con mensajes o voz registrados')}
                     ${renderServerInsightStat('Usuarios en voz ahora', formatServerMetric(liveVoiceUsers), `${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})`)}
                     ${renderServerInsightStat('Dias con actividad', formatServerMetric(activeDays), 'Dias recientes con movimiento registrado')}
                 </div>
+                <section class="server-insight-section">
+                    <h4>Usuarios mas activos</h4>
+                    <div class="summary-top-users-list summary-top-users-list--detail">
+                        ${renderTopUsersMarkup(topUsers, { limit: 6, detailed: true })}
+                    </div>
+                </section>
             `
         },
         channels: {
@@ -4996,6 +5074,38 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Voz', formatServerMetric(info.channels?.voice || 0), 'Canales de voz')}
                     ${renderServerInsightStat('Categorias', formatServerMetric(info.channels?.category || 0), 'Organizacion actual')}
                 </div>
+                <div class="server-insight-columns">
+                    <section class="server-insight-section">
+                        <h4>Canales de texto</h4>
+                        <div class="server-detail-list">
+                            ${renderServerTextList(textChannels.map((channel) => ({
+                                name: `# ${channel.name}`,
+                                meta: `${channel.type} • ${channel.parentName}`,
+                                extra: channel.topic || 'Sin descripcion'
+                            })), { emptyText: 'No hay canales de texto para mostrar.' })}
+                        </div>
+                    </section>
+                    <section class="server-insight-section">
+                        <h4>Canales de voz</h4>
+                        <div class="server-detail-list">
+                            ${renderServerTextList(voiceChannels.map((channel) => ({
+                                name: channel.name,
+                                meta: `${channel.type} • ${formatServerMetric(channel.userCount || 0)} usuarios`,
+                                extra: channel.parentName
+                            })), { emptyText: 'No hay canales de voz para mostrar.' })}
+                        </div>
+                    </section>
+                    <section class="server-insight-section">
+                        <h4>Categorias</h4>
+                        <div class="server-detail-list">
+                            ${renderServerTextList(categoryChannels.map((channel) => ({
+                                name: channel.name,
+                                meta: `Posicion ${formatServerMetric(channel.position || 0)}`,
+                                extra: channel.parentName
+                            })), { emptyText: 'No hay categorias para mostrar.' })}
+                        </div>
+                    </section>
+                </div>
             `
         },
         roles: {
@@ -5006,6 +5116,16 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Roles totales', formatServerMetric(info.roleCount || 0), 'Jerarquia y permisos')}
                     ${renderServerInsightStat('Boost level', `Nivel ${Number(info.premiumTier || 0)}`, `${Number(info.premiumSubscriptionCount || 0)} boosts`)}
                 </div>
+                <section class="server-insight-section">
+                    <h4>Roles principales</h4>
+                    <div class="server-detail-list">
+                        ${renderServerTextList(rolesDetailed.map((role) => ({
+                            name: role.name,
+                            meta: `${formatServerMetric(role.members)} miembros • Posicion ${formatServerMetric(role.position)}`,
+                            extra: role.color && role.color !== '#000000' ? role.color : 'Color por defecto'
+                        })), { emptyText: 'No hay roles destacados para mostrar.' })}
+                    </div>
+                </section>
             `
         },
         messages: {
@@ -5018,6 +5138,16 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Usuario top', topMessageTag, `${formatServerMetric(topMessageCount)} mensajes`)}
                     ${renderServerInsightStat('Promedio por usuario', formatServerMetric(averageMessagesPerTrackedUser, { maximumFractionDigits: 2 }), 'Mensajes por usuario con historial')}
                 </div>
+                <section class="server-insight-section">
+                    <h4>Ranking por mensajes</h4>
+                    <div class="summary-top-users-list summary-top-users-list--detail">
+                        ${renderServerProfileList(messageLeaders.map((user) => ({
+                            title: user.tag,
+                            avatar: user.avatar,
+                            meta: `${formatServerMetric(user.messageCount)} mensajes • ${formatServerMetric(user.voiceMinutes)} min voz`
+                        })), { emptyText: 'No hay usuarios con mensajes registrados.' })}
+                    </div>
+                </section>
             `
         },
         voice: {
@@ -5029,6 +5159,28 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Promedio diario', `${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h`, 'Horas por dia desde la creacion')}
                     ${renderServerInsightStat('Usuario top', topVoiceTag, `${formatServerMetric(topVoiceMinutes)} min`)}
                     ${renderServerInsightStat('Promedio por usuario', `${formatServerMetric(averageVoiceMinutesPerTrackedUser, { maximumFractionDigits: 2 })} min`, 'Voz promedio por usuario con historial')}
+                </div>
+                <div class="server-insight-columns">
+                    <section class="server-insight-section">
+                        <h4>Ranking por voz</h4>
+                        <div class="summary-top-users-list summary-top-users-list--detail">
+                            ${renderServerProfileList(voiceLeaders.map((user) => ({
+                                title: user.tag,
+                                avatar: user.avatar,
+                                meta: `${formatServerMetric(user.voiceMinutes)} min voz • ${formatServerMetric(user.messageCount)} mensajes`
+                            })), { emptyText: 'No hay usuarios con voz registrada.' })}
+                        </div>
+                    </section>
+                    <section class="server-insight-section">
+                        <h4>Canales de voz activos</h4>
+                        <div class="server-detail-list">
+                            ${renderServerTextList(liveVoiceChannels.map((channel) => ({
+                                name: channel.name,
+                                meta: `${formatServerMetric(channel.userCount || 0)} usuarios conectados`,
+                                extra: channel.parentName
+                            })), { emptyText: 'Ahora mismo no hay canales de voz activos.' })}
+                        </div>
+                    </section>
                 </div>
             `
         },
@@ -5042,6 +5194,16 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Balance neto', `${flowNet >= 0 ? '+' : ''}${formatServerMetric(flowNet)}`, 'Entradas menos salidas')}
                     ${renderServerInsightStat('Semanas registradas', formatServerMetric(weeklyTimeline.length), 'Historial agregado disponible')}
                 </div>
+                <section class="server-insight-section">
+                    <h4>Ultimos 7 dias</h4>
+                    <div class="server-detail-list">
+                        ${renderServerTextList(dailyTimeline.map((day) => ({
+                            name: day.label || formatChartShortDate(day.date),
+                            meta: `Entradas ${formatServerMetric(day.joins)} • Salidas ${formatServerMetric(day.leaves)}`,
+                            extra: `Mensajes ${formatServerMetric(day.messages)} • Voz ${formatServerMetric(day.voiceMinutes)} min`
+                        })), { emptyText: 'No hay datos recientes de flujo.' })}
+                    </div>
+                </section>
             `
         },
         peak: {
@@ -5062,6 +5224,16 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Usuarios conectados', formatServerMetric(liveVoiceUsers), 'En canales de voz ahora mismo')}
                     ${renderServerInsightStat('Canal mas activo', liveTopChannelName, `${formatServerMetric(liveTopChannelUsers)} usuarios`)}
                 </div>
+                <section class="server-insight-section">
+                    <h4>Canales con usuarios conectados</h4>
+                    <div class="server-detail-list">
+                        ${renderServerTextList(liveVoiceChannels.map((channel) => ({
+                            name: channel.name,
+                            meta: `${formatServerMetric(channel.userCount || 0)} usuarios`,
+                            extra: channel.parentName
+                        })), { emptyText: 'Nadie esta conectado en voz ahora mismo.' })}
+                    </div>
+                </section>
             `
         },
         age: {
@@ -5082,6 +5254,7 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Nivel premium', `Nivel ${Number(info.premiumTier || 0)}`, `${Number(info.premiumSubscriptionCount || 0)} boosts`)}
                     ${renderServerInsightStat('Verificacion', escapeHtml(String(info.verificationLevel ?? 'N/A')), 'Nivel de verificacion activo')}
                 </div>
+                ${renderServerChipList(featureList, 'Sin funciones premium o especiales visibles.')}
             `
         },
         created: {
@@ -5092,6 +5265,15 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Creado', createdDate, `${formatServerMetric(ageDays)} dias desde entonces`)}
                     ${renderServerInsightStat('Emojis', formatServerMetric(info.emojis || 0), `${formatServerMetric(info.stickers || 0)} stickers`)}
                 </div>
+                <section class="server-insight-section">
+                    <h4>Datos base del servidor</h4>
+                    <div class="server-detail-list">
+                        ${renderServerTextList([
+                            { name: 'Servidor', meta: String(info.name || 'Servidor'), extra: `ID ${String(info.id || 'N/A')}` },
+                            { name: 'Propietario', meta: ownerTag, extra: `ID ${escapeHtml(String(info.owner?.id || 'N/A'))}` }
+                        ], { emptyText: 'Sin datos base disponibles.' })}
+                    </div>
+                </section>
             `
         },
         activity: {
@@ -5137,6 +5319,46 @@ function buildServerInsightDetailMarkup(info, insightId) {
                 </div>
             `
         }
+    };
+
+    detailMap.activity = {
+        title: 'Usuarios activos',
+        copy: 'Usuarios con mas mensajes y minutos de voz acumulados.',
+        body: `
+            <div class="server-insight-grid">
+                ${renderServerInsightStat('Usuarios destacados', formatServerMetric(topUsers.length), 'Ranking actual por actividad')}
+                ${renderServerInsightStat('Top mensajes', topMessageTag, `${formatServerMetric(topMessageCount)} mensajes`)}
+                ${renderServerInsightStat('Top voz', topVoiceTag, `${formatServerMetric(topVoiceMinutes)} min voz`)}
+            </div>
+            <div class="summary-top-users-list summary-top-users-list--detail">
+                ${renderTopUsersMarkup(topUsers, { detailed: true })}
+            </div>
+        `
+    };
+
+    detailMap.chart = {
+        title: 'Graficas de actividad',
+        copy: 'Vista ampliada del historico de entradas, salidas, mensajes y voz.',
+        body: `
+            <div class="server-insight-grid">
+                ${renderServerInsightStat('Dias activos recientes', formatServerMetric(activeDays), 'Dias con eventos registrados')}
+                ${renderServerInsightStat('Semanas en historico', formatServerMetric(weeklyTimeline.length), 'Puntos agrupados para la vista extendida')}
+                ${renderServerInsightStat('Usuarios rastreados', formatServerMetric(trackedUsers), 'Base usada para mensajes y voz')}
+            </div>
+            <div class="summary-chart-head">
+                <div>
+                    <div class="summary-subvalue">Explora la actividad reciente o desde la creacion.</div>
+                </div>
+                <select id="serverActivityRangeDetail" class="summary-chart-select">
+                    <option value="week">Por semana (7 dias)</option>
+                    <option value="since">Desde creacion (por semanas)</option>
+                </select>
+            </div>
+            <div class="summary-chart-wrap summary-chart-wrap--detail">
+                <canvas id="serverActivityChartDetail"></canvas>
+                <div id="serverActivityChartEmptyDetail" class="summary-chart-empty" style="display:none;"></div>
+            </div>
+        `
     };
 
     return detailMap[insightId] || detailMap.members;
