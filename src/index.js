@@ -41,8 +41,7 @@ const COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS = Number.parseInt(process.env.COMMAN
 const FORCED_SLASH_GUILD_IDS = ['1428561902086262908'];
 const DISABLED_SLASH_COMMANDS = new Set([
     'voznombre',
-    'vozprivado',
-    'vozquitar'
+    'vozprivado'
 ]);
 const MODERATION_COMMAND_NAMES = new Set([
     'announce',

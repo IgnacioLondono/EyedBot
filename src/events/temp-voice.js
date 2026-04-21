@@ -88,7 +88,7 @@ function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) 
     if (isLocked) {
         embed.addFields({
             name: 'Invitar usuarios',
-            value: 'Usa `/vozinvitar (nombre)` para permitir el acceso.',
+            value: 'Usa `/vozinvitar (nombre)` para permitir el acceso.\nUsa `/vozquitar (nombre)` para quitar el acceso.',
             inline: false
         });
     }
