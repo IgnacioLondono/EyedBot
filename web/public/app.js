@@ -34,6 +34,8 @@ let revealObserver = null;
 let commandsCatalog = [];
 let commandsFilterQuery = '';
 let commandsFilterCategory = 'all';
+let currentServerInfo = null;
+let currentServerInsightView = 'overview';
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 
@@ -4616,7 +4618,8 @@ async function loadServerInfo(guildId) {
         const response = await fetchWithCredentials(`/api/guild/${guildId}/info`);
         if (response.ok) {
             const info = await response.json();
-            displayServerInfo(info);
+            currentServerInfo = info;
+            displayServerInfoEnhanced(info);
         } else {
             const error = await response.json().catch(() => ({ error: 'Error al cargar información' }));
             container.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--error-color);"><p>${error.error || 'Error al cargar información del servidor'}</p></div>`;
@@ -4746,10 +4749,10 @@ function buildServerActivityPoints(info, mode = 'week') {
     }));
 }
 
-function renderServerActivityChart(info) {
-    const canvas = document.getElementById('serverActivityChart');
-    const rangeSelect = document.getElementById('serverActivityRange');
-    const emptyState = document.getElementById('serverActivityChartEmpty');
+function renderServerActivityChart(info, options = {}) {
+    const canvas = document.getElementById(options.canvasId || 'serverActivityChart');
+    const rangeSelect = document.getElementById(options.selectId || 'serverActivityRange');
+    const emptyState = document.getElementById(options.emptyId || 'serverActivityChartEmpty');
     if (!canvas || !rangeSelect) return;
 
     if (typeof Chart === 'undefined') {
@@ -4823,6 +4826,373 @@ function renderServerActivityChart(info) {
     };
 
     renderByMode(serverActivityChartMode);
+}
+
+function renderServerInsightStat(label, value, detail = '') {
+    return `
+        <article class="server-insight-stat">
+            <span class="server-insight-stat-label">${label}</span>
+            <strong class="server-insight-stat-value">${value}</strong>
+            ${detail ? `<span class="server-insight-stat-detail">${detail}</span>` : ''}
+        </article>
+    `;
+}
+
+function buildServerInsightDetailMarkup(info, insightId) {
+    const ownerTag = escapeHtml(info.owner?.tag || 'Desconocido');
+    const createdDate = formatIsoDate(info.createdAt);
+    const ageDays = Number.parseInt(info.activity?.ageDays || 0, 10) || 0;
+    const trackedUsers = Number.parseInt(info.activity?.trackedUsers || 0, 10) || 0;
+    const totalMessages = Number.parseInt(info.activity?.messages?.totalTracked || 0, 10) || 0;
+    const avgMessagesPerDay = Number(info.activity?.messages?.avgPerDay || 0);
+    const topMessageTag = escapeHtml(info.activity?.messages?.topUser?.tag || 'N/A');
+    const topMessageCount = Number.parseInt(info.activity?.messages?.topUser?.count || 0, 10) || 0;
+    const totalVoiceMinutes = Number.parseInt(info.activity?.voice?.totalMinutes || 0, 10) || 0;
+    const avgVoiceHoursPerDay = Number(info.activity?.voice?.avgHoursPerDay || 0);
+    const topVoiceTag = escapeHtml(info.activity?.voice?.topUser?.tag || 'N/A');
+    const topVoiceMinutes = Number.parseInt(info.activity?.voice?.topUser?.minutes || 0, 10) || 0;
+    const liveVoiceUsers = Number.parseInt(info.activity?.voice?.live?.currentUsers || 0, 10) || 0;
+    const liveTopChannelName = escapeHtml(info.activity?.voice?.live?.topChannel?.name || 'Sin actividad');
+    const liveTopChannelUsers = Number.parseInt(info.activity?.voice?.live?.topChannel?.users || 0, 10) || 0;
+    const totalJoins = Number.parseInt(info.activity?.memberFlow?.totalJoins || 0, 10) || 0;
+    const totalLeaves = Number.parseInt(info.activity?.memberFlow?.totalLeaves || 0, 10) || 0;
+    const flowNet = Number.parseInt(info.activity?.memberFlow?.net || 0, 10) || 0;
+    const peakJoinDate = formatIsoDate(info.activity?.memberFlow?.peakJoinsDay?.date);
+    const peakJoinCount = Number.parseInt(info.activity?.memberFlow?.peakJoinsDay?.count || 0, 10) || 0;
+    const peakLeaveDate = formatIsoDate(info.activity?.memberFlow?.peakLeavesDay?.date);
+    const peakLeaveCount = Number.parseInt(info.activity?.memberFlow?.peakLeavesDay?.count || 0, 10) || 0;
+    const topUsers = Array.isArray(info.activity?.topUsers) ? info.activity.topUsers : [];
+
+    const ownerAvatar = info.owner?.avatar
+        ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
+        : `<div class="summary-owner-avatar summary-owner-avatar--placeholder">${ownerTag.charAt(0).toUpperCase()}</div>`;
+
+    const detailMap = {
+        owner: {
+            title: 'Propietario del servidor',
+            copy: 'Datos de la cuenta propietaria y referencia principal del servidor.',
+            body: `
+                <div class="server-insight-hero">
+                    <div class="summary-owner-row">
+                        ${ownerAvatar}
+                        <div>
+                            <div class="summary-value">${ownerTag}</div>
+                            <div class="summary-subvalue">ID ${escapeHtml(String(info.owner?.id || 'N/A'))}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Servidor', escapeHtml(info.name || 'Servidor'), 'Nombre visible actual')}
+                    ${renderServerInsightStat('Creado', createdDate, `${formatServerMetric(ageDays)} dias de antiguedad`)}
+                </div>
+            `
+        },
+        members: {
+            title: 'Miembros',
+            copy: 'Resumen de tamano y actividad general de la comunidad.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Miembros totales', formatServerMetric(info.memberCount || 0), 'Comunidad actual del servidor')}
+                    ${renderServerInsightStat('Usuarios con historial', formatServerMetric(trackedUsers), 'Usuarios con mensajes o voz registrados')}
+                    ${renderServerInsightStat('Usuarios en voz ahora', formatServerMetric(liveVoiceUsers), `${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})`)}
+                </div>
+            `
+        },
+        channels: {
+            title: 'Canales',
+            copy: 'Distribucion actual de canales del servidor.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Canales totales', formatServerMetric(info.channelCount || 0), 'Suma de texto, voz y categorias')}
+                    ${renderServerInsightStat('Texto', formatServerMetric(info.channels?.text || 0), 'Canales de texto')}
+                    ${renderServerInsightStat('Voz', formatServerMetric(info.channels?.voice || 0), 'Canales de voz')}
+                    ${renderServerInsightStat('Categorias', formatServerMetric(info.channels?.category || 0), 'Organizacion actual')}
+                </div>
+            `
+        },
+        roles: {
+            title: 'Roles',
+            copy: 'Volumen de roles y estructura de permisos del servidor.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Roles totales', formatServerMetric(info.roleCount || 0), 'Jerarquia y permisos')}
+                    ${renderServerInsightStat('Boost level', `Nivel ${Number(info.premiumTier || 0)}`, `${Number(info.premiumSubscriptionCount || 0)} boosts`)}
+                </div>
+            `
+        },
+        messages: {
+            title: 'Actividad de mensajes',
+            copy: 'Mensajes acumulados por usuarios rastreados del servidor.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Mensajes totales', `${formatServerMetric(totalMessages)} msgs`, 'Solo usuarios con historial')}
+                    ${renderServerInsightStat('Promedio diario', formatServerMetric(avgMessagesPerDay, { maximumFractionDigits: 2 }), 'Desde la creacion del servidor')}
+                    ${renderServerInsightStat('Usuario top', topMessageTag, `${formatServerMetric(topMessageCount)} mensajes`)}
+                </div>
+            `
+        },
+        voice: {
+            title: 'Actividad de voz',
+            copy: 'Tiempo de voz acumulado y usuario con mas minutos registrados.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Minutos totales', `${formatServerMetric(totalVoiceMinutes)} min`, 'Tiempo acumulado de voz')}
+                    ${renderServerInsightStat('Promedio diario', `${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h`, 'Horas por dia desde la creacion')}
+                    ${renderServerInsightStat('Usuario top', topVoiceTag, `${formatServerMetric(topVoiceMinutes)} min`)}
+                </div>
+            `
+        },
+        flow: {
+            title: 'Entradas y salidas',
+            copy: 'Movimiento historico de miembros que entran o salen.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Entradas', formatServerMetric(totalJoins), `Pico ${formatServerMetric(peakJoinCount)} el ${peakJoinDate}`)}
+                    ${renderServerInsightStat('Salidas', formatServerMetric(totalLeaves), `Pico ${formatServerMetric(peakLeaveCount)} el ${peakLeaveDate}`)}
+                    ${renderServerInsightStat('Balance neto', `${flowNet >= 0 ? '+' : ''}${formatServerMetric(flowNet)}`, 'Entradas menos salidas')}
+                </div>
+            `
+        },
+        peak: {
+            title: 'Pico de salidas',
+            copy: 'Dia con mayor volumen de salidas registrado.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Pico de salidas', formatServerMetric(peakLeaveCount), `Fecha ${peakLeaveDate}`)}
+                    ${renderServerInsightStat('Pico de entradas', formatServerMetric(peakJoinCount), `Fecha ${peakJoinDate}`)}
+                </div>
+            `
+        },
+        live: {
+            title: 'Voz en vivo',
+            copy: 'Estado en tiempo real de usuarios conectados en voz.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Usuarios conectados', formatServerMetric(liveVoiceUsers), 'En canales de voz ahora mismo')}
+                    ${renderServerInsightStat('Canal mas activo', liveTopChannelName, `${formatServerMetric(liveTopChannelUsers)} usuarios`)}
+                </div>
+            `
+        },
+        age: {
+            title: 'Edad y base',
+            copy: 'Antiguedad del servidor y base historica de usuarios rastreados.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Antiguedad', `${formatServerMetric(ageDays)} dias`, `Creado ${createdDate}`)}
+                    ${renderServerInsightStat('Usuarios con historial', formatServerMetric(trackedUsers), 'Usuarios con actividad guardada')}
+                </div>
+            `
+        },
+        core: {
+            title: 'Estadisticas core',
+            copy: 'Datos estructurales del servidor y configuracion central.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Nivel premium', `Nivel ${Number(info.premiumTier || 0)}`, `${Number(info.premiumSubscriptionCount || 0)} boosts`)}
+                    ${renderServerInsightStat('Verificacion', escapeHtml(String(info.verificationLevel ?? 'N/A')), 'Nivel de verificacion activo')}
+                </div>
+            `
+        },
+        created: {
+            title: 'Fecha de creacion',
+            copy: 'Fecha base del servidor y recursos visuales actuales.',
+            body: `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Creado', createdDate, `${formatServerMetric(ageDays)} dias desde entonces`)}
+                    ${renderServerInsightStat('Emojis', formatServerMetric(info.emojis || 0), `${formatServerMetric(info.stickers || 0)} stickers`)}
+                </div>
+            `
+        },
+        activity: {
+            title: 'Usuarios activos',
+            copy: 'Usuarios con mas mensajes y minutos de voz acumulados.',
+            body: `
+                <div class="summary-top-users-list">
+                    ${topUsers.length ? topUsers.map((user, index) => {
+                        const safeTag = escapeHtml(user?.tag || 'Desconocido');
+                        const avatar = user?.avatar
+                            ? `<img src="${user.avatar}" alt="${safeTag}" class="summary-top-user-avatar">`
+                            : `<div class="summary-top-user-avatar summary-top-user-avatar--placeholder">${safeTag.charAt(0).toUpperCase()}</div>`;
+                        return `
+                            <div class="summary-top-user-item">
+                                <div class="summary-top-user-rank">#${index + 1}</div>
+                                ${avatar}
+                                <div class="summary-top-user-copy">
+                                    <div class="summary-top-user-name">${safeTag}</div>
+                                    <div class="summary-top-user-meta">${formatServerMetric(Number.parseInt(user?.messageCount || 0, 10) || 0)} msgs • ${formatServerMetric(Number.parseInt(user?.voiceMinutes || 0, 10) || 0)} min voz</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') : '<div class="summary-top-users-empty">Todavia no hay usuarios con actividad registrada.</div>'}
+                </div>
+            `
+        },
+        chart: {
+            title: 'Graficas de actividad',
+            copy: 'Vista ampliada del historico de entradas, salidas, mensajes y voz.',
+            body: `
+                <div class="summary-chart-head">
+                    <div>
+                        <div class="summary-subvalue">Explora la actividad reciente o desde la creacion.</div>
+                    </div>
+                    <select id="serverActivityRangeDetail" class="summary-chart-select">
+                        <option value="week">Por semana (7 dias)</option>
+                        <option value="since">Desde creacion (por semanas)</option>
+                    </select>
+                </div>
+                <div class="summary-chart-wrap summary-chart-wrap--detail">
+                    <canvas id="serverActivityChartDetail"></canvas>
+                    <div id="serverActivityChartEmptyDetail" class="summary-chart-empty" style="display:none;"></div>
+                </div>
+            `
+        }
+    };
+
+    return detailMap[insightId] || detailMap.members;
+}
+
+function bindServerSummaryCardEvents() {
+    const container = document.getElementById('serverInfoContainer');
+    if (!container) return;
+
+    container.querySelectorAll('[data-server-insight]').forEach((card) => {
+        card.addEventListener('click', (event) => {
+            if (event.target.closest('select, option, canvas')) return;
+            openServerInsight(card.dataset.serverInsight);
+        });
+
+        card.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openServerInsight(card.dataset.serverInsight);
+            }
+        });
+    });
+
+    const backButton = container.querySelector('[data-server-insight-back]');
+    if (backButton) {
+        backButton.addEventListener('click', () => closeServerInsight());
+    }
+}
+
+function openServerInsight(insightId) {
+    if (!currentServerInfo || !insightId) return;
+    currentServerInsightView = insightId;
+    displayServerInfoEnhanced(currentServerInfo);
+}
+
+function closeServerInsight() {
+    if (!currentServerInfo) return;
+    currentServerInsightView = 'overview';
+    displayServerInfoEnhanced(currentServerInfo);
+}
+
+function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar, createdDate, ageDays, trackedUsers, totalMessages, avgMessagesPerDay, topMessageTag, topMessageCount, totalVoiceMinutes, avgVoiceHoursPerDay, topVoiceTag, topVoiceMinutes, totalJoins, totalLeaves, flowNet, peakJoinCount, peakJoinDate, peakLeaveCount, peakLeaveDate, liveVoiceUsers, liveTopChannelName, liveTopChannelUsers) {
+    return `
+        <div class="server-summary-grid">
+            <article class="summary-card summary-card--owner summary-card--interactive" data-server-insight="owner" tabindex="0" role="button">
+                ${summaryTitle('Propietario', 'owner', 'gold')}
+                <div class="summary-owner-row">
+                    ${ownerAvatar}
+                    <div>
+                        <div class="summary-value">${ownerTag}</div>
+                        <div class="summary-subvalue">ID • ${escapeHtml(String(info.owner?.id || 'N/A'))}</div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="members" tabindex="0" role="button">
+                ${summaryTitle('Miembros', 'members', 'blue')}
+                <div class="summary-value">${formatServerMetric(info.memberCount || 0)}</div>
+                <div class="summary-subvalue">Comunidad actual del servidor</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="channels" tabindex="0" role="button">
+                ${summaryTitle('Entradas de Canales', 'channels', 'teal')}
+                <div class="summary-value">${formatServerMetric(info.channelCount || 0)}</div>
+                <div class="summary-subvalue">${info.channels?.text || 0} texto • ${info.channels?.voice || 0} voz • ${info.channels?.category || 0} categorias</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="roles" tabindex="0" role="button">
+                ${summaryTitle('Roles', 'roles', 'violet')}
+                <div class="summary-value">${formatServerMetric(info.roleCount || 0)}</div>
+                <div class="summary-subvalue">Gestion de permisos y jerarquia</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="messages" tabindex="0" role="button">
+                ${summaryTitle('Actividad (Mensajes)', 'messages', 'pink')}
+                <div class="summary-value">${formatServerMetric(totalMessages)} msgs</div>
+                <div class="summary-subvalue">${formatServerMetric(avgMessagesPerDay, { maximumFractionDigits: 2 })} por dia desde creacion • Top ${topMessageTag} (${formatServerMetric(topMessageCount)})</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="voice" tabindex="0" role="button">
+                ${summaryTitle('Actividad (Voz)', 'voice', 'orange')}
+                <div class="summary-value">${formatServerMetric(totalVoiceMinutes)} min</div>
+                <div class="summary-subvalue">${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h por dia • Top ${topVoiceTag} (${formatServerMetric(topVoiceMinutes)} min)</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="flow" tabindex="0" role="button">
+                ${summaryTitle('Entradas / Salidas', 'flow', 'blue')}
+                <div class="summary-value">${formatServerMetric(totalJoins)} / ${formatServerMetric(totalLeaves)}</div>
+                <div class="summary-subvalue">Balance ${flowNet >= 0 ? '+' : ''}${formatServerMetric(flowNet)} • Pico entradas ${formatServerMetric(peakJoinCount)} (${peakJoinDate})</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="peak" tabindex="0" role="button">
+                ${summaryTitle('Pico de Salidas', 'peak', 'pink')}
+                <div class="summary-value">${formatServerMetric(peakLeaveCount)}</div>
+                <div class="summary-subvalue">Dia con mas salidas: ${peakLeaveDate}</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="live" tabindex="0" role="button">
+                ${summaryTitle('Voz en Vivo', 'live', 'teal')}
+                <div class="summary-value">${formatServerMetric(liveVoiceUsers)} conectados</div>
+                <div class="summary-subvalue">Canal top ahora: ${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="age" tabindex="0" role="button">
+                ${summaryTitle('Edad y Base', 'age', 'orange')}
+                <div class="summary-value">${formatServerMetric(ageDays)} dias</div>
+                <div class="summary-subvalue">Creado ${createdDate} • ${formatServerMetric(trackedUsers)} usuarios con historial</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="core" tabindex="0" role="button">
+                ${summaryTitle('Estadisticas Core', 'core', 'violet')}
+                <div class="summary-value">Nivel ${Number(info.premiumTier || 0)}</div>
+                <div class="summary-subvalue">Boosts ${Number(info.premiumSubscriptionCount || 0)} • Verificacion ${escapeHtml(String(info.verificationLevel ?? 'N/A'))}</div>
+            </article>
+
+            <article class="summary-card summary-card--interactive" data-server-insight="created" tabindex="0" role="button">
+                ${summaryTitle('Creado', 'created', 'gold')}
+                <div class="summary-value">${createdDate}</div>
+                <div class="summary-subvalue">Emojis ${info.emojis || 0} • Stickers ${info.stickers || 0}</div>
+            </article>
+
+            <article class="summary-card summary-card--top-users summary-card--interactive" data-server-insight="activity" tabindex="0" role="button">
+                ${summaryTitle('Usuarios Activos', 'activity', 'teal')}
+                <div class="summary-subvalue">Mensajes y tiempo de voz acumulado</div>
+                <div class="summary-top-users-list">
+                    ${topUsersMarkup}
+                </div>
+            </article>
+
+            <article class="summary-card summary-card--chart summary-card--interactive" data-server-insight="chart" tabindex="0" role="button">
+                <div class="summary-chart-head">
+                    <div>
+                        ${summaryTitle('Graficas de actividad', 'chart', 'blue')}
+                        <div class="summary-subvalue">Lineas de entradas, salidas, mensajes y voz</div>
+                    </div>
+                    <select id="serverActivityRange" class="summary-chart-select">
+                        <option value="week">Por semana (7 dias)</option>
+                        <option value="since">Desde creacion (por semanas)</option>
+                    </select>
+                </div>
+                <div class="summary-chart-wrap">
+                    <canvas id="serverActivityChart"></canvas>
+                    <div id="serverActivityChartEmpty" class="summary-chart-empty" style="display:none;"></div>
+                </div>
+            </article>
+        </div>
+    `;
 }
 
 function displayServerInfo(info) {
@@ -4990,6 +5360,124 @@ function displayServerInfo(info) {
         </div>
     `;
 
+    renderServerActivityChart(info);
+}
+
+function displayServerInfoEnhanced(info) {
+    const container = document.getElementById('serverInfoContainer');
+
+    if (!info) {
+        container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--error-color);"><p>Error al cargar informacion del servidor</p></div>';
+        return;
+    }
+
+    const ownerTag = escapeHtml(info.owner?.tag || 'Desconocido');
+    const createdDate = formatIsoDate(info.createdAt);
+    const ageDays = Number.parseInt(info.activity?.ageDays || 0, 10) || 0;
+    const trackedUsers = Number.parseInt(info.activity?.trackedUsers || 0, 10) || 0;
+    const totalMessages = Number.parseInt(info.activity?.messages?.totalTracked || 0, 10) || 0;
+    const avgMessagesPerDay = Number(info.activity?.messages?.avgPerDay || 0);
+    const topMessageTag = escapeHtml(info.activity?.messages?.topUser?.tag || 'N/A');
+    const topMessageCount = Number.parseInt(info.activity?.messages?.topUser?.count || 0, 10) || 0;
+    const totalVoiceMinutes = Number.parseInt(info.activity?.voice?.totalMinutes || 0, 10) || 0;
+    const avgVoiceHoursPerDay = Number(info.activity?.voice?.avgHoursPerDay || 0);
+    const topVoiceTag = escapeHtml(info.activity?.voice?.topUser?.tag || 'N/A');
+    const topVoiceMinutes = Number.parseInt(info.activity?.voice?.topUser?.minutes || 0, 10) || 0;
+    const liveVoiceUsers = Number.parseInt(info.activity?.voice?.live?.currentUsers || 0, 10) || 0;
+    const liveTopChannelName = escapeHtml(info.activity?.voice?.live?.topChannel?.name || 'Sin actividad');
+    const liveTopChannelUsers = Number.parseInt(info.activity?.voice?.live?.topChannel?.users || 0, 10) || 0;
+    const totalJoins = Number.parseInt(info.activity?.memberFlow?.totalJoins || 0, 10) || 0;
+    const totalLeaves = Number.parseInt(info.activity?.memberFlow?.totalLeaves || 0, 10) || 0;
+    const flowNet = Number.parseInt(info.activity?.memberFlow?.net || 0, 10) || 0;
+    const peakJoinDate = formatIsoDate(info.activity?.memberFlow?.peakJoinsDay?.date);
+    const peakJoinCount = Number.parseInt(info.activity?.memberFlow?.peakJoinsDay?.count || 0, 10) || 0;
+    const peakLeaveDate = formatIsoDate(info.activity?.memberFlow?.peakLeavesDay?.date);
+    const peakLeaveCount = Number.parseInt(info.activity?.memberFlow?.peakLeavesDay?.count || 0, 10) || 0;
+    const topUsers = Array.isArray(info.activity?.topUsers) ? info.activity.topUsers : [];
+
+    const ownerAvatar = info.owner?.avatar
+        ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
+        : `<div class="summary-owner-avatar summary-owner-avatar--placeholder">${ownerTag.charAt(0).toUpperCase()}</div>`;
+
+    const topUsersMarkup = topUsers.length
+        ? topUsers.map((user, index) => {
+            const safeTag = escapeHtml(user?.tag || 'Desconocido');
+            const avatar = user?.avatar
+                ? `<img src="${user.avatar}" alt="${safeTag}" class="summary-top-user-avatar">`
+                : `<div class="summary-top-user-avatar summary-top-user-avatar--placeholder">${safeTag.charAt(0).toUpperCase()}</div>`;
+            return `
+                <div class="summary-top-user-item">
+                    <div class="summary-top-user-rank">#${index + 1}</div>
+                    ${avatar}
+                    <div class="summary-top-user-copy">
+                        <div class="summary-top-user-name">${safeTag}</div>
+                        <div class="summary-top-user-meta">${formatServerMetric(Number.parseInt(user?.messageCount || 0, 10) || 0)} msgs • ${formatServerMetric(Number.parseInt(user?.voiceMinutes || 0, 10) || 0)} min voz</div>
+                    </div>
+                </div>
+            `;
+        }).join('')
+        : '<div class="summary-top-users-empty">Todavia no hay usuarios con actividad registrada.</div>';
+
+    if (currentServerInsightView !== 'overview') {
+        const detail = buildServerInsightDetailMarkup(info, currentServerInsightView);
+        container.innerHTML = `
+            <section class="server-insight-view">
+                <button type="button" class="chip-btn server-insight-back" data-server-insight-back>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"></path>
+                    </svg>
+                    <span>Volver al resumen</span>
+                </button>
+                <header class="server-insight-header">
+                    <div class="server-insight-kicker">Detalle</div>
+                    <h3>${detail.title}</h3>
+                    <p>${detail.copy}</p>
+                </header>
+                <div class="server-insight-body">
+                    ${detail.body}
+                </div>
+            </section>
+        `;
+        bindServerSummaryCardEvents();
+        if (currentServerInsightView === 'chart') {
+            renderServerActivityChart(info, {
+                canvasId: 'serverActivityChartDetail',
+                selectId: 'serverActivityRangeDetail',
+                emptyId: 'serverActivityChartEmptyDetail'
+            });
+        }
+        return;
+    }
+
+    container.innerHTML = renderServerOverviewMarkup(
+        info,
+        topUsersMarkup,
+        ownerTag,
+        ownerAvatar,
+        createdDate,
+        ageDays,
+        trackedUsers,
+        totalMessages,
+        avgMessagesPerDay,
+        topMessageTag,
+        topMessageCount,
+        totalVoiceMinutes,
+        avgVoiceHoursPerDay,
+        topVoiceTag,
+        topVoiceMinutes,
+        totalJoins,
+        totalLeaves,
+        flowNet,
+        peakJoinCount,
+        peakJoinDate,
+        peakLeaveCount,
+        peakLeaveDate,
+        liveVoiceUsers,
+        liveTopChannelName,
+        liveTopChannelUsers
+    );
+
+    bindServerSummaryCardEvents();
     renderServerActivityChart(info);
 }
 
