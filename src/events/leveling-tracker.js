@@ -4,8 +4,42 @@ const guildActivityStore = require('../utils/guild-activity-store');
 const { getLevelFromXp, sanitizeDifficulty } = require('../utils/leveling-math');
 
 const messageCooldownMap = new Map();
+const voiceAnalyticsSessions = new Map();
 let voiceLoopTimer = null;
 let voiceLoopRunning = false;
+
+function getVoiceSessionKey(guildId, userId) {
+    return `${guildId}:${userId}`;
+}
+
+function canTrackVoiceChannel(channel) {
+    return channel && (channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice);
+}
+
+function beginVoiceAnalyticsSession(member, channel, startedAt = Date.now()) {
+    if (!member?.guild || !member.user || member.user.bot || !canTrackVoiceChannel(channel)) return;
+    voiceAnalyticsSessions.set(getVoiceSessionKey(member.guild.id, member.user.id), {
+        guildId: member.guild.id,
+        userId: member.user.id,
+        startedAt
+    });
+}
+
+async function flushVoiceAnalyticsSession(guildId, userId, endedAt = Date.now()) {
+    const sessionKey = getVoiceSessionKey(guildId, userId);
+    const session = voiceAnalyticsSessions.get(sessionKey);
+    if (!session) return 0;
+
+    voiceAnalyticsSessions.delete(sessionKey);
+
+    const elapsedMs = Math.max(0, Number(endedAt) - Number(session.startedAt || endedAt));
+    const earnedMinutes = Math.max(0, Math.floor(elapsedMs / 60000));
+    if (earnedMinutes <= 0) return 0;
+
+    await levelingStore.incrementUserStats(guildId, userId, { voiceMinutes: earnedMinutes });
+    await guildActivityStore.incrementGuildMetric(guildId, 'voiceMinutes', earnedMinutes).catch(() => null);
+    return earnedMinutes;
+}
 
 function randInt(min, max) {
     const low = Math.max(0, Number.parseInt(min, 10) || 0);
@@ -63,17 +97,7 @@ async function awardXpToMember(member, amount, source = 'message') {
         updatedAt: new Date().toISOString()
     };
 
-    if (source === 'message') nextState.messageCount = Math.max(0, Number.parseInt(state.messageCount || 0, 10) || 0) + 1;
-    if (source === 'voice') nextState.voiceMinutes = Math.max(0, Number.parseInt(state.voiceMinutes || 0, 10) || 0) + 1;
-
     await levelingStore.setUserState(guildId, userId, nextState);
-
-    if (source === 'message') {
-        await guildActivityStore.incrementGuildMetric(guildId, 'messages', 1).catch(() => null);
-    }
-    if (source === 'voice') {
-        await guildActivityStore.incrementGuildMetric(guildId, 'voiceMinutes', 1).catch(() => null);
-    }
 
     if (newLevel > oldLevel) {
         const rewards = parseRoleRewards(cfg.roleRewards);
@@ -85,6 +109,9 @@ async function awardXpToMember(member, amount, source = 'message') {
 
 async function handleMessageCreate(message) {
     if (!message || !message.guild || message.author?.bot) return;
+
+    await levelingStore.incrementUserStats(message.guild.id, message.author.id, { messageCount: 1 });
+    await guildActivityStore.incrementGuildMetric(message.guild.id, 'messages', 1).catch(() => null);
 
     const cfg = await levelingStore.getLevelingConfig(message.guild.id);
     if (!cfg || cfg.enabled !== true || cfg.messageXpEnabled !== true) return;
@@ -102,6 +129,39 @@ async function handleMessageCreate(message) {
     if (!member) return;
 
     await awardXpToMember(member, xpGain, 'message');
+}
+
+async function handleAnalyticsVoiceStateUpdate(oldState, newState) {
+    const member = newState?.member || oldState?.member;
+    if (!member?.guild || member.user?.bot) return;
+
+    const guildId = member.guild.id;
+    const userId = member.user.id;
+    const oldChannelId = oldState?.channelId || null;
+    const newChannelId = newState?.channelId || null;
+    const oldTrackable = canTrackVoiceChannel(oldState?.channel);
+    const newTrackable = canTrackVoiceChannel(newState?.channel);
+
+    if (oldChannelId && (!newChannelId || oldChannelId !== newChannelId || !newTrackable)) {
+        await flushVoiceAnalyticsSession(guildId, userId, Date.now());
+    }
+
+    if (newChannelId && newTrackable && oldChannelId !== newChannelId) {
+        beginVoiceAnalyticsSession(member, newState.channel, Date.now());
+    }
+}
+
+function seedVoiceAnalyticsSessions(client) {
+    if (!client?.guilds?.cache) return;
+
+    for (const guild of client.guilds.cache.values()) {
+        for (const channel of guild.channels.cache.values()) {
+            if (!canTrackVoiceChannel(channel)) continue;
+            for (const member of channel.members.values()) {
+                beginVoiceAnalyticsSession(member, channel, Date.now());
+            }
+        }
+    }
 }
 
 function countHumanMembersInVoice(channel) {
@@ -160,8 +220,18 @@ function stopVoiceXpLoop() {
     }
 }
 
+async function flushAllVoiceAnalyticsSessions() {
+    const sessions = Array.from(voiceAnalyticsSessions.values());
+    for (const session of sessions) {
+        await flushVoiceAnalyticsSession(session.guildId, session.userId, Date.now());
+    }
+}
+
 module.exports = {
     handleMessageCreate,
+    handleAnalyticsVoiceStateUpdate,
+    seedVoiceAnalyticsSessions,
+    flushAllVoiceAnalyticsSessions,
     startVoiceXpLoop,
     stopVoiceXpLoop
 };

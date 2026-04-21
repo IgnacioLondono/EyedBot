@@ -4664,6 +4664,7 @@ function summaryIcon(type = 'server') {
         age: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>',
         core: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3"></path><path d="M12 18v3"></path><path d="m4.93 4.93 2.12 2.12"></path><path d="m16.95 16.95 2.12 2.12"></path><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="m4.93 19.07 2.12-2.12"></path><path d="m16.95 7.05 2.12-2.12"></path><circle cx="12" cy="12" r="3"></circle></svg>',
         created: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path></svg>',
+        activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 7-4-14-3 7H2"></path></svg>',
         chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>'
     };
 
@@ -4857,10 +4858,31 @@ function displayServerInfo(info) {
     const peakJoinCount = Number.parseInt(info.activity?.memberFlow?.peakJoinsDay?.count || 0, 10) || 0;
     const peakLeaveDate = formatIsoDate(info.activity?.memberFlow?.peakLeavesDay?.date);
     const peakLeaveCount = Number.parseInt(info.activity?.memberFlow?.peakLeavesDay?.count || 0, 10) || 0;
+    const topUsers = Array.isArray(info.activity?.topUsers) ? info.activity.topUsers : [];
 
     const ownerAvatar = info.owner?.avatar
         ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
         : `<div class="summary-owner-avatar summary-owner-avatar--placeholder">${ownerTag.charAt(0).toUpperCase()}</div>`;
+
+    const topUsersMarkup = topUsers.length
+        ? topUsers.map((user, index) => {
+            const safeTag = escapeHtml(user?.tag || 'Desconocido');
+            const avatar = user?.avatar
+                ? `<img src="${user.avatar}" alt="${safeTag}" class="summary-top-user-avatar">`
+                : `<div class="summary-top-user-avatar summary-top-user-avatar--placeholder">${safeTag.charAt(0).toUpperCase()}</div>`;
+
+            return `
+                <div class="summary-top-user-item">
+                    <div class="summary-top-user-rank">#${index + 1}</div>
+                    ${avatar}
+                    <div class="summary-top-user-copy">
+                        <div class="summary-top-user-name">${safeTag}</div>
+                        <div class="summary-top-user-meta">${formatServerMetric(Number.parseInt(user?.messageCount || 0, 10) || 0)} msgs • ${formatServerMetric(Number.parseInt(user?.voiceMinutes || 0, 10) || 0)} min voz</div>
+                    </div>
+                </div>
+            `;
+        }).join('')
+        : '<div class="summary-top-users-empty">Todavia no hay usuarios con actividad registrada.</div>';
 
     container.innerHTML = `
         <div class="server-summary-grid">
@@ -4939,6 +4961,14 @@ function displayServerInfo(info) {
                 ${summaryTitle('Creado', 'created', 'gold')}
                 <div class="summary-value">${createdDate}</div>
                 <div class="summary-subvalue">Emojis ${info.emojis || 0} • Stickers ${info.stickers || 0}</div>
+            </article>
+
+            <article class="summary-card summary-card--top-users">
+                ${summaryTitle('Usuarios Activos', 'activity', 'teal')}
+                <div class="summary-subvalue">Mensajes y tiempo de voz acumulado</div>
+                <div class="summary-top-users-list">
+                    ${topUsersMarkup}
+                </div>
             </article>
 
             <article class="summary-card summary-card--chart">
