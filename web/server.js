@@ -530,6 +530,29 @@ function resolveGuildUserAvatar(guild, userId) {
     return null;
 }
 
+function summarizeChannelType(channel) {
+    const type = Number(channel?.type);
+    if (type === 0) return 'Texto';
+    if (type === 2) return 'Voz';
+    if (type === 4) return 'Categoria';
+    if (type === 5) return 'Anuncios';
+    if (type === 13) return 'Escenario';
+    if (type === 15) return 'Foro';
+    return `Tipo ${type}`;
+}
+
+function sanitizeChannelSnapshot(channel) {
+    return {
+        id: channel.id,
+        name: channel.name,
+        type: summarizeChannelType(channel),
+        parentName: channel.parent?.name || 'Sin categoria',
+        position: Number(channel.rawPosition || channel.position || 0),
+        topic: typeof channel.topic === 'string' ? channel.topic.slice(0, 120) : '',
+        userCount: channel.members?.filter((m) => !m.user?.bot).size || 0
+    };
+}
+
 function toIsoDayKey(date) {
     return new Date(date).toISOString().slice(0, 10);
 }
@@ -2470,6 +2493,52 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             }
         });
 
+        const textChannelSnapshots = guild.channels.cache
+            .filter((c) => c.type === 0 || c.type === 5)
+            .map((channel) => sanitizeChannelSnapshot(channel))
+            .sort((a, b) => a.position - b.position)
+            .slice(0, 12);
+
+        const voiceChannelSnapshots = guild.channels.cache
+            .filter((c) => c.type === 2 || c.type === 13)
+            .map((channel) => sanitizeChannelSnapshot(channel))
+            .sort((a, b) => {
+                if (b.userCount !== a.userCount) return b.userCount - a.userCount;
+                return a.position - b.position;
+            })
+            .slice(0, 12);
+
+        const categorySnapshots = guild.channels.cache
+            .filter((c) => c.type === 4)
+            .map((channel) => sanitizeChannelSnapshot(channel))
+            .sort((a, b) => a.position - b.position)
+            .slice(0, 12);
+
+        const rolesDetailed = guild.roles.cache.map(role => ({
+            id: role.id,
+            name: role.name,
+            color: role.hexColor,
+            position: role.position,
+            members: role.members.size
+        })).sort((a, b) => b.position - a.position);
+
+        const textLeaders = [...topActiveUsers]
+            .sort((a, b) => {
+                if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
+                return b.voiceMinutes - a.voiceMinutes;
+            })
+            .slice(0, 6);
+
+        const voiceLeaders = [...topActiveUsers]
+            .sort((a, b) => {
+                if (b.voiceMinutes !== a.voiceMinutes) return b.voiceMinutes - a.voiceMinutes;
+                return b.messageCount - a.messageCount;
+            })
+            .slice(0, 6);
+
+        const nonBotMembers = guild.members.cache.filter((member) => !member.user?.bot).size;
+        const botMembers = guild.members.cache.filter((member) => member.user?.bot).size;
+
         const info = {
             id: guild.id,
             name: guild.name,
@@ -2487,18 +2556,21 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             verificationLevel: guild.verificationLevel,
             premiumTier: guild.premiumTier,
             premiumSubscriptionCount: guild.premiumSubscriptionCount || 0,
+            members: {
+                humans: nonBotMembers,
+                bots: botMembers
+            },
             channels: {
                 text: guild.channels.cache.filter(c => c.type === 0).size,
                 voice: guild.channels.cache.filter(c => c.type === 2).size,
-                category: guild.channels.cache.filter(c => c.type === 4).size
+                category: guild.channels.cache.filter(c => c.type === 4).size,
+                items: {
+                    text: textChannelSnapshots,
+                    voice: voiceChannelSnapshots,
+                    category: categorySnapshots
+                }
             },
-            roles: guild.roles.cache.map(role => ({
-                id: role.id,
-                name: role.name,
-                color: role.hexColor,
-                position: role.position,
-                members: role.members.size
-            })).sort((a, b) => b.position - a.position),
+            roles: rolesDetailed,
             emojis: guild.emojis.cache.size,
             stickers: guild.stickers?.cache?.size || 0,
             activity: {
@@ -2512,7 +2584,8 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                         id: topMessageEntry?.userId || null,
                         tag: topMessageEntry?.userId ? resolveGuildUserTag(guild, topMessageEntry.userId) : 'N/A',
                         count: topMessageEntry?.value || 0
-                    }
+                    },
+                    leaders: textLeaders
                 },
                 voice: {
                     totalMinutes: totalTrackedVoiceMinutes,
@@ -2525,8 +2598,10 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                     },
                     live: {
                         currentUsers: liveVoiceUsers,
-                        topChannel: topVoiceChannel
-                    }
+                        topChannel: topVoiceChannel,
+                        channels: voiceChannelSnapshots.filter((channel) => channel.userCount > 0).slice(0, 8)
+                    },
+                    leaders: voiceLeaders
                 },
                 memberFlow: {
                     totalJoins: Number.parseInt(guildActivity?.totals?.joins || 0, 10) || 0,
