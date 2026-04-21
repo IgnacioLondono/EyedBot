@@ -9,7 +9,14 @@ const guildMemberRemoveEvent = require('./events/guildMemberRemove');
 const antiRaidGuard = require('./events/anti-raid-guard');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
 const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = require('./events/ticket-interaction');
-const { handleMessageCreate, startVoiceXpLoop, stopVoiceXpLoop } = require('./events/leveling-tracker');
+const {
+    handleMessageCreate,
+    handleAnalyticsVoiceStateUpdate,
+    seedVoiceAnalyticsSessions,
+    flushAllVoiceAnalyticsSessions,
+    startVoiceXpLoop,
+    stopVoiceXpLoop
+} = require('./events/leveling-tracker');
 const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate } = require('./events/temp-voice');
 const { handleTempVoiceButton, handleTempVoiceModal } = require('./events/temp-voice-interaction');
@@ -276,6 +283,7 @@ client.once('clientReady', () => {
 
     startBackupScheduler();
     startVoiceXpLoop(client);
+    seedVoiceAnalyticsSessions(client);
     startStreamAlertScheduler(client);
 });
 
@@ -356,6 +364,7 @@ client.on('guildMemberRemove', async (member) => {
 
 client.on('voiceStateUpdate', async (oldState, newState) => {
     try {
+        await handleAnalyticsVoiceStateUpdate(oldState, newState);
         await handleVoiceStateUpdate(oldState, newState);
     } catch (error) {
         console.error('Error en voiceStateUpdate (temp voice):', error);
@@ -534,6 +543,7 @@ async function gracefulShutdown(signal) {
     try {
         stopBackupScheduler();
         stopVoiceXpLoop();
+        await flushAllVoiceAnalyticsSessions();
         stopStreamAlertScheduler();
         await db.close().catch(() => null);
         await client.destroy();

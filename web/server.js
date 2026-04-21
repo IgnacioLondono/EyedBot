@@ -518,6 +518,18 @@ function resolveGuildUserTag(guild, userId) {
     return `Usuario ${String(userId).slice(-4)}`;
 }
 
+function resolveGuildUserAvatar(guild, userId) {
+    if (!guild || !userId) return null;
+    const member = guild.members.cache.get(userId);
+    if (typeof member?.displayAvatarURL === 'function') {
+        return member.displayAvatarURL({ dynamic: true, size: 128 });
+    }
+    if (typeof member?.user?.displayAvatarURL === 'function') {
+        return member.user.displayAvatarURL({ dynamic: true, size: 128 });
+    }
+    return null;
+}
+
 function toIsoDayKey(date) {
     return new Date(date).toISOString().slice(0, 10);
 }
@@ -2414,6 +2426,26 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             return best;
         }, null);
 
+        const topActiveUsers = activeTrackedUsers
+            .map((entry) => {
+                const messageCount = Number.parseInt(entry.messageCount || 0, 10) || 0;
+                const voiceMinutes = Number.parseInt(entry.voiceMinutes || 0, 10) || 0;
+                return {
+                    id: entry.userId,
+                    tag: resolveGuildUserTag(guild, entry.userId),
+                    avatar: resolveGuildUserAvatar(guild, entry.userId),
+                    messageCount,
+                    voiceMinutes,
+                    score: messageCount + voiceMinutes
+                };
+            })
+            .sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
+                return b.voiceMinutes - a.voiceMinutes;
+            })
+            .slice(0, 8);
+
         const guildActivity = await guildActivityStore.getGuildActivity(guildId);
         const activityDaily = guildActivity?.daily || {};
         const last7Days = buildLast7DaysTimeline(activityDaily);
@@ -2507,7 +2539,8 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                 timeline: {
                     daily: last7Days,
                     weekly: weeklyTimeline
-                }
+                },
+                topUsers: topActiveUsers
             }
         };
 
@@ -2785,4 +2818,3 @@ const server = app.listen(PORT, () => {
 });
 
 module.exports = { setBotClient, app, server };
-

@@ -167,6 +167,18 @@ async function setUserState(guildId, userId, userState) {
     cacheSet(`leveling_user_${guildId}_${userId}`, normalized);
     return normalized;
 }
+ 
+async function incrementUserStats(guildId, userId, changes = {}) {
+    const current = await getUserState(guildId, userId);
+    const next = normalizeUserState({
+        ...current,
+        messageCount: (Number.parseInt(current.messageCount || 0, 10) || 0) + Math.max(0, Number.parseInt(changes.messageCount || 0, 10) || 0),
+        voiceMinutes: (Number.parseInt(current.voiceMinutes || 0, 10) || 0) + Math.max(0, Number.parseInt(changes.voiceMinutes || 0, 10) || 0),
+        updatedAt: new Date().toISOString()
+    });
+
+    return setUserState(guildId, userId, next);
+}
 
 async function listGuildUsers(guildId) {
     const store = readStore();
@@ -184,5 +196,6 @@ module.exports = {
     setLevelingConfig,
     getUserState,
     setUserState,
+    incrementUserStats,
     listGuildUsers
 };
