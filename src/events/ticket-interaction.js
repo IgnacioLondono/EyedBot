@@ -1189,9 +1189,377 @@ function ticketButtonCustomIdForGuild(guildId) {
     return `${OPEN_PREFIX}${guildId}`;
 }
 
+// ===== HELPERS EXPUESTOS PARA LA WEB =====
+
+async function acceptPendingFromWeb(botClient, guildId, requestId, acceptedByUserId) {
+    if (!botClient) {
+        return { ok: false, code: 'BOT_OFFLINE', error: 'Bot no disponible' };
+    }
+
+    const guild = botClient.guilds.cache.get(String(guildId));
+    if (!guild) {
+        return { ok: false, code: 'GUILD_NOT_FOUND', error: 'Servidor no encontrado' };
+    }
+
+    const pending = await getPendingRequest(guildId, requestId);
+    if (!pending || typeof pending !== 'object') {
+        return { ok: false, code: 'PENDING_NOT_FOUND', error: 'La solicitud ya fue atendida o expiro' };
+    }
+
+    const cfg = await ticketStore.getTicketConfig(guildId);
+    if (!cfg) {
+        return { ok: false, code: 'CONFIG_MISSING', error: 'El sistema de tickets no esta configurado' };
+    }
+
+    const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+    if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+        return { ok: false, code: 'BOT_NO_PERMS', error: 'El bot no tiene permisos para crear canales' };
+    }
+
+    const ownerUserId = String(pending.requesterId || '');
+    const ownerUsername = String(pending.requesterUsername || pending.requesterTag || 'usuario');
+
+    if (!ownerUserId) {
+        await clearPendingRequest(guildId, requestId, ownerUserId).catch(() => null);
+        return { ok: false, code: 'PENDING_CORRUPT', error: 'La solicitud no tiene usuario asociado' };
+    }
+
+    const existing = guild.channels.cache.find((ch) =>
+        ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === ownerUserId
+    );
+
+    if (existing) {
+        await clearPendingRequest(guildId, requestId, ownerUserId).catch(() => null);
+        return {
+            ok: false,
+            code: 'ALREADY_OPEN',
+            error: `El usuario ya tiene un ticket abierto: #${existing.name}`,
+            channelId: existing.id
+        };
+    }
+
+    const details = {
+        category: String(pending.category || 'Soporte general'),
+        commonIssue: String(pending.commonIssue || 'No especificado'),
+        categoryValue: String(pending.categoryValue || ''),
+        commonIssueValue: String(pending.commonIssueValue || ''),
+        noMatchIssue: String(pending.noMatchIssue || 'No especificado')
+    };
+
+    const reason = String(pending.reason || 'Sin motivo');
+
+    const adminRoleIds = Array.isArray(cfg.adminRoleIds) ? cfg.adminRoleIds : [];
+    const validAdminRoles = adminRoleIds
+        .map((id) => guild.roles.cache.get(id))
+        .filter(Boolean);
+    const caseRoleIds = buildCaseRoleIds(cfg, details);
+    const validCaseRoles = caseRoleIds
+        .filter((id) => !adminRoleIds.includes(id))
+        .map((id) => guild.roles.cache.get(id))
+        .filter(Boolean);
+
+    const categoryLabel = details.category.slice(0, 80);
+    const commonIssueLabel = details.commonIssue.slice(0, 120);
+    const noMatchIssueLabel = details.noMatchIssue.slice(0, 180);
+
+    const baseName = toSafeChannelName(ownerUsername);
+    const categorySlug = toSafeChannelName(categoryLabel).slice(0, 24);
+    const ticketName = `ticket-${categorySlug}-${baseName}`.slice(0, 95);
+
+    const permissionOverwrites = [
+        {
+            id: guild.roles.everyone.id,
+            deny: [PermissionsBitField.Flags.ViewChannel]
+        },
+        {
+            id: ownerUserId,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+                PermissionsBitField.Flags.EmbedLinks
+            ]
+        },
+        {
+            id: me.id,
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.SendMessages]
+        }
+    ];
+
+    validAdminRoles.forEach((role) => {
+        permissionOverwrites.push({
+            id: role.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.ManageChannels
+            ]
+        });
+    });
+
+    validCaseRoles.forEach((role) => {
+        permissionOverwrites.push({
+            id: role.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.ManageChannels
+            ]
+        });
+    });
+
+    const closerRoleIds = Array.from(new Set([
+        ...validAdminRoles.map((role) => String(role.id)),
+        ...validCaseRoles.map((role) => String(role.id))
+    ]));
+
+    const topic = [
+        `owner:${ownerUserId}`,
+        `category:${categoryLabel}`,
+        `common:${commonIssueLabel}`,
+        `staff:${closerRoleIds.join(',')}`,
+        `no-match:${noMatchIssueLabel}`,
+        `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
+    ].join(' | ').slice(0, 1000);
+
+    const created = await guild.channels.create({
+        name: ticketName,
+        type: ChannelType.GuildText,
+        topic,
+        permissionOverwrites
+    }).catch(() => null);
+
+    if (!created) {
+        return { ok: false, code: 'CHANNEL_CREATE_FAILED', error: 'No pude crear el canal del ticket' };
+    }
+
+    const ownerMember = await guild.members.fetch(ownerUserId).catch(() => null);
+    const acceptorUser = acceptedByUserId ? await botClient.users.fetch(acceptedByUserId).catch(() => null) : null;
+    const ownerAvatarURL = ownerMember?.user?.displayAvatarURL({ size: 128 }) || null;
+
+    const infoEmbed = new EmbedBuilder()
+        .setColor((cfg.color || '7c4dff').replace('#', ''))
+        .setAuthor({
+            name: `${ownerUsername} abrio un ticket`,
+            iconURL: ownerAvatarURL || undefined
+        })
+        .setTitle('Nuevo ticket abierto')
+        .setDescription('Se registro una nueva solicitud. El staff revisara la informacion del ticket.')
+        .addFields(
+            { name: 'Usuario', value: `<@${ownerUserId}>`, inline: true },
+            { name: 'Referencia', value: `#${created.id}`, inline: true },
+            { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
+            { name: 'Caso', value: commonIssueLabel.slice(0, 1024), inline: true },
+            { name: 'Contexto / Motivo', value: String(reason).slice(0, 1024) || 'Sin detalles', inline: false },
+            { name: 'Aceptado por', value: acceptorUser ? `<@${acceptorUser.id}> (web)` : 'Web panel', inline: false }
+        )
+        .setFooter({ text: 'Usa el boton de abajo para cerrar el ticket cuando termines.' })
+        .setTimestamp();
+
+    if (ownerAvatarURL) infoEmbed.setThumbnail(ownerAvatarURL);
+
+    const closeBtn = new ButtonBuilder()
+        .setCustomId(CLOSE_ID)
+        .setLabel('Cerrar ticket')
+        .setStyle(ButtonStyle.Danger);
+
+    await created.send({
+        content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
+        embeds: [infoEmbed],
+        components: [new ActionRowBuilder().addComponents(closeBtn)]
+    }).catch(() => null);
+
+    // Intentar editar / borrar el mensaje pendiente si existe
+    if (pending.channelId && pending.messageId) {
+        const pendingChannel = guild.channels.cache.get(pending.channelId) || await guild.channels.fetch(pending.channelId).catch(() => null);
+        if (pendingChannel && pendingChannel.isTextBased && pendingChannel.isTextBased()) {
+            const pendingMsg = await pendingChannel.messages.fetch(pending.messageId).catch(() => null);
+            if (pendingMsg) {
+                await pendingMsg.edit({
+                    content: `Solicitud aceptada desde la web. Canal: <#${created.id}>`,
+                    components: []
+                }).catch(() => null);
+            }
+        }
+    }
+
+    clearDraftForUser(guildId, ownerUserId);
+    await clearPendingRequest(guildId, requestId, ownerUserId).catch(() => null);
+
+    // DM de confirmacion al usuario
+    if (ownerMember) {
+        await ownerMember.send({
+            content: `Tu solicitud de ticket fue aceptada. Accede aqui: <#${created.id}>`
+        }).catch(() => null);
+    }
+
+    return {
+        ok: true,
+        channelId: created.id,
+        channelName: created.name,
+        ownerId: ownerUserId
+    };
+}
+
+async function listPendingRequests(guildId) {
+    const safeGuildId = String(guildId || '');
+    if (!safeGuildId) return [];
+
+    try {
+        const prefix = `ticket_pending_${safeGuildId}_`;
+        const rows = await db.query(
+            'SELECT `key`, `value` FROM key_value_store WHERE `key` LIKE ?',
+            [`${prefix}%`]
+        );
+
+        const out = [];
+        for (const row of rows || []) {
+            const key = String(row.key || '');
+            if (!key.startsWith(prefix)) continue;
+            // Skip pending_user index entries
+            if (key.startsWith(`ticket_pending_user_${safeGuildId}_`)) continue;
+            try {
+                const parsed = JSON.parse(row.value);
+                if (parsed && typeof parsed === 'object' && parsed.requesterId) {
+                    out.push(parsed);
+                }
+            } catch {
+                // ignorar
+            }
+        }
+
+        // De mas reciente a mas antiguo
+        out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        return out;
+    } catch (error) {
+        console.error('Error listando pendientes de tickets:', error.message);
+        return [];
+    }
+}
+
+async function listTicketReports(guildId, limit = 50) {
+    const safeGuildId = String(guildId || '');
+    if (!safeGuildId) return [];
+
+    try {
+        const rows = await db.query(
+            'SELECT `value` FROM key_value_store WHERE `key` LIKE ? ORDER BY created_at DESC LIMIT ?',
+            [`ticket_report_%`, Math.max(1, Math.min(500, Number(limit) || 50))]
+        );
+
+        const out = [];
+        for (const row of rows || []) {
+            try {
+                const parsed = JSON.parse(row.value);
+                if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) {
+                    out.push(parsed);
+                }
+            } catch {
+                // ignorar
+            }
+        }
+
+        out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        return out;
+    } catch (error) {
+        console.error('Error listando reports de tickets:', error.message);
+        return [];
+    }
+}
+
+function listActiveTicketChannels(guild) {
+    if (!guild) return [];
+    const channels = [];
+    guild.channels.cache.forEach((ch) => {
+        if (ch.type !== ChannelType.GuildText) return;
+        const topic = String(ch.topic || '');
+        const ownerId = parseTicketOwner(topic);
+        if (!ownerId) return;
+        channels.push({
+            channelId: ch.id,
+            channelName: ch.name,
+            ownerId,
+            category: parseTopicField(topic, 'category') || 'Sin categoria',
+            commonIssue: parseTopicField(topic, 'common') || '',
+            reason: parseTopicField(topic, 'reason') || '',
+            claimedBy: parseTopicField(topic, 'claimed') || '',
+            createdAt: new Date(Number(ch.createdTimestamp || Date.now())).toISOString()
+        });
+    });
+
+    channels.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return channels;
+}
+
+async function claimTicketFromWeb(botClient, guildId, channelId, claimerUserId) {
+    if (!botClient) return { ok: false, code: 'BOT_OFFLINE', error: 'Bot no disponible' };
+
+    const guild = botClient.guilds.cache.get(String(guildId));
+    if (!guild) return { ok: false, code: 'GUILD_NOT_FOUND', error: 'Servidor no encontrado' };
+
+    const channel = guild.channels.cache.get(String(channelId)) || await guild.channels.fetch(String(channelId)).catch(() => null);
+    if (!channel || channel.type !== ChannelType.GuildText) {
+        return { ok: false, code: 'CHANNEL_NOT_FOUND', error: 'Canal no encontrado' };
+    }
+
+    const topic = String(channel.topic || '');
+    const ownerId = parseTicketOwner(topic);
+    if (!ownerId) {
+        return { ok: false, code: 'NOT_A_TICKET', error: 'El canal no parece un ticket' };
+    }
+
+    const currentClaim = parseTopicField(topic, 'claimed');
+    const newClaim = String(claimerUserId || '');
+
+    // Remover campo claimed: existente y agregar el nuevo
+    let newTopic = topic.replace(/\s*\|\s*claimed:[^|]*/i, '').trim();
+
+    if (newClaim) {
+        // Agregar al final si es un nuevo claim o cambio de claim
+        newTopic = `${newTopic} | claimed:${newClaim}`.slice(0, 1000);
+    }
+
+    await channel.setTopic(newTopic).catch(() => null);
+
+    // Anuncio en el canal
+    const claimerUser = await botClient.users.fetch(newClaim).catch(() => null);
+    if (newClaim && claimerUser) {
+        const embed = new EmbedBuilder()
+            .setColor('7c4dff')
+            .setDescription(`🛎️ **<@${newClaim}> ha reclamado este ticket desde la web.** Se encargara de la atencion.`)
+            .setTimestamp();
+        await channel.send({ embeds: [embed] }).catch(() => null);
+    } else if (!newClaim && currentClaim) {
+        const embed = new EmbedBuilder()
+            .setColor('f59e0b')
+            .setDescription(`🔓 El ticket ha sido liberado. Cualquier staff puede tomarlo.`)
+            .setTimestamp();
+        await channel.send({ embeds: [embed] }).catch(() => null);
+    }
+
+    return {
+        ok: true,
+        channelId: channel.id,
+        claimedBy: newClaim || ''
+    };
+}
+
 module.exports = {
     handleTicketButton,
     handleTicketSelectMenu,
     handleTicketModal,
-    ticketButtonCustomIdForGuild
+    ticketButtonCustomIdForGuild,
+    // Helpers web
+    acceptPendingFromWeb,
+    claimTicketFromWeb,
+    listPendingRequests,
+    listTicketReports,
+    listActiveTicketChannels,
+    parseTicketOwner,
+    parseTopicField
 };

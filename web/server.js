@@ -19,7 +19,14 @@ const tempVoiceStore = require('../src/utils/temp-voice-store');
 const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const { ticketButtonCustomIdForGuild } = require('../src/events/ticket-interaction');
+const {
+    ticketButtonCustomIdForGuild,
+    acceptPendingFromWeb,
+    claimTicketFromWeb,
+    listPendingRequests,
+    listTicketReports,
+    listActiveTicketChannels
+} = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
 
 const app = express();
@@ -548,6 +555,21 @@ function summarizeChannelType(channel) {
 }
 
 function sanitizeChannelSnapshot(channel) {
+    const connectedUsers = channel.members
+        ? channel.members
+            .filter((member) => !member.user?.bot)
+            .map((member) => ({
+                id: member.id,
+                tag: member.user?.tag || member.displayName || `Usuario ${String(member.id).slice(-4)}`,
+                avatar: typeof member.displayAvatarURL === 'function'
+                    ? member.displayAvatarURL({ dynamic: true, size: 128 })
+                    : (typeof member.user?.displayAvatarURL === 'function'
+                        ? member.user.displayAvatarURL({ dynamic: true, size: 128 })
+                        : null)
+            }))
+            .sort((a, b) => a.tag.localeCompare(b.tag, 'es'))
+        : [];
+
     return {
         id: channel.id,
         name: channel.name,
@@ -555,7 +577,8 @@ function sanitizeChannelSnapshot(channel) {
         parentName: channel.parent?.name || 'Sin categoria',
         position: Number(channel.rawPosition || channel.position || 0),
         topic: typeof channel.topic === 'string' ? channel.topic.slice(0, 120) : '',
-        userCount: channel.members?.filter((m) => !m.user?.bot).size || 0
+        userCount: connectedUsers.length,
+        users: connectedUsers
     };
 }
 
@@ -1475,6 +1498,247 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => 
     } catch (error) {
         console.error('Error publicando ticket panel:', error);
         res.status(500).json({ error: 'Error al publicar panel de tickets' });
+    }
+});
+
+// ===== GESTION DE TICKETS (WEB) =====
+
+function buildTicketStats(activeList, pendingList, reportsList) {
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000;
+    const days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now - (6 - i) * oneDay);
+        d.setHours(0, 0, 0, 0);
+        return { ts: d.getTime(), opened: 0, closed: 0 };
+    });
+
+    const bucketIndex = (iso) => {
+        const t = new Date(iso || 0).getTime();
+        if (!Number.isFinite(t) || t <= 0) return -1;
+        for (let i = 0; i < days.length; i++) {
+            const start = days[i].ts;
+            const end = start + oneDay;
+            if (t >= start && t < end) return i;
+        }
+        return -1;
+    };
+
+    (pendingList || []).forEach((p) => {
+        const idx = bucketIndex(p.createdAt);
+        if (idx >= 0) days[idx].opened += 1;
+    });
+
+    (activeList || []).forEach((a) => {
+        const idx = bucketIndex(a.createdAt);
+        if (idx >= 0) days[idx].opened += 1;
+    });
+
+    (reportsList || []).forEach((r) => {
+        const idx = bucketIndex(r.createdAt);
+        if (idx >= 0) days[idx].closed += 1;
+    });
+
+    const last7 = days.map((d) => ({
+        date: new Date(d.ts).toISOString().slice(0, 10),
+        opened: d.opened,
+        closed: d.closed
+    }));
+
+    const claimedCount = (activeList || []).filter((a) => a.claimedBy).length;
+
+    return {
+        active: (activeList || []).length,
+        pending: (pendingList || []).length,
+        closed: (reportsList || []).length,
+        total: (activeList || []).length + (pendingList || []).length + (reportsList || []).length,
+        claimed: claimedCount,
+        unclaimed: Math.max(0, (activeList || []).length - claimedCount),
+        last7Days: last7
+    };
+}
+
+async function enrichActiveTickets(guild, botClient, active) {
+    if (!active?.length) return [];
+    const out = [];
+    for (const item of active) {
+        const ownerUser = await botClient.users.fetch(item.ownerId).catch(() => null);
+        const claimerUser = item.claimedBy ? await botClient.users.fetch(item.claimedBy).catch(() => null) : null;
+        out.push({
+            ...item,
+            owner: ownerUser ? {
+                id: ownerUser.id,
+                username: ownerUser.username,
+                tag: ownerUser.tag || ownerUser.username,
+                avatar: ownerUser.displayAvatarURL({ size: 64 })
+            } : { id: item.ownerId, username: 'Usuario desconocido', tag: '', avatar: null },
+            claimer: claimerUser ? {
+                id: claimerUser.id,
+                username: claimerUser.username,
+                tag: claimerUser.tag || claimerUser.username,
+                avatar: claimerUser.displayAvatarURL({ size: 64 })
+            } : null
+        });
+    }
+    return out;
+}
+
+async function enrichPendingTickets(botClient, pending) {
+    if (!pending?.length) return [];
+    const out = [];
+    for (const item of pending) {
+        const user = await botClient.users.fetch(item.requesterId).catch(() => null);
+        out.push({
+            ...item,
+            requester: user ? {
+                id: user.id,
+                username: user.username,
+                tag: user.tag || user.username,
+                avatar: user.displayAvatarURL({ size: 64 })
+            } : { id: item.requesterId, username: item.requesterUsername || 'Usuario', tag: item.requesterTag || '', avatar: null }
+        });
+    }
+    return out;
+}
+
+async function enrichReports(botClient, reports) {
+    if (!reports?.length) return [];
+    const out = [];
+    for (const item of reports) {
+        const owner = item.ownerId ? await botClient.users.fetch(item.ownerId).catch(() => null) : null;
+        const closer = item.closedById ? await botClient.users.fetch(item.closedById).catch(() => null) : null;
+        out.push({
+            ...item,
+            owner: owner ? {
+                id: owner.id,
+                username: owner.username,
+                tag: owner.tag || owner.username,
+                avatar: owner.displayAvatarURL({ size: 64 })
+            } : { id: item.ownerId || '', username: 'Usuario desconocido', tag: '', avatar: null },
+            closer: closer ? {
+                id: closer.id,
+                username: closer.username,
+                tag: closer.tag || closer.username,
+                avatar: closer.displayAvatarURL({ size: 64 })
+            } : { id: item.closedById || '', username: item.closedByTag || 'Staff desconocido', tag: item.closedByTag || '', avatar: null }
+        });
+    }
+    return out;
+}
+
+app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const historyLimitRaw = Number.parseInt(req.query.historyLimit, 10);
+        const historyLimit = Number.isFinite(historyLimitRaw) ? Math.max(10, Math.min(200, historyLimitRaw)) : 50;
+
+        const rawActive = listActiveTicketChannels(guild);
+        const rawPending = await listPendingRequests(guildId);
+        const rawReports = await listTicketReports(guildId, historyLimit);
+
+        const [active, pending, history] = await Promise.all([
+            enrichActiveTickets(guild, botClient, rawActive),
+            enrichPendingTickets(botClient, rawPending),
+            enrichReports(botClient, rawReports)
+        ]);
+
+        const stats = buildTicketStats(rawActive, rawPending, rawReports);
+
+        res.json({
+            success: true,
+            stats,
+            active,
+            pending,
+            history,
+            updatedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error obteniendo overview de tickets:', error);
+        res.status(500).json({ error: 'Error al obtener tickets' });
+    }
+});
+
+app.post('/api/guild/:guildId/tickets/pending/:requestId/accept', requireAuth, async (req, res) => {
+    try {
+        const { guildId, requestId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const result = await acceptPendingFromWeb(
+            botClient,
+            guildId,
+            requestId,
+            req.session.user?.id || ''
+        );
+
+        if (!result?.ok) {
+            const status = result?.code === 'PENDING_NOT_FOUND' ? 404
+                : result?.code === 'ALREADY_OPEN' ? 409
+                : result?.code === 'BOT_NO_PERMS' || result?.code === 'CONFIG_MISSING' ? 400
+                : 500;
+            return res.status(status).json({ error: result?.error || 'No se pudo aceptar la solicitud', code: result?.code || 'UNKNOWN', ...result });
+        }
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error aceptando pendiente de ticket:', error);
+        res.status(500).json({ error: 'Error al aceptar la solicitud' });
+    }
+});
+
+app.post('/api/guild/:guildId/tickets/active/:channelId/claim', requireAuth, async (req, res) => {
+    try {
+        const { guildId, channelId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const claimerId = req.session.user?.id || '';
+        if (!claimerId) return res.status(401).json({ error: 'Sesion invalida' });
+
+        const result = await claimTicketFromWeb(botClient, guildId, channelId, claimerId);
+
+        if (!result?.ok) {
+            const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
+                : result?.code === 'NOT_A_TICKET' ? 400
+                : 500;
+            return res.status(status).json({ error: result?.error || 'No se pudo reclamar el ticket', code: result?.code || 'UNKNOWN' });
+        }
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error reclamando ticket:', error);
+        res.status(500).json({ error: 'Error al reclamar el ticket' });
+    }
+});
+
+app.post('/api/guild/:guildId/tickets/active/:channelId/unclaim', requireAuth, async (req, res) => {
+    try {
+        const { guildId, channelId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const result = await claimTicketFromWeb(botClient, guildId, channelId, '');
+
+        if (!result?.ok) {
+            const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
+                : result?.code === 'NOT_A_TICKET' ? 400
+                : 500;
+            return res.status(status).json({ error: result?.error || 'No se pudo liberar el ticket', code: result?.code || 'UNKNOWN' });
+        }
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error liberando ticket:', error);
+        res.status(500).json({ error: 'Error al liberar el ticket' });
     }
 });
 
