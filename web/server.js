@@ -26,7 +26,9 @@ const {
     listPendingRequests,
     listTicketReports,
     getTicketReport,
-    listActiveTicketChannels
+    listActiveTicketChannels,
+    listTicketChannelMessages,
+    sendWebMessageToTicket
 } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
 
@@ -1836,6 +1838,100 @@ app.get('/api/guild/:guildId/tickets/report/:reportId/download', requireAuth, as
     } catch (error) {
         console.error('Error descargando comprobante:', error);
         res.status(500).json({ error: 'No se pudo descargar el comprobante' });
+    }
+});
+
+// ============================================================
+// Chat bidireccional ticket <-> web
+// ============================================================
+
+function buildSenderFromSession(reqUser) {
+    if (!reqUser) return null;
+    let avatarURL = null;
+    if (reqUser.avatar) {
+        avatarURL = `https://cdn.discordapp.com/avatars/${reqUser.id}/${reqUser.avatar}.${reqUser.avatar.startsWith('a_') ? 'gif' : 'png'}?size=128`;
+    } else if (reqUser.id) {
+        const idx = (Number(reqUser.discriminator || 0) % 5);
+        avatarURL = `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+    }
+    return {
+        id: String(reqUser.id || ''),
+        username: reqUser.username || 'usuario',
+        discriminator: reqUser.discriminator || '0',
+        tag: reqUser.discriminator && reqUser.discriminator !== '0'
+            ? `${reqUser.username}#${reqUser.discriminator}`
+            : reqUser.username || 'usuario',
+        displayName: reqUser.global_name || reqUser.username || 'usuario',
+        avatarURL
+    };
+}
+
+app.get('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, async (req, res) => {
+    try {
+        const { guildId, channelId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 60));
+        const after = req.query.after ? String(req.query.after) : null;
+
+        const result = await listTicketChannelMessages(botClient, guildId, channelId, { limit, after });
+        if (!result?.ok) {
+            const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
+                : result?.code === 'NOT_A_TICKET' ? 400
+                : 500;
+            return res.status(status).json({ error: result?.error || 'No se pudieron cargar los mensajes' });
+        }
+
+        res.json({
+            success: true,
+            channelId: result.channelId,
+            channelName: result.channelName,
+            ownerId: result.ownerId,
+            category: result.category,
+            commonIssue: result.commonIssue,
+            claimedBy: result.claimedBy,
+            messages: result.messages,
+            fetchedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error listando mensajes del ticket:', error);
+        res.status(500).json({ error: 'No se pudieron cargar los mensajes' });
+    }
+});
+
+app.post('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, express.json(), async (req, res) => {
+    try {
+        const { guildId, channelId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const content = String(req.body?.content || '').trim();
+        if (!content) return res.status(400).json({ error: 'El mensaje no puede estar vacio' });
+        if (content.length > 1800) return res.status(400).json({ error: 'El mensaje es demasiado largo (max 1800)' });
+
+        const sender = buildSenderFromSession(req.session.user);
+        if (!sender?.id) return res.status(401).json({ error: 'Sesion invalida' });
+
+        const result = await sendWebMessageToTicket(botClient, guildId, channelId, sender, content);
+        if (!result?.ok) {
+            const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
+                : result?.code === 'NOT_A_TICKET' ? 400
+                : result?.code === 'EMPTY_CONTENT' || result?.code === 'TOO_LONG' ? 400
+                : 500;
+            return res.status(status).json({ error: result?.error || 'No se pudo enviar el mensaje' });
+        }
+
+        res.json({
+            success: true,
+            via: result.via,
+            message: result.message
+        });
+    } catch (error) {
+        console.error('Error enviando mensaje a ticket desde web:', error);
+        res.status(500).json({ error: 'No se pudo enviar el mensaje' });
     }
 });
 

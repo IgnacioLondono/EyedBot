@@ -1588,6 +1588,198 @@ async function claimTicketFromWeb(botClient, guildId, channelId, claimerUserId) 
     };
 }
 
+// =====================================================================
+// Chat bidireccional ticket <-> web
+// =====================================================================
+
+// Nombre del webhook usado para enviar mensajes desde la web con el avatar y
+// nombre del staff autenticado.
+const WEB_RELAY_WEBHOOK_NAME = 'EyedBot Web Relay';
+
+function mapDiscordMessageToPayload(message) {
+    if (!message) return null;
+    const attachments = Array.from(message.attachments?.values?.() || []).map((a) => ({
+        id: a.id,
+        name: a.name || 'attachment',
+        url: a.url || '',
+        contentType: a.contentType || '',
+        size: Number(a.size || 0)
+    }));
+
+    const author = message.author || {};
+    const avatarURL = typeof author.displayAvatarURL === 'function'
+        ? author.displayAvatarURL({ size: 128, extension: 'png' })
+        : null;
+
+    return {
+        id: message.id,
+        createdAt: new Date(Number(message.createdTimestamp || Date.now())).toISOString(),
+        editedAt: message.editedTimestamp ? new Date(Number(message.editedTimestamp)).toISOString() : null,
+        content: String(message.content || ''),
+        authorId: author.id || '',
+        authorTag: author.tag || author.username || 'desconocido',
+        authorDisplayName: author.globalName || author.username || 'desconocido',
+        authorAvatarURL: avatarURL,
+        authorBot: !!author.bot,
+        webhookId: message.webhookId || null,
+        attachments,
+        embeds: Array.isArray(message.embeds)
+            ? message.embeds.slice(0, 5).map((embed) => ({
+                title: embed.title || '',
+                description: embed.description || '',
+                color: embed.color || null,
+                url: embed.url || '',
+                fields: Array.isArray(embed.fields)
+                    ? embed.fields.slice(0, 10).map((f) => ({ name: f.name, value: f.value, inline: !!f.inline }))
+                    : []
+            }))
+            : []
+    };
+}
+
+async function listTicketChannelMessages(botClient, guildId, channelId, { limit = 60, after = null } = {}) {
+    if (!botClient) return { ok: false, code: 'BOT_OFFLINE', error: 'Bot no disponible' };
+
+    const guild = botClient.guilds.cache.get(String(guildId));
+    if (!guild) return { ok: false, code: 'GUILD_NOT_FOUND', error: 'Servidor no encontrado' };
+
+    const channel = guild.channels.cache.get(String(channelId))
+        || await guild.channels.fetch(String(channelId)).catch(() => null);
+    if (!channel || channel.type !== ChannelType.GuildText) {
+        return { ok: false, code: 'CHANNEL_NOT_FOUND', error: 'Canal no encontrado' };
+    }
+
+    const topic = String(channel.topic || '');
+    const ownerId = parseTicketOwner(topic);
+    if (!ownerId) {
+        return { ok: false, code: 'NOT_A_TICKET', error: 'El canal no parece un ticket' };
+    }
+
+    const fetchOptions = { limit: Math.max(1, Math.min(100, Number(limit) || 60)) };
+    if (after) fetchOptions.after = String(after);
+
+    const fetched = await channel.messages.fetch(fetchOptions).catch(() => null);
+    if (!fetched) return { ok: false, code: 'FETCH_FAILED', error: 'No se pudieron cargar los mensajes' };
+
+    const messages = Array.from(fetched.values())
+        .sort((a, b) => Number(a.createdTimestamp || 0) - Number(b.createdTimestamp || 0))
+        .map(mapDiscordMessageToPayload)
+        .filter(Boolean);
+
+    return {
+        ok: true,
+        channelId: channel.id,
+        channelName: channel.name,
+        ownerId,
+        category: parseTopicField(topic, 'category') || '',
+        commonIssue: parseTopicField(topic, 'common') || '',
+        claimedBy: parseTopicField(topic, 'claimed') || '',
+        messages
+    };
+}
+
+async function getOrCreateWebRelayWebhook(channel) {
+    try {
+        const webhooks = await channel.fetchWebhooks().catch(() => null);
+        if (webhooks) {
+            const existing = webhooks.find((w) => w.name === WEB_RELAY_WEBHOOK_NAME && w.token);
+            if (existing) return existing;
+        }
+        const created = await channel.createWebhook({
+            name: WEB_RELAY_WEBHOOK_NAME,
+            reason: 'Webhook para mensajes enviados desde el dashboard web'
+        }).catch(() => null);
+        return created || null;
+    } catch {
+        return null;
+    }
+}
+
+function sanitizeWebhookUsername(rawName, fallback = 'Staff web') {
+    const name = String(rawName || '').trim() || fallback;
+    const cleaned = name.replace(/discord/gi, 'd1scord').slice(0, 80);
+    return cleaned || fallback;
+}
+
+async function sendWebMessageToTicket(botClient, guildId, channelId, sender, rawContent) {
+    if (!botClient) return { ok: false, code: 'BOT_OFFLINE', error: 'Bot no disponible' };
+
+    const content = String(rawContent || '').trim();
+    if (!content) return { ok: false, code: 'EMPTY_CONTENT', error: 'El mensaje no puede estar vacio' };
+    if (content.length > 1800) return { ok: false, code: 'TOO_LONG', error: 'El mensaje es demasiado largo' };
+
+    const guild = botClient.guilds.cache.get(String(guildId));
+    if (!guild) return { ok: false, code: 'GUILD_NOT_FOUND', error: 'Servidor no encontrado' };
+
+    const channel = guild.channels.cache.get(String(channelId))
+        || await guild.channels.fetch(String(channelId)).catch(() => null);
+    if (!channel || channel.type !== ChannelType.GuildText) {
+        return { ok: false, code: 'CHANNEL_NOT_FOUND', error: 'Canal no encontrado' };
+    }
+
+    const topic = String(channel.topic || '');
+    const ownerId = parseTicketOwner(topic);
+    if (!ownerId) {
+        return { ok: false, code: 'NOT_A_TICKET', error: 'El canal no parece un ticket' };
+    }
+
+    const safeContent = content
+        .replace(/@everyone/gi, '@\u200beveryone')
+        .replace(/@here/gi, '@\u200bhere');
+
+    const webhook = await getOrCreateWebRelayWebhook(channel);
+
+    if (webhook) {
+        const username = sanitizeWebhookUsername(
+            sender?.displayName || sender?.tag || sender?.username,
+            'Staff web'
+        );
+        try {
+            const sent = await webhook.send({
+                content: safeContent,
+                username,
+                avatarURL: sender?.avatarURL || undefined,
+                allowedMentions: { parse: ['users', 'roles'] }
+            });
+            return {
+                ok: true,
+                via: 'webhook',
+                message: mapDiscordMessageToPayload(sent)
+            };
+        } catch (err) {
+            // Si falla el webhook caemos al fallback
+            console.warn('Webhook send fallo, usando bot como fallback:', err.message);
+        }
+    }
+
+    // Fallback: el bot envia un embed con la identidad del staff
+    try {
+        const senderTag = String(sender?.displayName || sender?.tag || 'Staff web');
+        const embed = new EmbedBuilder()
+            .setColor('7c4dff')
+            .setAuthor({
+                name: `${senderTag} (via web)`,
+                iconURL: sender?.avatarURL || undefined
+            })
+            .setDescription(safeContent)
+            .setTimestamp();
+
+        const sent = await channel.send({
+            embeds: [embed],
+            allowedMentions: { parse: ['users', 'roles'] }
+        });
+
+        return {
+            ok: true,
+            via: 'bot-embed',
+            message: mapDiscordMessageToPayload(sent)
+        };
+    } catch (err) {
+        console.error('Error enviando mensaje a ticket desde web:', err);
+        return { ok: false, code: 'SEND_FAILED', error: 'No se pudo enviar el mensaje' };
+    }
+}
+
 module.exports = {
     handleTicketButton,
     handleTicketSelectMenu,
@@ -1600,6 +1792,8 @@ module.exports = {
     listTicketReports,
     getTicketReport,
     listActiveTicketChannels,
+    listTicketChannelMessages,
+    sendWebMessageToTicket,
     parseTicketOwner,
     parseTopicField
 };

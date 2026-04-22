@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260419-2">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-8">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-9">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -1320,7 +1320,55 @@
         </div>
     </div>
 
+    <!-- Modal: Chat de ticket en vivo -->
+    <div id="ticketChatModal" class="ticket-chat-modal" aria-hidden="true" role="dialog" aria-labelledby="ticketChatTitle">
+        <div class="ticket-chat-backdrop" data-tchat-close="1"></div>
+        <div class="ticket-chat-dialog" role="document">
+            <header class="ticket-chat-head">
+                <div class="ticket-chat-head-info">
+                    <div class="ticket-chat-avatar" id="ticketChatAvatar">#</div>
+                    <div class="ticket-chat-head-meta">
+                        <div class="ticket-chat-kicker">
+                            <span class="ticket-chat-dot"></span>
+                            <span>Chat en vivo</span>
+                        </div>
+                        <h3 id="ticketChatTitle">Cargando ticket...</h3>
+                        <div class="ticket-chat-sub" id="ticketChatSubtitle">—</div>
+                    </div>
+                </div>
+                <div class="ticket-chat-head-actions">
+                    <button type="button" id="ticketChatRefreshBtn" class="btn btn-ghost btn-sm" title="Refrescar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>
+                    </button>
+                    <button type="button" class="ticket-chat-close" data-tchat-close="1" aria-label="Cerrar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="ticket-chat-body" id="ticketChatBody">
+                <div class="ticket-chat-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando mensajes...</p>
+                </div>
+            </div>
+
+            <div class="ticket-chat-status" id="ticketChatStatus" style="display:none;"></div>
+
+            <form class="ticket-chat-form" id="ticketChatForm" autocomplete="off">
+                <div class="ticket-chat-input-wrap">
+                    <textarea id="ticketChatInput" class="ticket-chat-input" rows="1" maxlength="1800" placeholder="Escribe un mensaje al usuario..."></textarea>
+                    <div class="ticket-chat-counter"><span id="ticketChatCounter">0</span>/1800</div>
+                </div>
+                <button type="submit" class="ticket-chat-send" id="ticketChatSendBtn" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    <span>Enviar</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260422-7"></script>
+    <script src="app.js?v=20260422-9"></script>
 </body>
 </html>

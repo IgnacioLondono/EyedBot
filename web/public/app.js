@@ -7219,7 +7219,13 @@ function renderTmActiveCard(item) {
                 </div>
                 ${item.reason ? `<div class="tm-ticket-reason">${escapeHtml(item.reason)}</div>` : ''}
             </div>
-            <div class="tm-ticket-actions">${claimBtn}</div>
+            <div class="tm-ticket-actions">
+                <button type="button" class="tm-btn tm-btn-chat" data-tm-chat="${escapeHtml(item.channelId || '')}" data-tm-chat-name="${escapeHtml(item.channelName || '')}" data-tm-chat-owner="${escapeHtml(o.username || 'Usuario')}" data-tm-chat-owner-avatar="${escapeHtml(o.avatar || '')}">
+                    <svg viewBox="0 0 24 24" fill="none" ${sSmall}><path d="M21 11.5a8.4 8.4 0 0 1-1 4A8.5 8.5 0 0 1 12.5 20a8.4 8.4 0 0 1-4-1L3 21l1.9-5.6a8.4 8.4 0 0 1-1-4 8.5 8.5 0 0 1 4.5-7.5 8.4 8.4 0 0 1 4-1h.5a8.5 8.5 0 0 1 8 8z"></path></svg>
+                    <span>Chat</span>
+                </button>
+                ${claimBtn}
+            </div>
         </div>`;
 }
 
@@ -7317,6 +7323,16 @@ function wireTmActiveActions() {
             const channelId = btn.getAttribute('data-tm-unclaim');
             if (!channelId) return;
             await unclaimTicket(channelId, btn);
+        });
+    });
+    document.querySelectorAll('[data-tm-chat]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const channelId = btn.getAttribute('data-tm-chat');
+            const channelName = btn.getAttribute('data-tm-chat-name') || '';
+            const ownerName = btn.getAttribute('data-tm-chat-owner') || '';
+            const ownerAvatar = btn.getAttribute('data-tm-chat-owner-avatar') || '';
+            if (!channelId) return;
+            openTicketChat(channelId, { channelName, ownerName, ownerAvatar });
         });
     });
 }
@@ -7693,6 +7709,453 @@ function highlightText(text, query) {
     const re = new RegExp(`(${escapedQuery})`, 'gi');
     const safe = escapeHtml(text);
     return safe.replace(re, '<mark class="receipt-highlight">$1</mark>');
+}
+
+// ============================================================
+// Chat bidireccional ticket <-> web
+// ============================================================
+const _ticketChatState = {
+    channelId: null,
+    channelName: '',
+    ownerName: '',
+    ownerAvatar: '',
+    messages: [],
+    messageIds: new Set(),
+    pollTimer: null,
+    wired: false,
+    isOpen: false,
+    lastFetchAt: 0,
+    sending: false
+};
+
+function openTicketChat(channelId, meta = {}) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId || !channelId) return;
+
+    _ticketChatState.channelId = channelId;
+    _ticketChatState.channelName = meta.channelName || '';
+    _ticketChatState.ownerName = meta.ownerName || '';
+    _ticketChatState.ownerAvatar = meta.ownerAvatar || '';
+    _ticketChatState.messages = [];
+    _ticketChatState.messageIds = new Set();
+    _ticketChatState.isOpen = true;
+
+    const modal = document.getElementById('ticketChatModal');
+    if (!modal) return;
+
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    wireTicketChatControls();
+    resetTicketChatUI(meta);
+
+    fetchTicketChatMessages({ initial: true });
+    startTicketChatPolling();
+}
+
+function closeTicketChat() {
+    stopTicketChatPolling();
+    _ticketChatState.isOpen = false;
+    _ticketChatState.channelId = null;
+    _ticketChatState.messages = [];
+    _ticketChatState.messageIds = new Set();
+
+    const modal = document.getElementById('ticketChatModal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+
+    const input = document.getElementById('ticketChatInput');
+    if (input) input.value = '';
+    updateTicketChatCounter();
+}
+
+function wireTicketChatControls() {
+    if (_ticketChatState.wired) return;
+    _ticketChatState.wired = true;
+
+    const modal = document.getElementById('ticketChatModal');
+    if (!modal) return;
+
+    modal.querySelectorAll('[data-tchat-close]').forEach((el) => {
+        el.addEventListener('click', closeTicketChat);
+    });
+
+    const refreshBtn = document.getElementById('ticketChatRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => fetchTicketChatMessages({ force: true }));
+
+    const form = document.getElementById('ticketChatForm');
+    const input = document.getElementById('ticketChatInput');
+    const sendBtn = document.getElementById('ticketChatSendBtn');
+
+    if (input) {
+        input.addEventListener('input', () => {
+            autoResizeTicketChatInput();
+            updateTicketChatCounter();
+            if (sendBtn) sendBtn.disabled = !input.value.trim() || _ticketChatState.sending;
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (form) form.requestSubmit();
+            }
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await sendTicketChatMessage();
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const m = document.getElementById('ticketChatModal');
+            if (m && m.classList.contains('is-open')) closeTicketChat();
+        }
+    });
+}
+
+function resetTicketChatUI(meta = {}) {
+    const title = document.getElementById('ticketChatTitle');
+    if (title) title.textContent = meta.channelName ? `#${meta.channelName}` : 'Cargando ticket...';
+
+    const subtitle = document.getElementById('ticketChatSubtitle');
+    if (subtitle) subtitle.textContent = meta.ownerName ? `con ${meta.ownerName}` : '—';
+
+    const avatar = document.getElementById('ticketChatAvatar');
+    if (avatar) {
+        if (meta.ownerAvatar) {
+            avatar.innerHTML = `<img src="${escapeHtml(meta.ownerAvatar)}" alt="${escapeHtml(meta.ownerName || 'U')}">`;
+        } else {
+            avatar.textContent = String(meta.ownerName || '#').charAt(0).toUpperCase();
+        }
+    }
+
+    const body = document.getElementById('ticketChatBody');
+    if (body) {
+        body.innerHTML = `
+            <div class="ticket-chat-loading">
+                <div class="loading-spinner"></div>
+                <p>Cargando mensajes...</p>
+            </div>`;
+    }
+
+    const status = document.getElementById('ticketChatStatus');
+    if (status) { status.style.display = 'none'; status.textContent = ''; status.classList.remove('is-info'); }
+
+    const sendBtn = document.getElementById('ticketChatSendBtn');
+    if (sendBtn) sendBtn.disabled = true;
+
+    updateTicketChatCounter();
+}
+
+function autoResizeTicketChatInput() {
+    const input = document.getElementById('ticketChatInput');
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(140, input.scrollHeight)}px`;
+}
+
+function updateTicketChatCounter() {
+    const input = document.getElementById('ticketChatInput');
+    const counter = document.getElementById('ticketChatCounter');
+    if (!input || !counter) return;
+    const len = input.value.length;
+    counter.textContent = String(len);
+    counter.parentElement?.classList.toggle('is-warning', len > 1500 && len <= 1750);
+    counter.parentElement?.classList.toggle('is-danger', len > 1750);
+}
+
+function startTicketChatPolling() {
+    stopTicketChatPolling();
+    _ticketChatState.pollTimer = setInterval(() => {
+        if (!_ticketChatState.isOpen) return;
+        if (document.hidden) return;
+        fetchTicketChatMessages();
+    }, 3500);
+}
+
+function stopTicketChatPolling() {
+    if (_ticketChatState.pollTimer) {
+        clearInterval(_ticketChatState.pollTimer);
+        _ticketChatState.pollTimer = null;
+    }
+}
+
+function setTicketChatStatus(message, type = 'error') {
+    const status = document.getElementById('ticketChatStatus');
+    if (!status) return;
+    if (!message) {
+        status.style.display = 'none';
+        status.textContent = '';
+        status.classList.remove('is-info');
+        return;
+    }
+    status.textContent = message;
+    status.style.display = 'block';
+    status.classList.toggle('is-info', type === 'info');
+}
+
+async function fetchTicketChatMessages({ initial = false, force = false } = {}) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    const channelId = _ticketChatState.channelId;
+    if (!guildId || !channelId) return;
+
+    const now = Date.now();
+    if (!force && !initial && now - _ticketChatState.lastFetchAt < 1500) return;
+    _ticketChatState.lastFetchAt = now;
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/active/${encodeURIComponent(channelId)}/messages?limit=60`);
+        const data = await response.json();
+        if (!response.ok || !data?.success) {
+            throw new Error(data?.error || 'No se pudieron cargar los mensajes');
+        }
+
+        const headTitle = document.getElementById('ticketChatTitle');
+        if (headTitle && data.channelName) headTitle.textContent = `#${data.channelName}`;
+
+        const headSub = document.getElementById('ticketChatSubtitle');
+        if (headSub) {
+            const bits = [];
+            if (data.category) bits.push(data.category);
+            if (data.claimedBy) bits.push(`reclamado`);
+            bits.push(`${data.messages.length} msgs`);
+            headSub.textContent = bits.join(' · ');
+        }
+
+        const incoming = Array.isArray(data.messages) ? data.messages : [];
+        const hadAny = _ticketChatState.messages.length > 0;
+        const body = document.getElementById('ticketChatBody');
+        const wasAtBottom = body ? isScrolledToBottom(body) : true;
+
+        _ticketChatState.messages = incoming;
+        _ticketChatState.messageIds = new Set(incoming.map((m) => m.id));
+
+        renderTicketChatMessages(incoming);
+
+        if (initial || wasAtBottom || !hadAny) {
+            scrollTicketChatToBottom();
+        }
+
+        setTicketChatStatus('');
+    } catch (error) {
+        console.error('Error cargando mensajes:', error);
+        if (initial) setTicketChatStatus(error.message || 'No se pudieron cargar los mensajes.');
+    }
+}
+
+function isScrolledToBottom(el, threshold = 80) {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+}
+
+function scrollTicketChatToBottom(smooth = false) {
+    const body = document.getElementById('ticketChatBody');
+    if (!body) return;
+    requestAnimationFrame(() => {
+        body.scrollTo({ top: body.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    });
+}
+
+function renderTicketChatMessages(messages) {
+    const body = document.getElementById('ticketChatBody');
+    if (!body) return;
+
+    if (!messages.length) {
+        body.innerHTML = `
+            <div class="ticket-chat-empty">
+                <strong>Sin mensajes aún</strong>
+                <p>Envia un mensaje para iniciar la conversación con el usuario.</p>
+            </div>`;
+        return;
+    }
+
+    const ownerId = findTicketChatOwnerId();
+    let lastDay = '';
+    const html = messages.map((msg) => {
+        const date = msg.createdAt ? new Date(msg.createdAt) : null;
+        const dayKey = date ? date.toDateString() : '';
+        let sep = '';
+        if (dayKey && dayKey !== lastDay) {
+            lastDay = dayKey;
+            sep = `<div class="ticket-chat-day-separator"><span>${escapeHtml(formatChatDayLabel(date))}</span></div>`;
+        }
+        return sep + renderTicketChatMessage(msg, ownerId);
+    }).join('');
+
+    body.innerHTML = html;
+}
+
+function findTicketChatOwnerId() {
+    const active = Array.isArray(_ticketsManageState.lastData?.active) ? _ticketsManageState.lastData.active : [];
+    const current = active.find((t) => t.channelId === _ticketChatState.channelId);
+    return current?.ownerId || '';
+}
+
+function renderTicketChatMessage(msg, ownerId) {
+    const isBot = !!msg.authorBot;
+    const isWebhook = !!msg.webhookId;
+    const isOwner = ownerId && msg.authorId === ownerId;
+
+    const author = escapeHtml(msg.authorDisplayName || msg.authorTag || 'Desconocido');
+    const avatarHtml = msg.authorAvatarURL
+        ? `<img src="${escapeHtml(msg.authorAvatarURL)}" alt="${author}" loading="lazy">`
+        : escapeHtml(String(msg.authorDisplayName || msg.authorTag || '?').charAt(0).toUpperCase());
+
+    const timeStr = msg.createdAt ? formatChatTimeShort(new Date(msg.createdAt)) : '';
+
+    const classes = ['tchat-msg'];
+    if (isBot) classes.push('is-bot');
+    if (isWebhook) classes.push('is-from-web');
+    if (isOwner) classes.push('is-owner');
+
+    const authorClasses = ['tchat-author'];
+    if (isBot) authorClasses.push('is-bot');
+    if (isOwner) authorClasses.push('is-owner');
+
+    const badges = [];
+    if (isBot) badges.push('<span class="tchat-bot-tag">BOT</span>');
+    if (isWebhook && !isBot) badges.push('<span class="tchat-web-tag">WEB</span>');
+
+    const content = formatChatContent(msg.content || '');
+
+    const attachmentsHtml = (Array.isArray(msg.attachments) ? msg.attachments : []).map((a) => {
+        const isImage = (a.contentType && a.contentType.startsWith('image/'))
+            || /\.(png|jpe?g|gif|webp|bmp)$/i.test(a.name || '');
+        if (isImage) {
+            return `<a class="tchat-attach-image" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">
+                <img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.name || 'imagen')}" loading="lazy">
+            </a>`;
+        }
+        return `<a class="tchat-attach" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11l-9 9a5 5 0 1 1-7-7l9-9a3.5 3.5 0 1 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"></path></svg>
+            <span>${escapeHtml(a.name || 'archivo')}</span>
+        </a>`;
+    }).join('');
+    const attachBlock = attachmentsHtml ? `<div class="tchat-attachments">${attachmentsHtml}</div>` : '';
+
+    const embedsHtml = (Array.isArray(msg.embeds) ? msg.embeds : []).map((e) => {
+        if (!e.title && !e.description) return '';
+        return `<div class="tchat-embed">
+            ${e.title ? `<div class="tchat-embed-title">${escapeHtml(e.title)}</div>` : ''}
+            ${e.description ? `<div class="tchat-embed-desc">${formatChatContent(e.description)}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    return `
+        <div class="${classes.join(' ')}" data-msg-id="${escapeHtml(msg.id || '')}">
+            <div class="tchat-avatar">${avatarHtml}</div>
+            <div class="tchat-body">
+                <div class="tchat-head">
+                    <span class="${authorClasses.join(' ')}">${author}</span>
+                    ${badges.join('')}
+                    <span class="tchat-time">${escapeHtml(timeStr)}</span>
+                </div>
+                <div class="tchat-content">${content}</div>
+                ${attachBlock}
+                ${embedsHtml}
+            </div>
+        </div>`;
+}
+
+function formatChatContent(text) {
+    if (!text) return '';
+    let safe = escapeHtml(text);
+    // <@userId> -> mention
+    safe = safe.replace(/&lt;@!?(\d+)&gt;/g, '<span class="tchat-mention">@usuario</span>');
+    safe = safe.replace(/&lt;@&amp;(\d+)&gt;/g, '<span class="tchat-mention">@rol</span>');
+    safe = safe.replace(/&lt;#(\d+)&gt;/g, '<span class="tchat-mention">#canal</span>');
+    // Custom emoji <:name:id> / <a:name:id>
+    safe = safe.replace(/&lt;(a?):([a-zA-Z0-9_]+):(\d+)&gt;/g, (m, a, name) => `:${name}:`);
+    // Inline code `...`
+    safe = safe.replace(/`([^`\n]+)`/g, '<span class="tchat-code">$1</span>');
+    // URLs
+    safe = safe.replace(/\b(https?:\/\/[^\s<]+)/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+    return safe;
+}
+
+function formatChatTimeShort(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+    const time = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (sameDay) return `hoy · ${time}`;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return `ayer · ${time}`;
+    return `${date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} · ${time}`;
+}
+
+function formatChatDayLabel(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    if (date.toDateString() === now.toDateString()) return 'Hoy';
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
+    return date.toLocaleDateString('es-ES', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+async function sendTicketChatMessage() {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    const channelId = _ticketChatState.channelId;
+    const input = document.getElementById('ticketChatInput');
+    const sendBtn = document.getElementById('ticketChatSendBtn');
+    if (!guildId || !channelId || !input) return;
+
+    const content = input.value.trim();
+    if (!content) return;
+    if (_ticketChatState.sending) return;
+
+    _ticketChatState.sending = true;
+    if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.classList.add('is-sending');
+        sendBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg><span>Enviando...</span>`;
+    }
+    setTicketChatStatus('');
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/active/${encodeURIComponent(channelId)}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.success) {
+            throw new Error(data?.error || 'No se pudo enviar el mensaje');
+        }
+
+        input.value = '';
+        autoResizeTicketChatInput();
+        updateTicketChatCounter();
+
+        // Agregar mensaje localmente y refrescar
+        if (data.message && !_ticketChatState.messageIds.has(data.message.id)) {
+            _ticketChatState.messages.push(data.message);
+            _ticketChatState.messageIds.add(data.message.id);
+            renderTicketChatMessages(_ticketChatState.messages);
+            scrollTicketChatToBottom(true);
+        }
+
+        // Forzar un fetch para sincronizar con lo que haya
+        setTimeout(() => fetchTicketChatMessages({ force: true }), 800);
+    } catch (error) {
+        console.error('Error enviando mensaje:', error);
+        setTicketChatStatus(error.message || 'No se pudo enviar el mensaje.');
+    } finally {
+        _ticketChatState.sending = false;
+        if (sendBtn) {
+            sendBtn.classList.remove('is-sending');
+            sendBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg><span>Enviar</span>`;
+            sendBtn.disabled = !input.value.trim();
+        }
+        input.focus();
+    }
 }
 
 async function acceptPendingTicket(requestId, button) {
