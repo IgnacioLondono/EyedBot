@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260419-2">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-10">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-11">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -1021,6 +1021,18 @@
                                     <span class="side-menu-label">Centro de notificaciones</span>
                                 </span>
                             </button>
+                            <button type="button" class="side-menu-btn" data-server-pane="serverPaneFreeGames">
+                                <span class="side-menu-btn-inner">
+                                    <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M6 12h4"></path>
+                                        <path d="M8 10v4"></path>
+                                        <circle cx="15" cy="12" r="1"></circle>
+                                        <circle cx="17.5" cy="14.5" r="1"></circle>
+                                        <rect x="2" y="7" width="20" height="10" rx="5"></rect>
+                                    </svg>
+                                    <span class="side-menu-label">Juegos gratis</span>
+                                </span>
+                            </button>
                             </div>
                         </div>
 
@@ -1231,6 +1243,19 @@
                                 <div id="notificationsContainer" class="moderation-container"></div>
                             </div>
                         </div>
+
+                        <div id="serverPaneFreeGames" class="server-pane">
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Juegos gratis</h3>
+                                        <p>Recibe notificaciones automáticas cuando aparezcan juegos gratis en Epic Games o Steam.</p>
+                                    </div>
+                                </div>
+                                <div id="freeGamesContainer" class="moderation-container"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1369,6 +1394,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260422-9"></script>
+    <script src="app.js?v=20260422-11"></script>
 </body>
 </html>
