@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260419-2">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-6">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -1275,7 +1275,52 @@
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>
 
+    <!-- Modal: Visor de comprobantes -->
+    <div id="receiptModal" class="receipt-modal" aria-hidden="true" role="dialog" aria-labelledby="receiptModalTitle">
+        <div class="receipt-modal-backdrop" data-receipt-close="1"></div>
+        <div class="receipt-modal-dialog" role="document">
+            <header class="receipt-modal-head">
+                <div class="receipt-modal-kicker">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M8 9h3"></path></svg>
+                    <span>Comprobante</span>
+                </div>
+                <h3 id="receiptModalTitle">Detalle del comprobante</h3>
+                <button type="button" class="receipt-modal-close" data-receipt-close="1" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </header>
+            <div class="receipt-modal-toolbar">
+                <div class="receipt-modal-tabs" role="tablist">
+                    <button type="button" class="receipt-tab-btn is-active" data-receipt-tab="summary" role="tab">Resumen</button>
+                    <button type="button" class="receipt-tab-btn" data-receipt-tab="transcript" role="tab">Transcripción</button>
+                    <button type="button" class="receipt-tab-btn" data-receipt-tab="participants" role="tab">Participantes</button>
+                </div>
+                <div class="receipt-modal-toolbar-actions">
+                    <input type="text" id="receiptSearchInput" class="receipt-search" placeholder="Buscar en transcripción..." />
+                    <button type="button" id="receiptCopyBtn" class="btn btn-ghost btn-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span>Copiar</span>
+                    </button>
+                    <a id="receiptDownloadBtn" href="#" class="btn btn-primary btn-sm" download>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Descargar</span>
+                    </a>
+                </div>
+            </div>
+            <div class="receipt-modal-body">
+                <div id="receiptPaneSummary" class="receipt-pane is-active">
+                    <div class="receipt-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Cargando comprobante...</p>
+                    </div>
+                </div>
+                <div id="receiptPaneTranscript" class="receipt-pane"></div>
+                <div id="receiptPaneParticipants" class="receipt-pane"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260422-6"></script>
+    <script src="app.js?v=20260422-7"></script>
 </body>
 </html>

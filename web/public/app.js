@@ -5642,119 +5642,247 @@ function getServerInsightBackLabel() {
 
 function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar, createdDate, ageDays, trackedUsers, totalMessages, avgMessagesPerDay, topMessageTag, topMessageCount, totalVoiceMinutes, avgVoiceHoursPerDay, topVoiceTag, topVoiceMinutes, totalJoins, totalLeaves, flowNet, peakJoinCount, peakJoinDate, peakLeaveCount, peakLeaveDate, liveVoiceUsers, liveTopChannelName, liveTopChannelUsers) {
     const topUsers = getServerTopUsers(info);
-    const topUsersPreviewMarkup = renderTopUsersMarkup(topUsers, { limit: 3 });
-    const showMoreUsersButton = topUsers.length > 3
-        ? `
-            <button type="button" class="summary-link-btn" data-server-insight-more-users>
-                Ver mas usuarios
-            </button>
-        `
+    const topUsersPreviewMarkup = renderTopUsersMarkup(topUsers, { limit: 5 });
+    const showMoreUsersButton = topUsers.length > 5
+        ? `<button type="button" class="summary-link-btn" data-server-insight-more-users>Ver todos los usuarios</button>`
         : '';
 
+    const serverName = escapeHtml(info.name || 'Servidor');
+    const serverIcon = info.icon
+        ? `<img src="${escapeHtml(info.icon)}" alt="${serverName}" class="overview-hero-icon-img">`
+        : `<span class="overview-hero-icon-placeholder">${serverName.charAt(0).toUpperCase()}</span>`;
+
+    const humanMembers = Number.parseInt(info.members?.humans || 0, 10) || 0;
+    const botMembers = Number.parseInt(info.members?.bots || 0, 10) || 0;
+    const verification = escapeHtml(String(info.verificationLevel ?? 'N/A'));
+    const boostTier = Number(info.premiumTier || 0);
+    const boostCount = Number(info.premiumSubscriptionCount || 0);
+    const flowSign = flowNet >= 0 ? '+' : '';
+    const flowClass = flowNet >= 0 ? 'is-positive' : 'is-negative';
+
+    const kpiChip = (label, value, tone, iconType) => `
+        <div class="overview-hero-chip overview-hero-chip--${tone}">
+            <span class="overview-hero-chip-icon">${summaryIcon(iconType)}</span>
+            <div>
+                <div class="overview-hero-chip-value">${value}</div>
+                <div class="overview-hero-chip-label">${label}</div>
+            </div>
+        </div>`;
+
     return `
-        <div class="server-summary-grid">
-            <article class="summary-card summary-card--owner summary-card--interactive" data-server-insight="owner" tabindex="0" role="button">
-                ${summaryTitle('Propietario', 'owner', 'gold')}
-                <div class="summary-owner-row">
-                    ${ownerAvatar}
-                    <div>
-                        <div class="summary-value">${ownerTag}</div>
-                        <div class="summary-subvalue">ID • ${escapeHtml(String(info.owner?.id || 'N/A'))}</div>
+        <div class="server-overview-layout">
+
+            <!-- Hero: identidad del servidor -->
+            <article class="overview-hero">
+                <div class="overview-hero-bg"></div>
+                <div class="overview-hero-content">
+                    <div class="overview-hero-identity">
+                        <div class="overview-hero-icon">${serverIcon}</div>
+                        <div class="overview-hero-meta">
+                            <div class="overview-hero-kicker">Servidor</div>
+                            <h2 class="overview-hero-title">${serverName}</h2>
+                            <div class="overview-hero-sub">Creado el ${escapeHtml(createdDate)} • ${formatServerMetric(ageDays)} días de historia</div>
+                        </div>
+                    </div>
+                    <div class="overview-hero-owner summary-card--interactive" data-server-insight="owner" tabindex="0" role="button" aria-label="Ver propietario">
+                        ${ownerAvatar}
+                        <div>
+                            <div class="overview-hero-owner-label">Propietario</div>
+                            <div class="overview-hero-owner-name">${ownerTag}</div>
+                            <div class="overview-hero-owner-id">ID ${escapeHtml(String(info.owner?.id || 'N/A'))}</div>
+                        </div>
+                        <span class="overview-hero-owner-arrow" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+                        </span>
                     </div>
                 </div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="members" tabindex="0" role="button">
-                ${summaryTitle('Miembros', 'members', 'blue')}
-                <div class="summary-value">${formatServerMetric(info.memberCount || 0)}</div>
-                <div class="summary-subvalue">Comunidad actual del servidor</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="channels" tabindex="0" role="button">
-                ${summaryTitle('Entradas de Canales', 'channels', 'teal')}
-                <div class="summary-value">${formatServerMetric(info.channelCount || 0)}</div>
-                <div class="summary-subvalue">${info.channels?.text || 0} texto • ${info.channels?.voice || 0} voz • ${info.channels?.category || 0} categorias</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="roles" tabindex="0" role="button">
-                ${summaryTitle('Roles', 'roles', 'violet')}
-                <div class="summary-value">${formatServerMetric(info.roleCount || 0)}</div>
-                <div class="summary-subvalue">Gestion de permisos y jerarquia</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="messages" tabindex="0" role="button">
-                ${summaryTitle('Actividad (Mensajes)', 'messages', 'pink')}
-                <div class="summary-value">${formatServerMetric(totalMessages)} msgs</div>
-                <div class="summary-subvalue">${formatServerMetric(avgMessagesPerDay, { maximumFractionDigits: 2 })} por dia desde creacion • Top ${topMessageTag} (${formatServerMetric(topMessageCount)})</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="voice" tabindex="0" role="button">
-                ${summaryTitle('Actividad (Voz)', 'voice', 'orange')}
-                <div class="summary-value">${formatServerMetric(totalVoiceMinutes)} min</div>
-                <div class="summary-subvalue">${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h por dia • Top ${topVoiceTag} (${formatServerMetric(topVoiceMinutes)} min)</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="flow" tabindex="0" role="button">
-                ${summaryTitle('Entradas / Salidas', 'flow', 'blue')}
-                <div class="summary-value">${formatServerMetric(totalJoins)} / ${formatServerMetric(totalLeaves)}</div>
-                <div class="summary-subvalue">Balance ${flowNet >= 0 ? '+' : ''}${formatServerMetric(flowNet)} • Pico entradas ${formatServerMetric(peakJoinCount)} (${peakJoinDate})</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="peak" tabindex="0" role="button">
-                ${summaryTitle('Pico de Salidas', 'peak', 'pink')}
-                <div class="summary-value">${formatServerMetric(peakLeaveCount)}</div>
-                <div class="summary-subvalue">Dia con mas salidas: ${peakLeaveDate}</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="live" tabindex="0" role="button">
-                ${summaryTitle('Voz en Vivo', 'live', 'teal')}
-                <div class="summary-value">${formatServerMetric(liveVoiceUsers)} conectados</div>
-                <div class="summary-subvalue">Canal top ahora: ${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="age" tabindex="0" role="button">
-                ${summaryTitle('Edad y Base', 'age', 'orange')}
-                <div class="summary-value">${formatServerMetric(ageDays)} dias</div>
-                <div class="summary-subvalue">Creado ${createdDate} • ${formatServerMetric(trackedUsers)} usuarios con historial</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="core" tabindex="0" role="button">
-                ${summaryTitle('Estadisticas Core', 'core', 'violet')}
-                <div class="summary-value">Nivel ${Number(info.premiumTier || 0)}</div>
-                <div class="summary-subvalue">Boosts ${Number(info.premiumSubscriptionCount || 0)} • Verificacion ${escapeHtml(String(info.verificationLevel ?? 'N/A'))}</div>
-            </article>
-
-            <article class="summary-card summary-card--interactive" data-server-insight="created" tabindex="0" role="button">
-                ${summaryTitle('Creado', 'created', 'gold')}
-                <div class="summary-value">${createdDate}</div>
-                <div class="summary-subvalue">Emojis ${info.emojis || 0} • Stickers ${info.stickers || 0}</div>
-            </article>
-
-            <article class="summary-card summary-card--top-users summary-card--interactive" data-server-insight="activity" tabindex="0" role="button">
-                ${summaryTitle('Usuarios Activos', 'activity', 'teal')}
-                <div class="summary-subvalue">Mensajes y tiempo de voz acumulado</div>
-                <div class="summary-top-users-list">
-                    ${topUsersPreviewMarkup}
+                <div class="overview-hero-chips">
+                    ${kpiChip('Miembros', formatServerMetric(info.memberCount || 0), 'blue', 'members')}
+                    ${kpiChip('Canales', formatServerMetric(info.channelCount || 0), 'teal', 'channels')}
+                    ${kpiChip('Roles', formatServerMetric(info.roleCount || 0), 'violet', 'roles')}
+                    ${kpiChip('Boosts', `Nivel ${boostTier} · ${boostCount}`, 'gold', 'core')}
                 </div>
-                ${showMoreUsersButton}
             </article>
 
-            <article class="summary-card summary-card--chart summary-card--interactive" data-server-insight="chart" tabindex="0" role="button">
-                <div class="summary-chart-head">
-                    <div>
-                        ${summaryTitle('Graficas de actividad', 'chart', 'blue')}
-                        <div class="summary-subvalue">Lineas de entradas, salidas, mensajes y voz</div>
+            <!-- Seccion: KPIs principales -->
+            <section class="overview-section">
+                <header class="overview-section-head">
+                    <div class="overview-section-title">
+                        <span class="overview-section-dot overview-section-dot--blue"></span>
+                        <h4>Resumen del servidor</h4>
                     </div>
-                    <select id="serverActivityRange" class="summary-chart-select">
-                        <option value="week">Por semana (7 dias)</option>
-                        <option value="since">Desde creacion (por semanas)</option>
-                    </select>
+                    <span class="overview-section-hint">Toca cualquier tarjeta para ver el detalle</span>
+                </header>
+                <div class="overview-kpi-grid">
+                    <article class="summary-card summary-card--kpi summary-card--interactive tone-blue" data-server-insight="members" tabindex="0" role="button">
+                        ${summaryTitle('Miembros', 'members', 'blue')}
+                        <div class="summary-value summary-value--xl">${formatServerMetric(info.memberCount || 0)}</div>
+                        <div class="summary-subvalue">${formatServerMetric(humanMembers)} humanos · ${formatServerMetric(botMembers)} bots</div>
+                    </article>
+                    <article class="summary-card summary-card--kpi summary-card--interactive tone-teal" data-server-insight="channels" tabindex="0" role="button">
+                        ${summaryTitle('Canales', 'channels', 'teal')}
+                        <div class="summary-value summary-value--xl">${formatServerMetric(info.channelCount || 0)}</div>
+                        <div class="summary-subvalue">${info.channels?.text || 0} texto · ${info.channels?.voice || 0} voz · ${info.channels?.category || 0} categorías</div>
+                    </article>
+                    <article class="summary-card summary-card--kpi summary-card--interactive tone-violet" data-server-insight="roles" tabindex="0" role="button">
+                        ${summaryTitle('Roles', 'roles', 'violet')}
+                        <div class="summary-value summary-value--xl">${formatServerMetric(info.roleCount || 0)}</div>
+                        <div class="summary-subvalue">Gestión de permisos y jerarquía</div>
+                    </article>
+                    <article class="summary-card summary-card--kpi summary-card--interactive tone-gold" data-server-insight="core" tabindex="0" role="button">
+                        ${summaryTitle('Premium', 'core', 'gold')}
+                        <div class="summary-value summary-value--xl">Nivel ${boostTier}</div>
+                        <div class="summary-subvalue">${boostCount} boosts · Verificación ${verification}</div>
+                    </article>
                 </div>
-                <div class="summary-chart-wrap">
-                    <canvas id="serverActivityChart"></canvas>
-                    <div id="serverActivityChartEmpty" class="summary-chart-empty" style="display:none;"></div>
+            </section>
+
+            <!-- Seccion: Actividad -->
+            <section class="overview-section">
+                <header class="overview-section-head">
+                    <div class="overview-section-title">
+                        <span class="overview-section-dot overview-section-dot--pink"></span>
+                        <h4>Actividad de la comunidad</h4>
+                    </div>
+                    <span class="overview-section-hint">Desde la creación del servidor</span>
+                </header>
+                <div class="overview-dual-grid">
+                    <article class="summary-card summary-card--big summary-card--interactive tone-pink" data-server-insight="messages" tabindex="0" role="button">
+                        ${summaryTitle('Mensajes', 'messages', 'pink')}
+                        <div class="summary-value summary-value--xl">${formatServerMetric(totalMessages)}</div>
+                        <div class="summary-subvalue">${formatServerMetric(avgMessagesPerDay, { maximumFractionDigits: 2 })} por día</div>
+                        <div class="summary-highlight">
+                            <span class="summary-highlight-label">Top</span>
+                            <span class="summary-highlight-value">${topMessageTag}</span>
+                            <span class="summary-highlight-meta">${formatServerMetric(topMessageCount)} msgs</span>
+                        </div>
+                    </article>
+                    <article class="summary-card summary-card--big summary-card--interactive tone-orange" data-server-insight="voice" tabindex="0" role="button">
+                        ${summaryTitle('Voz', 'voice', 'orange')}
+                        <div class="summary-value summary-value--xl">${formatServerMetric(totalVoiceMinutes)} <span class="summary-value-unit">min</span></div>
+                        <div class="summary-subvalue">${formatServerMetric(avgVoiceHoursPerDay, { maximumFractionDigits: 2 })} h por día</div>
+                        <div class="summary-highlight">
+                            <span class="summary-highlight-label">Top</span>
+                            <span class="summary-highlight-value">${topVoiceTag}</span>
+                            <span class="summary-highlight-meta">${formatServerMetric(topVoiceMinutes)} min</span>
+                        </div>
+                    </article>
                 </div>
-            </article>
+            </section>
+
+            <!-- Seccion: Flujo de miembros -->
+            <section class="overview-section">
+                <header class="overview-section-head">
+                    <div class="overview-section-title">
+                        <span class="overview-section-dot overview-section-dot--teal"></span>
+                        <h4>Flujo de miembros</h4>
+                    </div>
+                </header>
+                <div class="overview-dual-grid">
+                    <article class="summary-card summary-card--interactive tone-blue" data-server-insight="flow" tabindex="0" role="button">
+                        ${summaryTitle('Entradas / Salidas', 'flow', 'blue')}
+                        <div class="summary-flow-row">
+                            <div class="summary-flow-item summary-flow-item--joins">
+                                <span class="summary-flow-label">Entradas</span>
+                                <span class="summary-flow-value">${formatServerMetric(totalJoins)}</span>
+                            </div>
+                            <div class="summary-flow-divider"></div>
+                            <div class="summary-flow-item summary-flow-item--leaves">
+                                <span class="summary-flow-label">Salidas</span>
+                                <span class="summary-flow-value">${formatServerMetric(totalLeaves)}</span>
+                            </div>
+                        </div>
+                        <div class="summary-flow-balance ${flowClass}">Balance ${flowSign}${formatServerMetric(flowNet)}</div>
+                    </article>
+                    <article class="summary-card summary-card--interactive tone-pink" data-server-insight="peak" tabindex="0" role="button">
+                        ${summaryTitle('Picos del período', 'peak', 'pink')}
+                        <div class="summary-peak-row">
+                            <div class="summary-peak-item">
+                                <span class="summary-peak-dot summary-peak-dot--up"></span>
+                                <span class="summary-peak-meta">
+                                    <strong>${formatServerMetric(peakJoinCount)}</strong> entradas
+                                    <span>${peakJoinDate}</span>
+                                </span>
+                            </div>
+                            <div class="summary-peak-item">
+                                <span class="summary-peak-dot summary-peak-dot--down"></span>
+                                <span class="summary-peak-meta">
+                                    <strong>${formatServerMetric(peakLeaveCount)}</strong> salidas
+                                    <span>${peakLeaveDate}</span>
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Seccion: En vivo + detalles -->
+            <section class="overview-section">
+                <header class="overview-section-head">
+                    <div class="overview-section-title">
+                        <span class="overview-section-dot overview-section-dot--live"></span>
+                        <h4>En vivo y detalles</h4>
+                    </div>
+                    <span class="overview-live-indicator">
+                        <span class="overview-live-pulse"></span>
+                        <span>Live</span>
+                    </span>
+                </header>
+                <div class="overview-dual-grid">
+                    <article class="summary-card summary-card--interactive tone-teal summary-card--live" data-server-insight="live" tabindex="0" role="button">
+                        ${summaryTitle('Voz en vivo', 'live', 'teal')}
+                        <div class="summary-value summary-value--xl">${formatServerMetric(liveVoiceUsers)} <span class="summary-value-unit">conectados</span></div>
+                        <div class="summary-subvalue">Canal top ahora · <strong>${liveTopChannelName}</strong> (${formatServerMetric(liveTopChannelUsers)})</div>
+                    </article>
+                    <article class="summary-card summary-card--interactive tone-gold" data-server-insight="created" tabindex="0" role="button">
+                        ${summaryTitle('Detalles y estilos', 'created', 'gold')}
+                        <div class="summary-detail-row">
+                            <div><span>Emojis</span><strong>${formatServerMetric(info.emojis || 0)}</strong></div>
+                            <div><span>Stickers</span><strong>${formatServerMetric(info.stickers || 0)}</strong></div>
+                            <div><span>Edad</span><strong>${formatServerMetric(ageDays)} d</strong></div>
+                            <div><span>Usuarios con historial</span><strong>${formatServerMetric(trackedUsers)}</strong></div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Seccion: Top usuarios + grafica -->
+            <section class="overview-section">
+                <header class="overview-section-head">
+                    <div class="overview-section-title">
+                        <span class="overview-section-dot overview-section-dot--violet"></span>
+                        <h4>Rendimiento</h4>
+                    </div>
+                </header>
+                <div class="overview-bottom-grid">
+                    <article class="summary-card summary-card--top-users summary-card--interactive tone-teal" data-server-insight="activity" tabindex="0" role="button">
+                        ${summaryTitle('Usuarios destacados', 'activity', 'teal')}
+                        <div class="summary-subvalue">Mensajes y tiempo de voz acumulado</div>
+                        <div class="summary-top-users-list">
+                            ${topUsersPreviewMarkup}
+                        </div>
+                        ${showMoreUsersButton}
+                    </article>
+
+                    <article class="summary-card summary-card--chart summary-card--interactive tone-blue" data-server-insight="chart" tabindex="0" role="button">
+                        <div class="summary-chart-head">
+                            <div>
+                                ${summaryTitle('Gráficas de actividad', 'chart', 'blue')}
+                                <div class="summary-subvalue">Entradas, salidas, mensajes y voz</div>
+                            </div>
+                            <select id="serverActivityRange" class="summary-chart-select">
+                                <option value="week">Por semana (7 días)</option>
+                                <option value="since">Desde creación</option>
+                            </select>
+                        </div>
+                        <div class="summary-chart-wrap">
+                            <canvas id="serverActivityChart"></canvas>
+                            <div id="serverActivityChartEmpty" class="summary-chart-empty" style="display:none;"></div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
         </div>
     `;
 }
@@ -7126,6 +7254,10 @@ function renderTmHistoryCard(item) {
                 ${item.reason ? `<div class="tm-ticket-reason">${escapeHtml(item.reason)}</div>` : ''}
             </div>
             <div class="tm-ticket-actions">
+                <button type="button" class="tm-btn tm-btn-receipt" data-tm-view-receipt="${escapeHtml(item.reportId || '')}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M8 9h3"></path></svg>
+                    <span>Ver comprobante</span>
+                </button>
                 <button type="button" class="tm-btn tm-btn-ghost" data-tm-history-toggle="${escapeHtml(item.reportId || '')}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
                     <span>Detalles</span>
@@ -7197,9 +7329,370 @@ function wireTmHistoryActions() {
             if (card) card.classList.toggle('expanded');
         });
     });
-    document.querySelectorAll('.tm-ticket-card.is-history').forEach((card) => {
-        card.addEventListener('click', () => card.classList.toggle('expanded'));
+    document.querySelectorAll('[data-tm-view-receipt]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const reportId = btn.getAttribute('data-tm-view-receipt');
+            if (reportId) openReceiptModal(reportId);
+        });
     });
+}
+
+// ============================================================
+// Modal visor de comprobantes (sub-pantalla)
+// ============================================================
+const _receiptModalState = {
+    reportId: null,
+    data: null,
+    activeTab: 'summary',
+    search: '',
+    wired: false
+};
+
+function openReceiptModal(reportId) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId || !reportId) return;
+
+    _receiptModalState.reportId = reportId;
+    _receiptModalState.data = null;
+    _receiptModalState.activeTab = 'summary';
+    _receiptModalState.search = '';
+
+    const modal = document.getElementById('receiptModal');
+    if (!modal) return;
+
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    wireReceiptModalControls();
+    resetReceiptModalUI();
+    loadReceipt(guildId, reportId);
+}
+
+function closeReceiptModal() {
+    const modal = document.getElementById('receiptModal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    _receiptModalState.reportId = null;
+    _receiptModalState.data = null;
+}
+
+function wireReceiptModalControls() {
+    if (_receiptModalState.wired) return;
+    _receiptModalState.wired = true;
+
+    const modal = document.getElementById('receiptModal');
+    if (!modal) return;
+
+    modal.querySelectorAll('[data-receipt-close]').forEach((el) => {
+        el.addEventListener('click', closeReceiptModal);
+    });
+
+    modal.querySelectorAll('[data-receipt-tab]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-receipt-tab');
+            setReceiptTab(tab);
+        });
+    });
+
+    const search = document.getElementById('receiptSearchInput');
+    if (search) {
+        search.addEventListener('input', (e) => {
+            _receiptModalState.search = String(e.target.value || '').trim();
+            if (_receiptModalState.activeTab !== 'transcript') setReceiptTab('transcript');
+            else renderReceiptTranscript();
+        });
+    }
+
+    const copyBtn = document.getElementById('receiptCopyBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+            const data = _receiptModalState.data;
+            if (!data) return;
+            const text = data.transcriptText || (Array.isArray(data.transcriptEntries)
+                ? data.transcriptEntries.map((e) => `[${e.createdAt}] ${e.authorTag}: ${e.content}`).join('\n')
+                : '');
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('Transcripción copiada al portapapeles', 'success');
+            } catch {
+                showToast('No se pudo copiar. Usa el botón de descarga.', 'error');
+            }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const m = document.getElementById('receiptModal');
+            if (m && m.classList.contains('is-open')) closeReceiptModal();
+        }
+    });
+}
+
+function resetReceiptModalUI() {
+    const title = document.getElementById('receiptModalTitle');
+    if (title) title.textContent = 'Cargando comprobante...';
+
+    const download = document.getElementById('receiptDownloadBtn');
+    if (download) {
+        download.setAttribute('href', '#');
+        download.classList.add('is-disabled');
+    }
+
+    const search = document.getElementById('receiptSearchInput');
+    if (search) search.value = '';
+
+    document.querySelectorAll('.receipt-tab-btn').forEach((b) => {
+        b.classList.toggle('is-active', b.getAttribute('data-receipt-tab') === 'summary');
+    });
+    document.querySelectorAll('.receipt-pane').forEach((p) => p.classList.remove('is-active'));
+    const pane = document.getElementById('receiptPaneSummary');
+    if (pane) {
+        pane.classList.add('is-active');
+        pane.innerHTML = `
+            <div class="receipt-loading">
+                <div class="loading-spinner"></div>
+                <p>Cargando comprobante...</p>
+            </div>`;
+    }
+    const paneT = document.getElementById('receiptPaneTranscript');
+    if (paneT) paneT.innerHTML = '';
+    const paneP = document.getElementById('receiptPaneParticipants');
+    if (paneP) paneP.innerHTML = '';
+}
+
+function setReceiptTab(tab) {
+    const valid = ['summary', 'transcript', 'participants'];
+    if (!valid.includes(tab)) tab = 'summary';
+    _receiptModalState.activeTab = tab;
+
+    document.querySelectorAll('.receipt-tab-btn').forEach((b) => {
+        b.classList.toggle('is-active', b.getAttribute('data-receipt-tab') === tab);
+    });
+    document.querySelectorAll('.receipt-pane').forEach((p) => p.classList.remove('is-active'));
+
+    const paneMap = {
+        summary: 'receiptPaneSummary',
+        transcript: 'receiptPaneTranscript',
+        participants: 'receiptPaneParticipants'
+    };
+    const el = document.getElementById(paneMap[tab]);
+    if (el) el.classList.add('is-active');
+
+    if (tab === 'summary') renderReceiptSummary();
+    else if (tab === 'transcript') renderReceiptTranscript();
+    else if (tab === 'participants') renderReceiptParticipants();
+}
+
+async function loadReceipt(guildId, reportId) {
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/report/${encodeURIComponent(reportId)}`);
+        const data = await response.json();
+        if (!response.ok || !data?.success) {
+            throw new Error(data?.error || 'No se pudo cargar el comprobante');
+        }
+        _receiptModalState.data = data.report;
+
+        const title = document.getElementById('receiptModalTitle');
+        if (title) title.textContent = `Comprobante ${data.report.reportId}`;
+
+        const download = document.getElementById('receiptDownloadBtn');
+        if (download) {
+            download.setAttribute('href', `/api/guild/${guildId}/tickets/report/${encodeURIComponent(reportId)}/download`);
+            download.classList.remove('is-disabled');
+        }
+
+        renderReceiptSummary();
+    } catch (error) {
+        console.error('Error cargando comprobante:', error);
+        const pane = document.getElementById('receiptPaneSummary');
+        if (pane) {
+            pane.innerHTML = `
+                <div class="receipt-empty">
+                    <p><strong>Error al cargar el comprobante</strong></p>
+                    <p>${escapeHtml(error.message || 'Intenta de nuevo más tarde.')}</p>
+                </div>`;
+        }
+    }
+}
+
+function renderReceiptAvatar(user) {
+    if (user && user.avatarURL) {
+        return `<img src="${escapeHtml(user.avatarURL)}" alt="${escapeHtml(user.displayName || user.tag || 'U')}" loading="lazy">`;
+    }
+    const label = String(user?.displayName || user?.tag || user?.username || '?').charAt(0).toUpperCase();
+    return escapeHtml(label);
+}
+
+function renderReceiptSummary() {
+    const pane = document.getElementById('receiptPaneSummary');
+    const data = _receiptModalState.data;
+    if (!pane || !data) return;
+
+    const owner = data.owner || { id: data.ownerId, displayName: 'Desconocido', tag: data.ownerId || '-' };
+    const closer = data.closer || { id: data.closedById, displayName: data.closedByTag || 'Staff', tag: data.closedByTag || '-' };
+    const dateStr = data.createdAt ? new Date(data.createdAt).toLocaleString('es-ES') : '-';
+
+    pane.innerHTML = `
+        <div class="receipt-summary">
+            <div class="receipt-card">
+                <div class="receipt-card-label">ID Comprobante</div>
+                <div class="receipt-card-value">${escapeHtml(data.reportId || '-')}</div>
+            </div>
+            <div class="receipt-card">
+                <div class="receipt-card-label">Fecha de cierre</div>
+                <div class="receipt-card-value">${escapeHtml(dateStr)}</div>
+            </div>
+            <div class="receipt-card">
+                <div class="receipt-card-label">Canal</div>
+                <div class="receipt-card-value">#${escapeHtml(data.channelName || '-')}</div>
+            </div>
+            <div class="receipt-card">
+                <div class="receipt-card-label">Categoría</div>
+                <div class="receipt-card-value">${escapeHtml(data.category || 'No especificado')}</div>
+            </div>
+            <div class="receipt-card">
+                <div class="receipt-card-label">Caso / problema</div>
+                <div class="receipt-card-value">${escapeHtml(data.common || 'No especificado')}</div>
+            </div>
+            <div class="receipt-card">
+                <div class="receipt-card-label">Mensajes</div>
+                <div class="receipt-card-value">${Number(data.messagesCount || 0)} · ${Array.isArray(data.participants) ? data.participants.length : 0} participantes</div>
+            </div>
+            <div class="receipt-card user-card">
+                <div class="receipt-user-avatar">${renderReceiptAvatar(owner)}</div>
+                <div class="receipt-user-meta">
+                    <div class="receipt-card-label">Abierto por</div>
+                    <div class="receipt-user-tag">${escapeHtml(owner.displayName || owner.tag || 'Desconocido')}</div>
+                    <div class="receipt-user-id">${escapeHtml(owner.id || '-')}</div>
+                </div>
+            </div>
+            <div class="receipt-card user-card">
+                <div class="receipt-user-avatar">${renderReceiptAvatar(closer)}</div>
+                <div class="receipt-user-meta">
+                    <div class="receipt-card-label">Cerrado por</div>
+                    <div class="receipt-user-tag">${escapeHtml(closer.displayName || closer.tag || 'Staff')}</div>
+                    <div class="receipt-user-id">${escapeHtml(closer.id || '-')}</div>
+                </div>
+            </div>
+            ${data.reason ? `
+                <div class="receipt-card receipt-summary-reason">
+                    <div class="receipt-card-label">Motivo</div>
+                    <div class="receipt-card-value">${escapeHtml(data.reason)}</div>
+                </div>` : ''}
+        </div>`;
+}
+
+function renderReceiptTranscript() {
+    const pane = document.getElementById('receiptPaneTranscript');
+    const data = _receiptModalState.data;
+    if (!pane) return;
+    if (!data) { pane.innerHTML = ''; return; }
+
+    const entries = Array.isArray(data.transcriptEntries) ? data.transcriptEntries : [];
+    const query = String(_receiptModalState.search || '').toLowerCase();
+
+    if (entries.length === 0) {
+        pane.innerHTML = `
+            <div class="receipt-empty">
+                <p><strong>Sin transcripción estructurada</strong></p>
+                <p>Este comprobante no tiene los mensajes guardados uno a uno. Usa <em>Descargar</em> para el archivo de texto.</p>
+            </div>`;
+        return;
+    }
+
+    const matches = [];
+    const html = entries.map((entry) => {
+        const content = String(entry.content || '');
+        const contentLc = content.toLowerCase();
+        const isMatch = !!(query && contentLc.includes(query));
+        if (isMatch) matches.push(entry.id);
+
+        const time = entry.createdAt ? new Date(entry.createdAt).toLocaleString('es-ES') : '';
+        const authorName = escapeHtml(entry.authorDisplayName || entry.authorTag || 'Desconocido');
+        const botTag = entry.authorBot ? '<span class="receipt-msg-bot-tag">BOT</span>' : '';
+
+        const avatarHtml = entry.authorAvatarURL
+            ? `<img src="${escapeHtml(entry.authorAvatarURL)}" alt="${authorName}" loading="lazy">`
+            : escapeHtml(String(entry.authorDisplayName || entry.authorTag || '?').charAt(0).toUpperCase());
+
+        const contentHtml = query
+            ? highlightText(content, query)
+            : escapeHtml(content);
+
+        const attachmentsHtml = Array.isArray(entry.attachments) && entry.attachments.length
+            ? `<div class="receipt-msg-attach">${entry.attachments.map((a) => `
+                <a href="${escapeHtml(a.url || '#')}" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11l-9 9a5 5 0 1 1-7-7l9-9a3.5 3.5 0 1 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"></path></svg>
+                    <span>${escapeHtml(a.name || 'archivo')}</span>
+                </a>`).join('')}</div>`
+            : '';
+
+        return `
+            <div class="receipt-msg ${entry.authorBot ? 'is-bot' : ''} ${isMatch ? 'is-match' : ''}">
+                <div class="receipt-msg-avatar">${avatarHtml}</div>
+                <div class="receipt-msg-body">
+                    <div class="receipt-msg-head">
+                        <span class="receipt-msg-author">${authorName}</span>
+                        ${botTag}
+                        <span class="receipt-msg-time">${escapeHtml(time)}</span>
+                    </div>
+                    <div class="receipt-msg-content">${contentHtml}</div>
+                    ${attachmentsHtml}
+                </div>
+            </div>`;
+    }).join('');
+
+    const header = `
+        <div class="receipt-transcript-head">
+            <span><strong>${entries.length}</strong> mensajes</span>
+            ${query ? `<span><strong>${matches.length}</strong> coincidencias para "${escapeHtml(_receiptModalState.search)}"</span>` : ''}
+        </div>`;
+
+    pane.innerHTML = `<div class="receipt-transcript">${header}${html}</div>`;
+}
+
+function renderReceiptParticipants() {
+    const pane = document.getElementById('receiptPaneParticipants');
+    const data = _receiptModalState.data;
+    if (!pane) return;
+    if (!data) { pane.innerHTML = ''; return; }
+
+    const list = Array.isArray(data.participantsDetailed) && data.participantsDetailed.length
+        ? data.participantsDetailed
+        : (Array.isArray(data.participants) ? data.participants.map((id) => ({ id, tag: id })) : []);
+
+    if (list.length === 0) {
+        pane.innerHTML = `
+            <div class="receipt-empty">
+                <p>Sin participantes registrados.</p>
+            </div>`;
+        return;
+    }
+
+    pane.innerHTML = `
+        <div class="receipt-participants">
+            ${list.map((p) => `
+                <div class="receipt-participant">
+                    <div class="receipt-user-avatar">${renderReceiptAvatar(p)}</div>
+                    <div class="receipt-user-meta">
+                        <div class="receipt-participant-tag">${escapeHtml(p.displayName || p.tag || 'Desconocido')}</div>
+                        <div class="receipt-participant-id">${escapeHtml(p.id || '-')}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>`;
+}
+
+function highlightText(text, query) {
+    if (!query) return escapeHtml(text);
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(${escapedQuery})`, 'gi');
+    const safe = escapeHtml(text);
+    return safe.replace(re, '<mark class="receipt-highlight">$1</mark>');
 }
 
 async function acceptPendingTicket(requestId, button) {

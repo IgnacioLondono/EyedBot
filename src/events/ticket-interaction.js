@@ -264,6 +264,25 @@ function buildTranscriptText(channel, messages = []) {
     return lines.join('\n').slice(0, 1900000);
 }
 
+function buildTranscriptEntries(messages = []) {
+    return messages.map((message) => {
+        const attachments = Array.from(message.attachments?.values?.() || []).map((a) => ({
+            name: a.name || 'attachment',
+            url: a.url || '',
+            contentType: a.contentType || ''
+        }));
+        return {
+            id: message.id,
+            createdAt: new Date(message.createdTimestamp).toISOString(),
+            authorId: message.author?.id || '',
+            authorTag: message.author?.tag || message.author?.username || 'desconocido',
+            authorBot: !!message.author?.bot,
+            content: String(message.content || ''),
+            attachments
+        };
+    });
+}
+
 async function generateAndSendCloseReport({ interaction, channel, guild, ownerId, closerTag }) {
     const reportId = await nextCloseReportId(guild.id).catch(() => `TK-${guild.id}-${Date.now()}`);
 
@@ -273,6 +292,10 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
     const category = parseTopicField(channel.topic, 'category') || 'No especificado';
     const common = parseTopicField(channel.topic, 'common') || 'No especificado';
     const reason = parseTopicField(channel.topic, 'reason') || 'No especificado';
+
+    const transcriptText = buildTranscriptText(channel, messages);
+    const transcriptEntries = buildTranscriptEntries(messages);
+    const fileName = `ticket-${channel.id}-${reportId}.txt`;
 
     const reportData = {
         reportId,
@@ -287,7 +310,10 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
         reason,
         messagesCount: messages.length,
         participants,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        transcriptFileName: fileName,
+        transcriptText: transcriptText.slice(0, 900000),
+        transcriptEntries
     };
 
     await db.set(`ticket_report_${reportId}`, reportData).catch(() => null);
@@ -297,9 +323,6 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
     const receiptHistoryChannel = receiptHistoryChannelId
         ? (guild.channels.cache.get(receiptHistoryChannelId) || await guild.channels.fetch(receiptHistoryChannelId).catch(() => null))
         : null;
-
-    const transcriptText = buildTranscriptText(channel, messages);
-    const fileName = `ticket-${channel.id}-${reportId}.txt`;
 
     const createTranscriptFile = () => new AttachmentBuilder(
         Buffer.from(transcriptText, 'utf8'),
@@ -1472,6 +1495,22 @@ async function listTicketReports(guildId, limit = 50) {
     }
 }
 
+async function getTicketReport(guildId, reportId) {
+    const safeGuildId = String(guildId || '');
+    const safeReportId = String(reportId || '');
+    if (!safeGuildId || !safeReportId) return null;
+
+    try {
+        const data = await db.get(`ticket_report_${safeReportId}`);
+        if (!data || typeof data !== 'object') return null;
+        if (String(data.guildId) !== safeGuildId) return null;
+        return data;
+    } catch (error) {
+        console.error('Error obteniendo report:', error.message);
+        return null;
+    }
+}
+
 function listActiveTicketChannels(guild) {
     if (!guild) return [];
     const channels = [];
@@ -1559,6 +1598,7 @@ module.exports = {
     claimTicketFromWeb,
     listPendingRequests,
     listTicketReports,
+    getTicketReport,
     listActiveTicketChannels,
     parseTicketOwner,
     parseTopicField
