@@ -492,6 +492,56 @@ body::before {
 input[type="range"].form-control { padding: 0; background: transparent !important; border: none !important; accent-color: var(--iris-400, #9a6dff); }
 input[type="color"].form-control { padding: 4px; height: 44px; cursor: pointer; }
 
+/* ---------- Select dropdown (native <option> readability) ---------- */
+select.form-control,
+select.form-select,
+select {
+    color: var(--text-primary, #f4eeff) !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, #b794ff 50%),
+        linear-gradient(135deg, #b794ff 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) 50%,
+        calc(100% - 13px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 2.25rem !important;
+}
+select.form-control option,
+select.form-select option,
+select option {
+    background-color: #140a2e !important;
+    color: #f4eeff !important;
+    padding: 0.4rem 0.6rem;
+}
+select.form-control option:disabled,
+select option:disabled {
+    color: #7a6ba0 !important;
+}
+select.form-control option:checked,
+select.form-control option:hover,
+select.form-control option:focus,
+select option:checked {
+    background: linear-gradient(0deg, #2a1760, #2a1760) !important;
+    background-color: #2a1760 !important;
+    color: #ffffff !important;
+}
+/* Firefox: fuerza fondo del dropdown */
+@-moz-document url-prefix() {
+    select.form-control,
+    select { background-color: #140a2e !important; }
+}
+/* Datalist y otros campos select multiples */
+select[multiple].form-control,
+select[size].form-control {
+    background-image: none;
+    padding-right: 0.75rem !important;
+    background-color: #140a2e !important;
+}
+
 label { color: var(--text-secondary); font-weight: 500; }
 
 /* Checkbox más moderno */
