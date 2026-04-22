@@ -36,7 +36,9 @@ let commandsFilterQuery = '';
 let commandsFilterCategory = 'all';
 let currentServerInfo = null;
 let currentServerInsightView = 'overview';
+let currentServerInsightPayload = null;
 let serverSummaryRefreshInterval = null;
+let isSwitchingServer = false;
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 
@@ -199,6 +201,8 @@ function updateServerMenuIdentity() {
     guildNameEl.textContent = selectedGuild.name || 'Servidor activo';
     if (selectedGuild.icon) {
         guildIconEl.style.display = 'block';
+        guildIconEl.loading = 'eager';
+        guildIconEl.decoding = 'async';
         guildIconEl.src = selectedGuild.icon;
     } else {
         guildIconEl.style.display = 'none';
@@ -231,11 +235,27 @@ function updateContextStrip() {
     nameEl.textContent = selectedGuild?.name || 'Servidor activo';
     if (selectedGuild?.icon) {
         iconEl.style.display = 'block';
+        iconEl.loading = 'eager';
+        iconEl.decoding = 'async';
         iconEl.src = selectedGuild.icon;
     } else {
         iconEl.style.display = 'none';
         iconEl.src = '';
     }
+}
+
+function setServerSwitchingState(isLoading) {
+    isSwitchingServer = isLoading;
+    const trigger = document.getElementById('changeServerBtn');
+    const selectBtn = document.getElementById('serverSwitcherSelect');
+    const dialog = document.querySelector('.server-switcher-dialog');
+
+    if (trigger) trigger.classList.toggle('is-loading', isLoading);
+    if (selectBtn) {
+        selectBtn.disabled = isLoading;
+        selectBtn.textContent = isLoading ? 'Cargando...' : 'Seleccionar';
+    }
+    if (dialog) dialog.classList.toggle('is-loading', isLoading);
 }
 
 function updateBackToServerButtonsVisibility(sectionId = '') {
@@ -505,7 +525,20 @@ function closeServerSwitcherModal() {
 }
 
 async function openServerSwitcherModal() {
+    const modal = document.getElementById('serverSwitcherModal');
     try {
+        if (Array.isArray(currentServerGuilds) && currentServerGuilds.length) {
+            serverSwitcherGuilds = currentServerGuilds;
+            const selectedIndex = serverSwitcherGuilds.findIndex((g) => String(g.id) === String(currentServerGuildId));
+            serverSwitcherIndex = selectedIndex >= 0 ? selectedIndex : 0;
+            renderServerSwitcherSlides();
+            if (modal) {
+                modal.classList.add('show');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+        }
+
+        setServerSwitchingState(true);
         const response = await fetchWithCredentials('/api/guilds');
         if (!response.ok) {
             showToast('No se pudieron cargar los servidores', 'error');
@@ -525,13 +558,14 @@ async function openServerSwitcherModal() {
         serverSwitcherIndex = selectedIndex >= 0 ? selectedIndex : 0;
         renderServerSwitcherSlides();
 
-        const modal = document.getElementById('serverSwitcherModal');
         if (!modal) return;
         modal.classList.add('show');
         modal.setAttribute('aria-hidden', 'false');
     } catch (error) {
         console.error('Error abriendo selector de servidores:', error);
         showToast('No se pudo abrir el selector de servidores', 'error');
+    } finally {
+        setServerSwitchingState(false);
     }
 }
 
@@ -542,8 +576,13 @@ async function confirmServerSwitcherSelection() {
         return;
     }
 
+    setServerSwitchingState(true);
     closeServerSwitcherModal();
-    await window.selectGuild(selectedGuild.id);
+    try {
+        await window.selectGuild(selectedGuild.id);
+    } finally {
+        setServerSwitchingState(false);
+    }
 }
 
 window.openServerSwitcherModal = openServerSwitcherModal;
@@ -2993,7 +3032,10 @@ async function selectServerGuild(guildId) {
         return;
     }
 
+    setServerSwitchingState(true);
     currentServerGuildId = guildId;
+    currentServerInsightView = 'overview';
+    currentServerInsightPayload = null;
     setServerFeaturesNavigationVisible(serverFeaturesUnlocked && hasSelectedGuildContext());
     updateServerMenuIdentity();
     if (serverSelect) serverSelect.value = guildId;
@@ -3028,17 +3070,23 @@ async function selectServerGuild(guildId) {
         notificationsContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando notificaciones...</p></div>';
     }
 
-    await loadServerInfo(guildId);
-    await loadServerMembers(guildId);
-    await loadWelcomePanel(guildId);
-    await loadVerifyPanel(guildId);
-    await loadTicketPanel(guildId);
-    await loadLevelsPanel(guildId);
-    await loadVoiceCreatorPanel(guildId);
-    await loadAutomationPanel(guildId);
-    await loadSecurityPanel(guildId);
-    await loadNotificationsPanel(guildId);
-    saveState();
+    try {
+        await Promise.all([
+            loadServerInfo(guildId),
+            loadServerMembers(guildId),
+            loadWelcomePanel(guildId),
+            loadVerifyPanel(guildId),
+            loadTicketPanel(guildId),
+            loadLevelsPanel(guildId),
+            loadVoiceCreatorPanel(guildId),
+            loadAutomationPanel(guildId),
+            loadSecurityPanel(guildId),
+            loadNotificationsPanel(guildId)
+        ]);
+        saveState();
+    } finally {
+        setServerSwitchingState(false);
+    }
 }
 
 async function loadGuildsForServer() {
@@ -5012,10 +5060,12 @@ function buildServerInsightDetailMarkup(info, insightId) {
     const voiceChannels = Array.isArray(info.channels?.items?.voice) ? info.channels.items.voice : [];
     const categoryChannels = Array.isArray(info.channels?.items?.category) ? info.channels.items.category : [];
     const rolesDetailed = Array.isArray(info.roles) ? info.roles.filter((role) => role.name !== '@everyone').slice(0, 10) : [];
+    const allRolesDetailed = Array.isArray(info.roles) ? info.roles.filter((role) => role.name !== '@everyone') : [];
     const messageLeaders = Array.isArray(info.activity?.messages?.leaders) ? info.activity.messages.leaders : [];
     const voiceLeaders = Array.isArray(info.activity?.voice?.leaders) ? info.activity.voice.leaders : [];
     const liveVoiceChannels = Array.isArray(info.activity?.voice?.live?.channels) ? info.activity.voice.live.channels : [];
     const featureList = Array.isArray(info.features) ? info.features : [];
+    const selectedRole = allRolesDetailed.find((role) => String(role.id) === String(currentServerInsightPayload?.roleId || ''));
 
     const ownerAvatar = info.owner?.avatar
         ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
@@ -5050,7 +5100,7 @@ function buildServerInsightDetailMarkup(info, insightId) {
             body: `
                 <div class="server-insight-grid">
                     ${renderServerInsightStat('Miembros totales', formatServerMetric(info.memberCount || 0), 'Comunidad actual del servidor')}
-                    ${renderServerInsightStat('Humanos', formatServerMetric(humanMembers), 'Usuarios reales en el servidor')}
+                    ${renderServerInsightStat('Usuarios reales', formatServerMetric(humanMembers), 'Usuarios reales en el servidor')}
                     ${renderServerInsightStat('Bots', formatServerMetric(botMembers), 'Bots conectados al servidor')}
                     ${renderServerInsightStat('Usuarios con historial', formatServerMetric(trackedUsers), 'Usuarios con mensajes o voz registrados')}
                     ${renderServerInsightStat('Usuarios en voz ahora', formatServerMetric(liveVoiceUsers), `${liveTopChannelName} (${formatServerMetric(liveTopChannelUsers)})`)}
@@ -5119,11 +5169,13 @@ function buildServerInsightDetailMarkup(info, insightId) {
                 <section class="server-insight-section">
                     <h4>Roles principales</h4>
                     <div class="server-detail-list">
-                        ${renderServerTextList(rolesDetailed.map((role) => ({
-                            name: role.name,
-                            meta: `${formatServerMetric(role.members)} miembros • Posicion ${formatServerMetric(role.position)}`,
-                            extra: role.color && role.color !== '#000000' ? role.color : 'Color por defecto'
-                        })), { emptyText: 'No hay roles destacados para mostrar.' })}
+                        ${rolesDetailed.length ? rolesDetailed.map((role) => `
+                            <button type="button" class="server-detail-list-item server-detail-list-item--button" data-server-role-id="${role.id}">
+                                <div class="server-detail-list-title">${escapeHtml(role.name)}</div>
+                                <div class="server-detail-list-meta">${formatServerMetric(role.members)} miembros • Posicion ${formatServerMetric(role.position)}</div>
+                                <div class="server-detail-list-extra">${escapeHtml(role.color && role.color !== '#000000' ? role.color : 'Color por defecto')}</div>
+                            </button>
+                        `).join('') : '<div class="summary-top-users-empty">No hay roles destacados para mostrar.</div>'}
                     </div>
                 </section>
             `
@@ -5318,6 +5370,31 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     <div id="serverActivityChartEmptyDetail" class="summary-chart-empty" style="display:none;"></div>
                 </div>
             `
+        },
+        roleMembers: {
+            title: selectedRole ? `Rol: ${escapeHtml(selectedRole.name)}` : 'Miembros del rol',
+            copy: selectedRole
+                ? 'Usuarios que actualmente pertenecen a este rol.'
+                : 'Selecciona un rol desde la pantalla de roles para ver sus miembros.',
+            body: selectedRole ? `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Miembros del rol', formatServerMetric(selectedRole.members || 0), 'Usuarios asignados actualmente')}
+                    ${renderServerInsightStat('Posicion', formatServerMetric(selectedRole.position || 0), 'Ubicacion en la jerarquia')}
+                    ${renderServerInsightStat('Color', escapeHtml(selectedRole.color && selectedRole.color !== '#000000' ? selectedRole.color : 'Por defecto'), 'Color visible del rol')}
+                </div>
+                <section class="server-insight-section">
+                    <h4>Usuarios del rol</h4>
+                    <div class="summary-top-users-list summary-top-users-list--detail">
+                        ${renderServerProfileList((Array.isArray(selectedRole.users) ? selectedRole.users : []).map((user) => ({
+                            title: user.tag,
+                            avatar: user.avatar,
+                            meta: `ID ${user.id}`
+                        })), { emptyText: 'Este rol no tiene usuarios visibles en cache.' })}
+                    </div>
+                </section>
+            ` : `
+                <div class="summary-top-users-empty">No se encontro el rol seleccionado.</div>
+            `
         }
     };
 
@@ -5395,17 +5472,29 @@ function bindServerSummaryCardEvents() {
             openServerInsight('activity');
         });
     }
+
+    container.querySelectorAll('[data-server-role-id]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openServerInsight('roleMembers', {
+                roleId: button.dataset.serverRoleId || ''
+            });
+        });
+    });
 }
 
-function openServerInsight(insightId) {
+function openServerInsight(insightId, payload = null) {
     if (!currentServerInfo || !insightId) return;
     currentServerInsightView = insightId;
+    currentServerInsightPayload = payload;
     displayServerInfoEnhanced(currentServerInfo);
 }
 
 function closeServerInsight() {
     if (!currentServerInfo) return;
     currentServerInsightView = 'overview';
+    currentServerInsightPayload = null;
     displayServerInfoEnhanced(currentServerInfo);
 }
 

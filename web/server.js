@@ -309,6 +309,12 @@ function hasAdminOrManageGuildPermission(guild = {}) {
     }
 }
 
+function sessionGuildAllowsManagement(sessionGuilds = [], guildId = '') {
+    return (Array.isArray(sessionGuilds) ? sessionGuilds : []).some((guild) => (
+        String(guild?.id || '') === String(guildId) && hasAdminOrManageGuildPermission(guild)
+    ));
+}
+
 function filterTrackableGuilds(guilds = []) {
     const list = Array.isArray(guilds) ? guilds : [];
     return list.filter((guild) => {
@@ -921,7 +927,7 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
 
 app.get('/api/guilds', requireAuth, async (req, res) => {
     try {
-        const guilds = await syncSessionGuilds(req, { force: true });
+        const guilds = filterTrackableGuilds(await syncSessionGuilds(req, { force: true }));
         
         // Filtrar solo servidores donde el bot está presente
         const botGuilds = [];
@@ -968,8 +974,7 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
         }
 
         // Verificar que el usuario tenga permisos en el servidor
-        const userGuild = req.session.guilds?.find(g => g.id === guildId);
-        if (!userGuild) {
+        if (!sessionGuildAllowsManagement(req.session.guilds, guildId)) {
             return res.status(403).json({ error: 'No tienes acceso a este servidor' });
         }
 
@@ -2418,8 +2423,7 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
 
-        const userGuild = req.session.guilds?.find(g => g.id === guildId);
-        if (!userGuild) {
+        if (!sessionGuildAllowsManagement(req.session.guilds, guildId)) {
             return res.status(403).json({ error: 'No tienes acceso a este servidor' });
         }
 
@@ -2519,7 +2523,19 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             name: role.name,
             color: role.hexColor,
             position: role.position,
-            members: role.members.size
+            members: role.members.size,
+            users: role.members
+                .map((member) => ({
+                    id: member.id,
+                    tag: member.user?.tag || member.displayName || `Usuario ${String(member.id).slice(-4)}`,
+                    avatar: typeof member.displayAvatarURL === 'function'
+                        ? member.displayAvatarURL({ dynamic: true, size: 128 })
+                        : (typeof member.user?.displayAvatarURL === 'function'
+                            ? member.user.displayAvatarURL({ dynamic: true, size: 128 })
+                            : null)
+                }))
+                .sort((a, b) => a.tag.localeCompare(b.tag, 'es'))
+                .slice(0, 30)
         })).sort((a, b) => b.position - a.position);
 
         const textLeaders = [...topActiveUsers]
