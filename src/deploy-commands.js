@@ -24,6 +24,7 @@ if (!guildId) {
     process.exit(1);
 }
 
+const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
 const commands = [];
 const byName = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -45,6 +46,23 @@ for (const folder of commandFolders) {
 
         // Evita registrar nombres duplicados por accidente.
         byName.set(command.data.name, command.data.toJSON());
+    }
+}
+
+if (MUSIC_ENABLED) {
+    const musicDir = path.join(commandsPath, 'music');
+    if (fs.existsSync(musicDir)) {
+        const musicFiles = fs.readdirSync(musicDir).filter((f) => f.endsWith('.js') && !f.startsWith('_'));
+        for (const file of musicFiles) {
+            try {
+                const command = require(path.join(musicDir, file));
+                if (!('data' in command && 'execute' in command)) continue;
+                if (DISABLED_SLASH_COMMANDS.has(command.data.name)) continue;
+                byName.set(command.data.name, command.data.toJSON());
+            } catch (error) {
+                console.error(`⚠️ Error cargando comando música ${file}:`, error?.message || error);
+            }
+        }
     }
 }
 

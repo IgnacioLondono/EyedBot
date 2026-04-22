@@ -5,9 +5,13 @@ const axios = require('axios');
 const config = require('../../config');
 const { safeDeferReply, safeEditReply } = require('../../utils/interactions');
 const { getMusicSystem } = require('./_common');
+const { resolveProviderUrl, detectProvider, formatDurationMs } = require('../../utils/music-providers');
 
 const AUTOCOMPLETE_TTL_MS = Math.max(5000, Number.parseInt(process.env.MUSIC_AUTOCOMPLETE_TTL_MS || '15000', 10));
 const autocompleteCache = new Map();
+
+const MAX_BULK_TRACKS = Math.max(1, Number.parseInt(process.env.MUSIC_MAX_BULK_TRACKS || '80', 10));
+const BULK_RESOLVE_CONCURRENCY = Math.max(1, Number.parseInt(process.env.MUSIC_BULK_CONCURRENCY || '4', 10));
 
 function autocompleteCacheGet(key) {
     const hit = autocompleteCache.get(key);
@@ -54,11 +58,16 @@ function normalizeUrl(input) {
 
         if (host.includes('youtu.be')) {
             const id = url.pathname.split('/').filter(Boolean)[0];
+            const listId = url.searchParams.get('list');
+            if (id && listId) return `https://www.youtube.com/watch?v=${id}&list=${listId}`;
             return id ? `https://www.youtube.com/watch?v=${id}` : cleaned;
         }
 
         if (host.includes('youtube.com')) {
             const id = url.searchParams.get('v');
+            const listId = url.searchParams.get('list');
+            if (id && listId) return `https://www.youtube.com/watch?v=${id}&list=${listId}`;
+            if (listId && !id) return `https://www.youtube.com/playlist?list=${listId}`;
             return id ? `https://www.youtube.com/watch?v=${id}` : cleaned;
         }
 
@@ -112,6 +121,7 @@ function scoreYoutubeCandidate(video, title, artist) {
         : 0;
 
     const tNorm = normalizeText(vTitle);
+    const aNorm = normalizeText(vAuthor);
     const queryNorm = normalizeText(`${title} ${artist}`);
     const artistTokens = tokenSet(artist);
     const candidateTokens = tokenSet(`${vAuthor} ${vTitle}`);
@@ -123,18 +133,30 @@ function scoreYoutubeCandidate(video, title, artist) {
         + (tNorm.includes('edit') && !queryNorm.includes('edit') ? 0.7 : 0)
         + (tNorm.includes('amv') ? 0.9 : 0)
         + (tNorm.includes('x ') ? 0.35 : 0)
-        + (tNorm.includes('nightcore') ? 0.8 : 0)
-        + (tNorm.includes('slowed') ? 0.5 : 0)
-        + (tNorm.includes('sped up') ? 0.5 : 0)
-        + (tNorm.includes('remix') && !queryNorm.includes('remix') ? 0.4 : 0)
-        + (tNorm.includes('cover') && !queryNorm.includes('cover') ? 0.7 : 0)
-        + (tNorm.includes('instrumental') && !queryNorm.includes('instrumental') ? 0.3 : 0)
+        + (tNorm.includes('nightcore') ? 0.9 : 0)
+        + (tNorm.includes('slowed') ? 0.6 : 0)
+        + (tNorm.includes('sped up') ? 0.6 : 0)
+        + (tNorm.includes('reverb') ? 0.3 : 0)
+        + (tNorm.includes('bass boost') ? 0.5 : 0)
+        + (tNorm.includes(' 8d ') || tNorm.includes(' 8 d ') ? 0.5 : 0)
+        + (tNorm.includes('tiktok') && !queryNorm.includes('tiktok') ? 0.4 : 0)
+        + (tNorm.includes('remix') && !queryNorm.includes('remix') ? 0.45 : 0)
+        + (tNorm.includes('cover') && !queryNorm.includes('cover') ? 0.75 : 0)
+        + (tNorm.includes('guitar cover') ? 0.6 : 0)
+        + (tNorm.includes('piano cover') ? 0.6 : 0)
+        + (tNorm.includes('karaoke') && !queryNorm.includes('karaoke') ? 0.8 : 0)
+        + (tNorm.includes('instrumental') && !queryNorm.includes('instrumental') ? 0.35 : 0)
+        + (tNorm.includes('reaction') ? 0.7 : 0)
+        + (tNorm.includes(' live ') && !queryNorm.includes('live') ? 0.25 : 0)
         + (artistTokens.size && artistOverlap === 0 ? 1.4 : 0)
         + (artistTokens.size && artistOverlap > 0 && artistOverlap < 0.34 ? 0.45 : 0)
         + (artistTokens.size && shortTitle && artistOverlap < 0.34 ? 0.65 : 0);
 
-    const bonus = (tNorm.includes('official') ? 0.15 : 0)
-        + (tNorm.includes('topic') ? 0.2 : 0)
+    const bonus = (tNorm.includes('official') ? 0.2 : 0)
+        + (aNorm.includes('topic') ? 0.45 : 0)
+        + (aNorm.includes('vevo') ? 0.25 : 0)
+        + (tNorm.includes('official audio') ? 0.25 : 0)
+        + (tNorm.includes('official music video') ? 0.2 : 0)
         + (tNorm.includes('audio') ? 0.1 : 0);
 
     return (titleScore * 1.3 + artistScore * 1.0) + bonus - heavyPenalty;
@@ -154,36 +176,65 @@ function isLikelyBadUploadTitle(title) {
         || t.includes('short')
         || t.includes('preview')
         || t.includes('teaser')
-        || t.includes('edit')
         || t.includes('amv')
         || t.includes('clip');
 }
 
-async function getProviderMetadata(url) {
-    const lower = url.toLowerCase();
+async function findBestYoutubeMatch(title, artist = '') {
+    if (!title) return null;
 
-    if (lower.includes('spotify.com')) {
-        const { data } = await axios.get('https://open.spotify.com/oembed', {
-            timeout: 8000,
-            params: { url }
-        }).catch(() => ({ data: null }));
+    const queries = [
+        `${artist} - ${title} official audio`.trim(),
+        `${artist} ${title} topic`.trim(),
+        `${artist} ${title} official`.trim(),
+        `${artist} ${title}`.trim(),
+        `${title} ${artist}`.trim(),
+        title
+    ].filter(Boolean);
 
-        const rawTitle = (data?.title || '').toString().trim();
-        const rawArtist = (data?.author_name || '').toString().trim();
-        if (!rawTitle && !rawArtist) return null;
+    const seen = new Set();
+    let best = null;
+    let bestScore = -Infinity;
+    let strictBest = null;
+    let strictBestScore = -Infinity;
 
-        let title = rawTitle;
-        let artist = rawArtist;
-        if (rawTitle.includes(' - ') && !rawArtist) {
-            const parts = rawTitle.split(' - ').map((p) => p.trim()).filter(Boolean);
-            if (parts.length >= 2) {
-                title = parts[0];
-                artist = parts.slice(1).join(' - ');
+    for (const q of queries) {
+        if (seen.has(q)) continue;
+        seen.add(q);
+
+        const videos = await YouTube.search(q, {
+            type: 'video',
+            limit: 12,
+            safeSearch: false
+        }).catch(() => []);
+
+        for (const v of videos || []) {
+            if (isLikelyBadUploadTitle(v?.title || '')) continue;
+            const score = scoreYoutubeCandidate(v, title, artist);
+            if (artist && hasArtistSignal(v, artist) && score > strictBestScore) {
+                strictBestScore = score;
+                strictBest = v;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                best = v;
             }
         }
-
-        return { provider: 'spotify', title, artist };
     }
+
+    const chosen = strictBest || best;
+    if (!chosen) return null;
+    return {
+        url: chosen.url || (chosen.id ? `https://www.youtube.com/watch?v=${chosen.id}` : null),
+        title: chosen.title,
+        author: chosen?.channel?.name || chosen?.author || null,
+        durationFormatted: chosen.durationFormatted || chosen.duration || null,
+        thumbnail: chosen?.thumbnail?.url || chosen?.thumbnail || null
+    };
+}
+
+async function getProviderMetadata(url) {
+    const lower = url.toLowerCase();
 
     if (lower.includes('soundcloud.com')) {
         const { data } = await axios.get('https://soundcloud.com/oembed', {
@@ -198,58 +249,6 @@ async function getProviderMetadata(url) {
     }
 
     return null;
-}
-
-async function resolveProviderToYoutubeUrl(meta) {
-    if (!meta?.title) return null;
-    const title = meta.title;
-    const artist = meta.artist || '';
-
-    const queries = [
-        `${artist} - ${title} official audio`.trim(),
-        `${artist} ${title} topic`.trim(),
-        `${artist} ${title}`.trim(),
-        `${title} ${artist}`.trim(),
-        title
-    ].filter(Boolean);
-
-    let best = null;
-    let bestScore = -Infinity;
-    let strictBest = null;
-    let strictBestScore = -Infinity;
-
-    for (const q of queries) {
-        const videos = await YouTube.search(q, {
-            type: 'video',
-            limit: 15,
-            safeSearch: false
-        }).catch(() => []);
-
-        for (const v of videos || []) {
-            const s = scoreYoutubeCandidate(v, title, artist);
-
-            if (artist && hasArtistSignal(v, artist) && s > strictBestScore) {
-                strictBestScore = s;
-                strictBest = v;
-            }
-
-            if (s > bestScore) {
-                bestScore = s;
-                best = v;
-            }
-        }
-    }
-
-    if (strictBest) {
-        return strictBest.url || (strictBest.id ? `https://www.youtube.com/watch?v=${strictBest.id}` : null);
-    }
-
-    if (artist && config.musicStrictArtistMatch) {
-        return null;
-    }
-
-    if (!best) return null;
-    return best.url || (best.id ? `https://www.youtube.com/watch?v=${best.id}` : null);
 }
 
 async function trySearchCandidates(player, candidates, requestedBy) {
@@ -296,14 +295,241 @@ async function getProviderFallbackQuery(url) {
     return null;
 }
 
+async function runWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let index = 0;
+    const runners = new Array(Math.min(limit, items.length)).fill(null).map(async () => {
+        while (true) {
+            const current = index++;
+            if (current >= items.length) return;
+            try {
+                results[current] = await worker(items[current], current);
+            } catch (error) {
+                results[current] = { error: error?.message || 'Error' };
+            }
+        }
+    });
+    await Promise.all(runners);
+    return results;
+}
+
+async function resolveTrackToYoutube(trackMeta) {
+    if (trackMeta.provider === 'youtube' && trackMeta.sourceUrl) {
+        return {
+            url: trackMeta.sourceUrl,
+            title: trackMeta.title,
+            author: trackMeta.artist,
+            thumbnail: trackMeta.thumbnail
+        };
+    }
+    return findBestYoutubeMatch(trackMeta.title, trackMeta.artist);
+}
+
+function providerLabel(providerKey) {
+    if (providerKey === 'spotify') return 'Spotify';
+    if (providerKey === 'apple') return 'Apple Music';
+    if (providerKey === 'youtube') return 'YouTube';
+    if (providerKey === 'soundcloud') return 'SoundCloud';
+    return 'External';
+}
+
+function bulkResultEmbed(providerResult, added, failed, totalDurationMs) {
+    const providerName = providerLabel(providerResult.provider);
+    const typeLabel = providerResult.type === 'album' ? 'álbum'
+        : providerResult.type === 'playlist' ? 'playlist'
+        : 'colección';
+
+    const fields = [
+        { name: `🔗 Fuente`, value: providerName, inline: true },
+        { name: `📦 Tipo`, value: typeLabel, inline: true },
+        { name: `✅ Añadidas`, value: `${added}`, inline: true }
+    ];
+    if (failed > 0) fields.push({ name: '⚠️ No reproducibles', value: `${failed}`, inline: true });
+    if (totalDurationMs > 0) {
+        fields.push({ name: '⏱️ Duración total (aprox.)', value: formatDurationMs(totalDurationMs), inline: true });
+    }
+    if (providerResult.author) fields.push({ name: '👤 Autor', value: providerResult.author.substring(0, 1024), inline: true });
+
+    const embed = new EmbedBuilder()
+        .setColor(config.embedColor)
+        .setTitle(`✅ ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} añadida a la cola`)
+        .setDescription(`**${(providerResult.title || 'Colección').substring(0, 200)}**`)
+        .addFields(fields);
+
+    if (providerResult.thumbnail) embed.setThumbnail(providerResult.thumbnail);
+    if (providerResult.url) embed.setURL(providerResult.url);
+    return embed;
+}
+
+async function handleBulkAdd(interaction, voiceChannel, musicSystem, providerResult) {
+    const tracksMeta = (providerResult.tracks || []).slice(0, MAX_BULK_TRACKS);
+    if (!tracksMeta.length) {
+        return safeEditReply(interaction, {
+            embeds: [new EmbedBuilder()
+                .setColor('#FFA500')
+                .setTitle('❌ Sin canciones')
+                .setDescription(`No pude extraer canciones reproducibles de esa URL de ${providerLabel(providerResult.provider)}.`)]
+        });
+    }
+
+    const processingEmbed = new EmbedBuilder()
+        .setColor(config.embedColor)
+        .setTitle('⏳ Procesando colección')
+        .setDescription(`Resolviendo **${tracksMeta.length}** canciones de **${(providerResult.title || providerLabel(providerResult.provider)).substring(0, 120)}**...`);
+    if (providerResult.thumbnail) processingEmbed.setThumbnail(providerResult.thumbnail);
+    await safeEditReply(interaction, { embeds: [processingEmbed] }).catch(() => {});
+
+    const requestedBy = interaction.user;
+    const nodeOptions = musicSystem.buildNodeOptions(interaction.channel);
+
+    const resolved = await runWithConcurrency(tracksMeta, BULK_RESOLVE_CONCURRENCY, async (trackMeta) => {
+        const match = await resolveTrackToYoutube(trackMeta).catch(() => null);
+        if (!match?.url) return null;
+        return { meta: trackMeta, match };
+    });
+
+    let added = 0;
+    let failed = 0;
+    let totalDurationMs = 0;
+
+    for (const entry of resolved) {
+        if (!entry?.match?.url) {
+            failed++;
+            continue;
+        }
+
+        const playResult = await interaction.client.player.play(voiceChannel, entry.match.url, {
+            requestedBy,
+            nodeOptions,
+            searchEngine: 'youtube'
+        }).catch(() => null);
+
+        if (!playResult?.track) {
+            failed++;
+            continue;
+        }
+
+        const track = playResult.track;
+        if (entry.meta.title) track.title = entry.meta.title;
+        if (entry.meta.artist) track.author = entry.meta.artist;
+        if (entry.meta.thumbnail) track.thumbnail = entry.meta.thumbnail;
+        if (entry.meta.durationMs) totalDurationMs += entry.meta.durationMs;
+
+        added++;
+    }
+
+    if (!added) {
+        return safeEditReply(interaction, {
+            embeds: [new EmbedBuilder()
+                .setColor('#FFA500')
+                .setTitle('❌ No se pudo cargar la colección')
+                .setDescription(`Encontré ${tracksMeta.length} canciones en esa ${providerResult.type}, pero ninguna se pudo reproducir.`)]
+        });
+    }
+
+    return safeEditReply(interaction, {
+        embeds: [bulkResultEmbed(providerResult, added, failed, totalDurationMs)]
+    });
+}
+
+async function playSingleTrackFlow(interaction, voiceChannel, musicSystem, { query, providerMeta }) {
+    const requestedBy = interaction.user;
+    let result = await trySearchCandidates(interaction.client.player, [query], requestedBy);
+
+    if (!result?.hasTracks?.()) {
+        const providerQuery = await getProviderFallbackQuery(query);
+        if (providerQuery) {
+            result = await trySearchCandidates(interaction.client.player, [
+                `ytsearch:${providerQuery}`,
+                `${providerQuery} official audio`,
+                providerQuery
+            ], requestedBy);
+        }
+    }
+
+    if (!result?.hasTracks?.()) {
+        return safeEditReply(interaction, {
+            embeds: [new EmbedBuilder()
+                .setColor('#FFA500')
+                .setTitle('❌ Sin resultados')
+                .setDescription('No se pudo cargar esa URL.\nPrueba otro enlace o busca por texto para elegir versión.')]
+        });
+    }
+
+    const queueBefore = useQueue(interaction.guild.id);
+    const wasPlaying = queueBefore?.isPlaying?.() || false;
+
+    let strictTrack = await musicSystem.resolveStrictTrack(query, requestedBy);
+    if (!strictTrack && result?.hasTracks?.()) {
+        strictTrack = result.tracks[0] || null;
+    }
+
+    if (!strictTrack) {
+        return safeEditReply(interaction, {
+            embeds: [new EmbedBuilder()
+                .setColor('#FFA500')
+                .setTitle('❌ Sin resultados')
+                .setDescription('No pude resolver una pista exacta para esa URL.')]
+        });
+    }
+
+    if (providerMeta?.title) strictTrack.title = providerMeta.title;
+    if (providerMeta?.artist) strictTrack.author = providerMeta.artist;
+
+    let played = null;
+    try {
+        played = await interaction.client.player.play(voiceChannel, strictTrack, {
+            requestedBy,
+            nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
+        });
+    } catch {
+        const first = result?.tracks?.[0];
+        const fallbackQuery = `${first?.title || ''} ${first?.author || ''}`.trim();
+        if (fallbackQuery) {
+            const fallbackResult = await trySearchCandidates(interaction.client.player, [
+                `ytsearch:${fallbackQuery}`,
+                `${fallbackQuery} official audio`,
+                fallbackQuery
+            ], requestedBy);
+            if (fallbackResult?.hasTracks?.()) {
+                const fallbackTrack = fallbackResult.tracks[0] || null;
+                if (providerMeta?.title && fallbackTrack) fallbackTrack.title = providerMeta.title;
+                if (providerMeta?.artist && fallbackTrack) fallbackTrack.author = providerMeta.artist;
+
+                played = await interaction.client.player.play(voiceChannel, fallbackTrack || fallbackResult, {
+                    requestedBy,
+                    nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
+                }).catch(() => null);
+                result = fallbackResult;
+            }
+        }
+    }
+
+    if (!played) {
+        return safeEditReply(interaction, {
+            embeds: [new EmbedBuilder()
+                .setColor('#FFA500')
+                .setTitle('❌ Error reproduciendo')
+                .setDescription('Encontré la canción, pero falló la reproducción del stream. Intenta otra versión desde búsqueda.')]
+        });
+    }
+    const playedTrack = played?.track || strictTrack;
+    return safeEditReply(interaction, {
+        embeds: [new EmbedBuilder()
+            .setColor(config.embedColor)
+            .setTitle(wasPlaying ? '✅ Añadido a la cola' : '✅ Reproduciendo')
+            .setDescription(`**${playedTrack?.title || 'Sin titulo'}**${playedTrack?.author ? ` — *${playedTrack.author}*` : ''}`)]
+    });
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('play')
-        .setDescription('Reproduce música desde URL o búsqueda (YouTube, Spotify, SoundCloud, Apple Music).')
+        .setDescription('Reproduce música desde URL o búsqueda (YouTube, Spotify, Apple Music, SoundCloud).')
         .addStringOption((option) =>
             option
                 .setName('input')
-                .setDescription('URL o termino de busqueda')
+                .setDescription('URL, playlist, álbum o término de búsqueda')
                 .setRequired(true)
                 .setAutocomplete(true)
         ),
@@ -366,120 +592,62 @@ module.exports = {
         await safeDeferReply(interaction);
 
         let query = normalizeUrl((input || '').trim());
-        const lower = query.toLowerCase();
-        const isApple = lower.includes('music.apple.com') || lower.includes('itunes.apple.com');
+        const provider = isUrl(query) ? detectProvider(query) : null;
 
-        if (isUrl(query) && isApple) {
-            const bridged = await musicSystem.resolveAppleMusicUrlToYouTube(query);
-            if (!bridged) {
+        if (provider && provider !== 'soundcloud') {
+            const providerResult = await resolveProviderUrl(query).catch(() => null);
+
+            if (providerResult?.unsupported) {
                 return safeEditReply(interaction, {
                     embeds: [new EmbedBuilder()
                         .setColor('#FFA500')
-                        .setTitle('❌ Sin resultados')
-                        .setDescription('No pude convertir ese link de Apple Music a una versión reproducible en YouTube.')]
+                        .setTitle('❌ No soportado')
+                        .setDescription(`Las URLs de tipo **${providerResult.type}** de ${providerLabel(provider)} no están soportadas. Usa un track, playlist o álbum.`)]
                 });
             }
-            query = bridged;
+
+            if (providerResult && (providerResult.type === 'playlist' || providerResult.type === 'album')) {
+                return handleBulkAdd(interaction, voiceChannel, musicSystem, providerResult);
+            }
+
+            if (providerResult?.type === 'track' && Array.isArray(providerResult.tracks) && providerResult.tracks.length) {
+                const trackMeta = providerResult.tracks[0];
+
+                if (provider === 'youtube' && trackMeta.sourceUrl) {
+                    return playSingleTrackFlow(interaction, voiceChannel, musicSystem, {
+                        query: trackMeta.sourceUrl,
+                        providerMeta: null
+                    });
+                }
+
+                const match = await findBestYoutubeMatch(trackMeta.title, trackMeta.artist).catch(() => null);
+                if (!match?.url) {
+                    return safeEditReply(interaction, {
+                        embeds: [new EmbedBuilder()
+                            .setColor('#FFA500')
+                            .setTitle('❌ Sin resultados')
+                            .setDescription(`No pude encontrar **${trackMeta.title}${trackMeta.artist ? ` — ${trackMeta.artist}` : ''}** en YouTube.`)]
+                    });
+                }
+
+                return playSingleTrackFlow(interaction, voiceChannel, musicSystem, {
+                    query: match.url,
+                    providerMeta: { title: trackMeta.title, artist: trackMeta.artist }
+                });
+            }
         }
 
         let providerMeta = null;
-        if (isUrl(query) && !isApple) {
+        if (isUrl(query) && provider === 'soundcloud') {
             providerMeta = await getProviderMetadata(query);
-            if (providerMeta) {
-                const bridged = await resolveProviderToYoutubeUrl(providerMeta);
-                if (bridged) query = bridged;
+            if (providerMeta?.title) {
+                const match = await findBestYoutubeMatch(providerMeta.title, providerMeta.artist).catch(() => null);
+                if (match?.url) query = match.url;
             }
         }
 
         if (isUrl(query)) {
-            const requestedBy = interaction.user;
-            let result = await trySearchCandidates(interaction.client.player, [query], requestedBy);
-
-            if (!result?.hasTracks?.()) {
-                const providerQuery = await getProviderFallbackQuery(query);
-                if (providerQuery) {
-                    result = await trySearchCandidates(interaction.client.player, [
-                        `ytsearch:${providerQuery}`,
-                        `${providerQuery} official audio`,
-                        providerQuery
-                    ], requestedBy);
-                }
-            }
-
-            if (!result?.hasTracks?.()) {
-                return safeEditReply(interaction, {
-                    embeds: [new EmbedBuilder()
-                        .setColor('#FFA500')
-                        .setTitle('❌ Sin resultados')
-                        .setDescription('No se pudo cargar esa URL.\nPrueba otro enlace o busca por texto para elegir versión.')]
-                });
-            }
-
-            const queueBefore = useQueue(interaction.guild.id);
-            const wasPlaying = queueBefore?.isPlaying?.() || false;
-
-            // Forzar resolución estricta de URL para evitar covers/versiones ajenas.
-            let strictTrack = await musicSystem.resolveStrictTrack(query, requestedBy);
-            if (!strictTrack && result?.hasTracks?.()) {
-                strictTrack = result.tracks[0] || null;
-            }
-
-            if (!strictTrack) {
-                return safeEditReply(interaction, {
-                    embeds: [new EmbedBuilder()
-                        .setColor('#FFA500')
-                        .setTitle('❌ Sin resultados')
-                        .setDescription('No pude resolver una pista exacta para esa URL.')]
-                });
-            }
-
-            if (providerMeta?.title) strictTrack.title = providerMeta.title;
-            if (providerMeta?.artist) strictTrack.author = providerMeta.artist;
-
-            let played = null;
-            try {
-                played = await interaction.client.player.play(voiceChannel, strictTrack, {
-                    requestedBy,
-                    nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
-                });
-            } catch {
-                const first = result?.tracks?.[0];
-                const fallbackQuery = `${first?.title || ''} ${first?.author || ''}`.trim();
-                if (fallbackQuery) {
-                    const fallbackResult = await trySearchCandidates(interaction.client.player, [
-                        `ytsearch:${fallbackQuery}`,
-                        `${fallbackQuery} official audio`,
-                        fallbackQuery
-                    ], requestedBy);
-                    if (fallbackResult?.hasTracks?.()) {
-                        const fallbackTrack = fallbackResult.tracks[0] || null;
-                        if (providerMeta?.title && fallbackTrack) fallbackTrack.title = providerMeta.title;
-                        if (providerMeta?.artist && fallbackTrack) fallbackTrack.author = providerMeta.artist;
-
-                        played = await interaction.client.player.play(voiceChannel, fallbackTrack || fallbackResult, {
-                            requestedBy,
-                            nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
-                        }).catch(() => null);
-                        result = fallbackResult;
-                    }
-                }
-            }
-
-            if (!played) {
-                return safeEditReply(interaction, {
-                    embeds: [new EmbedBuilder()
-                        .setColor('#FFA500')
-                        .setTitle('❌ Error reproduciendo')
-                        .setDescription('Encontré la canción, pero falló la reproducción del stream. Intenta otra versión desde búsqueda.')]
-                });
-            }
-            const playedTrack = played?.track || strictTrack;
-            return safeEditReply(interaction, {
-                embeds: [new EmbedBuilder()
-                    .setColor(config.embedColor)
-                    .setTitle(wasPlaying ? '✅ Añadido a la cola' : '✅ Reproduciendo')
-                    .setDescription(`**${playedTrack?.title || 'Sin titulo'}**${playedTrack?.author ? ` — *${playedTrack.author}*` : ''}`)]
-            });
+            return playSingleTrackFlow(interaction, voiceChannel, musicSystem, { query, providerMeta });
         }
 
         const videos = await YouTube.search(query, {

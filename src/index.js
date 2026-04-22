@@ -263,6 +263,29 @@ function loadCommands(dir) {
 
 loadCommands(commandsPath);
 
+if (MUSIC_ENABLED) {
+    const musicDir = path.join(commandsPath, 'music');
+    if (fs.existsSync(musicDir)) {
+        const musicFiles = fs.readdirSync(musicDir).filter((f) => f.endsWith('.js') && !f.startsWith('_'));
+        for (const file of musicFiles) {
+            try {
+                const command = require(path.join(musicDir, file));
+                if ('data' in command && 'execute' in command) {
+                    if (DISABLED_SLASH_COMMANDS.has(command.data.name)) {
+                        console.log(`⏭️ Comando música desactivado (omitido): ${command.data.name}`);
+                        continue;
+                    }
+                    client.commands.set(command.data.name, command);
+                    commands.push(command.data.toJSON());
+                    console.log(`🎵 Comando música cargado: ${command.data.name}`);
+                }
+            } catch (error) {
+                console.error(`❌ Error cargando comando música ${file}:`, error?.message || error);
+            }
+        }
+    }
+}
+
 client.once('clientReady', () => {
     console.log(`👁️ EyedBot conectado como ${client.user.tag}`);
     if (webPanel?.setBotClient) {
@@ -433,6 +456,22 @@ client.on('interactionCreate', async interaction => {
 
                 await musicSystem.handleMusicControl(interaction, action);
                 return;
+            }
+
+            if (interaction.customId.startsWith('lyrics_')) {
+                const lyricsCmd = interaction.client.commands?.get?.('lyrics');
+                if (lyricsCmd && typeof lyricsCmd.handleButton === 'function') {
+                    const handled = await lyricsCmd.handleButton(interaction);
+                    if (handled) return;
+                }
+            }
+
+            if (interaction.customId.startsWith('karaoke_')) {
+                const karaokeCmd = interaction.client.commands?.get?.('karaoke');
+                if (karaokeCmd && typeof karaokeCmd.handleButton === 'function') {
+                    const handled = await karaokeCmd.handleButton(interaction);
+                    if (handled) return;
+                }
             }
         } catch (error) {
             if (isUnknownInteractionError(error)) return;
