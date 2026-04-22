@@ -3669,3 +3669,620 @@ mark.receipt-highlight {
     .ticket-chat-send { padding: 0.7rem 0.8rem; }
 }
 
+/* ==========================================================
+   REDISENO PREMIUM DE MODULOS (excepto Resumen y Gestion de tickets)
+   Targeta: Moderacion, Bienvenida, Verificacion, Tickets (config),
+   Niveles, Voz temporal, Automatizacion, Seguridad, Notificaciones.
+   ========================================================== */
+
+/* --- Acentos tematicos por modulo ---------------------------------- */
+#serverPaneModeration    { --pane-accent: #ff8357; --pane-accent-2: #ff4e78; --pane-ink: #ffd2c1; }
+#serverPaneWelcome       { --pane-accent: #27e5c8; --pane-accent-2: #2b90d9; --pane-ink: #b8f4ea; }
+#serverPaneVerify        { --pane-accent: #4ccbff; --pane-accent-2: #7c4dff; --pane-ink: #c2e8ff; }
+#serverPaneTickets       { --pane-accent: #a070ff; --pane-accent-2: #c663ff; --pane-ink: #e0ccff; }
+#serverPaneLevels        { --pane-accent: #ffbe55; --pane-accent-2: #ff7e5f; --pane-ink: #ffe1b5; }
+#serverPaneVoiceCreator  { --pane-accent: #ff79c6; --pane-accent-2: #9b6cff; --pane-ink: #ffd4ec; }
+#serverPaneAutomation    { --pane-accent: #4ccb81; --pane-accent-2: #27e5c8; --pane-ink: #c5f2d7; }
+#serverPaneSecurity      { --pane-accent: #ff6b6b; --pane-accent-2: #ffbe55; --pane-ink: #ffd2d2; }
+#serverPaneNotifications { --pane-accent: #ffd166; --pane-accent-2: #f59e0b; --pane-ink: #fff0bc; }
+
+/* Panes que cubre este bloque */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) {
+    --pane-accent: var(--pane-accent, #7c4dff);
+    --pane-accent-2: var(--pane-accent-2, #2b90d9);
+    --pane-ink: var(--pane-ink, #e6ddfb);
+}
+
+/* --- Shell del pane: fondo sutil con halo de color por modulo ------ */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .server-pane-surface {
+    padding: 0.25rem 0 0.8rem !important;
+    position: relative;
+    isolation: isolate;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .server-pane-surface::before {
+    content: "";
+    position: absolute;
+    inset: -2rem -2rem auto -2rem;
+    height: 260px;
+    background:
+        radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--pane-accent) 16%, transparent), transparent 55%),
+        radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--pane-accent-2) 14%, transparent), transparent 60%);
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.9;
+    filter: blur(12px);
+}
+
+/* Header oculto por defecto queda igual; usamos welcome-panel-title como hero */
+
+/* --- Container base de todos los modulos --------------------------- */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container {
+    background:
+        linear-gradient(180deg, rgba(28, 16, 64, 0.72), rgba(15, 8, 38, 0.82)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 24%, rgba(190, 155, 255, 0.18)) !important;
+    border-radius: 22px !important;
+    padding: 1.6rem !important;
+    box-shadow:
+        0 30px 70px rgba(6, 2, 20, 0.55),
+        inset 0 1px 0 color-mix(in srgb, var(--pane-accent) 18%, rgba(255, 255, 255, 0.05));
+    position: relative;
+    overflow: hidden;
+    animation: panePremiumIn 0.45s cubic-bezier(.2,.9,.3,1.1);
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--pane-accent) 30%,
+        var(--pane-accent-2) 70%,
+        transparent 100%);
+    opacity: 0.85;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container::after {
+    content: "";
+    position: absolute;
+    inset: auto -20% -40% 40%;
+    height: 220px;
+    background: radial-gradient(circle, color-mix(in srgb, var(--pane-accent-2) 18%, transparent), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(50px);
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container > * {
+    position: relative;
+    z-index: 1;
+}
+
+@keyframes panePremiumIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Titulo del panel (hero) --------------------------------------- */
+.welcome-panel-title {
+    position: relative;
+    margin: 0 0 0.25rem !important;
+    padding-left: 1rem !important;
+    font-size: 1.85rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    background: linear-gradient(90deg, #ffffff 0%, color-mix(in srgb, var(--pane-ink) 80%, #ffffff) 55%, var(--pane-ink) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+.welcome-panel-title::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 8px; bottom: 10px;
+    width: 5px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, var(--pane-accent), var(--pane-accent-2));
+    box-shadow: 0 0 14px color-mix(in srgb, var(--pane-accent) 60%, transparent);
+}
+
+.welcome-panel-subtitle {
+    margin: 0 0 1.5rem !important;
+    padding-left: 1rem;
+    color: #b7a7d6 !important;
+    font-size: 0.95rem !important;
+    line-height: 1.55 !important;
+    max-width: 760px;
+}
+.welcome-panel-subtitle code {
+    background: rgba(12, 6, 30, 0.6);
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(190, 155, 255, 0.2));
+    border-radius: 6px;
+    padding: 0.08rem 0.4rem;
+    color: color-mix(in srgb, var(--pane-accent) 70%, #ffffff);
+    font-size: 0.86em;
+}
+
+/* Kicker chip visible sobre el titulo */
+.welcome-panel-title::after {
+    content: "";
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .moderation-container > .welcome-panel-title {
+    margin-top: 0.2rem !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .moderation-container > .welcome-panel-title {
+    position: relative;
+}
+/* Chip pequeno "MODULO" antes del titulo, solo en los panes cubiertos */
+#serverPaneWelcome       .moderation-container > .welcome-panel-title::after { content: "BIENVENIDA"; }
+#serverPaneVerify        .moderation-container > .welcome-panel-title::after { content: "VERIFICACION"; }
+#serverPaneTickets       .moderation-container > .welcome-panel-title::after { content: "TICKETS"; }
+#serverPaneLevels        .moderation-container > .welcome-panel-title::after { content: "NIVELES"; }
+#serverPaneVoiceCreator  .moderation-container > .welcome-panel-title::after { content: "VOZ TEMPORAL"; }
+#serverPaneAutomation    .moderation-container > .welcome-panel-title::after { content: "AUTOMATIZACION"; }
+#serverPaneSecurity      .moderation-container > .welcome-panel-title::after { content: "SEGURIDAD"; }
+#serverPaneNotifications .moderation-container > .welcome-panel-title::after { content: "NOTIFICACIONES"; }
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .moderation-container > .welcome-panel-title::after {
+    position: absolute;
+    top: -1.3rem;
+    left: 1rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    color: color-mix(in srgb, var(--pane-accent) 70%, #ffffff);
+    -webkit-text-fill-color: color-mix(in srgb, var(--pane-accent) 70%, #ffffff);
+    background: color-mix(in srgb, var(--pane-accent) 14%, rgba(7, 3, 20, 0.5));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 32%, rgba(190, 155, 255, 0.2));
+    padding: 0.22rem 0.65rem;
+    border-radius: 999px;
+    display: inline-block;
+    line-height: 1;
+}
+
+/* --- Layout editor + preview --------------------------------------- */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-layout {
+    grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr) !important;
+    gap: 1.5rem !important;
+    margin-top: 0.5rem;
+}
+
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-editor,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel {
+    position: relative;
+    background:
+        linear-gradient(180deg, rgba(24, 14, 54, 0.85), rgba(14, 7, 32, 0.92)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(190, 155, 255, 0.16)) !important;
+    border-radius: 18px !important;
+    padding: 1.3rem !important;
+    box-shadow:
+        0 18px 38px rgba(6, 2, 20, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-editor:hover,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel:hover {
+    border-color: color-mix(in srgb, var(--pane-accent) 38%, rgba(190, 155, 255, 0.25));
+    box-shadow:
+        0 26px 54px rgba(6, 2, 20, 0.55),
+        0 0 0 1px color-mix(in srgb, var(--pane-accent) 18%, transparent) inset;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-editor::before,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 1rem; right: 1rem;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--pane-accent), transparent);
+    opacity: 0.55;
+}
+
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel {
+    position: sticky;
+    top: 84px;
+    height: fit-content;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel h4 {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: color-mix(in srgb, var(--pane-accent) 70%, #ffffff) !important;
+    font-weight: 800 !important;
+    padding: 0.3rem 0.7rem;
+    background: color-mix(in srgb, var(--pane-accent) 12%, rgba(7, 3, 20, 0.5));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(190, 155, 255, 0.2));
+    border-radius: 999px;
+    margin-bottom: 1rem !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel h4::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--pane-accent);
+    box-shadow: 0 0 8px var(--pane-accent);
+    animation: premiumDotPulse 1.6s ease-in-out infinite;
+}
+@keyframes premiumDotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.75); opacity: 0.55; }
+}
+
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-image-editor {
+    margin-top: 1rem !important;
+    padding: 1rem !important;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--pane-accent) 6%, rgba(12, 6, 30, 0.5)), rgba(12, 6, 30, 0.7)) !important;
+    border: 1px dashed color-mix(in srgb, var(--pane-accent) 35%, rgba(190, 155, 255, 0.2)) !important;
+    border-radius: 14px !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-image-editor h4 {
+    color: color-mix(in srgb, var(--pane-accent) 55%, #ffffff) !important;
+    font-size: 0.85rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.7rem !important;
+}
+
+/* --- Pestanas de saludo (Bienvenida/Despedida) --------------------- */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-tabs {
+    padding: 0.35rem !important;
+    background: rgba(7, 3, 20, 0.5) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.15)) !important;
+    border-radius: 14px !important;
+    margin-bottom: 1rem !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-tab-btn {
+    padding: 0.5rem 1.05rem !important;
+    border-radius: 10px !important;
+    color: #b7a7d6 !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.02em;
+    transition: all 0.18s ease !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-tab-btn:hover {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: transparent !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-tab-btn.active {
+    color: #ffffff !important;
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--pane-accent) 55%, transparent),
+        color-mix(in srgb, var(--pane-accent-2) 45%, transparent)) !important;
+    border-color: color-mix(in srgb, var(--pane-accent) 50%, transparent) !important;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--pane-accent) 35%, transparent) !important;
+}
+
+/* --- Form controls dentro de modulos ------------------------------- */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-group {
+    margin-bottom: 1.05rem;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-group label {
+    color: color-mix(in srgb, var(--pane-ink) 60%, #ffffff) !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.45rem !important;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-group label::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--pane-accent);
+    box-shadow: 0 0 6px var(--pane-accent);
+    flex-shrink: 0;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control {
+    background: rgba(10, 5, 24, 0.78) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 16%, rgba(190, 155, 255, 0.18)) !important;
+    color: #f4eeff !important;
+    border-radius: 12px !important;
+    padding: 0.72rem 0.95rem !important;
+    font-size: 0.92rem !important;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control::placeholder {
+    color: #7a689c !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control:hover {
+    border-color: color-mix(in srgb, var(--pane-accent) 32%, rgba(190, 155, 255, 0.25)) !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control:focus,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control:focus-visible {
+    border-color: var(--pane-accent) !important;
+    background: rgba(12, 6, 30, 0.9) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--pane-accent) 25%, transparent) !important;
+    outline: none !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) select.form-control {
+    background-image: linear-gradient(45deg, transparent 50%, color-mix(in srgb, var(--pane-accent) 70%, #ffffff) 50%),
+                      linear-gradient(135deg, color-mix(in srgb, var(--pane-accent) 70%, #ffffff) 50%, transparent 50%) !important;
+    background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50% !important;
+    background-size: 6px 6px !important;
+    background-repeat: no-repeat !important;
+    padding-right: 2.4rem !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) textarea.form-control {
+    min-height: 120px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+/* Switch / checkbox inline nice (para cuando el JS usa labels simples) */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-group input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--pane-accent);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* --- Botones dentro de los modulos --------------------------------- */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-primary,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) button.btn-primary {
+    background: linear-gradient(135deg, var(--pane-accent), var(--pane-accent-2)) !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    padding: 0.7rem 1.2rem !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--pane-accent) 30%, transparent) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-primary:hover {
+    transform: translateY(-1px) !important;
+    filter: brightness(1.08) !important;
+    box-shadow: 0 14px 32px color-mix(in srgb, var(--pane-accent) 45%, transparent) !important;
+}
+
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-ghost,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-secondary {
+    background: rgba(12, 6, 30, 0.6) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.25)) !important;
+    color: #f4eeff !important;
+    border-radius: 12px !important;
+    padding: 0.65rem 1.1rem !important;
+    font-weight: 700 !important;
+    transition: all 0.15s ease !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-ghost:hover,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-secondary:hover {
+    border-color: color-mix(in srgb, var(--pane-accent) 45%, transparent) !important;
+    background: color-mix(in srgb, var(--pane-accent) 12%, rgba(12, 6, 30, 0.7)) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* --- MODERACION: buscador + lista de miembros ---------------------- */
+#serverPaneModeration .moderation-container > h3 {
+    background: linear-gradient(90deg, #ffffff, var(--pane-ink)) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+    font-family: 'Inter', 'Segoe UI', sans-serif !important;
+    font-weight: 800 !important;
+    font-size: 1.85rem !important;
+    letter-spacing: -0.01em !important;
+    padding-left: 1rem !important;
+    position: relative !important;
+    margin-bottom: 0.35rem !important;
+}
+#serverPaneModeration .moderation-container > h3::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 10px; bottom: 12px;
+    width: 5px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, var(--pane-accent), var(--pane-accent-2));
+    box-shadow: 0 0 14px color-mix(in srgb, var(--pane-accent) 60%, transparent);
+}
+#serverPaneModeration .moderation-container > h3::after {
+    content: "MODERACION";
+    position: absolute;
+    top: -1.3rem;
+    left: 1rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    color: color-mix(in srgb, var(--pane-accent) 70%, #ffffff);
+    -webkit-text-fill-color: color-mix(in srgb, var(--pane-accent) 70%, #ffffff);
+    background: color-mix(in srgb, var(--pane-accent) 14%, rgba(7, 3, 20, 0.5));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 32%, rgba(190, 155, 255, 0.2));
+    padding: 0.22rem 0.65rem;
+    border-radius: 999px;
+    display: inline-block;
+    line-height: 1;
+    background-clip: border-box !important;
+}
+
+#serverPaneModeration .member-search {
+    position: relative;
+    margin-top: 1.2rem;
+    margin-bottom: 1rem;
+}
+#serverPaneModeration .member-search::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff8357' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='M21 21l-4.35-4.35'/></svg>");
+    background-size: contain;
+    background-repeat: no-repeat;
+    pointer-events: none;
+    opacity: 0.85;
+}
+#serverPaneModeration .member-search .form-control {
+    padding-left: 2.55rem !important;
+}
+
+#serverPaneModeration .member-list {
+    margin-top: 0.4rem !important;
+    gap: 0.6rem !important;
+}
+
+#serverPaneModeration .member-item {
+    background:
+        linear-gradient(180deg, rgba(24, 14, 54, 0.7), rgba(14, 7, 32, 0.85)) !important;
+    border: 1px solid rgba(190, 155, 255, 0.15) !important;
+    border-radius: 14px !important;
+    padding: 0.9rem 1rem !important;
+    transition: all 0.18s ease !important;
+    position: relative;
+    overflow: hidden;
+}
+#serverPaneModeration .member-item::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--pane-accent), var(--pane-accent-2));
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+#serverPaneModeration .member-item:hover {
+    border-color: color-mix(in srgb, var(--pane-accent) 40%, rgba(190, 155, 255, 0.3)) !important;
+    transform: translateX(4px) !important;
+    box-shadow: 0 10px 26px rgba(6, 2, 20, 0.45), 0 0 0 1px color-mix(in srgb, var(--pane-accent) 18%, transparent) !important;
+}
+#serverPaneModeration .member-item:hover::before { opacity: 1; }
+
+#serverPaneModeration .member-avatar {
+    width: 46px !important;
+    height: 46px !important;
+    border: 2px solid color-mix(in srgb, var(--pane-accent) 50%, transparent) !important;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--pane-accent) 30%, transparent) !important;
+}
+#serverPaneModeration .member-details h4 {
+    color: #f4eeff !important;
+    font-size: 0.98rem !important;
+    font-weight: 700 !important;
+}
+#serverPaneModeration .member-details p {
+    color: #8a75b8 !important;
+    font-family: 'Consolas', monospace;
+    font-size: 0.78rem !important;
+}
+
+#serverPaneModeration .action-btn {
+    padding: 0.5rem 0.9rem !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 0.02em;
+    transition: all 0.15s ease !important;
+}
+#serverPaneModeration .action-btn:hover {
+    transform: translateY(-1px);
+}
+#serverPaneModeration .btn-kick {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(245, 158, 11, 0.08)) !important;
+    border: 1px solid rgba(245, 158, 11, 0.35) !important;
+    color: #ffc976 !important;
+}
+#serverPaneModeration .btn-kick:hover {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.32), rgba(245, 158, 11, 0.18)) !important;
+    border-color: #f59e0b !important;
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.3) !important;
+}
+#serverPaneModeration .btn-ban {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(239, 68, 68, 0.08)) !important;
+    border: 1px solid rgba(239, 68, 68, 0.4) !important;
+    color: #ffa4a4 !important;
+}
+#serverPaneModeration .btn-ban:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.35), rgba(239, 68, 68, 0.2)) !important;
+    border-color: #ef4444 !important;
+    box-shadow: 0 6px 18px rgba(239, 68, 68, 0.35) !important;
+}
+#serverPaneModeration .btn-timeout {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.08)) !important;
+    border: 1px solid rgba(139, 92, 246, 0.4) !important;
+    color: #c4b0ff !important;
+}
+#serverPaneModeration .btn-timeout:hover {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.35), rgba(139, 92, 246, 0.2)) !important;
+    border-color: #8b5cf6 !important;
+    box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35) !important;
+}
+
+/* --- Scrollbars personalizados dentro de los panes ----------------- */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage)::-webkit-scrollbar {
+    width: 8px;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage)::-webkit-scrollbar-track {
+    background: transparent;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage)::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--pane-accent) 50%, transparent), color-mix(in srgb, var(--pane-accent-2) 45%, transparent));
+    border-radius: 8px;
+}
+
+/* --- Links y codigo inline ----------------------------------------- */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) a {
+    color: color-mix(in srgb, var(--pane-accent) 65%, #ffffff);
+    transition: color 0.15s ease;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) a:hover {
+    color: #ffffff;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--pane-accent) 60%, transparent);
+}
+
+/* --- Responsive ---------------------------------------------------- */
+@media (max-width: 1100px) {
+    .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-layout {
+        grid-template-columns: 1fr !important;
+    }
+    .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel {
+        position: static;
+    }
+}
+
+@media (max-width: 720px) {
+    .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container {
+        padding: 1.1rem !important;
+        border-radius: 18px !important;
+    }
+    .welcome-panel-title {
+        font-size: 1.5rem !important;
+    }
+    .welcome-panel-subtitle {
+        font-size: 0.88rem !important;
+    }
+    #serverPaneModeration .member-item {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.7rem;
+    }
+    #serverPaneModeration .member-actions {
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-editor,
+    .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel {
+        padding: 1rem !important;
+        border-radius: 14px !important;
+    }
+    .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-tabs {
+        flex-wrap: wrap;
+    }
+}
+
+/* --- Cache bump marker: v=20260422-10 ------------------------------ */
+
