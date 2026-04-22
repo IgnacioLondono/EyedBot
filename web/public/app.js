@@ -1216,6 +1216,11 @@ function restoreServerState(state) {
     currentServerInsightPayload = state.serverSection.insightPayload || null;
     
     setTimeout(async () => {
+        await loadGuildsForServer();
+        if (document.getElementById('serverSelect') && state.serverSection.selectedGuildId) {
+            document.getElementById('serverSelect').value = state.serverSection.selectedGuildId;
+            // Disparar evento change para cargar la informacion
+            const event = new Event('change');
             document.getElementById('serverSelect').dispatchEvent(event);
         }
     }, 100);
