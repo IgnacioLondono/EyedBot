@@ -395,6 +395,13 @@ function switchServerPane(paneId, button = null) {
         const targetButton = document.querySelector(`.side-menu-btn[data-server-pane="${paneId}"]`);
         activateServerSideButton(targetButton);
     }
+
+    // Hook: cargar datos especificos al abrir ciertos panes
+    if (paneId === 'serverPaneTicketsManage' && typeof openTicketsManagePane === 'function') {
+        try { openTicketsManagePane(); } catch (e) { console.error('openTicketsManagePane error', e); }
+    } else if (typeof stopTicketsManageAutoRefresh === 'function') {
+        stopTicketsManageAutoRefresh();
+    }
 }
 
 function handleServerSideAction(button) {
@@ -6762,3 +6769,539 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+/* ================================================================
+   GESTION DE TICKETS (pane serverPaneTicketsManage)
+   ================================================================ */
+
+const TICKETS_MANAGE_AUTO_REFRESH_MS = 20000;
+let _ticketsManageState = {
+    guildId: '',
+    tab: 'pending', // 'pending' | 'active' | 'history'
+    timer: null,
+    lastData: null,
+    loading: false
+};
+
+function openTicketsManagePane() {
+    if (!hasSelectedGuildContext()) {
+        const container = document.getElementById('ticketManageContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="tm-list-empty">
+                    <div class="tm-list-empty-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    <strong>Selecciona un servidor</strong>
+                    <p>Elige un servidor desde el Dashboard para gestionar sus tickets.</p>
+                </div>`;
+        }
+        return;
+    }
+
+    _ticketsManageState.guildId = String(currentServerGuildId || '');
+    wireTicketsManageControls();
+    loadTicketsManage({ showLoader: true });
+    startTicketsManageAutoRefresh();
+}
+
+function wireTicketsManageControls() {
+    const refreshBtn = document.getElementById('ticketManageRefreshBtn');
+    if (refreshBtn && !refreshBtn._wired) {
+        refreshBtn._wired = true;
+        refreshBtn.addEventListener('click', () => loadTicketsManage({ showLoader: false, force: true }));
+    }
+
+    const autoCheckbox = document.getElementById('ticketManageAutoRefresh');
+    if (autoCheckbox && !autoCheckbox._wired) {
+        autoCheckbox._wired = true;
+        autoCheckbox.addEventListener('change', () => {
+            if (autoCheckbox.checked) startTicketsManageAutoRefresh();
+            else stopTicketsManageAutoRefresh();
+        });
+    }
+}
+
+function startTicketsManageAutoRefresh() {
+    stopTicketsManageAutoRefresh();
+    const autoCheckbox = document.getElementById('ticketManageAutoRefresh');
+    if (autoCheckbox && !autoCheckbox.checked) return;
+
+    _ticketsManageState.timer = setInterval(() => {
+        const pane = document.getElementById('serverPaneTicketsManage');
+        if (!pane || !pane.classList.contains('active')) {
+            stopTicketsManageAutoRefresh();
+            return;
+        }
+        loadTicketsManage({ showLoader: false });
+    }, TICKETS_MANAGE_AUTO_REFRESH_MS);
+}
+
+function stopTicketsManageAutoRefresh() {
+    if (_ticketsManageState.timer) {
+        clearInterval(_ticketsManageState.timer);
+        _ticketsManageState.timer = null;
+    }
+}
+
+async function loadTicketsManage({ showLoader = false, force = false } = {}) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId) return;
+
+    const container = document.getElementById('ticketManageContainer');
+    if (!container) return;
+
+    if (_ticketsManageState.loading && !force) return;
+    _ticketsManageState.loading = true;
+
+    if (showLoader) {
+        container.innerHTML = `
+            <div class="ticket-manage-loading">
+                <div class="loading-spinner"></div>
+                <p>Cargando datos de tickets...</p>
+            </div>`;
+    }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/overview`);
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            container.innerHTML = `
+                <div class="tm-list-empty">
+                    <div class="tm-list-empty-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    <strong>No pudimos cargar los tickets</strong>
+                    <p>${escapeHtml(err.error || `Codigo ${response.status}`)}</p>
+                </div>`;
+            return;
+        }
+
+        const data = await response.json();
+        _ticketsManageState.lastData = data;
+        renderTicketsManage(data);
+    } catch (error) {
+        console.error('Error cargando gestion de tickets:', error);
+        container.innerHTML = `
+            <div class="tm-list-empty">
+                <div class="tm-list-empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                </div>
+                <strong>Error de red</strong>
+                <p>No pudimos contactar el servidor.</p>
+            </div>`;
+    } finally {
+        _ticketsManageState.loading = false;
+    }
+}
+
+function renderTicketsManage(data) {
+    const container = document.getElementById('ticketManageContainer');
+    if (!container) return;
+
+    const stats = data?.stats || { active: 0, pending: 0, closed: 0, total: 0, claimed: 0, unclaimed: 0, last7Days: [] };
+    const activeCount = Number(stats.active || 0);
+    const pendingCount = Number(stats.pending || 0);
+    const closedCount = Number(stats.closed || 0);
+    const totalCount = Number(stats.total || (activeCount + pendingCount + closedCount));
+
+    const tab = _ticketsManageState.tab;
+
+    container.innerHTML = `
+        <div class="tm-stats-grid">
+            ${renderTmStatCard('total', 'Total', totalCount, 'Todos los tickets registrados', tmIconStack())}
+            ${renderTmStatCard('active', 'Activos', activeCount, activeCount === 1 ? 'Canal abierto ahora' : 'Canales abiertos ahora', tmIconActivity())}
+            ${renderTmStatCard('pending', 'Pendientes', pendingCount, pendingCount === 1 ? 'Solicitud por aceptar' : 'Solicitudes por aceptar', tmIconHourglass())}
+            ${renderTmStatCard('closed', 'Cerrados', closedCount, 'En historial de informes', tmIconCheck())}
+            ${renderTmStatCard('claimed', 'Reclamados', stats.claimed || 0, 'Con staff asignado', tmIconShield())}
+            ${renderTmStatCard('unclaimed', 'Sin asignar', stats.unclaimed || 0, 'Requieren atencion', tmIconBell())}
+        </div>
+
+        ${renderTmTrendCard(stats.last7Days || [])}
+
+        <div class="tm-tabs" role="tablist">
+            <button type="button" class="tm-tab-btn ${tab === 'pending' ? 'active' : ''}" data-tm-tab="pending">
+                <span>Pendientes</span>
+                <span class="tm-tab-count">${pendingCount}</span>
+            </button>
+            <button type="button" class="tm-tab-btn ${tab === 'active' ? 'active' : ''}" data-tm-tab="active">
+                <span>Activos</span>
+                <span class="tm-tab-count">${activeCount}</span>
+            </button>
+            <button type="button" class="tm-tab-btn ${tab === 'history' ? 'active' : ''}" data-tm-tab="history">
+                <span>Historial</span>
+                <span class="tm-tab-count">${closedCount}</span>
+            </button>
+        </div>
+
+        <div id="tmListContainer" class="tm-list-container"></div>
+    `;
+
+    container.querySelectorAll('.tm-tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            _ticketsManageState.tab = btn.dataset.tmTab;
+            renderTicketsManage(_ticketsManageState.lastData);
+        });
+    });
+
+    renderTmList(data, tab);
+}
+
+function renderTmStatCard(type, label, value, sub, iconSvg) {
+    return `
+        <div class="tm-stat-card is-${type}">
+            <div class="tm-stat-head">
+                <span class="tm-stat-icon">${iconSvg}</span>
+                <span class="tm-stat-label">${escapeHtml(label)}</span>
+            </div>
+            <div class="tm-stat-value">${Number(value || 0).toLocaleString()}</div>
+            <div class="tm-stat-sub">${escapeHtml(sub || '')}</div>
+        </div>`;
+}
+
+function renderTmTrendCard(last7) {
+    const arr = Array.isArray(last7) ? last7 : [];
+    const maxVal = Math.max(1, ...arr.map((d) => Math.max(d.opened || 0, d.closed || 0)));
+    const dayNames = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+
+    const bars = arr.map((d) => {
+        const openH = Math.max(2, Math.round(((d.opened || 0) / maxVal) * 100));
+        const closedH = Math.max(2, Math.round(((d.closed || 0) / maxVal) * 100));
+        const dt = d.date ? new Date(d.date) : null;
+        const label = dt && !Number.isNaN(dt.getTime()) ? dayNames[dt.getUTCDay()] : '';
+        const tip = `${d.date || ''} · Abiertos: ${d.opened || 0} · Cerrados: ${d.closed || 0}`;
+        return `
+            <div class="tm-trend-day" title="${escapeHtml(tip)}">
+                <div class="tm-trend-day-bars">
+                    <div class="tm-trend-bar bar-open" style="height: ${openH}%"></div>
+                    <div class="tm-trend-bar bar-closed" style="height: ${closedH}%"></div>
+                </div>
+                <div class="tm-trend-day-label">${escapeHtml(label)}</div>
+            </div>`;
+    }).join('');
+
+    return `
+        <div class="tm-trend-card">
+            <div class="tm-trend-head">
+                <h4>Actividad de los últimos 7 días</h4>
+                <div class="tm-trend-legend">
+                    <span class="lg-open">Abiertos</span>
+                    <span class="lg-closed">Cerrados</span>
+                </div>
+            </div>
+            <div class="tm-trend-bars">${bars || '<div class="tm-list-empty" style="grid-column:1/-1">Sin datos recientes</div>'}</div>
+        </div>`;
+}
+
+function renderTmList(data, tab) {
+    const container = document.getElementById('tmListContainer');
+    if (!container) return;
+
+    if (tab === 'pending') {
+        container.innerHTML = renderTmPendingList(data?.pending || []);
+        wireTmPendingActions();
+    } else if (tab === 'active') {
+        container.innerHTML = renderTmActiveList(data?.active || []);
+        wireTmActiveActions();
+    } else {
+        container.innerHTML = renderTmHistoryList(data?.history || []);
+        wireTmHistoryActions();
+    }
+}
+
+function renderTmPendingList(items) {
+    if (!items?.length) return renderTmEmpty('pending');
+    return `<div class="tm-list">${items.map(renderTmPendingCard).join('')}</div>`;
+}
+
+function renderTmPendingCard(item) {
+    const r = item.requester || {};
+    const avatar = r.avatar
+        ? `<img src="${escapeHtml(r.avatar)}" alt="${escapeHtml(r.username || 'U')}">`
+        : escapeHtml(String(r.username || '?').charAt(0).toUpperCase());
+    const when = formatRelativeTime(item.createdAt);
+    const category = escapeHtml(item.category || 'Soporte general');
+    const commonIssue = escapeHtml(item.commonIssue || '');
+    const reason = escapeHtml(item.reason || 'Sin motivo');
+
+    return `
+        <div class="tm-ticket-card">
+            <div class="tm-ticket-avatar">${avatar}</div>
+            <div class="tm-ticket-body">
+                <div class="tm-ticket-title">
+                    <span>${escapeHtml(r.username || 'Usuario')}</span>
+                    <span class="tm-badge pending">Pendiente</span>
+                    <span class="tm-badge cat">${category}</span>
+                </div>
+                <div class="tm-ticket-meta">
+                    ${commonIssue ? `<span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>${commonIssue}</span>` : ''}
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${escapeHtml(when)}</span>
+                </div>
+                <div class="tm-ticket-reason">${reason}</div>
+            </div>
+            <div class="tm-ticket-actions">
+                <button type="button" class="tm-btn tm-btn-primary" data-tm-accept="${escapeHtml(item.requestId || '')}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span>Aceptar</span>
+                </button>
+            </div>
+        </div>`;
+}
+
+function renderTmActiveList(items) {
+    if (!items?.length) return renderTmEmpty('active');
+    return `<div class="tm-list">${items.map(renderTmActiveCard).join('')}</div>`;
+}
+
+function renderTmActiveCard(item) {
+    const o = item.owner || {};
+    const avatar = o.avatar
+        ? `<img src="${escapeHtml(o.avatar)}" alt="${escapeHtml(o.username || 'U')}">`
+        : escapeHtml(String(o.username || '?').charAt(0).toUpperCase());
+    const when = formatRelativeTime(item.createdAt);
+    const claimer = item.claimer;
+    const claimedBadge = claimer
+        ? `<span class="tm-badge claimed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path></svg>${escapeHtml(claimer.username || 'staff')}</span>`
+        : `<span class="tm-badge active">Sin asignar</span>`;
+
+    const claimBtn = claimer
+        ? `<button type="button" class="tm-btn tm-btn-unclaim" data-tm-unclaim="${escapeHtml(item.channelId || '')}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                <span>Liberar</span>
+            </button>`
+        : `<button type="button" class="tm-btn tm-btn-claim" data-tm-claim="${escapeHtml(item.channelId || '')}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"></path></svg>
+                <span>Reclamar</span>
+            </button>`;
+
+    return `
+        <div class="tm-ticket-card">
+            <div class="tm-ticket-avatar">${avatar}</div>
+            <div class="tm-ticket-body">
+                <div class="tm-ticket-title">
+                    <span>#${escapeHtml(item.channelName || 'ticket')}</span>
+                    ${claimedBadge}
+                    <span class="tm-badge cat">${escapeHtml(item.category || 'Soporte general')}</span>
+                </div>
+                <div class="tm-ticket-meta">
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${escapeHtml(o.username || 'Usuario')}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${escapeHtml(when)}</span>
+                </div>
+                ${item.reason ? `<div class="tm-ticket-reason">${escapeHtml(item.reason)}</div>` : ''}
+            </div>
+            <div class="tm-ticket-actions">${claimBtn}</div>
+        </div>`;
+}
+
+function renderTmHistoryList(items) {
+    if (!items?.length) return renderTmEmpty('history');
+    return `<div class="tm-list">${items.map(renderTmHistoryCard).join('')}</div>`;
+}
+
+function renderTmHistoryCard(item) {
+    const o = item.owner || {};
+    const c = item.closer || {};
+    const avatar = o.avatar
+        ? `<img src="${escapeHtml(o.avatar)}" alt="${escapeHtml(o.username || 'U')}">`
+        : escapeHtml(String(o.username || '?').charAt(0).toUpperCase());
+    const when = formatRelativeTime(item.createdAt);
+
+    return `
+        <div class="tm-ticket-card is-history" data-tm-history="${escapeHtml(item.reportId || '')}">
+            <div class="tm-ticket-avatar">${avatar}</div>
+            <div class="tm-ticket-body">
+                <div class="tm-ticket-title">
+                    <span>${escapeHtml(o.username || 'Usuario')}</span>
+                    <span class="tm-badge closed">Cerrado</span>
+                    <span class="tm-badge cat">${escapeHtml(item.category || 'Soporte general')}</span>
+                </div>
+                <div class="tm-ticket-meta">
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>${escapeHtml(item.reportId || 'SIN-ID')}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${escapeHtml(when)}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path></svg>Cerrado por ${escapeHtml(c.username || 'staff')}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>${Number(item.messagesCount || 0)} mensajes</span>
+                </div>
+                ${item.reason ? `<div class="tm-ticket-reason">${escapeHtml(item.reason)}</div>` : ''}
+            </div>
+            <div class="tm-ticket-actions">
+                <button type="button" class="tm-btn tm-btn-ghost" data-tm-history-toggle="${escapeHtml(item.reportId || '')}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <span>Detalles</span>
+                </button>
+            </div>
+            <div class="tm-history-detail">
+                <dl>
+                    <dt>Canal</dt><dd>#${escapeHtml(item.channelName || '-')}</dd>
+                    <dt>Categoría</dt><dd>${escapeHtml(item.category || 'Soporte general')}</dd>
+                    <dt>Problema</dt><dd>${escapeHtml(item.common || '-')}</dd>
+                    <dt>Motivo</dt><dd>${escapeHtml(item.reason || '-')}</dd>
+                    <dt>Usuario</dt><dd>${escapeHtml(o.username || '-')} (${escapeHtml(item.ownerId || '-')})</dd>
+                    <dt>Cerrado por</dt><dd>${escapeHtml(c.username || item.closedByTag || '-')}</dd>
+                    <dt>Mensajes</dt><dd>${Number(item.messagesCount || 0)}</dd>
+                    <dt>Participantes</dt><dd>${Array.isArray(item.participants) ? item.participants.length : 0}</dd>
+                    <dt>Fecha</dt><dd>${escapeHtml(new Date(item.createdAt || 0).toLocaleString('es-ES'))}</dd>
+                </dl>
+            </div>
+        </div>`;
+}
+
+function renderTmEmpty(tab) {
+    const copy = {
+        pending: { icon: tmIconHourglass(), title: 'Sin solicitudes pendientes', desc: 'Cuando alguien solicite un ticket aparecerá aquí.' },
+        active: { icon: tmIconActivity(), title: 'Sin tickets activos', desc: 'No hay canales de tickets abiertos en este momento.' },
+        history: { icon: tmIconCheck(), title: 'Historial vacío', desc: 'Cuando se cierren tickets los verás aquí con todos sus detalles.' }
+    }[tab] || { icon: '', title: 'Sin datos', desc: '' };
+
+    return `
+        <div class="tm-list-empty">
+            <div class="tm-list-empty-icon">${copy.icon}</div>
+            <strong>${escapeHtml(copy.title)}</strong>
+            <p>${escapeHtml(copy.desc)}</p>
+        </div>`;
+}
+
+function wireTmPendingActions() {
+    document.querySelectorAll('[data-tm-accept]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const requestId = btn.getAttribute('data-tm-accept');
+            if (!requestId) return;
+            await acceptPendingTicket(requestId, btn);
+        });
+    });
+}
+
+function wireTmActiveActions() {
+    document.querySelectorAll('[data-tm-claim]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const channelId = btn.getAttribute('data-tm-claim');
+            if (!channelId) return;
+            await claimTicket(channelId, btn);
+        });
+    });
+    document.querySelectorAll('[data-tm-unclaim]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const channelId = btn.getAttribute('data-tm-unclaim');
+            if (!channelId) return;
+            await unclaimTicket(channelId, btn);
+        });
+    });
+}
+
+function wireTmHistoryActions() {
+    document.querySelectorAll('[data-tm-history-toggle]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const card = btn.closest('.tm-ticket-card.is-history');
+            if (card) card.classList.toggle('expanded');
+        });
+    });
+    document.querySelectorAll('.tm-ticket-card.is-history').forEach((card) => {
+        card.addEventListener('click', () => card.classList.toggle('expanded'));
+    });
+}
+
+async function acceptPendingTicket(requestId, button) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId || !requestId) return;
+
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tm-spin"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg><span>Procesando...</span>';
+    }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/pending/${encodeURIComponent(requestId)}/accept`, {
+            method: 'POST'
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result?.success) {
+            showToast(result?.error || 'No se pudo aceptar la solicitud', 'error');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Aceptar</span>';
+            }
+            return;
+        }
+
+        showToast(`Ticket aceptado: #${result.channelName || result.channelId}`, 'success');
+        await loadTicketsManage({ force: true });
+    } catch (error) {
+        console.error('Error aceptando ticket:', error);
+        showToast('Error de red al aceptar el ticket', 'error');
+        if (button) button.disabled = false;
+    }
+}
+
+async function claimTicket(channelId, button) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId || !channelId) return;
+
+    if (button) button.disabled = true;
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/active/${encodeURIComponent(channelId)}/claim`, {
+            method: 'POST'
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+            showToast(result?.error || 'No se pudo reclamar el ticket', 'error');
+            if (button) button.disabled = false;
+            return;
+        }
+        showToast('Ticket reclamado correctamente', 'success');
+        await loadTicketsManage({ force: true });
+    } catch (error) {
+        console.error('Error reclamando ticket:', error);
+        showToast('Error de red al reclamar el ticket', 'error');
+        if (button) button.disabled = false;
+    }
+}
+
+async function unclaimTicket(channelId, button) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId || !channelId) return;
+
+    if (button) button.disabled = true;
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/active/${encodeURIComponent(channelId)}/unclaim`, {
+            method: 'POST'
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+            showToast(result?.error || 'No se pudo liberar el ticket', 'error');
+            if (button) button.disabled = false;
+            return;
+        }
+        showToast('Ticket liberado', 'success');
+        await loadTicketsManage({ force: true });
+    } catch (error) {
+        console.error('Error liberando ticket:', error);
+        showToast('Error de red al liberar el ticket', 'error');
+        if (button) button.disabled = false;
+    }
+}
+
+function formatRelativeTime(iso) {
+    const t = new Date(iso || 0).getTime();
+    if (!Number.isFinite(t) || t <= 0) return '—';
+    const diff = Date.now() - t;
+    const abs = Math.abs(diff);
+    const mins = Math.round(abs / 60000);
+    if (mins < 1) return 'hace un momento';
+    if (mins < 60) return `hace ${mins} min`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `hace ${hrs} h`;
+    const days = Math.round(hrs / 24);
+    if (days < 30) return `hace ${days} d`;
+    const months = Math.round(days / 30);
+    if (months < 12) return `hace ${months} meses`;
+    return new Date(t).toLocaleDateString('es-ES');
+}
+
+/* ---- Iconos SVG reutilizables ---- */
+function tmIconStack()     { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 12 15 2 8.5 12 2"></polygon><polyline points="2 15.5 12 22 22 15.5"></polyline><polyline points="2 11.5 12 18 22 11.5"></polyline></svg>'; }
+function tmIconActivity()  { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>'; }
+function tmIconHourglass() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h12v6l-4 4 4 4v6H6v-6l4-4-4-4z"></path></svg>'; }
+function tmIconCheck()     { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'; }
+function tmIconShield()    { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path></svg>'; }
+function tmIconBell()      { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>'; }

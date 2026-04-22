@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260419-2">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-3">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260422-4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -942,6 +942,17 @@
                                     <span class="side-menu-label">Tickets</span>
                                 </span>
                             </button>
+                            <button type="button" class="side-menu-btn" data-server-pane="serverPaneTicketsManage">
+                                <span class="side-menu-btn-inner">
+                                    <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"></path>
+                                        <path d="M12 14V4"></path>
+                                        <path d="M9 7l3-3 3 3"></path>
+                                        <circle cx="12" cy="17" r="1.2"></circle>
+                                    </svg>
+                                    <span class="side-menu-label">Gestión de tickets</span>
+                                </span>
+                            </button>
                             <button type="button" class="side-menu-btn" data-server-pane="serverPaneLevels">
                                 <span class="side-menu-btn-inner">
                                     <svg class="side-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1124,6 +1135,35 @@
                             </div>
                         </div>
 
+                        <div id="serverPaneTicketsManage" class="server-pane">
+                            <div class="server-pane-surface">
+                                <div class="server-pane-head">
+                                    <div>
+                                        <div class="server-pane-kicker">Módulo</div>
+                                        <h3>Gestión de tickets</h3>
+                                        <p>Monitorea la actividad, acepta solicitudes y consulta el historial desde la web.</p>
+                                    </div>
+                                    <div class="ticket-manage-actions">
+                                        <button type="button" id="ticketManageRefreshBtn" class="btn btn-ghost">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>
+                                            <span>Actualizar</span>
+                                        </button>
+                                        <label class="ticket-manage-autorefresh">
+                                            <input type="checkbox" id="ticketManageAutoRefresh" checked>
+                                            <span>Auto</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div id="ticketManageContainer" class="ticket-manage-container">
+                                    <div class="ticket-manage-loading">
+                                        <div class="loading-spinner"></div>
+                                        <p>Cargando datos de tickets...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="serverPaneLevels" class="server-pane">
                             <div class="server-pane-surface">
                                 <div class="server-pane-head">
@@ -1233,6 +1273,6 @@
     <div id="toastContainer" class="toast-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260422-3"></script>
+    <script src="app.js?v=20260422-4"></script>
 </body>
 </html>
