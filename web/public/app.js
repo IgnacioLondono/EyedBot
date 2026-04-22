@@ -5523,7 +5523,8 @@ function bindServerSummaryCardEvents() {
             event.preventDefault();
             event.stopPropagation();
             openServerInsight('roleMembers', {
-                roleId: button.dataset.serverRoleId || ''
+                roleId: button.dataset.serverRoleId || '',
+                parentInsight: 'roles'
             });
         });
     });
@@ -5533,7 +5534,8 @@ function bindServerSummaryCardEvents() {
             event.preventDefault();
             event.stopPropagation();
             openServerInsight('channelList', {
-                channelSection: button.dataset.serverChannelSection || ''
+                channelSection: button.dataset.serverChannelSection || '',
+                parentInsight: 'channels'
             });
         });
     });
@@ -5548,9 +5550,43 @@ function openServerInsight(insightId, payload = null) {
 
 function closeServerInsight() {
     if (!currentServerInfo) return;
+    const parentInsight = String(currentServerInsightPayload?.parentInsight || '').trim();
+    if (parentInsight) {
+        currentServerInsightView = parentInsight;
+        currentServerInsightPayload = null;
+        displayServerInfoEnhanced(currentServerInfo);
+        return;
+    }
     currentServerInsightView = 'overview';
     currentServerInsightPayload = null;
     displayServerInfoEnhanced(currentServerInfo);
+}
+
+function getServerInsightBackLabel() {
+    const parentInsight = String(currentServerInsightPayload?.parentInsight || '').trim();
+    const insightLabels = {
+        overview: 'resumen',
+        owner: 'Propietario',
+        members: 'Miembros',
+        channels: 'Canales',
+        roles: 'Roles',
+        messages: 'Mensajes',
+        voice: 'Voz',
+        flow: 'Entradas y salidas',
+        peak: 'Picos',
+        live: 'Voz en vivo',
+        age: 'Edad y base',
+        core: 'Estadisticas core',
+        created: 'Fecha de creacion',
+        activity: 'Usuarios activos',
+        chart: 'Graficas'
+    };
+
+    if (parentInsight && insightLabels[parentInsight]) {
+        return `Volver a ${insightLabels[parentInsight]}`;
+    }
+
+    return 'Volver al resumen';
 }
 
 function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar, createdDate, ageDays, trackedUsers, totalMessages, avgMessagesPerDay, topMessageTag, topMessageCount, totalVoiceMinutes, avgVoiceHoursPerDay, topVoiceTag, topVoiceMinutes, totalJoins, totalLeaves, flowNet, peakJoinCount, peakJoinDate, peakLeaveCount, peakLeaveDate, liveVoiceUsers, liveTopChannelName, liveTopChannelUsers) {
@@ -5897,13 +5933,14 @@ function displayServerInfoEnhanced(info) {
 
     if (currentServerInsightView !== 'overview') {
         const detail = buildServerInsightDetailMarkup(info, currentServerInsightView);
+        const backLabel = getServerInsightBackLabel();
         container.innerHTML = `
             <section class="server-insight-view">
                 <button type="button" class="chip-btn server-insight-back" data-server-insight-back>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M15 18l-6-6 6-6"></path>
                     </svg>
-                    <span>Volver al resumen</span>
+                    <span>${escapeHtml(backLabel)}</span>
                 </button>
                 <header class="server-insight-header">
                     <div class="server-insight-kicker">Detalle</div>
