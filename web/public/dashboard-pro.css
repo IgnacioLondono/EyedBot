@@ -492,6 +492,24 @@ body::before {
 input[type="range"].form-control { padding: 0; background: transparent !important; border: none !important; accent-color: var(--iris-400, #9a6dff); }
 input[type="color"].form-control { padding: 4px; height: 44px; cursor: pointer; }
 
+/* ---------- Iconos SVG globales (estilo Lucide) ---------- */
+svg {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.side-menu-icon,
+.side-menu-group-icon,
+.summary-icon svg,
+.tm-stat-icon svg,
+.tm-ticket-meta-item svg,
+.tm-badge svg,
+.tm-btn svg,
+.section-title-icon {
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    vector-effect: non-scaling-stroke;
+}
+
 /* ---------- Select dropdown (native <option> readability) ---------- */
 select.form-control,
 select.form-select,
@@ -612,13 +630,34 @@ label { color: var(--text-secondary); font-weight: 500; }
 .side-menu-btn-inner { gap: 0.7rem !important; padding: 0.6rem 0.75rem !important; color: var(--text-secondary) !important; }
 .side-menu-btn:hover { background: rgba(255, 255, 255, 0.04) !important; }
 .side-menu-btn:hover .side-menu-btn-inner { color: var(--text-primary) !important; }
+.side-menu-btn:hover .side-menu-icon {
+    color: #e9d8ff !important;
+    transform: scale(1.05);
+}
+.side-menu-icon {
+    width: 20px !important;
+    height: 20px !important;
+    flex-shrink: 0;
+    color: var(--text-muted, #a48fd0);
+    transition: color 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+}
 .side-menu-btn.active {
     background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.24), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.18)) !important;
     border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4) !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 22px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2);
 }
 .side-menu-btn.active .side-menu-btn-inner { color: #fff !important; font-weight: 600; }
-.side-menu-btn.active .side-menu-icon { color: #fff !important; filter: drop-shadow(0 0 8px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.5)); }
+.side-menu-btn.active .side-menu-icon {
+    color: #fff !important;
+    filter: drop-shadow(0 0 8px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.6));
+    transform: scale(1.05);
+}
+.side-menu-group-icon {
+    width: 20px;
+    height: 20px;
+    padding: 4px;
+    box-sizing: content-box;
+}
 
 .side-menu-search .form-control { border-radius: 999px !important; padding: 0.55rem 1rem !important; }
 
