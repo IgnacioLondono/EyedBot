@@ -9,33 +9,47 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
+            --pro-violet: #8b5cf6;
+            --pro-violet-600: #7c3aed;
+            --pro-indigo: #6366f1;
+            --pro-pink: #ec4899;
+            --pro-rose: #f43f5e;
+            --pro-cyan: #22d3ee;
+            --pro-sky: #38bdf8;
+            --pro-emerald: #10b981;
+            --pro-amber: #f59e0b;
+
             --saber-blue-dark: #2d1b59;
             --saber-blue: #7c4dff;
             --saber-blue-light: #be9bff;
             --saber-gold: #9a6dff;
             --saber-gold-light: #e6dcff;
-            --bg-primary: #090512;
-            --bg-secondary: #150c26;
-            --bg-card: rgba(26, 16, 48, 0.9);
+            --bg-primary: #070410;
+            --bg-secondary: #120a24;
+            --bg-card: rgba(20, 12, 38, 0.92);
             --text-primary: #f4eeff;
             --text-secondary: #cbb7f6;
             --text-muted: #a48fd0;
             --border-color: rgba(154, 109, 255, 0.22);
+            --border-bright: rgba(190, 155, 255, 0.4);
+
+            --grad-primary: linear-gradient(135deg, #7c4dff 0%, #ff78d1 100%);
+            --grad-cool: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
+            --grad-warm: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
 
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
+            color: var(--text-primary);
             background:
-                radial-gradient(circle at 18% 12%, rgba(154, 109, 255, 0.16), transparent 30%),
-                radial-gradient(circle at 80% 18%, rgba(93, 168, 255, 0.13), transparent 28%),
-                radial-gradient(circle at 65% 84%, rgba(124, 77, 255, 0.14), transparent 36%),
-                linear-gradient(180deg, #090512 0%, #100920 48%, #090512 100%);
+                radial-gradient(1200px 600px at 85% -10%, rgba(255, 120, 209, 0.16), transparent 60%),
+                radial-gradient(1000px 500px at -10% 10%, rgba(124, 77, 255, 0.22), transparent 55%),
+                radial-gradient(900px 700px at 50% 110%, rgba(34, 211, 238, 0.12), transparent 60%),
+                linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 65%, var(--bg-primary) 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -45,305 +59,514 @@
             overflow: hidden;
         }
 
-        /* Background Effects - Minimalista */
         body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 30%, rgba(154, 109, 255, 0.11) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(93, 168, 255, 0.09) 0%, transparent 50%);
-            animation: patternFloat 30s ease-in-out infinite;
+            content: "";
+            position: fixed; inset: 0;
+            pointer-events: none;
             z-index: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: radial-gradient(ellipse at 50% 30%, rgba(0, 0, 0, 0.55) 0%, transparent 75%);
+            -webkit-mask-image: radial-gradient(ellipse at 50% 30%, rgba(0, 0, 0, 0.55) 0%, transparent 75%);
         }
 
-        body::after {
-            content: '';
+        .floating-orb {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(154, 109, 255, 0.16) 0%, transparent 70%);
-            transform: translate(-50%, -50%);
-            animation: glowPulse 20s ease-in-out infinite;
-            z-index: 0;
             border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: 0;
         }
+        .orb-1 { width: 420px; height: 420px; top: -10%; left: -10%; background: radial-gradient(circle, rgba(124, 77, 255, 0.55), transparent 65%); animation: orb1 14s ease-in-out infinite; }
+        .orb-2 { width: 360px; height: 360px; bottom: -12%; right: -8%; background: radial-gradient(circle, rgba(255, 120, 209, 0.45), transparent 65%); animation: orb2 18s ease-in-out infinite; }
+        .orb-3 { width: 260px; height: 260px; top: 40%; right: 35%; background: radial-gradient(circle, rgba(34, 211, 238, 0.35), transparent 65%); animation: orb3 22s ease-in-out infinite; }
+        @keyframes orb1 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(40px, 30px) scale(1.08);} }
+        @keyframes orb2 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(-30px, -20px) scale(1.1);} }
+        @keyframes orb3 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(-25px, 15px) scale(1.15);} }
 
-        @keyframes patternFloat {
-            0%, 100% { 
-                opacity: 1;
-                transform: translateY(0);
-            }
-            50% { 
-                opacity: 0.7;
-                transform: translateY(-20px);
-            }
-        }
-
-        @keyframes glowPulse {
-            0%, 100% { 
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 0.5;
-            }
-            50% { 
-                transform: translate(-50%, -50%) scale(1.2);
-                opacity: 0.8;
-            }
-        }
-
-        .login-container {
-            background: linear-gradient(180deg, rgba(26, 16, 48, 0.94), rgba(14, 8, 28, 0.94));
-            backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid var(--border-color);
-            border-radius: 24px;
-            padding: 4rem 3rem;
-            max-width: 480px;
-            width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), 0 0 40px rgba(154, 109, 255, 0.2);
-            text-align: center;
+        .login-shell {
             position: relative;
             z-index: 1;
-            animation: containerFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 0;
+            width: 100%;
+            max-width: 1080px;
+            min-height: 620px;
+            border-radius: 28px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(20, 12, 38, 0.94), rgba(12, 7, 24, 0.96));
+            border: 1px solid var(--border-color);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(154, 109, 255, 0.15), 0 0 60px rgba(154, 109, 255, 0.12);
+            backdrop-filter: blur(22px) saturate(180%);
+            -webkit-backdrop-filter: blur(22px) saturate(180%);
+            animation: shellFadeIn 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
         }
 
-        @keyframes containerFadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(30px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
+        @keyframes shellFadeIn {
+            from { opacity: 0; transform: translateY(24px) scale(0.98); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        .logo-container {
-            margin-bottom: 2rem;
+        /* PANEL IZQUIERDO — marca + features */
+        .brand-panel {
+            position: relative;
+            padding: 3rem 2.8rem;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            justify-content: space-between;
+            background:
+                radial-gradient(420px 240px at 0% 0%, rgba(124, 77, 255, 0.28), transparent 60%),
+                radial-gradient(380px 240px at 100% 100%, rgba(255, 120, 209, 0.22), transparent 60%),
+                linear-gradient(180deg, rgba(26, 16, 48, 0.88), rgba(12, 7, 24, 0.92));
+            border-right: 1px solid rgba(154, 109, 255, 0.18);
+            overflow: hidden;
         }
-
-        .logo-icon {
-            width: 72px;
-            height: 72px;
-            color: var(--saber-blue);
-            filter: drop-shadow(0 0 16px rgba(154, 109, 255, 0.42));
-            animation: iconGlow 3s ease-in-out infinite;
-            transition: all 0.3s ease;
+        .brand-panel::after {
+            content: "";
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: radial-gradient(ellipse at 30% 40%, rgba(0, 0, 0, 0.7), transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse at 30% 40%, rgba(0, 0, 0, 0.7), transparent 70%);
+            pointer-events: none;
         }
+        .brand-panel > * { position: relative; z-index: 1; }
 
-        .logo-container:hover .logo-icon {
-            color: var(--saber-gold);
-            filter: drop-shadow(0 0 20px rgba(190, 155, 255, 0.6));
+        .brand-head {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
         }
-
-        @keyframes iconGlow {
-            0%, 100% { 
-                filter: drop-shadow(0 0 16px rgba(154, 109, 255, 0.42));
-            }
-            50% { 
-                filter: drop-shadow(0 0 24px rgba(154, 109, 255, 0.64)) drop-shadow(0 0 32px rgba(93, 168, 255, 0.3));
-            }
+        .brand-icon-wrap {
+            width: 52px; height: 52px;
+            border-radius: 14px;
+            background: var(--grad-primary);
+            display: inline-flex; align-items: center; justify-content: center;
+            box-shadow: 0 10px 26px rgba(124, 77, 255, 0.45);
         }
-
-        h1 {
+        .brand-icon-wrap svg { width: 28px; height: 28px; color: #fff; }
+        .brand-head h2 {
             font-family: 'Cormorant Garamond', 'Sora', serif;
-            background: linear-gradient(135deg, var(--saber-blue-light), var(--saber-gold));
+            font-size: 1.7rem;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            background: linear-gradient(135deg, #fff 0%, #be9bff 100%);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 0.75rem;
-            font-size: 2.25rem;
-            font-weight: 600;
-            letter-spacing: 1px;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+        .brand-head .brand-tag {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
         }
 
-        .subtitle {
-            color: var(--text-secondary);
-            margin-bottom: 2.5rem;
-            line-height: 1.6;
-            font-size: 1rem;
+        .brand-hero {
+            margin-top: 2.5rem;
         }
+        .brand-hero h1 {
+            font-size: clamp(1.8rem, 2.6vw, 2.3rem);
+            line-height: 1.15;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #ffffff 0%, #be9bff 65%, #ff78d1 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+        .brand-hero p {
+            margin-top: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+            font-size: 0.98rem;
+            max-width: 42ch;
+        }
+
+        .feature-list {
+            margin-top: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .feature-row {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            padding: 0.7rem 0.9rem;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+            border: 1px solid rgba(190, 155, 255, 0.16);
+            border-radius: 14px;
+            transition: border-color 0.25s ease, transform 0.25s ease, background 0.25s ease;
+        }
+        .feature-row:hover {
+            border-color: rgba(154, 109, 255, 0.45);
+            transform: translateX(3px);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+        }
+        .feature-dot {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: inline-flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .feature-dot svg { width: 18px; height: 18px; color: #fff; }
+        .feature-row:nth-child(1) .feature-dot { background: linear-gradient(135deg, var(--pro-violet), var(--pro-pink)); }
+        .feature-row:nth-child(2) .feature-dot { background: linear-gradient(135deg, var(--pro-cyan), var(--pro-indigo)); }
+        .feature-row:nth-child(3) .feature-dot { background: linear-gradient(135deg, var(--pro-emerald), var(--pro-cyan)); }
+        .feature-row:nth-child(4) .feature-dot { background: linear-gradient(135deg, var(--pro-amber), var(--pro-rose)); }
+
+        .feature-text strong { display: block; color: var(--text-primary); font-size: 0.92rem; }
+        .feature-text span { color: var(--text-muted); font-size: 0.82rem; }
+
+        .brand-footer {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            margin-top: 2rem;
+        }
+        .brand-footer .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--pro-emerald);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+        }
+
+        /* PANEL DERECHO — formulario login */
+        .login-panel {
+            padding: 3rem 2.8rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        .login-kicker {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, rgba(124, 77, 255, 0.22), rgba(255, 120, 209, 0.18));
+            border: 1px solid rgba(124, 77, 255, 0.32);
+            font-size: 0.72rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.12em;
+            color: var(--text-primary);
+            align-self: flex-start;
+        }
+        .login-kicker .kicker-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--grad-primary);
+            box-shadow: 0 0 10px rgba(124, 77, 255, 0.75);
+        }
+
+        .login-title {
+            margin-top: 1rem;
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+        .login-subtitle {
+            margin-top: 0.55rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .error {
+            background: rgba(244, 63, 94, 0.08);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+            margin-top: 1.5rem;
+            color: #ff8da0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: errorSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+        @keyframes errorSlide { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .error svg { width: 18px; height: 18px; flex-shrink: 0; }
 
         .login-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
-            background: linear-gradient(135deg, var(--saber-blue), var(--saber-blue-dark));
-            color: #f4eeff;
-            padding: 1.125rem 2.5rem;
-            border-radius: 12px;
+            background: var(--grad-primary);
+            color: #fff;
+            padding: 1rem 1.5rem;
+            border-radius: 14px;
             text-decoration: none;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 1rem;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 1.75rem;
             border: none;
             cursor: pointer;
             width: 100%;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 8px 32px rgba(124, 77, 255, 0.3);
+            box-shadow: 0 14px 36px rgba(124, 77, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: transform 0.25s ease, box-shadow 0.3s ease, filter 0.25s ease;
         }
-
         .login-btn::before {
             content: '';
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.15);
             transform: translate(-50%, -50%);
             transition: width 0.6s, height 0.6s;
         }
-
-        .login-btn:hover::before {
-            width: 300px;
-            height: 300px;
-        }
-
+        .login-btn:hover::before { width: 520px; height: 520px; }
         .login-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(124, 77, 255, 0.38);
-            background: linear-gradient(135deg, var(--saber-blue-light), var(--saber-blue));
+            transform: translateY(-2px);
+            filter: brightness(1.06);
+            box-shadow: 0 20px 46px rgba(124, 77, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
         }
+        .login-btn svg { width: 20px; height: 20px; transition: transform 0.25s ease; position: relative; z-index: 1; }
+        .login-btn span { position: relative; z-index: 1; }
+        .login-btn:hover svg { transform: translateX(3px); }
 
-        .login-btn svg {
-            width: 20px;
-            height: 20px;
-            transition: transform 0.3s ease;
-        }
-
-        .login-btn:hover svg {
-            transform: scale(1.1);
-        }
-
-        .error {
-            background: rgba(239, 68, 68, 0.08);
-            border: 1px solid rgba(239, 68, 68, 0.24);
-            border-radius: 12px;
-            padding: 1.125rem;
-            margin-bottom: 1.5rem;
-            color: #EF4444;
+        .divider {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            animation: errorSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            text-align: left;
+            margin: 1.5rem 0;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            font-weight: 600;
         }
-
-        @keyframes errorSlide {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .error svg {
-            width: 18px;
-            height: 18px;
-            flex-shrink: 0;
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(190, 155, 255, 0.25), transparent);
         }
 
         .info {
-            background: rgba(154, 109, 255, 0.1);
-            border: 1px solid rgba(154, 109, 255, 0.24);
-            border-radius: 12px;
-            padding: 1.125rem;
-            margin-top: 2rem;
-            color: var(--saber-gold);
-            font-size: 0.9rem;
-            line-height: 1.6;
+            background: linear-gradient(180deg, rgba(154, 109, 255, 0.1), rgba(154, 109, 255, 0.04));
+            border: 1px solid rgba(154, 109, 255, 0.28);
+            border-radius: 14px;
+            padding: 1rem 1.1rem;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.55;
             display: flex;
             align-items: flex-start;
             gap: 0.75rem;
-            text-align: left;
         }
+        .info svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; color: var(--saber-gold); }
+        .info strong { display: block; margin-bottom: 0.3rem; color: var(--saber-gold-light); font-size: 0.93rem; }
 
-        .info svg {
-            width: 18px;
-            height: 18px;
-            flex-shrink: 0;
-            margin-top: 2px;
-            color: var(--saber-gold);
+        .trust-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px dashed rgba(190, 155, 255, 0.18);
+            color: var(--text-muted);
+            font-size: 0.78rem;
         }
-
-        .info strong {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--saber-gold-light);
+        .trust-row .badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .trust-badge {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid rgba(190, 155, 255, 0.2);
+            background: rgba(255, 255, 255, 0.03);
+            font-size: 0.72rem;
+            color: var(--text-secondary);
         }
+        .trust-badge svg { width: 12px; height: 12px; }
 
+        @media (max-width: 900px) {
+            .login-shell {
+                grid-template-columns: 1fr;
+                max-width: 520px;
+                min-height: auto;
+            }
+            .brand-panel { padding: 2.25rem 2rem; border-right: none; border-bottom: 1px solid rgba(154, 109, 255, 0.18); }
+            .login-panel { padding: 2.25rem 2rem; }
+            .feature-list { display: none; }
+        }
         @media (max-width: 480px) {
-            .login-container {
-                padding: 3rem 2rem;
-            }
-
-            h1 {
-                font-size: 1.875rem;
-            }
-
-            .subtitle {
-                font-size: 0.95rem;
-            }
+            body { padding: 1rem; }
+            .brand-panel, .login-panel { padding: 1.8rem 1.5rem; }
+            .login-title { font-size: 1.45rem; }
+            .brand-hero h1 { font-size: 1.5rem; }
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="logo-container">
-            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-        </div>
-        <h1>EyedBot Panel</h1>
-        <p class="subtitle">Inicia sesión con tu cuenta de Discord para acceder al panel de administración</p>
-        
-        <div id="errorMessage" class="error" style="display: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <span></span>
-        </div>
-        
-        <a href="/auth/discord" class="login-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-            <span>Iniciar Sesión con Discord</span>
-        </a>
+    <div class="floating-orb orb-1"></div>
+    <div class="floating-orb orb-2"></div>
+    <div class="floating-orb orb-3"></div>
 
-        <div class="info">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            <div>
-                <strong>Nota Importante</strong>
-                Necesitas tener permisos de administrador en al menos un servidor donde el bot esté presente.
+    <div class="login-shell">
+        <!-- Panel Izquierdo: Marca + Features -->
+        <aside class="brand-panel">
+            <div class="brand-head">
+                <span class="brand-icon-wrap">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </span>
+                <div>
+                    <h2>EyedBot</h2>
+                    <span class="brand-tag">Panel de administración</span>
+                </div>
             </div>
-        </div>
+
+            <div class="brand-hero">
+                <h1>El control total de tu comunidad, en un solo dashboard.</h1>
+                <p>Gestiona tus servidores de Discord con una experiencia moderna: moderación, bienvenida, tickets, niveles, embeds y mucho más.</p>
+            </div>
+
+            <div class="feature-list">
+                <div class="feature-row">
+                    <span class="feature-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                    </span>
+                    <div class="feature-text">
+                        <strong>Moderación profesional</strong>
+                        <span>Bans, mutes, advertencias y logs centralizados.</span>
+                    </div>
+                </div>
+                <div class="feature-row">
+                    <span class="feature-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 2L11 13"></path>
+                            <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                        </svg>
+                    </span>
+                    <div class="feature-text">
+                        <strong>Embeds en vivo</strong>
+                        <span>Vista previa instantánea con plantillas reutilizables.</span>
+                    </div>
+                </div>
+                <div class="feature-row">
+                    <span class="feature-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 3v18h18"></path>
+                            <path d="M7 14l4-4 4 4 6-7"></path>
+                        </svg>
+                    </span>
+                    <div class="feature-text">
+                        <strong>Estadísticas y analítica</strong>
+                        <span>Métricas en tiempo real de tu comunidad.</span>
+                    </div>
+                </div>
+                <div class="feature-row">
+                    <span class="feature-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </span>
+                    <div class="feature-text">
+                        <strong>Totalmente personalizable</strong>
+                        <span>Temas, colores y flujos adaptados a tu marca.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="brand-footer">
+                <span class="dot"></span>
+                <span>Sistemas operativos · versión web estable</span>
+            </div>
+        </aside>
+
+        <!-- Panel Derecho: Login -->
+        <section class="login-panel">
+            <span class="login-kicker">
+                <span class="kicker-dot"></span>
+                Acceso seguro
+            </span>
+            <h1 class="login-title">Bienvenido de vuelta</h1>
+            <p class="login-subtitle">Inicia sesión con tu cuenta de Discord para entrar al panel de administración de EyedBot.</p>
+
+            <div id="errorMessage" class="error" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span></span>
+            </div>
+
+            <a href="/auth/discord" class="login-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>Iniciar Sesión con Discord</span>
+            </a>
+
+            <div class="divider">o sigue explorando</div>
+
+            <div class="info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <div>
+                    <strong>Nota importante</strong>
+                    Necesitas tener permisos de administrador en al menos un servidor donde el bot esté presente.
+                </div>
+            </div>
+
+            <div class="trust-row">
+                <span>OAuth2 · Discord</span>
+                <div class="badges">
+                    <span class="trust-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        Conexión cifrada
+                    </span>
+                    <span class="trust-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5"></path>
+                        </svg>
+                        Sin contraseña
+                    </span>
+                </div>
+            </div>
+        </section>
     </div>
 
     <script>
-        // Mostrar mensajes de error si hay alguno en la URL
         const urlParams = new URLSearchParams(window.location.search);
         const error = urlParams.get('error');
         const errorMessages = {
