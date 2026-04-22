@@ -629,7 +629,9 @@ function saveState() {
         },
         serverSection: {
             selectedGuildId: document.getElementById('serverSelect')?.value || currentServerGuildId || '',
-            activePaneId: currentServerPaneId || 'serverPaneOverview'
+            activePaneId: currentServerPaneId || 'serverPaneOverview',
+            insightView: currentServerInsightView || 'overview',
+            insightPayload: currentServerInsightPayload || null
         },
         logs: {
             levelFilter: document.getElementById('logLevelFilter')?.value || '',
@@ -1210,6 +1212,8 @@ function restoreServerState(state) {
     if (state.serverSection.activePaneId) {
         currentServerPaneId = state.serverSection.activePaneId;
     }
+    currentServerInsightView = state.serverSection.insightView || 'overview';
+    currentServerInsightPayload = state.serverSection.insightPayload || null;
     
     setTimeout(async () => {
         await loadGuildsForServer();
@@ -4811,6 +4815,29 @@ function renderServerPreviewSection(title, items = [], sectionType, mapper, empt
     `;
 }
 
+function renderVoiceChannelCards(items = [], options = {}) {
+    const { limit = items.length, emptyText = 'No hay canales de voz para mostrar.' } = options;
+    const channels = items.slice(0, limit);
+    if (!channels.length) {
+        return `<div class="summary-top-users-empty">${emptyText}</div>`;
+    }
+
+    return channels.map((channel) => `
+        <article class="server-detail-list-item">
+            <div class="server-detail-list-title">${escapeHtml(String(channel?.name || 'Canal de voz'))}</div>
+            <div class="server-detail-list-meta">${escapeHtml(String(channel?.type || 'Voz'))} • ${formatServerMetric(channel?.userCount || 0)} usuarios</div>
+            <div class="server-detail-list-extra">${escapeHtml(String(channel?.parentName || 'Sin categoria'))}</div>
+            <div class="summary-top-users-list summary-top-users-list--compact">
+                ${renderServerProfileList((Array.isArray(channel?.users) ? channel.users : []).map((user) => ({
+                    title: user.tag,
+                    avatar: user.avatar,
+                    meta: `ID ${user.id}`
+                })), { emptyText: 'Sin usuarios conectados.' })}
+            </div>
+        </article>
+    `).join('');
+}
+
 function renderServerChipList(items = [], emptyText = 'Sin datos adicionales.') {
     if (!items.length) {
         return `<div class="summary-top-users-empty">${emptyText}</div>`;
@@ -5177,7 +5204,15 @@ function buildServerInsightDetailMarkup(info, insightId) {
                 </div>
                 <div class="server-insight-columns">
                     ${renderServerPreviewSection('Canales de texto', textChannels, 'text', channelSectionMap.text.mapItem, 'No hay canales de texto para mostrar.')}
-                    ${renderServerPreviewSection('Canales de voz', voiceChannels, 'voice', channelSectionMap.voice.mapItem, 'No hay canales de voz para mostrar.')}
+                    <section class="server-insight-section">
+                        <div class="server-insight-section-head">
+                            <h4>Canales de voz</h4>
+                            ${voiceChannels.length > 3 ? '<button type="button" class="summary-link-btn" data-server-channel-section="voice">Ver mas</button>' : ''}
+                        </div>
+                        <div class="server-detail-list">
+                            ${renderVoiceChannelCards(voiceChannels, { limit: 3, emptyText: 'No hay canales de voz para mostrar.' })}
+                        </div>
+                    </section>
                     ${renderServerPreviewSection('Categorias', categoryChannels, 'category', channelSectionMap.category.mapItem, 'No hay categorias para mostrar.')}
                 </div>
             `
@@ -5432,9 +5467,11 @@ function buildServerInsightDetailMarkup(info, insightId) {
                 <section class="server-insight-section">
                     <h4>${escapeHtml(selectedChannelConfig.title)}</h4>
                     <div class="server-detail-list server-detail-list--scroll">
-                        ${renderServerTextList(selectedChannelConfig.items.map(selectedChannelConfig.mapItem), {
-                            emptyText: selectedChannelConfig.emptyText
-                        })}
+                        ${selectedChannelSection === 'voice'
+                            ? renderVoiceChannelCards(selectedChannelConfig.items, { emptyText: selectedChannelConfig.emptyText })
+                            : renderServerTextList(selectedChannelConfig.items.map(selectedChannelConfig.mapItem), {
+                                emptyText: selectedChannelConfig.emptyText
+                            })}
                     </div>
                 </section>
             ` : `
@@ -5546,6 +5583,7 @@ function openServerInsight(insightId, payload = null) {
     currentServerInsightView = insightId;
     currentServerInsightPayload = payload;
     displayServerInfoEnhanced(currentServerInfo);
+    saveState();
 }
 
 function closeServerInsight() {
@@ -5555,11 +5593,13 @@ function closeServerInsight() {
         currentServerInsightView = parentInsight;
         currentServerInsightPayload = null;
         displayServerInfoEnhanced(currentServerInfo);
+        saveState();
         return;
     }
     currentServerInsightView = 'overview';
     currentServerInsightPayload = null;
     displayServerInfoEnhanced(currentServerInfo);
+    saveState();
 }
 
 function getServerInsightBackLabel() {
