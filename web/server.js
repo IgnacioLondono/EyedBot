@@ -25,6 +25,7 @@ const {
     claimTicketFromWeb,
     listPendingRequests,
     listTicketReports,
+    getTicketReport,
     listActiveTicketChannels
 } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
@@ -1739,6 +1740,102 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/unclaim', requireAuth, a
     } catch (error) {
         console.error('Error liberando ticket:', error);
         res.status(500).json({ error: 'Error al liberar el ticket' });
+    }
+});
+
+// Enriquecer report con datos de usuarios (owner, closer, participantes)
+async function enrichReportDetail(client, report) {
+    if (!report || typeof report !== 'object') return report;
+
+    const safeFetch = async (id) => {
+        if (!id || !client) return null;
+        try {
+            const u = await client.users.fetch(String(id)).catch(() => null);
+            if (!u) return null;
+            return {
+                id: u.id,
+                tag: u.tag || u.username,
+                username: u.username,
+                displayName: u.globalName || u.username,
+                avatarURL: typeof u.displayAvatarURL === 'function' ? u.displayAvatarURL({ size: 128, extension: 'png' }) : null
+            };
+        } catch {
+            return null;
+        }
+    };
+
+    const [owner, closer] = await Promise.all([
+        safeFetch(report.ownerId),
+        safeFetch(report.closedById)
+    ]);
+
+    const participantIds = Array.isArray(report.participants) ? report.participants.slice(0, 30) : [];
+    const participantsDetailed = await Promise.all(participantIds.map((id) => safeFetch(id)));
+
+    // Enriquecer autores de cada entry con url de avatar (por si el cliente quiere mostrarlos)
+    const authorMap = new Map();
+    (participantsDetailed || []).forEach((p) => { if (p?.id) authorMap.set(p.id, p); });
+    if (owner?.id) authorMap.set(owner.id, owner);
+    if (closer?.id) authorMap.set(closer.id, closer);
+
+    const entries = Array.isArray(report.transcriptEntries) ? report.transcriptEntries : [];
+    const enrichedEntries = entries.map((e) => {
+        const info = e.authorId && authorMap.get(e.authorId);
+        return {
+            ...e,
+            authorAvatarURL: info?.avatarURL || null,
+            authorDisplayName: info?.displayName || e.authorTag || 'Desconocido'
+        };
+    });
+
+    return {
+        ...report,
+        owner,
+        closer,
+        participantsDetailed: (participantsDetailed || []).filter(Boolean),
+        transcriptEntries: enrichedEntries
+    };
+}
+
+app.get('/api/guild/:guildId/tickets/report/:reportId', requireAuth, async (req, res) => {
+    try {
+        const { guildId, reportId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const report = await getTicketReport(guildId, reportId);
+        if (!report) return res.status(404).json({ error: 'Comprobante no encontrado' });
+
+        const enriched = await enrichReportDetail(botClient, report);
+        res.json({ success: true, report: enriched });
+    } catch (error) {
+        console.error('Error obteniendo comprobante:', error);
+        res.status(500).json({ error: 'No se pudo obtener el comprobante' });
+    }
+});
+
+app.get('/api/guild/:guildId/tickets/report/:reportId/download', requireAuth, async (req, res) => {
+    try {
+        const { guildId, reportId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const report = await getTicketReport(guildId, reportId);
+        if (!report) return res.status(404).json({ error: 'Comprobante no encontrado' });
+
+        const transcript = typeof report.transcriptText === 'string' && report.transcriptText
+            ? report.transcriptText
+            : `Comprobante ${report.reportId}\nSin transcripción almacenada.`;
+
+        const safeName = String(report.transcriptFileName || `comprobante-${report.reportId}.txt`)
+            .replace(/[^a-zA-Z0-9._-]+/g, '_');
+
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+        res.send(transcript);
+    } catch (error) {
+        console.error('Error descargando comprobante:', error);
+        res.status(500).json({ error: 'No se pudo descargar el comprobante' });
     }
 });
 
