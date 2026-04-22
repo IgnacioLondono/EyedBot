@@ -4887,21 +4887,22 @@ function setupServerSummaryAutoRefresh() {
 }
 
 function summaryIcon(type = 'server') {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
     const icons = {
-        owner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .9-4.5 4.4 1 6.2L12 17l-5.5 2.5 1-6.2L3 8.9 9 8z"></path></svg>',
-        members: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
-        channels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"></path><path d="M4 12h10"></path><path d="M4 17h16"></path><circle cx="18" cy="12" r="2"></circle></svg>',
-        roles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.6 13.4 12 22l-8.6-8.6a2 2 0 0 1 0-2.8L12 2l8.6 8.6a2 2 0 0 1 0 2.8z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>',
-        messages: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
-        voice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v4"></path><path d="M8 23h8"></path></svg>',
-        flow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h8"></path><path d="M3 16h12"></path><path d="M11 5l3 3-3 3"></path><path d="M15 13l3 3-3 3"></path></svg>',
-        peak: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17h18"></path><path d="M7 17V9"></path><path d="M12 17V5"></path><path d="M17 17v-6"></path></svg>',
-        live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="M6.34 6.34 7.76 7.76"></path><path d="M16.24 16.24 17.66 17.66"></path><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path></svg>',
-        age: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>',
-        core: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3"></path><path d="M12 18v3"></path><path d="m4.93 4.93 2.12 2.12"></path><path d="m16.95 16.95 2.12 2.12"></path><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="m4.93 19.07 2.12-2.12"></path><path d="m16.95 7.05 2.12-2.12"></path><circle cx="12" cy="12" r="3"></circle></svg>',
-        created: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path></svg>',
-        activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 7-4-14-3 7H2"></path></svg>',
-        chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>'
+        owner:    `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M3 20l3-8 6 4 6-4 3 8"></path><circle cx="12" cy="7" r="3.5"></circle><path d="M8 5l-1-2"></path><path d="M16 5l1-2"></path></svg>`,
+        members:  `<svg viewBox="0 0 24 24" fill="none" ${s}><circle cx="9" cy="8" r="3.5"></circle><circle cx="17" cy="9.5" r="2.5"></circle><path d="M2.5 20v-1.5A3.5 3.5 0 0 1 6 15h6a3.5 3.5 0 0 1 3.5 3.5V20"></path><path d="M16 20v-1a3 3 0 0 0-1.3-2.5"></path><path d="M22 20v-1a3 3 0 0 0-2.3-2.9"></path></svg>`,
+        channels: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M6.5 3l-1 18"></path><path d="M14.5 3l-1 18"></path><path d="M3 8.5h18"></path><path d="M3 15.5h18"></path></svg>`,
+        roles:    `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M12 2l3 6 6 .9-4.5 4.4 1 6.2L12 17l-5.5 2.5 1-6.2L3 8.9 9 8z"></path></svg>`,
+        messages: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>`,
+        voice:    `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 1 0 6 0V6a3 3 0 0 0-3-3z"></path><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path><path d="M9 21h6"></path></svg>`,
+        flow:     `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 8h10"></path><path d="M11 5l3 3-3 3"></path><path d="M20 16H10"></path><path d="M13 13l-3 3 3 3"></path></svg>`,
+        peak:     `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M3 20h18"></path><path d="M5 20V12"></path><path d="M10 20V7"></path><path d="M15 20v-9"></path><path d="M20 20V5"></path><path d="M3 11l5-5 4 2 4-6 5 2"></path></svg>`,
+        live:     `<svg viewBox="0 0 24 24" fill="none" ${s}><circle cx="12" cy="12" r="3"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.5"></path><path d="M16.2 7.8a6 6 0 0 1 0 8.5"></path><path d="M4.7 4.7a10 10 0 0 0 0 14.6"></path><path d="M19.3 4.7a10 10 0 0 1 0 14.6"></path></svg>`,
+        age:      `<svg viewBox="0 0 24 24" fill="none" ${s}><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2.5"></path><path d="M9 2h6"></path><path d="M12 2v3"></path></svg>`,
+        core:     `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M12 2l2.2 4.6 5 .7-3.6 3.6.9 5-4.5-2.4-4.5 2.4.9-5L4.8 7.3l5-.7z"></path><path d="M8 22l1.5-5"></path><path d="M16 22l-1.5-5"></path></svg>`,
+        created:  `<svg viewBox="0 0 24 24" fill="none" ${s}><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4"></path><path d="M8 3v4"></path><path d="M3 10h18"></path><circle cx="12" cy="15.5" r="1.2"></circle></svg>`,
+        activity: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M3 12h3l2-7 4 14 2-7h7"></path></svg>`,
+        chart:    `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 4v16h16"></path><path d="M7 15l3-4 3 2 5-7"></path><circle cx="7" cy="15" r="1.2" fill="currentColor"></circle><circle cx="10" cy="11" r="1.2" fill="currentColor"></circle><circle cx="13" cy="13" r="1.2" fill="currentColor"></circle><circle cx="18" cy="6" r="1.2" fill="currentColor"></circle></svg>`
     };
 
     return icons[type] || icons.chart;
@@ -7034,14 +7035,14 @@ function renderTmPendingCard(item) {
                     <span class="tm-badge cat">${category}</span>
                 </div>
                 <div class="tm-ticket-meta">
-                    ${commonIssue ? `<span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>${commonIssue}</span>` : ''}
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${escapeHtml(when)}</span>
+                    ${commonIssue ? `<span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"></path><rect x="3" y="3" width="18" height="18" rx="4"></rect></svg>${commonIssue}</span>` : ''}
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>${escapeHtml(when)}</span>
                 </div>
                 <div class="tm-ticket-reason">${reason}</div>
             </div>
             <div class="tm-ticket-actions">
                 <button type="button" class="tm-btn tm-btn-primary" data-tm-accept="${escapeHtml(item.requestId || '')}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg>
                     <span>Aceptar</span>
                 </button>
             </div>
@@ -7060,17 +7061,18 @@ function renderTmActiveCard(item) {
         : escapeHtml(String(o.username || '?').charAt(0).toUpperCase());
     const when = formatRelativeTime(item.createdAt);
     const claimer = item.claimer;
+    const sSmall = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
     const claimedBadge = claimer
-        ? `<span class="tm-badge claimed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path></svg>${escapeHtml(claimer.username || 'staff')}</span>`
-        : `<span class="tm-badge active">Sin asignar</span>`;
+        ? `<span class="tm-badge claimed"><svg viewBox="0 0 24 24" fill="none" ${sSmall}><path d="M12 2l8 4v6c0 4.8-3.4 9-8 10-4.6-1-8-5.2-8-10V6l8-4z"></path><path d="M9 12l2.2 2.2L15 10.5"></path></svg>${escapeHtml(claimer.username || 'staff')}</span>`
+        : `<span class="tm-badge active"><svg viewBox="0 0 24 24" fill="none" ${sSmall}><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2"></path><path d="M12 19v2"></path><path d="M3 12h2"></path><path d="M19 12h2"></path></svg>Sin asignar</span>`;
 
     const claimBtn = claimer
         ? `<button type="button" class="tm-btn tm-btn-unclaim" data-tm-unclaim="${escapeHtml(item.channelId || '')}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" ${sSmall}><circle cx="12" cy="12" r="9"></circle><path d="M8 12h8"></path></svg>
                 <span>Liberar</span>
             </button>`
         : `<button type="button" class="tm-btn tm-btn-claim" data-tm-claim="${escapeHtml(item.channelId || '')}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" ${sSmall}><path d="M12 2l8 4v6c0 4.8-3.4 9-8 10-4.6-1-8-5.2-8-10V6l8-4z"></path><path d="M9 12l2.2 2.2L15 10.5"></path></svg>
                 <span>Reclamar</span>
             </button>`;
 
@@ -7084,8 +7086,8 @@ function renderTmActiveCard(item) {
                     <span class="tm-badge cat">${escapeHtml(item.category || 'Soporte general')}</span>
                 </div>
                 <div class="tm-ticket-meta">
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${escapeHtml(o.username || 'Usuario')}</span>
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${escapeHtml(when)}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" ${sSmall}><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg>${escapeHtml(o.username || 'Usuario')}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" ${sSmall}><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>${escapeHtml(when)}</span>
                 </div>
                 ${item.reason ? `<div class="tm-ticket-reason">${escapeHtml(item.reason)}</div>` : ''}
             </div>
@@ -7116,16 +7118,16 @@ function renderTmHistoryCard(item) {
                     <span class="tm-badge cat">${escapeHtml(item.category || 'Soporte general')}</span>
                 </div>
                 <div class="tm-ticket-meta">
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>${escapeHtml(item.reportId || 'SIN-ID')}</span>
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${escapeHtml(when)}</span>
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path></svg>Cerrado por ${escapeHtml(c.username || 'staff')}</span>
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>${Number(item.messagesCount || 0)} mensajes</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path></svg>${escapeHtml(item.reportId || 'SIN-ID')}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>${escapeHtml(when)}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 4.8-3.4 9-8 10-4.6-1-8-5.2-8-10V6l8-4z"></path><path d="M9 12l2.2 2.2L15 10.5"></path></svg>Cerrado por ${escapeHtml(c.username || 'staff')}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"></path></svg>${Number(item.messagesCount || 0)} mensajes</span>
                 </div>
                 ${item.reason ? `<div class="tm-ticket-reason">${escapeHtml(item.reason)}</div>` : ''}
             </div>
             <div class="tm-ticket-actions">
                 <button type="button" class="tm-btn tm-btn-ghost" data-tm-history-toggle="${escapeHtml(item.reportId || '')}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
                     <span>Detalles</span>
                 </button>
             </div>
@@ -7298,10 +7300,28 @@ function formatRelativeTime(iso) {
     return new Date(t).toLocaleDateString('es-ES');
 }
 
-/* ---- Iconos SVG reutilizables ---- */
-function tmIconStack()     { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 12 15 2 8.5 12 2"></polygon><polyline points="2 15.5 12 22 22 15.5"></polyline><polyline points="2 11.5 12 18 22 11.5"></polyline></svg>'; }
-function tmIconActivity()  { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>'; }
-function tmIconHourglass() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h12v6l-4 4 4 4v6H6v-6l4-4-4-4z"></path></svg>'; }
-function tmIconCheck()     { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'; }
-function tmIconShield()    { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path></svg>'; }
-function tmIconBell()      { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>'; }
+/* ---- Iconos SVG reutilizables (estilo Lucide) ---- */
+function tmIconStack()     {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 6l8-4 8 4-8 4-8-4z"></path><path d="M4 12l8 4 8-4"></path><path d="M4 18l8 4 8-4"></path></svg>`;
+}
+function tmIconActivity()  {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 1 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 1 0 0-4V7z"></path><path d="M13 6v3"></path><path d="M13 13v3"></path></svg>`;
+}
+function tmIconHourglass() {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M6 3h12"></path><path d="M6 21h12"></path><path d="M6 3v3.5A5 5 0 0 0 9 10.8L12 12l3-1.2A5 5 0 0 0 18 6.5V3"></path><path d="M6 21v-3.5a5 5 0 0 1 3-4.3L12 12l3 1.2a5 5 0 0 1 3 4.3V21"></path></svg>`;
+}
+function tmIconCheck()     {
+    const s = 'stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16 10"></path></svg>`;
+}
+function tmIconShield()    {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M12 2l8 4v6c0 4.8-3.4 9-8 10-4.6-1-8-5.2-8-10V6l8-4z"></path><path d="M9 12l2.2 2.2L15 10.5"></path></svg>`;
+}
+function tmIconBell()      {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8z"></path><path d="M10 21a2 2 0 0 0 4 0"></path><circle cx="18" cy="5" r="2.5" fill="currentColor" opacity="0.3"></circle></svg>`;
+}
