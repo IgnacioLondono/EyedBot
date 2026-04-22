@@ -4794,6 +4794,23 @@ function renderServerTextList(items = [], options = {}) {
     `).join('');
 }
 
+function renderServerPreviewSection(title, items = [], sectionType, mapper, emptyText) {
+    const previewItems = items.slice(0, 3).map(mapper);
+    const hasMore = items.length > 3;
+
+    return `
+        <section class="server-insight-section">
+            <div class="server-insight-section-head">
+                <h4>${escapeHtml(title)}</h4>
+                ${hasMore ? `<button type="button" class="summary-link-btn" data-server-channel-section="${escapeHtml(sectionType)}">Ver mas</button>` : ''}
+            </div>
+            <div class="server-detail-list">
+                ${renderServerTextList(previewItems, { emptyText })}
+            </div>
+        </section>
+    `;
+}
+
 function renderServerChipList(items = [], emptyText = 'Sin datos adicionales.') {
     if (!items.length) {
         return `<div class="summary-top-users-empty">${emptyText}</div>`;
@@ -5066,6 +5083,40 @@ function buildServerInsightDetailMarkup(info, insightId) {
     const liveVoiceChannels = Array.isArray(info.activity?.voice?.live?.channels) ? info.activity.voice.live.channels : [];
     const featureList = Array.isArray(info.features) ? info.features : [];
     const selectedRole = allRolesDetailed.find((role) => String(role.id) === String(currentServerInsightPayload?.roleId || ''));
+    const selectedChannelSection = String(currentServerInsightPayload?.channelSection || '');
+    const channelSectionMap = {
+        text: {
+            title: 'Canales de texto',
+            items: textChannels,
+            emptyText: 'No hay canales de texto para mostrar.',
+            mapItem: (channel) => ({
+                name: `# ${channel.name}`,
+                meta: `${channel.type} • ${channel.parentName}`,
+                extra: channel.topic || 'Sin descripcion'
+            })
+        },
+        voice: {
+            title: 'Canales de voz',
+            items: voiceChannels,
+            emptyText: 'No hay canales de voz para mostrar.',
+            mapItem: (channel) => ({
+                name: channel.name,
+                meta: `${channel.type} • ${formatServerMetric(channel.userCount || 0)} usuarios`,
+                extra: channel.parentName
+            })
+        },
+        category: {
+            title: 'Categorias',
+            items: categoryChannels,
+            emptyText: 'No hay categorias para mostrar.',
+            mapItem: (channel) => ({
+                name: channel.name,
+                meta: `Posicion ${formatServerMetric(channel.position || 0)}`,
+                extra: channel.parentName
+            })
+        }
+    };
+    const selectedChannelConfig = channelSectionMap[selectedChannelSection] || null;
 
     const ownerAvatar = info.owner?.avatar
         ? `<img src="${info.owner.avatar}" alt="${ownerTag}" class="summary-owner-avatar">`
@@ -5125,36 +5176,9 @@ function buildServerInsightDetailMarkup(info, insightId) {
                     ${renderServerInsightStat('Categorias', formatServerMetric(info.channels?.category || 0), 'Organizacion actual')}
                 </div>
                 <div class="server-insight-columns">
-                    <section class="server-insight-section">
-                        <h4>Canales de texto</h4>
-                        <div class="server-detail-list">
-                            ${renderServerTextList(textChannels.map((channel) => ({
-                                name: `# ${channel.name}`,
-                                meta: `${channel.type} • ${channel.parentName}`,
-                                extra: channel.topic || 'Sin descripcion'
-                            })), { emptyText: 'No hay canales de texto para mostrar.' })}
-                        </div>
-                    </section>
-                    <section class="server-insight-section">
-                        <h4>Canales de voz</h4>
-                        <div class="server-detail-list">
-                            ${renderServerTextList(voiceChannels.map((channel) => ({
-                                name: channel.name,
-                                meta: `${channel.type} • ${formatServerMetric(channel.userCount || 0)} usuarios`,
-                                extra: channel.parentName
-                            })), { emptyText: 'No hay canales de voz para mostrar.' })}
-                        </div>
-                    </section>
-                    <section class="server-insight-section">
-                        <h4>Categorias</h4>
-                        <div class="server-detail-list">
-                            ${renderServerTextList(categoryChannels.map((channel) => ({
-                                name: channel.name,
-                                meta: `Posicion ${formatServerMetric(channel.position || 0)}`,
-                                extra: channel.parentName
-                            })), { emptyText: 'No hay categorias para mostrar.' })}
-                        </div>
-                    </section>
+                    ${renderServerPreviewSection('Canales de texto', textChannels, 'text', channelSectionMap.text.mapItem, 'No hay canales de texto para mostrar.')}
+                    ${renderServerPreviewSection('Canales de voz', voiceChannels, 'voice', channelSectionMap.voice.mapItem, 'No hay canales de voz para mostrar.')}
+                    ${renderServerPreviewSection('Categorias', categoryChannels, 'category', channelSectionMap.category.mapItem, 'No hay categorias para mostrar.')}
                 </div>
             `
         },
@@ -5395,6 +5419,27 @@ function buildServerInsightDetailMarkup(info, insightId) {
             ` : `
                 <div class="summary-top-users-empty">No se encontro el rol seleccionado.</div>
             `
+        },
+        channelList: {
+            title: selectedChannelConfig ? selectedChannelConfig.title : 'Canales',
+            copy: selectedChannelConfig
+                ? 'Vista completa de esta seccion del servidor.'
+                : 'Selecciona una seccion de canales para ver la lista completa.',
+            body: selectedChannelConfig ? `
+                <div class="server-insight-grid">
+                    ${renderServerInsightStat('Elementos', formatServerMetric(selectedChannelConfig.items.length), 'Listado completo de la seccion')}
+                </div>
+                <section class="server-insight-section">
+                    <h4>${escapeHtml(selectedChannelConfig.title)}</h4>
+                    <div class="server-detail-list server-detail-list--scroll">
+                        ${renderServerTextList(selectedChannelConfig.items.map(selectedChannelConfig.mapItem), {
+                            emptyText: selectedChannelConfig.emptyText
+                        })}
+                    </div>
+                </section>
+            ` : `
+                <div class="summary-top-users-empty">No se encontro la seccion seleccionada.</div>
+            `
         }
     };
 
@@ -5479,6 +5524,16 @@ function bindServerSummaryCardEvents() {
             event.stopPropagation();
             openServerInsight('roleMembers', {
                 roleId: button.dataset.serverRoleId || ''
+            });
+        });
+    });
+
+    container.querySelectorAll('[data-server-channel-section]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openServerInsight('channelList', {
+                channelSection: button.dataset.serverChannelSection || ''
             });
         });
     });

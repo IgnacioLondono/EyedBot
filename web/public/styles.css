@@ -5507,6 +5507,13 @@ body {
     min-width: 0;
 }
 
+.server-insight-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
 .server-insight-section h4 {
     margin: 0;
     color: var(--text-primary);
@@ -5550,6 +5557,26 @@ body {
 .server-detail-list {
     display: grid;
     gap: 0.6rem;
+}
+
+.server-detail-list--scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 0.35rem;
+}
+
+.server-detail-list--scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.server-detail-list--scroll::-webkit-scrollbar-thumb {
+    background: rgba(var(--accent-primary-rgb), 0.4);
+    border-radius: 999px;
+}
+
+.server-detail-list--scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
 }
 
 .server-detail-list-item {
