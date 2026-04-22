@@ -142,6 +142,60 @@ body::before {
 }
 .add-bot-btn:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 16px 34px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45); }
 
+/* Boton oficial de Discord (navbar) */
+.discord-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    background: linear-gradient(135deg, #5865F2 0%, #7289DA 100%);
+    color: #fff;
+    text-decoration: none;
+    border: none;
+    border-radius: 999px;
+    padding: 0.55rem 1.05rem;
+    font-weight: 600;
+    font-size: 0.92rem;
+    letter-spacing: 0.01em;
+    box-shadow: 0 12px 28px rgba(88, 101, 242, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transition: transform 0.2s ease, box-shadow 0.25s ease, filter 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+.discord-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 55%);
+    pointer-events: none;
+    opacity: 0.9;
+}
+.discord-btn svg {
+    width: 20px;
+    height: 20px;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+.discord-btn span { position: relative; z-index: 1; }
+.discord-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow: 0 18px 36px rgba(88, 101, 242, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.discord-btn:focus-visible {
+    outline: 2px solid rgba(88, 101, 242, 0.75);
+    outline-offset: 3px;
+}
+
+/* Version icon-only en pantallas pequenas */
+@media (max-width: 768px) {
+    .discord-btn {
+        padding: 0.55rem 0.7rem;
+    }
+    .discord-btn span { display: none; }
+}
+
 /* User menu refinado */
 .user-menu {
     background: rgba(255, 255, 255, 0.03) !important;
