@@ -1216,11 +1216,6 @@ function restoreServerState(state) {
     currentServerInsightPayload = state.serverSection.insightPayload || null;
     
     setTimeout(async () => {
-        await loadGuildsForServer();
-        if (document.getElementById('serverSelect') && state.serverSection.selectedGuildId) {
-            document.getElementById('serverSelect').value = state.serverSection.selectedGuildId;
-            // Disparar evento change para cargar la información
-            const event = new Event('change');
             document.getElementById('serverSelect').dispatchEvent(event);
         }
     }, 100);
@@ -3004,7 +2999,7 @@ function renderServerTabs(guilds, selectedGuildId = '') {
     }).join('');
 }
 
-async function selectServerGuild(guildId) {
+async function selectServerGuild(guildId, options = {}) {
     const serverInfoContainer = document.getElementById('serverInfoContainer');
     const moderationContainer = document.getElementById('moderationContainer');
     const welcomeContainer = document.getElementById('welcomeContainer');
@@ -3016,6 +3011,7 @@ async function selectServerGuild(guildId) {
     const securityContainer = document.getElementById('securityContainer');
     const notificationsContainer = document.getElementById('notificationsContainer');
     const serverSelect = document.getElementById('serverSelect');
+    const { preserveInsight = false } = options;
 
     if (!guildId) {
         currentServerGuildId = '';
@@ -3038,8 +3034,10 @@ async function selectServerGuild(guildId) {
 
     setServerSwitchingState(true);
     currentServerGuildId = guildId;
-    currentServerInsightView = 'overview';
-    currentServerInsightPayload = null;
+    if (!preserveInsight) {
+        currentServerInsightView = 'overview';
+        currentServerInsightPayload = null;
+    }
     setServerFeaturesNavigationVisible(serverFeaturesUnlocked && hasSelectedGuildContext());
     updateServerMenuIdentity();
     if (serverSelect) serverSelect.value = guildId;
@@ -3152,7 +3150,7 @@ async function loadGuildsForServer() {
             if (tabsContainer) {
                 renderServerTabs([selectedGuild], selectedGuild.id);
             }
-            await selectServerGuild(selectedGuild.id);
+            await selectServerGuild(selectedGuild.id, { preserveInsight: true });
         } else {
             const error = await response.json().catch(() => ({ error: 'Error al cargar servidores' }));
             if (select) {
@@ -6647,26 +6645,110 @@ window.selectGuild = async function(guildId) {
 window.removeField = removeField;
 window.moderateUser = moderateUser;
 
-// Mostrar toast
+// Mostrar toast (tarjeta unica que se actualiza en vez de apilarse)
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    
+    if (!container) return;
+
     const icons = {
-        success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>',
-        error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
-        warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'
+        success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+        error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+        warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'
     };
-    
-    toast.innerHTML = `${icons[type] || icons.success}<span>${escapeHtml(message)}</span>`;
-    
-    container.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.animation = 'toastSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) reverse';
-        setTimeout(() => toast.remove(), 400);
-    }, 4000);
+
+    const validType = icons[type] ? type : 'success';
+    const iconSvg = icons[validType];
+
+    // Reutilizar el toast activo si existe para evitar apilamiento
+    let toast = container.querySelector('.toast.pro-toast');
+    const isExisting = Boolean(toast);
+
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.className = `toast pro-toast ${validType}`;
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.innerHTML = `
+            <span class="pro-toast-icon" aria-hidden="true">${iconSvg}</span>
+            <div class="pro-toast-body">
+                <div class="pro-toast-title"></div>
+                <div class="pro-toast-message"></div>
+            </div>
+            <button type="button" class="pro-toast-close" aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+            </button>
+            <div class="pro-toast-progress"><span></span></div>
+        `;
+        container.appendChild(toast);
+    }
+
+    // Actualizar tipo y contenido
+    toast.classList.remove('success', 'error', 'warning');
+    toast.classList.add(validType);
+
+    const titles = { success: 'Listo', error: 'Atencion', warning: 'Aviso' };
+    const iconEl = toast.querySelector('.pro-toast-icon');
+    const titleEl = toast.querySelector('.pro-toast-title');
+    const messageEl = toast.querySelector('.pro-toast-message');
+    const progressBar = toast.querySelector('.pro-toast-progress span');
+    const closeBtn = toast.querySelector('.pro-toast-close');
+
+    if (iconEl) iconEl.innerHTML = iconSvg;
+    if (titleEl) titleEl.textContent = titles[validType] || '';
+    if (messageEl) messageEl.textContent = String(message == null ? '' : message);
+
+    // Reset animaciones para que se vuelvan a ejecutar al actualizar
+    if (isExisting) {
+        toast.classList.add('pro-toast-pulse');
+        // forzar reflow para reiniciar la animacion
+        // eslint-disable-next-line no-unused-expressions
+        void toast.offsetWidth;
+    } else {
+        toast.classList.add('pro-toast-enter');
+    }
+
+    // Reiniciar barra de progreso
+    if (progressBar) {
+        progressBar.style.transition = 'none';
+        progressBar.style.transform = 'scaleX(1)';
+        // forzar reflow
+        // eslint-disable-next-line no-unused-expressions
+        void progressBar.offsetWidth;
+        progressBar.style.transition = 'transform 4s linear';
+        progressBar.style.transform = 'scaleX(0)';
+    }
+
+    // Limpiar timers previos
+    if (toast._hideTimer) clearTimeout(toast._hideTimer);
+    if (toast._pulseTimer) clearTimeout(toast._pulseTimer);
+    if (toast._removeTimer) clearTimeout(toast._removeTimer);
+
+    // Quitar la clase de pulse despues de la animacion para permitir repetirla
+    toast._pulseTimer = setTimeout(() => {
+        toast.classList.remove('pro-toast-pulse');
+        toast.classList.remove('pro-toast-enter');
+    }, 420);
+
+    // Cerrar manual
+    if (closeBtn && !closeBtn._wired) {
+        closeBtn._wired = true;
+        closeBtn.addEventListener('click', () => {
+            if (toast._hideTimer) clearTimeout(toast._hideTimer);
+            dismissToast(toast);
+        });
+    }
+
+    // Auto-ocultar
+    toast._hideTimer = setTimeout(() => dismissToast(toast), 4000);
+}
+
+function dismissToast(toast) {
+    if (!toast || toast._dismissing) return;
+    toast._dismissing = true;
+    toast.classList.add('pro-toast-leave');
+    toast._removeTimer = setTimeout(() => {
+        if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 320);
 }
 
 // Escapar HTML
