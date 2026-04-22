@@ -320,7 +320,7 @@ function clearServerBoundSectionState() {
         serverSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
     }
 
-    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer', 'levelsContainer', 'voiceCreatorContainer', 'automationContainer', 'securityContainer', 'notificationsContainer'];
+    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer', 'levelsContainer', 'voiceCreatorContainer', 'automationContainer', 'securityContainer', 'notificationsContainer', 'freeGamesContainer'];
     containerIds.forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = '';
@@ -401,6 +401,10 @@ function switchServerPane(paneId, button = null) {
         try { openTicketsManagePane(); } catch (e) { console.error('openTicketsManagePane error', e); }
     } else if (typeof stopTicketsManageAutoRefresh === 'function') {
         stopTicketsManageAutoRefresh();
+    }
+
+    if (paneId === 'serverPaneFreeGames' && typeof openFreeGamesPane === 'function') {
+        try { openFreeGamesPane(); } catch (e) { console.error('openFreeGamesPane error', e); }
     }
 }
 
@@ -8280,4 +8284,439 @@ function tmIconShield()    {
 function tmIconBell()      {
     const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
     return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8z"></path><path d="M10 21a2 2 0 0 0 4 0"></path><circle cx="18" cy="5" r="2.5" fill="currentColor" opacity="0.3"></circle></svg>`;
+}
+
+// ============================================================
+// FREE GAMES (Epic Games / Steam) — dashboard
+// ============================================================
+const _freeGamesState = {
+    guildId: null,
+    config: null,
+    games: [],
+    channels: [],
+    fetchedAt: null,
+    loadingPreview: false
+};
+
+async function openFreeGamesPane() {
+    const guildId = currentServerGuildId;
+    if (!guildId) return;
+    _freeGamesState.guildId = guildId;
+
+    const container = document.getElementById('freeGamesContainer');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="loading" style="padding:3rem;text-align:center;">
+            <div class="loading-spinner"></div>
+            <p>Cargando configuración y juegos gratis...</p>
+        </div>`;
+
+    try {
+        const [cfgResp, chanResp] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/free-games/config`),
+            fetchWithCredentials(`/api/guild/${guildId}/channels`)
+        ]);
+        const cfg = await cfgResp.json();
+        const channels = await chanResp.json();
+        _freeGamesState.config = cfg;
+        _freeGamesState.channels = Array.isArray(channels) ? channels.filter((c) => c.type === 0) : [];
+        renderFreeGamesPane();
+        // Carga de juegos en paralelo
+        fetchFreeGamesPreview().catch(() => null);
+    } catch (error) {
+        console.error('Error cargando panel de juegos gratis:', error);
+        container.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--error-color);"><p>Error al cargar: ${escapeHtml(error.message || '')}</p></div>`;
+    }
+}
+
+function renderFreeGamesPane() {
+    const container = document.getElementById('freeGamesContainer');
+    if (!container) return;
+    const cfg = _freeGamesState.config || {};
+    const channels = _freeGamesState.channels || [];
+
+    const channelOptions = channels
+        .map((c) => `<option value="${c.id}" ${c.id === cfg.channelId ? 'selected' : ''}>#${escapeHtml(c.name)}</option>`)
+        .join('');
+
+    const color = String(cfg.color || '4ccb81').replace('#', '');
+
+    container.innerHTML = `
+        <h3 class="welcome-panel-title">Juegos gratis — Epic Games &amp; Steam</h3>
+        <p class="welcome-panel-subtitle">Configura un canal para recibir notificaciones automáticas cuando aparezca un juego gratis. Mostramos la imagen, el precio original, el descuento y el tiempo restante.</p>
+
+        <div class="fg-layout">
+            <!-- Columna izquierda: Configuracion -->
+            <div class="fg-config">
+                <div class="fg-section">
+                    <h4 class="fg-section-title">
+                        <span class="fg-dot"></span>
+                        Configuración
+                    </h4>
+
+                    <div class="form-group">
+                        <label class="fg-switch-label">
+                            <input type="checkbox" id="fgEnabled" ${cfg.enabled ? 'checked' : ''}>
+                            <span class="fg-switch"><span class="fg-switch-knob"></span></span>
+                            <span>Activar notificaciones de juegos gratis</span>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fgChannel">Canal de notificaciones</label>
+                        <select id="fgChannel" class="form-control">
+                            <option value="">— Selecciona un canal —</option>
+                            ${channelOptions}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fgMention">Mención opcional</label>
+                        <input type="text" id="fgMention" class="form-control" placeholder="@everyone, <@&ROL_ID> o vacío"
+                            value="${escapeHtml(cfg.mentionText || '')}" maxlength="300">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Plataformas</label>
+                        <div class="fg-sources">
+                            <label class="fg-source-chip epic ${cfg.sources?.epic !== false ? 'is-active' : ''}">
+                                <input type="checkbox" id="fgEpic" ${cfg.sources?.epic !== false ? 'checked' : ''}>
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h16v14l-8 5-8-5V3z"/></svg>
+                                <span>Epic Games</span>
+                            </label>
+                            <label class="fg-source-chip steam ${cfg.sources?.steam !== false ? 'is-active' : ''}">
+                                <input type="checkbox" id="fgSteam" ${cfg.sources?.steam !== false ? 'checked' : ''}>
+                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill-opacity="0.15"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="16" cy="9" r="3" fill="currentColor"/><circle cx="9" cy="15" r="2" fill="currentColor"/></svg>
+                                <span>Steam</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="fgColor">Color del embed</label>
+                            <div class="fg-color-picker">
+                                <input type="color" id="fgColor" value="#${color}">
+                                <input type="text" id="fgColorHex" class="form-control" value="#${color}" maxlength="7">
+                            </div>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="fgFooter">Texto del footer</label>
+                            <input type="text" id="fgFooter" class="form-control" placeholder="EyedBot · Juegos gratis"
+                                value="${escapeHtml(cfg.footerText || 'EyedBot · Juegos gratis')}" maxlength="200">
+                        </div>
+                    </div>
+
+                    <div class="fg-actions">
+                        <button type="button" id="fgSaveBtn" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                            <span>Guardar configuración</span>
+                        </button>
+                        <button type="button" id="fgTestBtn" class="btn btn-ghost">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12A10 10 0 1 1 11.5 2"></path><path d="M22 2L12 12"></path><polyline points="16 2 22 2 22 8"></polyline></svg>
+                            <span>Enviar prueba al canal</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="fg-info-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                    <div>
+                        <strong>¿Cómo funciona?</strong>
+                        <p>Cada 30 minutos comprobamos Epic Games y Steam. Cuando detectamos un juego nuevo al 100% de descuento, enviamos automáticamente un embed con toda la información al canal configurado.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna derecha: Preview de juegos actuales -->
+            <div class="fg-preview">
+                <div class="fg-preview-head">
+                    <div>
+                        <h4 class="fg-section-title">
+                            <span class="fg-dot fg-dot-live"></span>
+                            Juegos gratis ahora mismo
+                        </h4>
+                        <p class="fg-preview-sub">Así se verá la notificación en tu canal.</p>
+                    </div>
+                    <button type="button" id="fgRefreshBtn" class="btn btn-ghost btn-sm" title="Actualizar lista">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>
+                    </button>
+                </div>
+
+                <div id="fgGamesList" class="fg-games-list">
+                    <div class="fg-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Buscando juegos gratis...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    wireFreeGamesControls();
+}
+
+function wireFreeGamesControls() {
+    const saveBtn = document.getElementById('fgSaveBtn');
+    const testBtn = document.getElementById('fgTestBtn');
+    const refreshBtn = document.getElementById('fgRefreshBtn');
+    const colorInput = document.getElementById('fgColor');
+    const colorHex = document.getElementById('fgColorHex');
+    const epicChk = document.getElementById('fgEpic');
+    const steamChk = document.getElementById('fgSteam');
+
+    if (saveBtn) saveBtn.addEventListener('click', saveFreeGamesConfig);
+    if (testBtn) testBtn.addEventListener('click', sendFreeGamesTest);
+    if (refreshBtn) refreshBtn.addEventListener('click', () => fetchFreeGamesPreview(true));
+
+    if (colorInput && colorHex) {
+        colorInput.addEventListener('input', () => { colorHex.value = colorInput.value; });
+        colorHex.addEventListener('change', () => {
+            const v = String(colorHex.value || '').replace('#', '').slice(0, 6);
+            if (/^[0-9a-fA-F]{6}$/.test(v)) colorInput.value = `#${v}`;
+        });
+    }
+
+    [epicChk, steamChk].forEach((chk) => {
+        if (!chk) return;
+        chk.addEventListener('change', () => {
+            const wrap = chk.closest('.fg-source-chip');
+            if (wrap) wrap.classList.toggle('is-active', chk.checked);
+            fetchFreeGamesPreview(true);
+        });
+    });
+}
+
+function collectFreeGamesInput() {
+    const enabled = !!document.getElementById('fgEnabled')?.checked;
+    const channelId = String(document.getElementById('fgChannel')?.value || '').trim();
+    const mentionText = String(document.getElementById('fgMention')?.value || '').trim();
+    const epic = !!document.getElementById('fgEpic')?.checked;
+    const steam = !!document.getElementById('fgSteam')?.checked;
+    const colorHex = String(document.getElementById('fgColorHex')?.value || '4ccb81').replace('#', '');
+    const footerText = String(document.getElementById('fgFooter')?.value || 'EyedBot · Juegos gratis').trim();
+
+    return {
+        enabled,
+        channelId,
+        mentionText,
+        sources: { epic, steam },
+        color: colorHex,
+        footerText
+    };
+}
+
+async function saveFreeGamesConfig() {
+    const guildId = _freeGamesState.guildId;
+    if (!guildId) return;
+    const body = collectFreeGamesInput();
+
+    if (body.enabled && !body.channelId) {
+        showToast('Selecciona un canal antes de activar las notificaciones', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('fgSaveBtn');
+    if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/free-games/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.success) throw new Error(data?.error || 'No se pudo guardar');
+        _freeGamesState.config = data.config;
+        showToast('Configuración de juegos gratis guardada', 'success');
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || 'Error al guardar', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+    }
+}
+
+async function sendFreeGamesTest() {
+    const guildId = _freeGamesState.guildId;
+    if (!guildId) return;
+    const body = collectFreeGamesInput();
+
+    if (!body.channelId) {
+        showToast('Selecciona un canal primero', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('fgTestBtn');
+    if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/free-games/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.success) throw new Error(data?.error || 'No se pudo enviar');
+        showToast('Prueba enviada al canal', 'success');
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || 'Error al enviar prueba', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+    }
+}
+
+async function fetchFreeGamesPreview(force = false) {
+    const guildId = _freeGamesState.guildId;
+    const list = document.getElementById('fgGamesList');
+    if (!guildId || !list) return;
+
+    if (_freeGamesState.loadingPreview) return;
+    _freeGamesState.loadingPreview = true;
+
+    if (force) {
+        list.innerHTML = `
+            <div class="fg-loading">
+                <div class="loading-spinner"></div>
+                <p>Buscando juegos gratis...</p>
+            </div>`;
+    }
+
+    const epic = !!document.getElementById('fgEpic')?.checked;
+    const steam = !!document.getElementById('fgSteam')?.checked;
+
+    try {
+        const qs = new URLSearchParams({
+            epic: epic ? '1' : '0',
+            steam: steam ? '1' : '0',
+            force: force ? '1' : '0'
+        }).toString();
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/free-games/preview?${qs}`);
+        const data = await response.json();
+        if (!response.ok || !data?.success) throw new Error(data?.error || 'Error al cargar juegos');
+        _freeGamesState.games = data.games || [];
+        _freeGamesState.fetchedAt = data.fetchedAt;
+        renderFreeGamesList();
+    } catch (error) {
+        console.error('Error cargando juegos gratis:', error);
+        list.innerHTML = `
+            <div class="fg-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <strong>No se pudieron cargar los juegos</strong>
+                <p>${escapeHtml(error.message || 'Intenta de nuevo en unos instantes.')}</p>
+            </div>`;
+    } finally {
+        _freeGamesState.loadingPreview = false;
+    }
+}
+
+function renderFreeGamesList() {
+    const list = document.getElementById('fgGamesList');
+    if (!list) return;
+
+    const games = _freeGamesState.games || [];
+    if (!games.length) {
+        list.innerHTML = `
+            <div class="fg-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                <strong>No hay juegos gratis ahora mismo</strong>
+                <p>Revisaremos Epic Games y Steam cada 30 minutos. Te avisaremos en el canal configurado cuando aparezca alguno.</p>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = games.map(renderFreeGameCard).join('');
+
+    // Footer con timestamp de actualización
+    if (_freeGamesState.fetchedAt) {
+        const date = new Date(_freeGamesState.fetchedAt);
+        const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        list.insertAdjacentHTML('beforeend', `
+            <div class="fg-updated">Actualizado a las ${escapeHtml(timeStr)}</div>
+        `);
+    }
+}
+
+function renderFreeGameCard(game) {
+    const sourceClass = game.source === 'epic' ? 'epic' : 'steam';
+    const tags = Array.isArray(game.tags) ? game.tags.slice(0, 3) : [];
+
+    const countdownHtml = game.endsAt
+        ? renderFreeGameCountdown(game)
+        : (game.source === 'steam'
+            ? '<span class="fg-meta-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Tiempo limitado</span>'
+            : '');
+
+    const priceHtml = game.originalPriceMinor > 0
+        ? `<span class="fg-price-old">${escapeHtml(game.originalPrice)}</span><span class="fg-price-new">GRATIS</span>`
+        : `<span class="fg-price-new">GRATIS</span>`;
+
+    const upcomingBadge = game.isUpcoming
+        ? '<span class="fg-badge fg-badge-upcoming">Próximamente</span>'
+        : '<span class="fg-badge fg-badge-live">● Disponible</span>';
+
+    return `
+        <article class="fg-card fg-card--${sourceClass}">
+            <div class="fg-card-media">
+                ${game.imageUrl
+                    ? `<img src="${escapeHtml(game.imageUrl)}" alt="${escapeHtml(game.title)}" loading="lazy">`
+                    : '<div class="fg-card-media-fallback"></div>'}
+                <div class="fg-card-source fg-card-source--${sourceClass}">
+                    ${game.source === 'epic'
+                        ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h16v14l-8 5-8-5V3z"/></svg>'
+                        : '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill-opacity="0.15"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="16" cy="9" r="3" fill="currentColor"/></svg>'}
+                    <span>${escapeHtml(game.sourceLabel || '')}</span>
+                </div>
+                <div class="fg-card-discount">-${Number(game.discountPercent || 100)}%</div>
+            </div>
+
+            <div class="fg-card-body">
+                <div class="fg-card-header">
+                    <h5 class="fg-card-title">${escapeHtml(game.title || '')}</h5>
+                    ${upcomingBadge}
+                </div>
+                ${game.description ? `<p class="fg-card-desc">${escapeHtml(game.description).slice(0, 180)}${game.description.length > 180 ? '…' : ''}</p>` : ''}
+
+                <div class="fg-card-price">
+                    ${priceHtml}
+                </div>
+
+                <div class="fg-card-meta">
+                    ${countdownHtml}
+                    ${game.publisher ? `<span class="fg-meta-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V7l7-4 7 4v14"></path><path d="M9 9h1M9 13h1M14 9h1M14 13h1M9 17h6"></path></svg>${escapeHtml(game.publisher)}</span>` : ''}
+                </div>
+
+                ${tags.length ? `<div class="fg-card-tags">${tags.map((t) => `<span class="fg-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+
+                <a class="fg-card-cta" href="${escapeHtml(game.storeUrl || '#')}" target="_blank" rel="noopener">
+                    <span>Reclamar gratis</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"></path><polyline points="7 7 17 7 17 17"></polyline></svg>
+                </a>
+            </div>
+        </article>
+    `;
+}
+
+function renderFreeGameCountdown(game) {
+    if (!game.endsAt) return '';
+    const end = new Date(game.endsAt);
+    if (Number.isNaN(end.getTime())) return '';
+    const ms = end.getTime() - Date.now();
+    if (ms <= 0) return '<span class="fg-meta-chip is-expired">Finalizado</span>';
+    const totalMinutes = Math.floor(ms / 60000);
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+    const mins = totalMinutes % 60;
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (days === 0 && mins > 0) parts.push(`${mins}m`);
+    const label = parts.join(' ') || '<1m';
+    const urgent = ms < 86400000; // <1 dia
+    return `<span class="fg-meta-chip ${urgent ? 'is-urgent' : ''}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        ${game.isUpcoming ? 'Empieza en ' : 'Quedan '}${label}
+    </span>`;
 }

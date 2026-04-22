@@ -18,6 +18,8 @@ const guildActivityStore = require('../src/utils/guild-activity-store');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
 const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
+const freeGamesStore = require('../src/utils/free-games-store');
+const freeGamesService = require('../src/utils/free-games-service');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const {
     ticketButtonCustomIdForGuild,
@@ -2228,6 +2230,155 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
     } catch (error) {
         console.error('Error enviando stream alert test:', error);
         res.status(500).json({ error: 'Error al enviar prueba de stream alert' });
+    }
+});
+
+// ============================================================
+// FREE GAMES (Epic Games / Steam)
+// ============================================================
+
+app.get('/api/guild/:guildId/free-games/config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await freeGamesStore.getFreeGamesConfig(guildId);
+        res.json(config || freeGamesStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo free-games config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de juegos gratis' });
+    }
+});
+
+app.post('/api/guild/:guildId/free-games/config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const current = await freeGamesStore.getFreeGamesConfig(guildId);
+        const body = req.body || {};
+        const config = freeGamesStore.normalizeConfig({
+            ...current,
+            enabled: body.enabled === true,
+            channelId: String(body.channelId || '').trim(),
+            mentionText: String(body.mentionText || '').slice(0, 300),
+            sources: {
+                epic: body?.sources?.epic !== false,
+                steam: body?.sources?.steam !== false
+            },
+            color: String(body.color || current.color || '4ccb81').replace('#', '').slice(0, 6),
+            footerText: String(body.footerText || current.footerText || 'EyedBot · Juegos gratis').slice(0, 200),
+            notifiedIds: current.notifiedIds || [],
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+
+        if (config.enabled && !config.channelId) {
+            return res.status(400).json({ error: 'Debes seleccionar un canal de notificaciones' });
+        }
+
+        const saved = await freeGamesStore.setFreeGamesConfig(guildId, config);
+        res.json({ success: true, config: saved });
+    } catch (error) {
+        console.error('Error guardando free-games config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de juegos gratis' });
+    }
+});
+
+app.get('/api/guild/:guildId/free-games/preview', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const includeEpic = req.query.epic !== '0';
+        const includeSteam = req.query.steam !== '0';
+        const force = req.query.force === '1';
+
+        const games = await freeGamesService.fetchAllFreeGames({ includeEpic, includeSteam, force });
+        res.json({
+            success: true,
+            count: games.length,
+            fetchedAt: new Date().toISOString(),
+            games
+        });
+    } catch (error) {
+        console.error('Error en free-games preview:', error);
+        res.status(500).json({ error: 'No se pudieron cargar los juegos gratis' });
+    }
+});
+
+app.post('/api/guild/:guildId/free-games/test', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const current = await freeGamesStore.getFreeGamesConfig(guildId);
+        const body = req.body || {};
+        const config = freeGamesStore.normalizeConfig({
+            ...current,
+            enabled: true,
+            channelId: String(body.channelId || current.channelId || '').trim(),
+            mentionText: String(body.mentionText || current.mentionText || '').slice(0, 300),
+            sources: body.sources && typeof body.sources === 'object' ? body.sources : current.sources,
+            color: String(body.color || current.color || '4ccb81').replace('#', '').slice(0, 6),
+            footerText: String(body.footerText || current.footerText || 'EyedBot · Juegos gratis').slice(0, 200),
+            notifiedIds: current.notifiedIds || [],
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+
+        if (!config.channelId) {
+            return res.status(400).json({ error: 'Selecciona un canal antes de enviar la prueba' });
+        }
+
+        const channel = guild.channels.cache.get(config.channelId)
+            || await guild.channels.fetch(config.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(400).json({ error: 'Canal inválido' });
+        }
+
+        // Elegir un juego real si hay, si no armar uno demo
+        const games = await freeGamesService.fetchAllFreeGames({
+            includeEpic: config.sources.epic !== false,
+            includeSteam: config.sources.steam !== false
+        });
+        const demo = games[0] || {
+            id: 'demo_0',
+            source: 'epic',
+            sourceLabel: 'Epic Games',
+            title: 'Juego de prueba',
+            description: 'Este es un mensaje de prueba enviado desde el panel web. Un juego real aparecerá aquí cuando se detecte una promoción.',
+            imageUrl: 'https://cdn2.unrealengine.com/egs-homepagepromoblade-tallpromomay2023-1920x1080-1920x1080-7e79fcf0b3a0.jpg',
+            thumbnailUrl: '',
+            originalPriceMinor: 2999,
+            currency: 'EUR',
+            originalPrice: '29,99 €',
+            discountPercent: 100,
+            endsAt: new Date(Date.now() + 5 * 86400000).toISOString(),
+            isUpcoming: false,
+            storeUrl: 'https://store.epicgames.com/es-ES/free-games',
+            tags: ['Acción', 'Aventura'],
+            publisher: 'EyedBot Studios'
+        };
+
+        const embed = freeGamesService.buildFreeGameEmbed(demo, config);
+
+        await channel.send({
+            content: `🧪 **Prueba de notificación**${config.mentionText ? `\n${config.mentionText}` : ''}`,
+            embeds: [embed],
+            allowedMentions: { parse: ['users', 'roles', 'everyone'] }
+        });
+
+        res.json({ success: true, sample: demo });
+    } catch (error) {
+        console.error('Error enviando free-games test:', error);
+        res.status(500).json({ error: 'Error al enviar prueba' });
     }
 });
 

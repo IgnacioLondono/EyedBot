@@ -24,6 +24,7 @@ const guildActivityStore = require('./utils/guild-activity-store');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startStreamAlertScheduler, stopStreamAlertScheduler } = require('./utils/stream-alert-scheduler');
+const { startFreeGamesScheduler, stopFreeGamesScheduler } = require('./utils/free-games-service');
 require('dotenv').config();
 
 let webPanel = null;
@@ -285,6 +286,7 @@ client.once('clientReady', () => {
     startVoiceXpLoop(client);
     seedVoiceAnalyticsSessions(client);
     startStreamAlertScheduler(client);
+    startFreeGamesScheduler(client);
 });
 
 client.on('guildCreate', (guild) => {
@@ -545,6 +547,7 @@ async function gracefulShutdown(signal) {
         stopVoiceXpLoop();
         await flushAllVoiceAnalyticsSessions();
         stopStreamAlertScheduler();
+        stopFreeGamesScheduler();
         await db.close().catch(() => null);
         await client.destroy();
     } catch {
