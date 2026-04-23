@@ -3198,6 +3198,85 @@ function collectPanelValues(containerId) {
     return values;
 }
 
+// ====== Generic dashboard panel UI helpers (dpx-*) ======
+
+function bindDpxTabs(container) {
+    if (!container) return;
+    const tabs = Array.from(container.querySelectorAll('[data-dpx-tab]'));
+    const panels = Array.from(container.querySelectorAll('[data-dpx-panel]'));
+    if (!tabs.length || !panels.length) return;
+
+    const activate = (key) => {
+        tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-dpx-tab') === key));
+        panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
+    };
+
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => activate(tab.getAttribute('data-dpx-tab')));
+    });
+
+    if (!tabs.some((t) => t.classList.contains('is-active'))) {
+        activate(tabs[0].getAttribute('data-dpx-tab'));
+    }
+}
+
+function dpxRenderToggle({ id, checked = false, title = '', description = '', dataPrefKey = '' } = {}) {
+    const idAttr = id ? `id="${id}"` : '';
+    const prefAttr = dataPrefKey ? `data-pref-key="${dataPrefKey}"` : '';
+    return `
+        <label class="dpx-toggle">
+            <input type="checkbox" ${idAttr} ${prefAttr} ${checked ? 'checked' : ''}>
+            <span class="dpx-toggle-switch"></span>
+            <span class="dpx-toggle-info">
+                <strong>${escapeHtml(title)}</strong>
+                <span>${escapeHtml(description)}</span>
+            </span>
+        </label>
+    `;
+}
+
+function dpxRenderHero({ kicker = '', title = '', description = '', actionsHtml = '', accent = '#ff78d1', glow1 = 'rgba(124,77,255,0.18)', glow2 = 'rgba(255,120,209,0.18)' } = {}) {
+    const styleAttr = `style="--dpx-hero-accent:${accent};--dpx-hero-glow-1:${glow1};--dpx-hero-glow-2:${glow2};"`;
+    return `
+        <header class="dpx-hero" ${styleAttr}>
+            <div class="dpx-hero-text">
+                ${kicker ? `<div class="dpx-hero-kicker">${kicker}</div>` : ''}
+                <h3>${escapeHtml(title)}</h3>
+                <p>${escapeHtml(description)}</p>
+            </div>
+            <div class="dpx-hero-actions">${actionsHtml}</div>
+        </header>
+    `;
+}
+
+function dpxRenderTabs(tabs, activeKey) {
+    if (!Array.isArray(tabs) || !tabs.length) return '';
+    const activeKeyEffective = activeKey || tabs[0].key;
+    return `
+        <nav class="dpx-tabs" role="tablist">
+            ${tabs.map((tab) => `
+                <button type="button" class="dpx-tab ${tab.key === activeKeyEffective ? 'is-active' : ''}" data-dpx-tab="${escapeHtml(tab.key)}" role="tab">
+                    ${tab.icon ? `<span aria-hidden="true">${tab.icon}</span>` : ''}
+                    <span>${escapeHtml(tab.label)}</span>
+                </button>
+            `).join('')}
+        </nav>
+    `;
+}
+
+function dpxRenderStatCard({ label = '', value = '', hint = '', accent = '', accent2 = '' } = {}) {
+    const styleAttr = (accent || accent2)
+        ? `style="--dpx-stat-accent:${accent || 'var(--iris-400)'};--dpx-stat-accent-2:${accent2 || 'var(--fuchsia)'};"`
+        : '';
+    return `
+        <div class="dpx-stat-card" ${styleAttr}>
+            <span class="dpx-stat-label">${escapeHtml(label)}</span>
+            <span class="dpx-stat-value">${value}</span>
+            ${hint ? `<span class="dpx-stat-hint">${hint}</span>` : ''}
+        </div>
+    `;
+}
+
 async function loadVoiceCreatorPanel(guildId) {
     const container = document.getElementById('voiceCreatorContainer');
     if (!container) return;
@@ -3219,69 +3298,134 @@ async function loadVoiceCreatorPanel(guildId) {
         const voiceChannels = (Array.isArray(channels) ? channels : []).filter((c) => c.type === 2);
         const categories = (Array.isArray(channels) ? channels : []).filter((c) => c.type === 4);
 
-        container.innerHTML = `
-            <h3 class="welcome-panel-title">Canales de Voz Temporales</h3>
-            <p class="welcome-panel-subtitle">Al entrar al canal creador, el bot genera automáticamente tu canal de voz y lo elimina cuando queda vacío.</p>
-            <div class="welcome-layout">
-                <div class="welcome-editor">
-                    <div class="form-row">
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="tempVoiceEnabled" ${config.enabled ? 'checked' : ''}> <span>Activar sistema de voz temporal</span></label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="tempVoiceAllowCustomNames" ${config.allowCustomNames !== false ? 'checked' : ''}> <span>Permitir nombre personalizado por usuario</span></label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="tempVoiceSendManageEmbed" ${config.sendManageEmbed === true ? 'checked' : ''}> <span>Enviar embed de gestion con botones al chat del canal creado</span></label>
-                        </div>
-                    </div>
+        const enabled = config.enabled === true;
+        const userLimitVal = Math.max(0, Number.parseInt(config.userLimit || 0, 10) || 0);
+        const creatorChannelName = (voiceChannels.find((c) => String(c.id) === String(config.creatorChannelId)) || {}).name || '—';
+        const categoryName = (categories.find((c) => String(c.id) === String(config.categoryId)) || {}).name || 'Igual que el creador';
 
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="tempVoiceCreatorChannel">Canal creador (voz)</label>
-                            <select id="tempVoiceCreatorChannel" class="form-control">
-                                <option value="">Selecciona un canal de voz</option>
-                                ${voiceChannels.map((c) => `<option value="${c.id}" ${String(config.creatorChannelId || '') === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="tempVoiceCategory">Categoría para canales creados</label>
-                            <select id="tempVoiceCategory" class="form-control">
-                                <option value="">Usar categoría del canal creador</option>
-                                ${categories.map((c) => `<option value="${c.id}" ${String(config.categoryId || '') === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
-                            </select>
-                        </div>
-                    </div>
+        const heroHtml = dpxRenderHero({
+            kicker: 'Voz dinámica',
+            title: 'Canales de Voz Temporales',
+            description: 'Al entrar al canal creador, el bot genera un canal de voz personal y lo elimina automáticamente cuando queda vacío.',
+            accent: '#ff78d1',
+            actionsHtml: `
+                <span class="dpx-status-chip ${enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${enabled ? 'Activo' : 'Desactivado'}</span>
+                <button type="button" id="saveTempVoiceBtn" class="btn btn-primary">Guardar cambios</button>
+            `
+        });
 
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="tempVoiceTemplate">Formato del nombre automático</label>
-                            <input type="text" id="tempVoiceTemplate" class="form-control" value="${escapeHtmlForValue(config.channelNameTemplate || 'Canal de {username}')}" placeholder="Canal de {username}">
-                            <small style="color:var(--text-muted);">Variables: <code>{username}</code>, <code>{displayName}</code></small>
-                        </div>
-                        <div class="form-group">
-                            <label for="tempVoiceUserLimit">Límite de usuarios (0 = sin límite)</label>
-                            <input type="number" min="0" max="99" id="tempVoiceUserLimit" class="form-control" value="${Math.max(0, Number.parseInt(config.userLimit || 0, 10) || 0)}">
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="button" id="saveTempVoiceBtn" class="btn btn-primary">Guardar sistema de voz temporal</button>
-                    </div>
-                </div>
-
-                <div class="welcome-preview-panel">
-                    <h4>Como usarlo</h4>
-                    <p style="color:var(--text-secondary); margin-bottom:0.65rem;">1. El usuario entra al canal creador.</p>
-                    <p style="color:var(--text-secondary); margin-bottom:0.65rem;">2. Se crea su canal privado temporal.</p>
-                    <p style="color:var(--text-secondary); margin-bottom:0.65rem;">3. Cuando se vacía, se elimina solo.</p>
-                    <p style="color:var(--text-secondary); margin-top:0.8rem;">Nombre personalizado: <code>/voznombre nombre:&lt;tu nombre&gt;</code>.</p>
-                    <p style="color:var(--text-secondary); margin-top:0.45rem;">Privado/público: <code>/vozprivado activar:true|false</code>.</p>
-                    <p style="color:var(--text-secondary); margin-top:0.45rem;">Invitar a privado: <code>/vozinvitar usuario:@alguien</code>.</p>
-                    <p style="color:var(--text-secondary); margin-top:0.45rem;">Quitar del privado: <code>/vozquitar usuario:@alguien</code>.</p>
-                </div>
+        const statsHtml = `
+            <div class="dpx-stats-grid">
+                ${dpxRenderStatCard({ label: 'Estado', value: `<span class="dpx-stat-pill ${enabled ? 'is-on' : 'is-off'}">${enabled ? 'Activo' : 'Inactivo'}</span>`, hint: enabled ? 'Sistema operativo' : 'Activa el toggle para empezar' })}
+                ${dpxRenderStatCard({ label: 'Canal creador', value: escapeHtml(creatorChannelName), hint: 'Voz que dispara la creación', accent: '#7c4dff' })}
+                ${dpxRenderStatCard({ label: 'Categoría destino', value: escapeHtml(categoryName), hint: 'Donde aparecen los canales creados', accent: '#9a6dff' })}
+                ${dpxRenderStatCard({ label: 'Límite de usuarios', value: userLimitVal === 0 ? 'Sin límite' : `${userLimitVal} pers.`, hint: 'Cupo por canal generado', accent: '#ff78d1', accent2: '#ffb778' })}
             </div>
         `;
+
+        const tabsHtml = dpxRenderTabs([
+            { key: 'config', label: 'Configuración', icon: '⚙️' },
+            { key: 'rules', label: 'Reglas', icon: '🛡️' },
+            { key: 'guide', label: 'Guía & comandos', icon: '📘' }
+        ], 'config');
+
+        container.innerHTML = `
+            <div class="dpx-panel">
+                ${heroHtml}
+                ${statsHtml}
+                ${tabsHtml}
+
+                <section class="dpx-tab-panel is-active" data-dpx-panel="config">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Canales y categorías</h4>
+                                <p>Selecciona el canal de voz que actuará como creador y donde aparecerán los canales generados.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid">
+                            <div class="dpx-field">
+                                <label for="tempVoiceCreatorChannel">Canal creador (voz)</label>
+                                <select id="tempVoiceCreatorChannel" class="form-control">
+                                    <option value="">Selecciona un canal de voz</option>
+                                    ${voiceChannels.map((c) => `<option value="${c.id}" ${String(config.creatorChannelId || '') === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                                <small>Cuando alguien entre aquí se generará su canal personal.</small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="tempVoiceCategory">Categoría destino</label>
+                                <select id="tempVoiceCategory" class="form-control">
+                                    <option value="">Usar la del canal creador</option>
+                                    ${categories.map((c) => `<option value="${c.id}" ${String(config.categoryId || '') === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                                <small>Si lo dejas vacío se usa la misma categoría del creador.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Personalización</h4>
+                                <p>Define el formato del nombre y los límites por defecto.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid">
+                            <div class="dpx-field">
+                                <label for="tempVoiceTemplate">Formato del nombre</label>
+                                <input type="text" id="tempVoiceTemplate" class="form-control" value="${escapeHtmlForValue(config.channelNameTemplate || 'Canal de {username}')}" placeholder="Canal de {username}">
+                                <small>Variables: <code>{username}</code>, <code>{displayName}</code></small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="tempVoiceUserLimit">Límite por canal (0 = sin límite)</label>
+                                <input type="number" min="0" max="99" id="tempVoiceUserLimit" class="form-control" value="${userLimitVal}">
+                                <small>Cupo máximo por canal generado (0 a 99).</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="rules">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Reglas y permisos</h4>
+                                <p>Activa o desactiva el sistema y decide qué pueden hacer los usuarios.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-toggle-grid">
+                            ${dpxRenderToggle({ id: 'tempVoiceEnabled', checked: enabled, title: 'Activar sistema de voz temporal', description: 'Habilita la creación automática de canales personales.' })}
+                            ${dpxRenderToggle({ id: 'tempVoiceAllowCustomNames', checked: config.allowCustomNames !== false, title: 'Nombres personalizados', description: 'Los usuarios pueden cambiar el nombre con /voznombre.' })}
+                            ${dpxRenderToggle({ id: 'tempVoiceSendManageEmbed', checked: config.sendManageEmbed === true, title: 'Embed de gestión', description: 'Envía un panel con botones de gestión al chat del canal creado.' })}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="guide">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Cómo lo usan los usuarios</h4>
+                                <p>Comparte estos pasos con tu comunidad para sacar el máximo provecho.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid is-wide">
+                            <div class="dpx-tip"><strong>1.</strong>&nbsp;Entran al canal creador y se les genera su canal personal.</div>
+                            <div class="dpx-tip"><strong>2.</strong>&nbsp;Charlan dentro libremente con sus amigos.</div>
+                            <div class="dpx-tip"><strong>3.</strong>&nbsp;Cuando todos salen, el canal desaparece automáticamente.</div>
+                        </div>
+                        <div class="dpx-field-grid is-wide" style="margin-top:1rem;">
+                            <div class="dpx-tip"><strong>Renombrar:</strong>&nbsp;<code>/voznombre nombre:&lt;tu nombre&gt;</code></div>
+                            <div class="dpx-tip"><strong>Privado/Público:</strong>&nbsp;<code>/vozprivado activar:true|false</code></div>
+                            <div class="dpx-tip"><strong>Invitar:</strong>&nbsp;<code>/vozinvitar usuario:@alguien</code></div>
+                            <div class="dpx-tip"><strong>Quitar:</strong>&nbsp;<code>/vozquitar usuario:@alguien</code></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        `;
+
+        bindDpxTabs(container);
 
         const saveBtn = document.getElementById('saveTempVoiceBtn');
         if (saveBtn) {
@@ -3378,121 +3522,203 @@ async function loadAutomationPanel(guildId) {
         .map((c) => `<option value="${c.id}" ${String(streamConfig.channelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`)
         .join('');
 
-    container.innerHTML = `
-        <h3 class="welcome-panel-title">Centro de automatizacion</h3>
-        <p class="welcome-panel-subtitle">Configura reglas rapidas para prevenir spam y comportamiento abusivo sin perder control manual.</p>
-        <div class="control-grid">
-            <div class="control-card">
-                <h4>Anti Spam</h4>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiSpamEnabled" ${prefs.antiSpamEnabled ? 'checked' : ''}> Activar filtro</label>
-                <div class="form-row" style="margin-top:0.6rem;">
-                    <div class="form-group">
-                        <label>Mensajes límite</label>
-                        <input type="number" min="3" max="20" class="form-control" data-pref-key="spamMessages" value="${escapeHtmlForValue(prefs.spamMessages)}">
-                    </div>
-                    <div class="form-group">
-                        <label>Ventana (s)</label>
-                        <input type="number" min="3" max="60" class="form-control" data-pref-key="spamWindow" value="${escapeHtmlForValue(prefs.spamWindow)}">
-                    </div>
-                </div>
-            </div>
-            <div class="control-card">
-                <h4>Contenido</h4>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiLinksEnabled" ${prefs.antiLinksEnabled ? 'checked' : ''}> Bloquear enlaces sospechosos</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiCapsEnabled" ${prefs.antiCapsEnabled ? 'checked' : ''}> Bloquear exceso de mayúsculas</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiInvitesEnabled" ${prefs.antiInvitesEnabled ? 'checked' : ''}> Bloquear invitaciones externas</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="antiFloodAttachments" ${prefs.antiFloodAttachments ? 'checked' : ''}> Limitar flood de adjuntos</label>
-                <div class="form-group" style="margin-top:0.6rem;">
-                    <label>Máximo menciones por mensaje</label>
-                    <input type="number" min="1" max="25" class="form-control" data-pref-key="maxMentions" value="${escapeHtmlForValue(prefs.maxMentions)}">
-                </div>
-            </div>
-            <div class="control-card">
-                <h4>Modo anti-raid</h4>
-                <div class="form-group">
-                    <label>Perfil</label>
-                    <select class="form-control" data-pref-key="raidMode">
-                        <option value="soft" ${prefs.raidMode === 'soft' ? 'selected' : ''}>Suave</option>
-                        <option value="balanced" ${prefs.raidMode === 'balanced' ? 'selected' : ''}>Equilibrado</option>
-                        <option value="strict" ${prefs.raidMode === 'strict' ? 'selected' : ''}>Estricto</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-top:0.55rem;">
-                    <label>Accion automatica</label>
-                    <select class="form-control" data-pref-key="punishmentMode">
-                        <option value="warn" ${prefs.punishmentMode === 'warn' ? 'selected' : ''}>Advertir</option>
-                        <option value="mute" ${prefs.punishmentMode === 'mute' ? 'selected' : ''}>Silenciar</option>
-                        <option value="kick" ${prefs.punishmentMode === 'kick' ? 'selected' : ''}>Expulsar</option>
-                    </select>
-                </div>
-                <small style="color:var(--text-muted);">Puedes usar presets y luego ajustar campos puntuales.</small>
-            </div>
-        </div>
-        <div class="form-actions" style="margin-top:1rem;">
-            <button type="button" class="btn btn-secondary" id="presetSoftAutomationBtn">Preset Suave</button>
-            <button type="button" class="btn btn-secondary" id="presetStrictAutomationBtn">Preset Estricto</button>
-            <button type="button" class="btn btn-primary" id="saveAutomationBtn">Guardar Automatización</button>
-        </div>
+    const filtersActive = ['antiSpamEnabled', 'antiLinksEnabled', 'antiCapsEnabled', 'antiInvitesEnabled', 'antiFloodAttachments'].filter((k) => prefs[k]).length;
+    const enabledSourcesCount = streamSources.filter((s) => s.enabled !== false).length;
+    const raidProfileLabels = { soft: 'Suave', balanced: 'Equilibrado', strict: 'Estricto' };
+    const punishLabels = { warn: 'Advertir', mute: 'Silenciar', kick: 'Expulsar' };
 
-        <div style="margin-top:2rem; border-top:1px solid var(--border-color); padding-top:1.2rem;">
-            <h3 class="welcome-panel-title">Integraciones de stream (Twitch / YouTube / TikTok / RSS)</h3>
-            <p class="welcome-panel-subtitle">Publica embeds automáticos en un canal cuando detecta nuevo stream/contenido desde tus fuentes conectadas.</p>
-            <div class="control-grid">
-                <div class="control-card">
-                    <h4>Configuración del embed</h4>
-                    <label class="checkbox-inline"><input type="checkbox" id="streamAlertsEnabled" ${streamConfig.enabled ? 'checked' : ''}> Activar stream alerts</label>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label for="streamAlertsChannel">Canal destino</label>
-                        <select id="streamAlertsChannel" class="form-control">
-                            <option value="">Selecciona canal de texto</option>
-                            ${channelOptionsHtml}
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label for="streamAlertsMentionText">Texto de aviso (opcional)</label>
-                        <input type="text" id="streamAlertsMentionText" class="form-control" value="${escapeHtmlForValue(streamConfig.mentionText || '')}" placeholder="@everyone ¡Nuevo directo!">
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label for="streamAlertsColor">Color del embed</label>
-                        <input type="color" id="streamAlertsColor" class="form-control color-input" value="#${String(streamConfig.color || '7c4dff').replace('#', '')}">
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label for="streamAlertsTitleTemplate">Título</label>
-                        <input type="text" id="streamAlertsTitleTemplate" class="form-control" value="${escapeHtmlForValue(streamConfig.titleTemplate || '🔴 {platform}: {name} en directo')}" placeholder="🔴 {platform}: {name} en directo">
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label for="streamAlertsDescriptionTemplate">Descripción</label>
-                        <textarea id="streamAlertsDescriptionTemplate" class="form-control" rows="3">${escapeHtmlForValue(streamConfig.descriptionTemplate || '{title}\n{url}')}</textarea>
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label for="streamAlertsFooter">Footer</label>
-                        <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot Stream Alerts')}">
-                    </div>
-                    <small style="color:var(--text-muted);">Variables: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>.</small>
-                </div>
+    const heroHtml = dpxRenderHero({
+        kicker: 'Automatización · Streams',
+        title: 'Centro de Automatización',
+        description: 'Reglas rápidas contra spam y abuso, más alertas automáticas cuando un creador entra en directo o publica contenido nuevo.',
+        accent: '#ffb778',
+        glow1: 'rgba(255,183,120,0.18)',
+        glow2: 'rgba(124,77,255,0.22)',
+        actionsHtml: `
+            <span class="dpx-status-chip ${prefs.antiSpamEnabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${filtersActive} filtros activos</span>
+            <button type="button" class="btn btn-secondary" id="saveAutomationBtn">Guardar filtros</button>
+            <button type="button" class="btn btn-primary" id="saveStreamAlertsBtn">Guardar streams</button>
+        `
+    });
 
-                <div class="control-card">
-                    <h4>Fuentes</h4>
-                    <div class="form-group" style="margin-bottom:0.65rem;">
-                        <label for="streamSourcesSearch">Buscar fuente</label>
-                        <div style="display:flex; align-items:center; gap:0.5rem;">
-                            <span style="color:var(--text-muted); font-size:1rem;">🔍</span>
-                            <input type="text" id="streamSourcesSearch" class="form-control" placeholder="Buscar por nombre o URL...">
-                        </div>
-                    </div>
-                    <div id="streamSourcesList"></div>
-                    <div class="form-actions" style="margin-top:0.75rem;">
-                        <button type="button" class="btn btn-secondary" id="addStreamSourceBtn">Añadir fuente</button>
-                    </div>
-                    <small style="color:var(--text-muted);">Para YouTube puedes usar URL de canal o feed RSS. Para TikTok/custom añade feed RSS. Twitch funciona con URL del canal (live) o feed.</small>
-                </div>
-            </div>
-            <div class="form-actions" style="margin-top:1rem;">
-                <button type="button" class="btn btn-secondary" id="testStreamAlertsBtn">Enviar prueba</button>
-                <button type="button" class="btn btn-primary" id="saveStreamAlertsBtn">Guardar Stream Alerts</button>
-            </div>
+    const statsHtml = `
+        <div class="dpx-stats-grid">
+            ${dpxRenderStatCard({ label: 'Filtros activos', value: `${filtersActive}<span class="dpx-stat-pill">/ 5</span>`, hint: 'Anti-spam, links, caps, invites, flood', accent: '#7c4dff' })}
+            ${dpxRenderStatCard({ label: 'Modo anti-raid', value: raidProfileLabels[prefs.raidMode] || 'Equilibrado', hint: `Acción: ${punishLabels[prefs.punishmentMode] || 'Silenciar'}`, accent: '#ff9c9c' })}
+            ${dpxRenderStatCard({ label: 'Stream alerts', value: `<span class="dpx-stat-pill ${streamConfig.enabled ? 'is-on' : 'is-off'}">${streamConfig.enabled ? 'Activas' : 'Inactivas'}</span>`, hint: streamConfig.channelId ? 'Canal configurado' : 'Sin canal destino', accent: '#ff78d1' })}
+            ${dpxRenderStatCard({ label: 'Fuentes', value: `${enabledSourcesCount} <small style="color:var(--text-muted);font-weight:500;">/ ${streamSources.length}</small>`, hint: 'Activas / totales', accent: '#7ef0b4' })}
         </div>
     `;
+
+    const tabsHtml = dpxRenderTabs([
+        { key: 'antispam', label: 'Anti-spam', icon: '🚫' },
+        { key: 'content', label: 'Contenido', icon: '🧹' },
+        { key: 'raid', label: 'Modo anti-raid', icon: '🛡️' },
+        { key: 'stream-embed', label: 'Stream alerts', icon: '🔴' },
+        { key: 'stream-sources', label: 'Fuentes', icon: '📡' }
+    ], 'antispam');
+
+    container.innerHTML = `
+        <div class="dpx-panel">
+            ${heroHtml}
+            ${statsHtml}
+            ${tabsHtml}
+
+            <section class="dpx-tab-panel is-active" data-dpx-panel="antispam">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Anti-spam</h4>
+                            <p>Detecta y silencia usuarios que envían mensajes en ráfaga.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-toggle-grid">
+                        ${dpxRenderToggle({ dataPrefKey: 'antiSpamEnabled', checked: !!prefs.antiSpamEnabled, title: 'Activar anti-spam', description: 'Filtra mensajes repetitivos en ventana corta.' })}
+                    </div>
+                    <div class="dpx-field-grid" style="margin-top:1rem;">
+                        <div class="dpx-field">
+                            <label for="autoSpamMessages">Mensajes límite</label>
+                            <input type="number" min="3" max="20" class="form-control" id="autoSpamMessages" data-pref-key="spamMessages" value="${escapeHtmlForValue(prefs.spamMessages)}">
+                            <small>Cantidad de mensajes en la ventana antes de penalizar.</small>
+                        </div>
+                        <div class="dpx-field">
+                            <label for="autoSpamWindow">Ventana (segundos)</label>
+                            <input type="number" min="3" max="60" class="form-control" id="autoSpamWindow" data-pref-key="spamWindow" value="${escapeHtmlForValue(prefs.spamWindow)}">
+                            <small>Segundos contados para evaluar el ritmo.</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="content">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Filtros de contenido</h4>
+                            <p>Bloquea links, mayúsculas, invitaciones externas y abuso de adjuntos.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-toggle-grid">
+                        ${dpxRenderToggle({ dataPrefKey: 'antiLinksEnabled', checked: !!prefs.antiLinksEnabled, title: 'Bloquear enlaces sospechosos', description: 'Acortadores y dominios maliciosos conocidos.' })}
+                        ${dpxRenderToggle({ dataPrefKey: 'antiCapsEnabled', checked: !!prefs.antiCapsEnabled, title: 'Bloquear exceso de mayúsculas', description: 'Mensajes con porcentaje alto de CAPS.' })}
+                        ${dpxRenderToggle({ dataPrefKey: 'antiInvitesEnabled', checked: !!prefs.antiInvitesEnabled, title: 'Bloquear invitaciones externas', description: 'Elimina links discord.gg/.com de otros servers.' })}
+                        ${dpxRenderToggle({ dataPrefKey: 'antiFloodAttachments', checked: !!prefs.antiFloodAttachments, title: 'Limitar flood de adjuntos', description: 'Bloquea ráfagas de imágenes/videos.' })}
+                    </div>
+                    <div class="dpx-field-grid" style="margin-top:1rem;">
+                        <div class="dpx-field">
+                            <label for="autoMaxMentions">Máximo menciones por mensaje</label>
+                            <input type="number" min="1" max="25" class="form-control" id="autoMaxMentions" data-pref-key="maxMentions" value="${escapeHtmlForValue(prefs.maxMentions)}">
+                            <small>Mensajes que excedan esta cifra serán bloqueados.</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="raid">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Modo anti-raid rápido</h4>
+                            <p>Aplica un perfil predefinido y ajusta la acción automática que se aplicará a infractores.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-chip-row" style="margin-bottom:0.85rem;">
+                        <button type="button" class="dpx-chip" id="presetSoftAutomationBtn">🌿 Preset Suave</button>
+                        <button type="button" class="dpx-chip" id="presetStrictAutomationBtn">⚔️ Preset Estricto</button>
+                    </div>
+                    <div class="dpx-field-grid">
+                        <div class="dpx-field">
+                            <label for="autoRaidMode">Perfil</label>
+                            <select class="form-control" id="autoRaidMode" data-pref-key="raidMode">
+                                <option value="soft" ${prefs.raidMode === 'soft' ? 'selected' : ''}>Suave</option>
+                                <option value="balanced" ${prefs.raidMode === 'balanced' ? 'selected' : ''}>Equilibrado</option>
+                                <option value="strict" ${prefs.raidMode === 'strict' ? 'selected' : ''}>Estricto</option>
+                            </select>
+                            <small>Influye en la sensibilidad global del sistema.</small>
+                        </div>
+                        <div class="dpx-field">
+                            <label for="autoPunishmentMode">Acción automática</label>
+                            <select class="form-control" id="autoPunishmentMode" data-pref-key="punishmentMode">
+                                <option value="warn" ${prefs.punishmentMode === 'warn' ? 'selected' : ''}>Advertir</option>
+                                <option value="mute" ${prefs.punishmentMode === 'mute' ? 'selected' : ''}>Silenciar</option>
+                                <option value="kick" ${prefs.punishmentMode === 'kick' ? 'selected' : ''}>Expulsar</option>
+                            </select>
+                            <small>Aplicada a usuarios detectados por los filtros.</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="stream-embed">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Embed de stream alerts</h4>
+                            <p>Personaliza cómo se ven los avisos cuando un creador empieza un directo o publica contenido nuevo.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-toggle-grid">
+                        ${dpxRenderToggle({ id: 'streamAlertsEnabled', checked: !!streamConfig.enabled, title: 'Activar stream alerts', description: 'Publica embeds automáticos al detectar nuevo stream o contenido.' })}
+                    </div>
+                    <div class="dpx-field-grid" style="margin-top:1rem;">
+                        <div class="dpx-field">
+                            <label for="streamAlertsChannel">Canal destino</label>
+                            <select id="streamAlertsChannel" class="form-control">
+                                <option value="">Selecciona canal de texto</option>
+                                ${channelOptionsHtml}
+                            </select>
+                        </div>
+                        <div class="dpx-field">
+                            <label for="streamAlertsColor">Color del embed</label>
+                            <input type="color" id="streamAlertsColor" class="form-control color-input" value="#${String(streamConfig.color || '7c4dff').replace('#', '')}">
+                        </div>
+                        <div class="dpx-field is-full">
+                            <label for="streamAlertsMentionText">Texto de aviso (opcional)</label>
+                            <input type="text" id="streamAlertsMentionText" class="form-control" value="${escapeHtmlForValue(streamConfig.mentionText || '')}" placeholder="@everyone ¡Nuevo directo!">
+                        </div>
+                        <div class="dpx-field is-full">
+                            <label for="streamAlertsTitleTemplate">Título</label>
+                            <input type="text" id="streamAlertsTitleTemplate" class="form-control" value="${escapeHtmlForValue(streamConfig.titleTemplate || '🔴 {platform}: {name} en directo')}" placeholder="🔴 {platform}: {name} en directo">
+                        </div>
+                        <div class="dpx-field is-full">
+                            <label for="streamAlertsDescriptionTemplate">Descripción</label>
+                            <textarea id="streamAlertsDescriptionTemplate" class="form-control" rows="3">${escapeHtmlForValue(streamConfig.descriptionTemplate || '{title}\n{url}')}</textarea>
+                        </div>
+                        <div class="dpx-field is-full">
+                            <label for="streamAlertsFooter">Footer</label>
+                            <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot Stream Alerts')}">
+                        </div>
+                    </div>
+                    <div class="dpx-tip" style="margin-top:1rem;"><span aria-hidden="true">🛈</span><div>Variables disponibles: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>.</div></div>
+                    <div class="dpx-actions">
+                        <button type="button" class="btn btn-secondary" id="testStreamAlertsBtn">Enviar prueba</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="stream-sources">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Fuentes de stream</h4>
+                            <p>Twitch, YouTube, TikTok y RSS personalizados. Añade tantas fuentes como quieras vigilar.</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="addStreamSourceBtn">Añadir fuente</button>
+                    </div>
+                    <div class="dpx-field-grid" style="margin-bottom:0.75rem;">
+                        <div class="dpx-field is-full">
+                            <label for="streamSourcesSearch">Buscar fuente</label>
+                            <input type="text" id="streamSourcesSearch" class="form-control" placeholder="Buscar por nombre, URL o plataforma...">
+                        </div>
+                    </div>
+                    <div id="streamSourcesList" class="dpx-item-list"></div>
+                    <div class="dpx-tip" style="margin-top:1rem;"><span aria-hidden="true">🛈</span><div>YouTube acepta URL de canal o feed RSS · TikTok requiere feed RSS · Twitch acepta URL de canal (modo live) o feed.</div></div>
+                </div>
+            </section>
+        </div>
+    `;
+
+    bindDpxTabs(container);
 
     const presetSoftBtn = document.getElementById('presetSoftAutomationBtn');
     const presetStrictBtn = document.getElementById('presetStrictAutomationBtn');
@@ -3551,42 +3777,60 @@ async function loadAutomationPanel(guildId) {
     };
     let streamSourcesSearchQuery = '';
 
-    const sourceCardHtml = (source, index) => `
-        <div class="stream-source-card" data-index="${index}" style="border:1px solid var(--border-color); border-radius:10px; padding:0.75rem; margin-bottom:0.65rem; background:rgba(8,6,16,0.4);">
-            <div class="form-row">
-                <div class="form-group checkbox-group"><label><input type="checkbox" class="stream-source-enabled" ${source.enabled !== false ? 'checked' : ''}> <span>Activa</span></label></div>
-                <div class="form-group" style="display:flex; justify-content:flex-end;"><button type="button" class="btn btn-secondary stream-remove-source-btn" data-remove-index="${index}">Quitar</button></div>
+    const platformIcons = { twitch: '🟣', youtube: '▶️', tiktok: '🎵', custom: '🌐' };
+    const platformLabels = { twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok', custom: 'Custom / RSS' };
+    const sourceCardHtml = (source, index) => {
+        const platform = String(source.platform || 'custom');
+        const platformLabel = platformLabels[platform] || 'Custom';
+        const platformIcon = platformIcons[platform] || '🌐';
+        return `
+        <div class="stream-source-card dpx-item-card" data-index="${index}">
+            <div class="dpx-item-head">
+                <div class="dpx-item-head-title">
+                    <span class="dpx-platform-badge platform-${platform}">${platformIcon}</span>
+                    <span>${escapeHtml(source.name || 'Nueva fuente')}</span>
+                    <span class="dpx-source-meta">${escapeHtml(platformLabel)}</span>
+                </div>
+                <div style="display:inline-flex; align-items:center; gap:0.5rem;">
+                    <label class="dpx-toggle" style="padding:0.4rem 0.7rem;">
+                        <input type="checkbox" class="stream-source-enabled" ${source.enabled !== false ? 'checked' : ''}>
+                        <span class="dpx-toggle-switch"></span>
+                        <span class="dpx-toggle-info"><strong style="font-size:0.78rem;">${source.enabled !== false ? 'Activa' : 'Pausada'}</strong></span>
+                    </label>
+                    <button type="button" class="dpx-icon-btn stream-remove-source-btn" data-remove-index="${index}">✕ Quitar</button>
+                </div>
             </div>
-            <div class="form-grid">
-                <div class="form-group">
+            <div class="dpx-field-grid">
+                <div class="dpx-field">
                     <label>Plataforma</label>
                     <select class="form-control stream-source-platform">
-                        <option value="twitch" ${String(source.platform || '') === 'twitch' ? 'selected' : ''}>Twitch</option>
-                        <option value="youtube" ${String(source.platform || '') === 'youtube' ? 'selected' : ''}>YouTube</option>
-                        <option value="tiktok" ${String(source.platform || '') === 'tiktok' ? 'selected' : ''}>TikTok</option>
-                        <option value="custom" ${String(source.platform || '') === 'custom' ? 'selected' : ''}>Custom/RSS</option>
+                        <option value="twitch" ${platform === 'twitch' ? 'selected' : ''}>Twitch</option>
+                        <option value="youtube" ${platform === 'youtube' ? 'selected' : ''}>YouTube</option>
+                        <option value="tiktok" ${platform === 'tiktok' ? 'selected' : ''}>TikTok</option>
+                        <option value="custom" ${platform === 'custom' ? 'selected' : ''}>Custom / RSS</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="dpx-field">
                     <label>Nombre</label>
                     <input type="text" class="form-control stream-source-name" value="${escapeHtmlForValue(source.name || '')}" placeholder="Nombre de fuente">
                 </div>
-            </div>
-            <div class="form-group" style="margin-top:0.5rem;">
-                <label>URL canal/perfil</label>
-                <input type="url" class="form-control stream-source-url" value="${escapeHtmlForValue(source.url || '')}" placeholder="https://...">
-            </div>
-            <div class="form-group" style="margin-top:0.5rem;">
-                <label>Feed RSS/Atom (opcional)</label>
-                <input type="url" class="form-control stream-source-feed" value="${escapeHtmlForValue(source.feedUrl || '')}" placeholder="https://.../feed.xml">
-            </div>
-            <div class="form-group" style="margin-top:0.5rem;">
-                <label>Imagen fallback (opcional)</label>
-                <input type="url" class="form-control stream-source-image" value="${escapeHtmlForValue(source.imageUrl || '')}" placeholder="https://.../image.jpg">
+                <div class="dpx-field is-full">
+                    <label>URL canal / perfil</label>
+                    <input type="url" class="form-control stream-source-url" value="${escapeHtmlForValue(source.url || '')}" placeholder="https://...">
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Feed RSS / Atom (opcional)</label>
+                    <input type="url" class="form-control stream-source-feed" value="${escapeHtmlForValue(source.feedUrl || '')}" placeholder="https://.../feed.xml">
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Imagen fallback (opcional)</label>
+                    <input type="url" class="form-control stream-source-image" value="${escapeHtmlForValue(source.imageUrl || '')}" placeholder="https://.../image.jpg">
+                </div>
             </div>
             <input type="hidden" class="stream-source-id" value="${escapeHtmlForValue(source.id || `src_${Date.now()}_${index}`)}">
         </div>
-    `;
+        `;
+    };
 
     function renderStreamSources() {
         const listEl = document.getElementById('streamSourcesList');
@@ -3758,93 +4002,186 @@ async function loadSecurityPanel(guildId) {
         const verificationLevel = String(info?.verificationLevel ?? 'unknown');
         const trustedSet = new Set(Array.isArray(cfg.trustedRoleIds) ? cfg.trustedRoleIds.map(String) : []);
 
-        container.innerHTML = `
-            <h3 class="welcome-panel-title">Centro de seguridad anti-raid</h3>
-            <p class="welcome-panel-subtitle">Protege contra spam, raids de joins y cambios destructivos de canales/roles en segundos.</p>
-            <div class="control-grid">
-                <div class="control-card">
-                    <h4>Estado y acción</h4>
-                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidEnabled" ${cfg.enabled !== false ? 'checked' : ''}> Activar anti-raid</label>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label>Acción automática</label>
-                        <select id="antiRaidActionMode" class="form-control">
-                            <option value="timeout" ${cfg.actionMode === 'timeout' ? 'selected' : ''}>Timeout</option>
-                            <option value="kick" ${cfg.actionMode === 'kick' ? 'selected' : ''}>Kick</option>
-                            <option value="ban" ${cfg.actionMode === 'ban' ? 'selected' : ''}>Ban</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label>Minutos timeout (si aplica)</label>
-                        <input type="number" min="1" max="40320" id="antiRaidTimeoutMinutes" class="form-control" value="${Math.max(1, Number.parseInt(cfg.timeoutMinutes || 30, 10) || 30)}">
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label>Canal de alertas</label>
-                        <select id="antiRaidAlertChannelId" class="form-control">
-                            <option value="">Sin alertas</option>
-                            ${channels.map((c) => `<option value="${c.id}" ${String(cfg.alertChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
+        const enabled = cfg.enabled !== false;
+        const actionMode = cfg.actionMode || 'timeout';
+        const alertChannelName = (channels.find((c) => String(c.id) === String(cfg.alertChannelId)) || {}).name || '—';
+        const trustedRoleNames = roles.filter((r) => trustedSet.has(String(r.id))).slice(0, 8);
+        const trustedCount = roles.filter((r) => trustedSet.has(String(r.id))).length;
 
-                <div class="control-card">
-                    <h4>Protección de mensajes</h4>
-                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidSpamEnabled" ${cfg.antiSpamEnabled !== false ? 'checked' : ''}> Anti spam</label>
-                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidBlockInvites" ${cfg.blockInvites !== false ? 'checked' : ''}> Bloquear invitaciones</label>
-                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidBlockLinks" ${cfg.blockLinks === true ? 'checked' : ''}> Bloquear enlaces sospechosos</label>
-                    <div class="form-grid" style="margin-top:0.45rem;">
-                        <div class="form-group">
-                            <label>Mensajes límite</label>
-                            <input type="number" min="3" max="40" id="antiRaidSpamMessages" class="form-control" value="${Math.max(3, Number.parseInt(cfg.spamMessages || 7, 10) || 7)}">
-                        </div>
-                        <div class="form-group">
-                            <label>Ventana spam (s)</label>
-                            <input type="number" min="3" max="120" id="antiRaidSpamWindowSec" class="form-control" value="${Math.max(3, Number.parseInt(cfg.spamWindowSec || 8, 10) || 8)}">
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label>Máximo menciones por mensaje</label>
-                        <input type="number" min="1" max="50" id="antiRaidMaxMentions" class="form-control" value="${Math.max(1, Number.parseInt(cfg.maxMentions || 6, 10) || 6)}">
-                    </div>
-                </div>
+        const heroHtml = dpxRenderHero({
+            kicker: 'Moderación · Anti-Raid',
+            title: 'Centro de seguridad',
+            description: 'Protege tu servidor contra spam, raids masivos de joins y cambios destructivos de canales o roles en segundos.',
+            accent: '#ff9c9c',
+            glow1: 'rgba(255,99,99,0.18)',
+            glow2: 'rgba(124,77,255,0.22)',
+            actionsHtml: `
+                <span class="dpx-status-chip ${enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${enabled ? 'Protegido' : 'Sin protección'}</span>
+                <button type="button" id="saveAntiRaidBtn" class="btn btn-primary">Guardar cambios</button>
+            `
+        });
 
-                <div class="control-card">
-                    <h4>Entrada y destrucción</h4>
-                    <p style="color:var(--text-secondary); margin-bottom:0.45rem;">Verificación Discord actual: <strong>${escapeHtml(verificationLevel)}</strong></p>
-                    <div class="form-group">
-                        <label>Joins por minuto (umbral raid)</label>
-                        <input type="number" min="2" max="60" id="antiRaidJoinRateThreshold" class="form-control" value="${Math.max(2, Number.parseInt(cfg.joinRateThreshold || 8, 10) || 8)}">
-                    </div>
-                    <div class="form-group" style="margin-top:0.55rem;">
-                        <label>Edad mínima de cuenta (días)</label>
-                        <input type="number" min="0" max="365" id="antiRaidAccountAgeDays" class="form-control" value="${Math.max(0, Number.parseInt(cfg.accountAgeDays || 3, 10) || 3)}">
-                    </div>
-                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidProtectChannels" ${cfg.protectChannels !== false ? 'checked' : ''}> Proteger canales (creación/eliminación masiva)</label>
-                    <label class="checkbox-inline"><input type="checkbox" id="antiRaidProtectRoles" ${cfg.protectRoles !== false ? 'checked' : ''}> Proteger roles (creación/eliminación masiva)</label>
-                    <div class="form-grid" style="margin-top:0.45rem;">
-                        <div class="form-group">
-                            <label>Acciones destructivas permitidas</label>
-                            <input type="number" min="1" max="30" id="antiRaidDestructiveActionThreshold" class="form-control" value="${Math.max(1, Number.parseInt(cfg.destructiveActionThreshold || 3, 10) || 3)}">
-                        </div>
-                        <div class="form-group">
-                            <label>Ventana (s)</label>
-                            <input type="number" min="10" max="300" id="antiRaidActionWindowSec" class="form-control" value="${Math.max(10, Number.parseInt(cfg.actionWindowSec || 60, 10) || 60)}">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="control-card">
-                    <h4>Roles confiables</h4>
-                    <p style="color:var(--text-secondary); margin-bottom:0.45rem;">Estos roles quedan exentos del anti-raid.</p>
-                    <select id="antiRaidTrustedRoles" class="form-control" multiple style="min-height:180px;">
-                        ${roles.map((role) => `<option value="${role.id}" ${trustedSet.has(String(role.id)) ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-
-            <div class="form-actions" style="margin-top:1rem;">
-                <button type="button" class="btn btn-primary" id="saveAntiRaidBtn">Guardar Anti-Raid</button>
+        const actionLabels = { timeout: 'Timeout', kick: 'Expulsar', ban: 'Banear' };
+        const statsHtml = `
+            <div class="dpx-stats-grid">
+                ${dpxRenderStatCard({ label: 'Estado anti-raid', value: `<span class="dpx-stat-pill ${enabled ? 'is-on' : 'is-off'}">${enabled ? 'Activo' : 'Inactivo'}</span>`, hint: enabled ? 'Vigilando entradas y mensajes' : 'Activa el sistema para empezar', accent: '#7ef0b4', accent2: '#7c4dff' })}
+                ${dpxRenderStatCard({ label: 'Acción automática', value: actionLabels[actionMode] || 'Timeout', hint: actionMode === 'timeout' ? `${Math.max(1, Number.parseInt(cfg.timeoutMinutes || 30, 10) || 30)} min` : 'Aplicada al detectar abuso', accent: '#ff78d1' })}
+                ${dpxRenderStatCard({ label: 'Verificación Discord', value: escapeHtml(verificationLevel), hint: 'Nivel nativo del servidor', accent: '#9a6dff' })}
+                ${dpxRenderStatCard({ label: 'Roles confiables', value: `${trustedCount}`, hint: trustedCount ? 'Exentos del anti-raid' : 'Sin roles configurados', accent: '#7c4dff', accent2: '#ff78d1' })}
+                ${dpxRenderStatCard({ label: 'Canal de alertas', value: cfg.alertChannelId ? `# ${escapeHtml(alertChannelName)}` : 'Sin canal', hint: cfg.alertChannelId ? 'Reportes en vivo' : 'No se enviarán alertas', accent: '#ff9c9c' })}
             </div>
         `;
+
+        const tabsHtml = dpxRenderTabs([
+            { key: 'state', label: 'Estado y acción', icon: '⚡' },
+            { key: 'messages', label: 'Mensajes', icon: '💬' },
+            { key: 'entry', label: 'Entrada y destrucción', icon: '🛡️' },
+            { key: 'trusted', label: 'Roles confiables', icon: '✅' }
+        ], 'state');
+
+        const trustedChipsHtml = trustedRoleNames.length
+            ? `<div class="dpx-role-chip-list">${trustedRoleNames.map((r) => `<span class="dpx-role-chip"><span class="role-dot" style="--role-color:#9a6dff;"></span>${escapeHtml(r.name)}</span>`).join('')}</div>`
+            : '<small style="color:var(--text-muted); display:block; margin-top:0.5rem;">Selecciona roles abajo para excluirlos del anti-raid.</small>';
+
+        container.innerHTML = `
+            <div class="dpx-panel">
+                ${heroHtml}
+                ${statsHtml}
+                ${tabsHtml}
+
+                <section class="dpx-tab-panel is-active" data-dpx-panel="state">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Estado y acción</h4>
+                                <p>Activa el sistema, define la acción automática y dónde recibir las alertas.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-toggle-grid">
+                            ${dpxRenderToggle({ id: 'antiRaidEnabled', checked: enabled, title: 'Activar anti-raid', description: 'Habilita la vigilancia continua y reacciones automáticas.' })}
+                        </div>
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field">
+                                <label for="antiRaidActionMode">Acción automática</label>
+                                <select id="antiRaidActionMode" class="form-control">
+                                    <option value="timeout" ${actionMode === 'timeout' ? 'selected' : ''}>Timeout</option>
+                                    <option value="kick" ${actionMode === 'kick' ? 'selected' : ''}>Kick</option>
+                                    <option value="ban" ${actionMode === 'ban' ? 'selected' : ''}>Ban</option>
+                                </select>
+                                <small>Acción aplicada al detectar abuso por usuario.</small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="antiRaidTimeoutMinutes">Minutos de timeout</label>
+                                <input type="number" min="1" max="40320" id="antiRaidTimeoutMinutes" class="form-control" value="${Math.max(1, Number.parseInt(cfg.timeoutMinutes || 30, 10) || 30)}">
+                                <small>Solo se aplica si la acción es Timeout.</small>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="antiRaidAlertChannelId">Canal de alertas</label>
+                                <select id="antiRaidAlertChannelId" class="form-control">
+                                    <option value="">Sin alertas</option>
+                                    ${channels.map((c) => `<option value="${c.id}" ${String(cfg.alertChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                                <small>El bot reportará aquí cada incidente y acción tomada.</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="messages">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Protección de mensajes</h4>
+                                <p>Filtra spam, invitaciones, enlaces sospechosos y abuso de menciones.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-toggle-grid">
+                            ${dpxRenderToggle({ id: 'antiRaidSpamEnabled', checked: cfg.antiSpamEnabled !== false, title: 'Anti-spam', description: 'Detecta usuarios que envían mensajes en ráfaga.' })}
+                            ${dpxRenderToggle({ id: 'antiRaidBlockInvites', checked: cfg.blockInvites !== false, title: 'Bloquear invitaciones', description: 'Elimina mensajes con invitaciones a otros servidores.' })}
+                            ${dpxRenderToggle({ id: 'antiRaidBlockLinks', checked: cfg.blockLinks === true, title: 'Bloquear enlaces sospechosos', description: 'Filtra acortadores y dominios maliciosos conocidos.' })}
+                        </div>
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field">
+                                <label for="antiRaidSpamMessages">Mensajes límite</label>
+                                <input type="number" min="3" max="40" id="antiRaidSpamMessages" class="form-control" value="${Math.max(3, Number.parseInt(cfg.spamMessages || 7, 10) || 7)}">
+                                <small>Cuántos mensajes en la ventana antes de aplicar la acción.</small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="antiRaidSpamWindowSec">Ventana (segundos)</label>
+                                <input type="number" min="3" max="120" id="antiRaidSpamWindowSec" class="form-control" value="${Math.max(3, Number.parseInt(cfg.spamWindowSec || 8, 10) || 8)}">
+                                <small>Segundos contados para evaluar el ritmo.</small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="antiRaidMaxMentions">Máx. menciones por mensaje</label>
+                                <input type="number" min="1" max="50" id="antiRaidMaxMentions" class="form-control" value="${Math.max(1, Number.parseInt(cfg.maxMentions || 6, 10) || 6)}">
+                                <small>Mensajes con más menciones se bloquean.</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="entry">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Entrada y acciones destructivas</h4>
+                                <p>Detecta oleadas de joins y cambios masivos en canales o roles.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-tip"><span aria-hidden="true">🛈</span> Verificación Discord actual: <strong>${escapeHtml(verificationLevel)}</strong>. Sube este nivel desde Discord si recibes raids constantes.</div>
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field">
+                                <label for="antiRaidJoinRateThreshold">Joins por minuto (umbral raid)</label>
+                                <input type="number" min="2" max="60" id="antiRaidJoinRateThreshold" class="form-control" value="${Math.max(2, Number.parseInt(cfg.joinRateThreshold || 8, 10) || 8)}">
+                                <small>Si entran más miembros por minuto se activa modo raid.</small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="antiRaidAccountAgeDays">Edad mínima de cuenta (días)</label>
+                                <input type="number" min="0" max="365" id="antiRaidAccountAgeDays" class="form-control" value="${Math.max(0, Number.parseInt(cfg.accountAgeDays || 3, 10) || 3)}">
+                                <small>Cuentas más nuevas serán filtradas en modo raid.</small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="antiRaidDestructiveActionThreshold">Acciones destructivas permitidas</label>
+                                <input type="number" min="1" max="30" id="antiRaidDestructiveActionThreshold" class="form-control" value="${Math.max(1, Number.parseInt(cfg.destructiveActionThreshold || 3, 10) || 3)}">
+                                <small>Antes de bloquear cambios masivos.</small>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="antiRaidActionWindowSec">Ventana (segundos)</label>
+                                <input type="number" min="10" max="300" id="antiRaidActionWindowSec" class="form-control" value="${Math.max(10, Number.parseInt(cfg.actionWindowSec || 60, 10) || 60)}">
+                                <small>Lapso para contar acciones destructivas.</small>
+                            </div>
+                        </div>
+                        <div class="dpx-toggle-grid" style="margin-top:1rem;">
+                            ${dpxRenderToggle({ id: 'antiRaidProtectChannels', checked: cfg.protectChannels !== false, title: 'Proteger canales', description: 'Bloquea creación/eliminación masiva de canales.' })}
+                            ${dpxRenderToggle({ id: 'antiRaidProtectRoles', checked: cfg.protectRoles !== false, title: 'Proteger roles', description: 'Bloquea creación/eliminación masiva de roles.' })}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="trusted">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Roles confiables</h4>
+                                <p>Estos roles quedan exentos del anti-raid (mods, admins, bots).</p>
+                            </div>
+                        </div>
+                        ${trustedChipsHtml}
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field is-full">
+                                <label for="antiRaidTrustedRoles">Selecciona roles (Ctrl/Cmd para multi)</label>
+                                <select id="antiRaidTrustedRoles" class="form-control" multiple>
+                                    ${roles.map((role) => `<option value="${role.id}" ${trustedSet.has(String(role.id)) ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
+                                </select>
+                                <small>Asegúrate de incluir tus roles de moderación.</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        `;
+
+        bindDpxTabs(container);
 
         const saveBtn = document.getElementById('saveAntiRaidBtn');
         if (saveBtn) {
@@ -3920,39 +4257,107 @@ async function loadNotificationsPanel(guildId) {
         ? (await channelsResponse.json()).filter((c) => c.type === 0)
         : [];
 
-    container.innerHTML = `
-        <h3 class="welcome-panel-title">Centro de notificaciones</h3>
-        <p class="welcome-panel-subtitle">Define que eventos quieres notificar y en que canal centralizarlos.</p>
-        <div class="control-grid">
-            <div class="control-card">
-                <h4>Canal principal</h4>
-                <div class="form-group">
-                    <label>Canal de notificaciones</label>
-                    <select class="form-control" data-pref-key="notifyChannelId">
-                        <option value="">Selecciona un canal</option>
-                        ${channels.map((c) => `<option value="${c.id}" ${String(prefs.notifyChannelId) === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-            <div class="control-card">
-                <h4>Eventos</h4>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="joinLeave" ${prefs.joinLeave ? 'checked' : ''}> Entradas / salidas</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="moderationActions" ${prefs.moderationActions ? 'checked' : ''}> Acciones de moderación</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="ticketAlerts" ${prefs.ticketAlerts ? 'checked' : ''}> Alertas de tickets</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="levelingAlerts" ${prefs.levelingAlerts ? 'checked' : ''}> Subidas de nivel</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="streamAlerts" ${prefs.streamAlerts ? 'checked' : ''}> Twitch / YouTube</label>
-                <label class="checkbox-inline"><input type="checkbox" data-pref-key="dailyDigest" ${prefs.dailyDigest ? 'checked' : ''}> Resumen diario</label>
-                <div class="form-group" style="margin-top:0.55rem;">
-                    <label>Hora del resumen (0-23)</label>
-                    <input type="number" min="0" max="23" class="form-control" data-pref-key="digestHour" value="${escapeHtmlForValue(prefs.digestHour)}">
-                </div>
-            </div>
-        </div>
-        <div class="form-actions" style="margin-top:1rem;">
-            <button type="button" class="btn btn-secondary" id="testNotificationsBtn">Enviar prueba visual</button>
-            <button type="button" class="btn btn-primary" id="saveNotificationsBtn">Guardar Notificaciones</button>
+    const channelName = (channels.find((c) => String(c.id) === String(prefs.notifyChannelId)) || {}).name || '—';
+    const eventsActive = ['joinLeave', 'moderationActions', 'ticketAlerts', 'levelingAlerts', 'streamAlerts', 'dailyDigest'].filter((k) => prefs[k]).length;
+    const hasChannel = !!prefs.notifyChannelId;
+
+    const heroHtml = dpxRenderHero({
+        kicker: 'Centro de notificaciones',
+        title: 'Notificaciones inteligentes',
+        description: 'Define qué eventos quieres notificar y centralízalos en un canal de control para tu equipo.',
+        accent: '#7ef0b4',
+        glow1: 'rgba(80,230,160,0.18)',
+        glow2: 'rgba(124,77,255,0.22)',
+        actionsHtml: `
+            <span class="dpx-status-chip ${hasChannel ? 'is-on' : 'is-off'}"><span class="dot"></span>${hasChannel ? 'Canal listo' : 'Sin canal'}</span>
+            <button type="button" class="btn btn-secondary" id="testNotificationsBtn">Enviar prueba</button>
+            <button type="button" class="btn btn-primary" id="saveNotificationsBtn">Guardar cambios</button>
+        `
+    });
+
+    const statsHtml = `
+        <div class="dpx-stats-grid">
+            ${dpxRenderStatCard({ label: 'Canal principal', value: hasChannel ? `# ${escapeHtml(channelName)}` : 'Sin configurar', hint: hasChannel ? 'Notificaciones se envían aquí' : 'Selecciona un canal de texto', accent: '#7ef0b4' })}
+            ${dpxRenderStatCard({ label: 'Eventos activos', value: `${eventsActive}<span class="dpx-stat-pill">/ 6</span>`, hint: 'Tipos de aviso habilitados', accent: '#7c4dff' })}
+            ${dpxRenderStatCard({ label: 'Resumen diario', value: `<span class="dpx-stat-pill ${prefs.dailyDigest ? 'is-on' : 'is-off'}">${prefs.dailyDigest ? 'Activo' : 'Inactivo'}</span>`, hint: prefs.dailyDigest ? `Se envía a las ${prefs.digestHour}:00` : 'No se enviará un digest diario', accent: '#ff78d1' })}
         </div>
     `;
+
+    const tabsHtml = dpxRenderTabs([
+        { key: 'channel', label: 'Canal', icon: '📡' },
+        { key: 'events', label: 'Eventos', icon: '🔔' },
+        { key: 'digest', label: 'Resumen diario', icon: '📅' }
+    ], 'channel');
+
+    container.innerHTML = `
+        <div class="dpx-panel">
+            ${heroHtml}
+            ${statsHtml}
+            ${tabsHtml}
+
+            <section class="dpx-tab-panel is-active" data-dpx-panel="channel">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Canal principal</h4>
+                            <p>Todas las notificaciones se publican en este canal. Puedes refinar los eventos en la siguiente pestaña.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-field-grid is-wide">
+                        <div class="dpx-field is-full">
+                            <label for="notifyChannelSelect">Canal de notificaciones</label>
+                            <select id="notifyChannelSelect" class="form-control" data-pref-key="notifyChannelId">
+                                <option value="">Selecciona un canal</option>
+                                ${channels.map((c) => `<option value="${c.id}" ${String(prefs.notifyChannelId) === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                            <small>Asegúrate de que el bot pueda enviar mensajes y embeds en ese canal.</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="events">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Eventos a notificar</h4>
+                            <p>Activa solo lo que tu equipo necesita ver. Menos ruido, más contexto.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-toggle-grid">
+                        ${dpxRenderToggle({ dataPrefKey: 'joinLeave', checked: !!prefs.joinLeave, title: 'Entradas / salidas', description: 'Cuando un miembro entra o se va del servidor.' })}
+                        ${dpxRenderToggle({ dataPrefKey: 'moderationActions', checked: !!prefs.moderationActions, title: 'Acciones de moderación', description: 'Bans, kicks, timeouts y warns automáticos.' })}
+                        ${dpxRenderToggle({ dataPrefKey: 'ticketAlerts', checked: !!prefs.ticketAlerts, title: 'Tickets', description: 'Aperturas, cierres y eventos relevantes de tickets.' })}
+                        ${dpxRenderToggle({ dataPrefKey: 'levelingAlerts', checked: !!prefs.levelingAlerts, title: 'Subidas de nivel', description: 'Cuando un miembro alcanza un nuevo nivel.' })}
+                        ${dpxRenderToggle({ dataPrefKey: 'streamAlerts', checked: !!prefs.streamAlerts, title: 'Twitch / YouTube', description: 'Avisos de directos y nuevos videos detectados.' })}
+                    </div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="digest">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Resumen diario</h4>
+                            <p>Envía un resumen automático del día a la hora que prefieras.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-toggle-grid">
+                        ${dpxRenderToggle({ dataPrefKey: 'dailyDigest', checked: !!prefs.dailyDigest, title: 'Activar resumen diario', description: 'Recibe un mensaje con métricas y eventos relevantes.' })}
+                    </div>
+                    <div class="dpx-field-grid" style="margin-top:0.85rem;">
+                        <div class="dpx-field">
+                            <label for="digestHourInput">Hora del resumen (0-23)</label>
+                            <input type="number" min="0" max="23" class="form-control" id="digestHourInput" data-pref-key="digestHour" value="${escapeHtmlForValue(prefs.digestHour)}">
+                            <small>Hora local del servidor donde corre el bot.</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    `;
+
+    bindDpxTabs(container);
 
     const saveBtn = document.getElementById('saveNotificationsBtn');
     const testBtn = document.getElementById('testNotificationsBtn');
@@ -4115,95 +4520,161 @@ async function loadVerifyPanel(guildId) {
             .filter((role) => role && role.id && role.name && role.name !== '@everyone')
             .sort((a, b) => (b.position || 0) - (a.position || 0));
 
+        const enabled = cfg.enabled === true;
+        const channelName = (channels.find((c) => c.id === cfg.channelId) || {}).name || '—';
+        const roleName = (roles.find((r) => r.id === cfg.roleId) || {}).name || '—';
+        const emojiPreview = escapeHtml(cfg.emoji || '✅');
+        const isPublished = !!cfg.messageId;
+
+        const heroHtml = dpxRenderHero({
+            kicker: 'Verificación',
+            title: 'Sistema de Verificación',
+            description: 'Publica un embed con reacción para asignar automáticamente el rol de verificado a tus nuevos miembros.',
+            accent: '#7ef0b4',
+            glow1: 'rgba(80,230,160,0.18)',
+            glow2: 'rgba(124,77,255,0.18)',
+            actionsHtml: `
+                <span class="dpx-status-chip ${enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${enabled ? 'Activo' : 'Inactivo'}</span>
+                <button type="button" id="saveVerifyBtn" class="btn btn-secondary">Guardar</button>
+                <button type="button" id="publishVerifyBtn" class="btn btn-primary">Publicar embed</button>
+            `
+        });
+
+        const statsHtml = `
+            <div class="dpx-stats-grid">
+                ${dpxRenderStatCard({ label: 'Estado', value: `<span class="dpx-stat-pill ${enabled ? 'is-on' : 'is-off'}">${enabled ? 'Activo' : 'Inactivo'}</span>`, hint: enabled ? 'Verificación funcionando' : 'Activa para empezar', accent: '#7ef0b4' })}
+                ${dpxRenderStatCard({ label: 'Canal', value: cfg.channelId ? `# ${escapeHtml(channelName)}` : 'Sin canal', hint: cfg.channelId ? 'Donde se publica el embed' : 'Selecciona un canal', accent: '#7c4dff' })}
+                ${dpxRenderStatCard({ label: 'Rol asignado', value: cfg.roleId ? escapeHtml(roleName) : 'Sin rol', hint: cfg.roleId ? 'Asignado al reaccionar' : 'Configura un rol de verificado', accent: '#9a6dff' })}
+                ${dpxRenderStatCard({ label: 'Emoji', value: emojiPreview, hint: 'Reacción que activa el rol', accent: '#ff78d1' })}
+                ${dpxRenderStatCard({ label: 'Publicado', value: `<span class="dpx-stat-pill ${isPublished ? 'is-on' : 'is-off'}">${isPublished ? 'Sí' : 'No'}</span>`, hint: isPublished ? 'Embed activo en Discord' : 'Pulsa "Publicar embed"', accent: '#ffb778', accent2: '#ff78d1' })}
+            </div>
+        `;
+
+        const tabsHtml = dpxRenderTabs([
+            { key: 'config', label: 'Configuración', icon: '⚙️' },
+            { key: 'embed', label: 'Apariencia', icon: '🎨' },
+            { key: 'media', label: 'Imagen y publicación', icon: '🖼️' }
+        ], 'config');
+
         container.innerHTML = `
-            <h3 class="welcome-panel-title">Sistema de Verificación</h3>
-            <p class="welcome-panel-subtitle">Publica un embed con reacción para asignar automáticamente el rol de verificado.</p>
-            <div class="welcome-layout">
-                <div class="welcome-editor">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="verifyChannelSelect">Canal de verificación</label>
-                            <select id="verifyChannelSelect" class="form-control">
-                                <option value="">Selecciona un canal</option>
-                                ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                            </select>
+            <div class="dpx-panel">
+                ${heroHtml}
+                ${statsHtml}
+                ${tabsHtml}
+
+                <section class="dpx-tab-panel is-active" data-dpx-panel="config">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Canal y rol</h4>
+                                <p>Define dónde se publica el embed y qué rol se asigna al reaccionar.</p>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="verifyRoleSelect">Rol de verificado</label>
-                            <select id="verifyRoleSelect" class="form-control">
-                                <option value="">Selecciona un rol</option>
-                                ${roles.map((r) => `<option value="${r.id}" ${cfg.roleId === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
-                            </select>
+                        <div class="dpx-field-grid is-wide">
+                            <div class="dpx-field">
+                                <label for="verifyChannelSelect">Canal de verificación</label>
+                                <select id="verifyChannelSelect" class="form-control">
+                                    <option value="">Selecciona un canal</option>
+                                    ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="verifyRoleSelect">Rol de verificado</label>
+                                <select id="verifyRoleSelect" class="form-control">
+                                    <option value="">Selecciona un rol</option>
+                                    ${roles.map((r) => `<option value="${r.id}" ${cfg.roleId === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="dpx-toggle-grid" style="margin-top:1rem;">
+                            ${dpxRenderToggle({ id: 'verifyEnabled', checked: enabled, title: 'Activar sistema de verificación', description: 'Necesario para que el bot otorgue el rol al reaccionar.' })}
+                            ${dpxRenderToggle({ id: 'verifyRemoveOnUnreact', checked: !!cfg.removeRoleOnUnreact, title: 'Quitar rol al quitar reacción', description: 'Si se quita la reacción, también se retira el rol.' })}
                         </div>
                     </div>
+                </section>
 
-                    <div class="form-row">
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="verifyEnabled" ${cfg.enabled ? 'checked' : ''}> <span>Activar sistema de verificación</span></label>
+                <section class="dpx-tab-panel" data-dpx-panel="embed">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Apariencia del embed</h4>
+                                <p>Personaliza el mensaje, color, emoji y texto del pie.</p>
+                            </div>
                         </div>
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="verifyRemoveOnUnreact" ${cfg.removeRoleOnUnreact ? 'checked' : ''}> <span>Quitar rol al quitar reacción</span></label>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="verifyEmoji">Emoji de reacción</label>
-                            <input type="text" id="verifyEmoji" class="form-control" value="${escapeHtmlForValue(cfg.emoji || '✅')}" placeholder="✅ o <:emoji:id>">
-                        </div>
-                        <div class="form-group">
-                            <label for="verifyColor">Color del embed</label>
-                            <input type="color" id="verifyColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="verifyTitle">Título</label>
-                        <input type="text" id="verifyTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Verify')}">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="verifyMessage">Mensaje</label>
-                        <textarea id="verifyMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '¡Reacciona a este mensaje para ver los demás canales!')}</textarea>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="verifyFooter">Footer</label>
-                            <input type="text" id="verifyFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || '')}">
-                        </div>
-                        <div class="form-group">
-                            <label for="verifyImageUrl">URL imagen (opcional)</label>
-                            <input type="url" id="verifyImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
-                            <input type="file" id="verifyImageFile" class="form-control" accept="image/*" style="margin-top:0.5rem;">
-                            <div class="form-actions" style="margin-top:0.5rem;">
-                                <button type="button" id="verifyUploadImageBtn" class="btn btn-secondary">Subir Imagen</button>
-                                <small id="verifyImageUploadStatus"></small>
+                        <div class="dpx-split">
+                            <div>
+                                <div class="dpx-field-grid">
+                                    <div class="dpx-field">
+                                        <label for="verifyEmoji">Emoji de reacción</label>
+                                        <input type="text" id="verifyEmoji" class="form-control" value="${escapeHtmlForValue(cfg.emoji || '✅')}" placeholder="✅ o <:emoji:id>">
+                                        <small>Acepta unicode o personalizado <code>&lt;:nombre:id&gt;</code>.</small>
+                                    </div>
+                                    <div class="dpx-field">
+                                        <label for="verifyColor">Color del embed</label>
+                                        <input type="color" id="verifyColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
+                                    </div>
+                                </div>
+                                <div class="dpx-field-grid is-wide" style="margin-top:1rem;">
+                                    <div class="dpx-field is-full">
+                                        <label for="verifyTitle">Título</label>
+                                        <input type="text" id="verifyTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Verify')}">
+                                    </div>
+                                    <div class="dpx-field is-full">
+                                        <label for="verifyMessage">Mensaje</label>
+                                        <textarea id="verifyMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '¡Reacciona a este mensaje para ver los demás canales!')}</textarea>
+                                    </div>
+                                    <div class="dpx-field is-full">
+                                        <label for="verifyFooter">Footer</label>
+                                        <input type="text" id="verifyFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || '')}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dpx-preview-card">
+                                <h5>Resumen rápido</h5>
+                                <div class="dpx-preview-row"><span>Canal</span><strong>${cfg.channelId ? `# ${escapeHtml(channelName)}` : 'No configurado'}</strong></div>
+                                <div class="dpx-preview-row"><span>Rol</span><strong>${cfg.roleId ? escapeHtml(roleName) : 'No configurado'}</strong></div>
+                                <div class="dpx-preview-row"><span>Emoji</span><strong>${emojiPreview}</strong></div>
+                                <div class="dpx-preview-row"><span>Estado</span><strong>${enabled ? 'Activo' : 'Inactivo'}</strong></div>
+                                <div class="dpx-preview-row"><span>Publicado</span><strong>${isPublished ? 'Sí' : 'No'}</strong></div>
+                                ${isPublished ? `<small style="color:var(--text-muted); word-break:break-all;">ID: <code>${escapeHtml(cfg.messageId)}</code></small>` : ''}
                             </div>
                         </div>
                     </div>
+                </section>
 
-                    <div class="form-group">
-                        <label for="verifyMessageId">Message ID publicado</label>
-                        <input type="text" id="verifyMessageId" class="form-control" value="${escapeHtmlForValue(cfg.messageId || '')}" readonly>
+                <section class="dpx-tab-panel" data-dpx-panel="media">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Imagen del embed</h4>
+                                <p>Añade una imagen mediante URL externa o subiéndola directamente.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid is-wide">
+                            <div class="dpx-field is-full">
+                                <label for="verifyImageUrl">URL de la imagen</label>
+                                <input type="url" id="verifyImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="verifyImageFile">O sube una imagen</label>
+                                <input type="file" id="verifyImageFile" class="form-control" accept="image/*">
+                                <div class="dpx-actions" style="border-top:0; padding-top:0.5rem; margin-top:0.5rem; justify-content:flex-start;">
+                                    <button type="button" id="verifyUploadImageBtn" class="btn btn-secondary">Subir imagen</button>
+                                    <small id="verifyImageUploadStatus" style="color:var(--text-muted); align-self:center;"></small>
+                                </div>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="verifyMessageId">Message ID publicado</label>
+                                <input type="text" id="verifyMessageId" class="form-control" value="${escapeHtmlForValue(cfg.messageId || '')}" readonly>
+                                <small>Se rellena automáticamente al publicar el embed.</small>
+                            </div>
+                        </div>
                     </div>
-
-                    <div class="form-actions">
-                        <button type="button" id="saveVerifyBtn" class="btn btn-secondary">Guardar Configuración</button>
-                        <button type="button" id="publishVerifyBtn" class="btn btn-primary">Publicar Verify Embed</button>
-                    </div>
-                </div>
-
-                <div class="welcome-preview-panel">
-                    <h4>Resumen</h4>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal: <strong>${cfg.channelId ? escapeHtml(channels.find((c) => c.id === cfg.channelId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Rol: <strong>${cfg.roleId ? escapeHtml(roles.find((r) => r.id === cfg.roleId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Emoji: <strong>${escapeHtml(cfg.emoji || '✅')}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Estado: <strong>${cfg.enabled ? 'Activo' : 'Inactivo'}</strong></p>
-                    ${cfg.messageId ? `<p style="color: var(--text-secondary);">Message ID: <code>${escapeHtml(cfg.messageId)}</code></p>` : '<p style="color: var(--text-secondary);">Aún no publicado.</p>'}
-                </div>
+                </section>
             </div>
         `;
+
+        bindDpxTabs(container);
 
         const saveBtn = document.getElementById('saveVerifyBtn');
         const publishBtn = document.getElementById('publishVerifyBtn');
@@ -4428,7 +4899,7 @@ async function loadTicketPanel(guildId) {
 }
 
 function getLevelingRewardRows() {
-    return Array.from(document.querySelectorAll('.level-reward-row')).map((row) => {
+    return Array.from(document.querySelectorAll('#levelRewardRows .level-reward-card')).map((row) => {
         const levelInput = row.querySelector('.level-reward-level');
         const roleSelect = row.querySelector('.level-reward-role');
         return {
