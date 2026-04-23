@@ -64,12 +64,27 @@ async function applyRoleRewards(member, level, rewards) {
     const me = member.guild.members.me;
     if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageRoles)) return;
 
-    for (const reward of rewards) {
-        if (level < reward.level) continue;
-        const role = member.guild.roles.cache.get(reward.roleId) || await member.guild.roles.fetch(reward.roleId).catch(() => null);
-        if (!role) continue;
-        if (member.roles.cache.has(role.id)) continue;
-        if (me.roles.highest.position <= role.position) continue;
+    const sorted = [...rewards].sort((a, b) => a.level - b.level);
+    const unlocked = sorted.filter((r) => level >= r.level);
+    if (!unlocked.length) return;
+
+    const currentReward = unlocked[unlocked.length - 1];
+    const lowerRewards = unlocked.slice(0, -1);
+
+    for (const prev of lowerRewards) {
+        if (!member.roles.cache.has(prev.roleId)) continue;
+        const prevRole = member.guild.roles.cache.get(prev.roleId)
+            || await member.guild.roles.fetch(prev.roleId).catch(() => null);
+        if (!prevRole) continue;
+        if (me.roles.highest.position <= prevRole.position) continue;
+        await member.roles.remove(prevRole, `Level automático: reemplazo por nivel ${level}`).catch(() => null);
+    }
+
+    const role = member.guild.roles.cache.get(currentReward.roleId)
+        || await member.guild.roles.fetch(currentReward.roleId).catch(() => null);
+    if (!role) return;
+    if (me.roles.highest.position <= role.position) return;
+    if (!member.roles.cache.has(role.id)) {
         await member.roles.add(role, `Level automático: nivel ${level}`).catch(() => null);
     }
 }
