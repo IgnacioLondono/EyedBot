@@ -7379,9 +7379,8 @@ mark.receipt-highlight {
     min-height: 0;
 }
 
-/* Columnas con scroll interno (editor + preview) */
-.embed-builder-main,
-.embed-preview-aside {
+/* Columna izquierda: scroll del formulario completo */
+.embed-builder-main {
     min-width: 0;
     min-height: 0;
     max-height: min(72vh, calc(100dvh - 11rem));
@@ -7392,39 +7391,45 @@ mark.receipt-highlight {
     scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
-    padding-right: 0.15rem; /* alinea con gutter del scrollbar */
-}
-
-.embed-builder-main::-webkit-scrollbar,
-.embed-preview-aside::-webkit-scrollbar {
-    width: 8px;
-}
-
-.embed-builder-main::-webkit-scrollbar-track,
-.embed-preview-aside::-webkit-scrollbar-track {
-    background: rgba(20, 11, 42, 0.45);
-    border-radius: 999px;
-}
-
-.embed-builder-main::-webkit-scrollbar-thumb,
-.embed-preview-aside::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
-    border-radius: 999px;
-    border: 2px solid rgba(20, 11, 42, 0.45);
-}
-
-.embed-builder-main {
+    padding-right: 0.15rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
 
+.embed-builder-main::-webkit-scrollbar {
+    width: 8px;
+}
+
+.embed-builder-main::-webkit-scrollbar-track {
+    background: rgba(20, 11, 42, 0.45);
+    border-radius: 999px;
+}
+
+.embed-builder-main::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    border-radius: 999px;
+    border: 2px solid rgba(20, 11, 42, 0.45);
+}
+
+/* Columna derecha: sin scroll externo; el scroll es solo dentro de #embedPreview */
 .embed-preview-aside {
     position: static;
     align-self: stretch;
+    min-width: 0;
+    min-height: 0;
+    max-height: min(72vh, calc(100dvh - 11rem));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .embed-preview-card {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: 1.1rem 1.2rem 1.3rem;
 }
 
@@ -7432,10 +7437,19 @@ mark.receipt-highlight {
     margin: 0 0 0.9rem 0;
     font-size: 0.78rem;
     color: var(--text-muted);
+    flex-shrink: 0;
 }
 
+.embed-preview-card > h5 {
+    flex-shrink: 0;
+}
+
+/* Caja del embed: aquí aparece la barra al desbordar texto largo */
 .embed-preview-card .embed-preview {
-    min-height: 260px;
+    flex: 1 1 auto;
+    min-height: 200px;
+    min-width: 0;
+    max-height: min(52vh, 420px);
     border-radius: 14px;
     border: 1px dashed rgba(154, 109, 255, 0.25);
     background: rgba(10, 5, 20, 0.55);
@@ -7444,6 +7458,35 @@ mark.receipt-highlight {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+}
+
+.embed-preview-card .embed-preview::-webkit-scrollbar {
+    width: 8px;
+}
+
+.embed-preview-card .embed-preview::-webkit-scrollbar-track {
+    background: rgba(20, 11, 42, 0.45);
+    border-radius: 999px;
+}
+
+.embed-preview-card .embed-preview::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    border-radius: 999px;
+    border: 2px solid rgba(20, 11, 42, 0.45);
+}
+
+/* Texto largo sin espacios: que envuelva dentro de la caja con scroll */
+.embed-preview-card .discord-embed-description,
+.embed-preview-card .discord-embed-field-value {
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .embed-preview-card .embed-placeholder {
@@ -7566,9 +7609,15 @@ mark.receipt-highlight {
     .embed-preview-aside {
         max-height: min(58vh, calc(100dvh - 8.5rem));
     }
+    .embed-preview-card .embed-preview {
+        max-height: min(42vh, 300px);
+    }
 }
 
 @media (max-width: 480px) {
     .embed-crop-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    .embed-preview-card .embed-preview { min-height: 200px; }
+    .embed-preview-card .embed-preview {
+        min-height: 180px;
+        max-height: min(38vh, 280px);
+    }
 }
