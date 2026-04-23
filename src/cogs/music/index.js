@@ -581,9 +581,10 @@ class MusicSystem {
         const queueBefore = useQueue(interaction.guild.id);
         const wasPlaying = queueBefore?.isPlaying?.() || false;
 
-        await this.client.player.play(voiceChannel, exactTrack, {
+        await this.client.player.play(voiceChannel, strictUrl, {
             requestedBy: interaction.user,
-            nodeOptions: this.buildNodeOptions(interaction.channel)
+            nodeOptions: this.buildNodeOptions(interaction.channel),
+            searchEngine: 'youtube'
         });
 
         this.client.musicSearchSessions.delete(key);
