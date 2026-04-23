@@ -22,6 +22,7 @@ const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const {
+    ticketButtonCustomIdForGuild,
     acceptPendingFromWeb,
     claimTicketFromWeb,
     listPendingRequests,
@@ -29,8 +30,7 @@ const {
     getTicketReport,
     listActiveTicketChannels,
     listTicketChannelMessages,
-    sendWebMessageToTicket,
-    buildTicketPanelComponents
+    sendWebMessageToTicket
 } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
 
@@ -1479,9 +1479,14 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => 
 
         if (cfg.footer) embed.setFooter({ text: cfg.footer });
 
+        const openTicketBtn = new ButtonBuilder()
+            .setCustomId(ticketButtonCustomIdForGuild(guildId))
+            .setStyle(ButtonStyle.Primary)
+            .setLabel(cfg.buttonLabel || 'Solicitar ticket');
+
         const posted = await channel.send({
             embeds: [embed],
-            components: buildTicketPanelComponents(guildId, cfg)
+            components: [new ActionRowBuilder().addComponents(openTicketBtn)]
         });
 
         const updatedCfg = {
