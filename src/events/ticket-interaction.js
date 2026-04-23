@@ -555,25 +555,29 @@ function buildSetupComponents(guildId, optionsConfig, draft) {
     ];
 }
 
-function buildTicketPanelComponents(guildId, cfg) {
+function buildTicketPanelComponents(guildId, cfg, presetDraft = null) {
     const optionsConfig = buildSelectionConfig(cfg || {});
-    const defaultDraft = {
-        category: optionsConfig.categories[0]?.value || 'soporte-general',
-        commonIssue: (getCommonIssuesForCategory(optionsConfig, optionsConfig.categories[0]?.value || 'soporte-general')[0]?.value || 'otro')
-    };
-    const categoryIssues = getCommonIssuesForCategory(optionsConfig, defaultDraft.category);
+    const firstCategoryValue = optionsConfig.categories[0]?.value || 'soporte-general';
+    const category = (presetDraft && optionsConfig.categories.some((item) => item.value === presetDraft.category))
+        ? presetDraft.category
+        : firstCategoryValue;
+
+    const categoryIssues = getCommonIssuesForCategory(optionsConfig, category);
+    const commonIssue = (presetDraft && categoryIssues.some((item) => item.value === presetDraft.commonIssue))
+        ? presetDraft.commonIssue
+        : (categoryIssues[0]?.value || 'otro');
 
     const categorySelect = buildSelectMenu(
         `${PANEL_CATEGORY_SELECT_PREFIX}${guildId}`,
         'Selecciona una categoria',
         optionsConfig.categories,
-        defaultDraft.category
+        category
     );
     const issueSelect = buildSelectMenu(
         `${PANEL_COMMON_SELECT_PREFIX}${guildId}`,
         'Selecciona un problema frecuente',
         categoryIssues,
-        defaultDraft.commonIssue
+        commonIssue
     );
     const continueButton = new ButtonBuilder()
         .setCustomId(`${PANEL_CONTINUE_PREFIX}${guildId}`)
@@ -1217,7 +1221,14 @@ async function handleTicketButton(interaction) {
     if (interaction.customId.startsWith(PANEL_CANCEL_PREFIX)) {
         const guildId = interaction.customId.slice(PANEL_CANCEL_PREFIX.length);
         clearDraftForUser(guildId, interaction.user.id);
-        await interaction.deferUpdate().catch(() => null);
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await interaction.deferUpdate().catch(() => null);
+            return true;
+        }
+        await interaction.update({
+            components: buildTicketPanelComponents(guildId, cfg)
+        }).catch(() => null);
         return true;
     }
 
@@ -1268,7 +1279,12 @@ async function handleTicketSelectMenu(interaction) {
         draft.commonIssue = categoryIssues[0].value;
         draft.updatedAt = Date.now();
 
-        await interaction.deferUpdate().catch(() => null);
+        await interaction.update({
+            components: buildTicketPanelComponents(guildId, cfg, {
+                category: draft.category,
+                commonIssue: draft.commonIssue
+            })
+        }).catch(() => null);
         return true;
     }
 
@@ -1288,7 +1304,12 @@ async function handleTicketSelectMenu(interaction) {
         draft.commonIssue = valid ? selected : categoryIssues[0].value;
         draft.updatedAt = Date.now();
 
-        await interaction.deferUpdate().catch(() => null);
+        await interaction.update({
+            components: buildTicketPanelComponents(guildId, cfg, {
+                category: draft.category,
+                commonIssue: draft.commonIssue
+            })
+        }).catch(() => null);
         return true;
     }
 
