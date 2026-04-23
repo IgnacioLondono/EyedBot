@@ -1221,14 +1221,7 @@ async function handleTicketButton(interaction) {
     if (interaction.customId.startsWith(PANEL_CANCEL_PREFIX)) {
         const guildId = interaction.customId.slice(PANEL_CANCEL_PREFIX.length);
         clearDraftForUser(guildId, interaction.user.id);
-        const cfg = await resolveConfig(guildId);
-        if (!cfg) {
-            await interaction.deferUpdate().catch(() => null);
-            return true;
-        }
-        await interaction.update({
-            components: buildTicketPanelComponents(guildId, cfg)
-        }).catch(() => null);
+        await interaction.deferUpdate().catch(() => null);
         return true;
     }
 
@@ -1279,11 +1272,10 @@ async function handleTicketSelectMenu(interaction) {
         draft.commonIssue = categoryIssues[0].value;
         draft.updatedAt = Date.now();
 
-        await interaction.update({
-            components: buildTicketPanelComponents(guildId, cfg, {
-                category: draft.category,
-                commonIssue: draft.commonIssue
-            })
+        await interaction.reply({
+            content: buildSetupContent(optionsConfig, draft),
+            components: buildSetupComponents(guildId, optionsConfig, draft),
+            flags: 64
         }).catch(() => null);
         return true;
     }
@@ -1304,11 +1296,10 @@ async function handleTicketSelectMenu(interaction) {
         draft.commonIssue = valid ? selected : categoryIssues[0].value;
         draft.updatedAt = Date.now();
 
-        await interaction.update({
-            components: buildTicketPanelComponents(guildId, cfg, {
-                category: draft.category,
-                commonIssue: draft.commonIssue
-            })
+        await interaction.reply({
+            content: buildSetupContent(optionsConfig, draft),
+            components: buildSetupComponents(guildId, optionsConfig, draft),
+            flags: 64
         }).catch(() => null);
         return true;
     }
