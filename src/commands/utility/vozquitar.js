@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ChannelType, PermissionsBitField } = require('discord.js');
 const config = require('../../config');
+const { isTempVoiceProtectedFromOwnerKick } = require('../../utils/temp-voice-protected-users');
 const tempVoiceStore = require('../../utils/temp-voice-store');
 
 function isChannelPrivate(channel, guildId) {
@@ -58,6 +59,13 @@ module.exports = {
 
         if (targetUser.id === interaction.user.id) {
             return interaction.reply({ content: 'No puedes quitarte a ti mismo. Usa `/vozprivado activar:false` si quieres abrir el canal.', flags: 64 });
+        }
+
+        if (isTempVoiceProtectedFromOwnerKick(targetUser.id)) {
+            return interaction.reply({
+                content: 'No puedes quitar el acceso a este usuario desde tu canal temporal.',
+                flags: 64
+            });
         }
 
         if (!isChannelPrivate(channel, interaction.guild.id)) {

@@ -4,10 +4,65 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    AuditLogEvent
 } = require('discord.js');
 const tempVoiceStore = require('../utils/temp-voice-store');
+const { isTempVoiceProtectedFromOwnerKick } = require('../utils/temp-voice-protected-users');
 const { CONTROL_BUTTON_PREFIX } = require('./temp-voice-constants');
+
+async function findRecentVoiceDisconnectOrMoveExecutor(guild, memberId) {
+    if (!guild?.members?.me?.permissions?.has(PermissionsBitField.Flags.ViewAuditLog)) return null;
+
+    const types = [AuditLogEvent.MemberDisconnect, AuditLogEvent.MemberMove].filter((t) => typeof t === 'number');
+    const now = Date.now();
+    const maxAgeMs = 12_000;
+
+    for (const type of types) {
+        const logs = await guild.fetchAuditLogs({ type, limit: 8 }).catch(() => null);
+        if (!logs) continue;
+
+        const entry = logs.entries.find((item) => {
+            if (!item?.executor || !item?.target) return false;
+            if (String(item.target.id) !== String(memberId)) return false;
+            if (now - item.createdTimestamp > maxAgeMs) return false;
+            if (item.executor.system) return false;
+            if (String(item.executor.id) === String(memberId)) return false;
+            return true;
+        });
+        if (entry) return entry.executor;
+    }
+    return null;
+}
+
+async function restoreProtectedUserIfOwnerKickedFromTempVoice(oldState, newState) {
+    const guild = newState.guild || oldState.guild;
+    const member = newState.member;
+    if (!guild || !member?.user || member.user.bot) return;
+    if (!isTempVoiceProtectedFromOwnerKick(member.id)) return;
+
+    const oldChannel = oldState.channel;
+    if (!oldChannel || oldChannel.type !== ChannelType.GuildVoice) return;
+
+    const ownerId = await tempVoiceStore.getOwnerByChannelId(guild.id, oldChannel.id);
+    if (!ownerId || String(ownerId) === String(member.id)) return;
+    if (newState.channelId === oldState.channelId) return;
+
+    const me = guild.members.me;
+    if (!me?.permissions.has(PermissionsBitField.Flags.MoveMembers)) return;
+
+    const tryOnce = async () => {
+        const executor = await findRecentVoiceDisconnectOrMoveExecutor(guild, member.id);
+        if (!executor || String(executor.id) !== String(ownerId)) return;
+        if (member.voice?.channelId === oldChannel.id) return;
+        await member.voice.setChannel(oldChannel, 'Canal temporal: usuario protegido').catch(() => null);
+    };
+
+    await tryOnce();
+    setTimeout(() => {
+        tryOnce().catch(() => null);
+    }, 900);
+}
 
 function sanitizeChannelName(raw = '') {
     const cleaned = String(raw || '')
@@ -256,6 +311,7 @@ async function handleVoiceStateUpdate(oldState, newState) {
 
         await handleJoinCreatorChannel(newState, config);
         await handleLeaveTempChannel(oldState);
+        await restoreProtectedUserIfOwnerKickedFromTempVoice(oldState, newState);
     } catch (error) {
         console.error('Error en sistema de canales de voz temporales:', error);
     }
