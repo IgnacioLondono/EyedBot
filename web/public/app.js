@@ -4513,6 +4513,82 @@ function renderLevelRewardCard(roles, reward, index) {
 }
 
 /* ==== Leveling math mirror (client-side) ======================= */
+const LEVEL_CURVE_PRESETS = [
+    {
+        id: 'casual',
+        name: 'Casual',
+        baseXp: 120,
+        exponent: 1.6,
+        description: 'Progresión amable. Subir el nivel 10 en pocos días de actividad.'
+    },
+    {
+        id: 'balanced',
+        name: 'Equilibrado',
+        baseXp: 200,
+        exponent: 1.95,
+        description: 'Balance entre accesibilidad y desafío. Recomendado por defecto.'
+    },
+    {
+        id: 'challenging',
+        name: 'Exigente',
+        baseXp: 280,
+        exponent: 2.2,
+        description: 'Los niveles altos requieren semanas reales de actividad constante.'
+    },
+    {
+        id: 'odyssey',
+        name: 'Odisea',
+        baseXp: 400,
+        exponent: 2.5,
+        description: 'Hardcore. Llegar al Núcleo es un logro de meses. Premia activismo real.'
+    }
+];
+
+const LEVEL_TIERS = [
+    { id: 'iniciado', name: 'Iniciado', minLevel: 1, maxLevel: 4, color: '#94a3b8', accent: 'rgba(148, 163, 184, 0.55)', icon: 'seed', tagline: 'Primeros pasos' },
+    { id: 'explorador', name: 'Explorador', minLevel: 5, maxLevel: 14, color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.55)', icon: 'compass', tagline: 'Conociendo el servidor' },
+    { id: 'guardian', name: 'Guardián', minLevel: 15, maxLevel: 29, color: '#a78bfa', accent: 'rgba(167, 139, 250, 0.55)', icon: 'shield', tagline: 'Miembro consistente' },
+    { id: 'nucleo', name: 'Núcleo', minLevel: 30, maxLevel: 49, color: '#f472b6', accent: 'rgba(244, 114, 182, 0.55)', icon: 'atom', tagline: 'Columna de la comunidad' },
+    { id: 'arcano', name: 'Arcano', minLevel: 50, maxLevel: 74, color: '#f59e0b', accent: 'rgba(245, 158, 11, 0.55)', icon: 'diamond', tagline: 'Veterano de élite' },
+    { id: 'leyenda', name: 'Leyenda', minLevel: 75, maxLevel: Infinity, color: '#ef4444', accent: 'rgba(239, 68, 68, 0.6)', icon: 'flame', tagline: 'Presencia mítica' }
+];
+
+function tierForLevel(level) {
+    const lvl = Math.max(1, Number.parseInt(level, 10) || 1);
+    return LEVEL_TIERS.find((tier) => lvl >= tier.minLevel && lvl <= tier.maxLevel) || LEVEL_TIERS[0];
+}
+
+function renderTierIcon(iconId, size = 20) {
+    const common = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"`;
+    switch (iconId) {
+        case 'seed':
+            return `<svg ${common}><path d="M12 22V10"/><path d="M12 10c-3 0-5-2-5-5 3 0 5 2 5 5z"/><path d="M12 10c3 0 5-2 5-5-3 0-5 2-5 5z"/></svg>`;
+        case 'compass':
+            return `<svg ${common}><circle cx="12" cy="12" r="9"/><polygon points="16 8 13.5 13.5 8 16 10.5 10.5 16 8" fill="currentColor" stroke="none"/></svg>`;
+        case 'shield':
+            return `<svg ${common}><path d="M12 2l8 3v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V5l8-3z"/><path d="M9 12l2 2 4-4"/></svg>`;
+        case 'atom':
+            return `<svg ${common}><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9" ry="3.5"/><ellipse cx="12" cy="12" rx="9" ry="3.5" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.5" transform="rotate(120 12 12)"/></svg>`;
+        case 'diamond':
+            return `<svg ${common}><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M8 9h8"/><path d="M6 3l4 6 2 12"/><path d="M18 3l-4 6-2 12"/></svg>`;
+        case 'flame':
+            return `<svg ${common}><path d="M12 2s4 5 4 9a4 4 0 01-8 0c0-2 1-3 1-3s-3 2-3 6a6 6 0 0012 0c0-6-6-12-6-12z"/></svg>`;
+        default:
+            return '';
+    }
+}
+
+function renderTierBadge(tier, size = 'sm') {
+    if (!tier) return '';
+    const iconSize = size === 'lg' ? 28 : size === 'md' ? 18 : 14;
+    return `
+        <span class="levels-tier-badge levels-tier-badge--${size}" style="--tier-color:${tier.color}; --tier-accent:${tier.accent};" title="${escapeHtml(tier.tagline)}">
+            <span class="levels-tier-badge-icon">${renderTierIcon(tier.icon, iconSize)}</span>
+            <span class="levels-tier-badge-name">${tier.name}</span>
+        </span>
+    `;
+}
+
 function levelingSanitizeDifficulty(raw) {
     const baseXp = Math.max(50, Math.min(5000, Number.parseInt(raw?.baseXp ?? 280, 10) || 280));
     const exponentRaw = Number.parseFloat(raw?.exponent ?? 2.08);
@@ -4556,10 +4632,10 @@ function levelingEstimateTimeToLevel(targetLevel, difficulty, config) {
     return { totalXp, msgsNeeded, msgHours, voiceHours };
 }
 
-function renderLevelCurveSvg(difficulty, maxLevel = 40) {
-    const width = 520;
-    const height = 180;
-    const padding = { top: 14, right: 12, bottom: 22, left: 36 };
+function renderLevelCurveSvg(difficulty, maxLevel = 75) {
+    const width = 560;
+    const height = 200;
+    const padding = { top: 18, right: 12, bottom: 26, left: 40 };
     const innerW = width - padding.left - padding.right;
     const innerH = height - padding.top - padding.bottom;
 
@@ -4590,11 +4666,23 @@ function renderLevelCurveSvg(difficulty, maxLevel = 40) {
         `;
     }).join('');
 
+    const tierMarkers = LEVEL_TIERS
+        .filter((tier) => tier.minLevel > 1 && tier.minLevel <= maxLevel)
+        .map((tier) => {
+            const i = tier.minLevel - 1;
+            const x = padding.left + i * xStep;
+            return `
+                <line x1="${x}" y1="${padding.top}" x2="${x}" y2="${padding.top + innerH}" stroke="${tier.color}" stroke-opacity="0.35" stroke-dasharray="3 3" stroke-width="1"/>
+                <rect x="${x - 18}" y="${padding.top - 14}" width="36" height="14" rx="7" fill="${tier.color}" fill-opacity="0.18" stroke="${tier.color}" stroke-opacity="0.55"/>
+                <text x="${x}" y="${padding.top - 4}" text-anchor="middle" class="levels-curve-tier-label" fill="${tier.color}">${tier.name}</text>
+            `;
+        }).join('');
+
     const xTickLevels = [1, Math.round(maxLevel * 0.25), Math.round(maxLevel * 0.5), Math.round(maxLevel * 0.75), maxLevel];
     const xTicks = xTickLevels.map((lvl) => {
         const i = lvl - 1;
         const x = padding.left + i * xStep;
-        return `<text x="${x}" y="${height - 6}" class="levels-curve-axis" text-anchor="middle">Nv ${lvl}</text>`;
+        return `<text x="${x}" y="${height - 8}" class="levels-curve-axis" text-anchor="middle">Nv ${lvl}</text>`;
     }).join('');
 
     return `
@@ -4612,9 +4700,53 @@ function renderLevelCurveSvg(difficulty, maxLevel = 40) {
             ${yTicks}
             <path d="${areaPath}" fill="url(#levelsCurveFill)"/>
             <path d="${pathData}" fill="none" stroke="url(#levelsCurveStroke)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            ${tierMarkers}
             ${xTicks}
         </svg>
     `;
+}
+
+function renderCurvePresets(currentDifficulty) {
+    const current = levelingSanitizeDifficulty(currentDifficulty);
+    return `
+        <div class="levels-presets">
+            ${LEVEL_CURVE_PRESETS.map((preset) => {
+                const isActive = Math.abs(current.baseXp - preset.baseXp) <= 5 && Math.abs(current.exponent - preset.exponent) <= 0.05;
+                return `
+                    <button type="button" class="levels-preset ${isActive ? 'is-active' : ''}" data-preset="${preset.id}" data-base="${preset.baseXp}" data-exp="${preset.exponent}">
+                        <div class="levels-preset-head">
+                            <span class="levels-preset-name">${preset.name}</span>
+                            ${isActive ? '<span class="levels-preset-dot"></span>' : ''}
+                        </div>
+                        <div class="levels-preset-values">base ${preset.baseXp} · exp ${preset.exponent.toFixed(2)}</div>
+                        <div class="levels-preset-desc">${escapeHtml(preset.description)}</div>
+                    </button>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function renderTierLadder(difficulty) {
+    const cards = LEVEL_TIERS.map((tier) => {
+        const xp = levelingTotalXpForLevel(tier.minLevel, difficulty);
+        const rangeLabel = tier.maxLevel === Infinity ? `Nv ${tier.minLevel}+` : `Nv ${tier.minLevel}–${tier.maxLevel}`;
+        return `
+            <div class="levels-tier-card" style="--tier-color:${tier.color}; --tier-accent:${tier.accent};">
+                <div class="levels-tier-card-icon">${renderTierIcon(tier.icon, 26)}</div>
+                <div class="levels-tier-card-body">
+                    <div class="levels-tier-card-name">${tier.name}</div>
+                    <div class="levels-tier-card-range">${rangeLabel}</div>
+                    <div class="levels-tier-card-tagline">${escapeHtml(tier.tagline)}</div>
+                </div>
+                <div class="levels-tier-card-threshold">
+                    <span class="levels-tier-card-threshold-label">Umbral</span>
+                    <span class="levels-tier-card-threshold-value">${levelingFormatNumber(xp)} XP</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+    return `<div class="levels-tier-ladder">${cards}</div>`;
 }
 
 function renderLevelMilestones(difficulty, config) {
@@ -4672,15 +4804,19 @@ function renderLevelsStatsHeader(config, leaderboard) {
             </div>
             <div class="levels-stat-card levels-stat-card--top">
                 <div class="levels-stat-label">Top actual</div>
-                ${topUser ? `
-                    <div class="levels-top-user">
+                ${topUser ? (() => {
+                    const topTier = tierForLevel(topUser.level);
+                    return `
+                    <div class="levels-top-user" style="--tier-color:${topTier.color};">
                         ${topUser.avatar ? `<img src="${topUser.avatar}" alt="avatar">` : `<div class="levels-top-user-placeholder">${(topUser.tag || 'U').charAt(0).toUpperCase()}</div>`}
                         <div>
                             <div class="levels-top-user-name">${escapeHtml(topUser.tag || topUser.username || 'Usuario')}</div>
                             <div class="levels-top-user-meta">Nv ${topUser.level} · ${levelingFormatNumber(topUser.xp)} XP</div>
+                            ${renderTierBadge(topTier, 'sm')}
                         </div>
                     </div>
-                ` : `<div class="levels-stat-hint">Aún sin ranking</div>`}
+                    `;
+                })() : `<div class="levels-stat-hint">Aún sin ranking</div>`}
             </div>
             <div class="levels-stat-card levels-stat-card--diff">
                 <div class="levels-stat-label">Dificultad</div>
@@ -4695,17 +4831,19 @@ function renderLeaderboardPodium(entries) {
     const order = [entries[1], entries[0], entries[2]];
     return `
         <div class="levels-podium">
-            ${order.map((entry, idx) => {
+            ${order.map((entry) => {
                 if (!entry) return '<div class="levels-podium-slot is-empty"></div>';
                 const realRank = entries.indexOf(entry) + 1;
                 const positionClass = realRank === 1 ? 'levels-podium-slot--first' : realRank === 2 ? 'levels-podium-slot--second' : 'levels-podium-slot--third';
+                const tier = tierForLevel(entry.level);
                 return `
                     <div class="levels-podium-slot ${positionClass}">
                         <div class="levels-podium-medal">${realRank === 1 ? '🥇' : realRank === 2 ? '🥈' : '🥉'}</div>
-                        ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                        ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${tier.color};">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${tier.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
                         <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
                         <div class="levels-podium-level">Nivel ${entry.level}</div>
                         <div class="levels-podium-xp">${levelingFormatNumber(entry.xp)} XP</div>
+                        ${renderTierBadge(tier, 'sm')}
                     </div>
                 `;
             }).join('')}
@@ -4737,17 +4875,21 @@ function buildLeaderboardHtml(payload) {
     const restHtml = rest.map((item, idx) => {
         const rank = idx + 4;
         const progress = Math.max(0, Math.min(100, Number(item.progressPercent) || 0));
+        const tier = tierForLevel(item.level);
         return `
-            <div class="levels-rank-row">
+            <div class="levels-rank-row" style="--tier-color:${tier.color};">
                 <div class="levels-rank-number">#${rank}</div>
                 ${item.avatar ? `<img src="${item.avatar}" alt="avatar" class="levels-rank-avatar">` : `<div class="levels-rank-avatar levels-rank-avatar--placeholder">${(item.tag || 'U').charAt(0).toUpperCase()}</div>`}
                 <div class="levels-rank-body">
                     <div class="levels-rank-head">
                         <span class="levels-rank-name">${escapeHtml(item.tag || item.username || 'Usuario')}</span>
-                        <span class="levels-rank-level">Nv ${item.level}</span>
+                        <div class="levels-rank-head-tags">
+                            ${renderTierBadge(tier, 'sm')}
+                            <span class="levels-rank-level">Nv ${item.level}</span>
+                        </div>
                     </div>
                     <div class="levels-rank-progress">
-                        <div class="levels-rank-progress-bar" style="width:${progress}%"></div>
+                        <div class="levels-rank-progress-bar" style="width:${progress}%; --tier-color:${tier.color};"></div>
                     </div>
                     <div class="levels-rank-meta">
                         <span>${levelingFormatNumber(item.xp)} XP</span>
@@ -4915,19 +5057,27 @@ async function loadLevelsPanel(guildId) {
                 <div class="levels-tab-panel" data-levels-panel="curve">
                     <div class="levels-section">
                         <div class="levels-section-head">
-                            <h4>Dificultad</h4>
-                            <p>Ajusta la fórmula de XP por nivel. La curva y los hitos se actualizan en tiempo real.</p>
+                            <h4>Presets de curva</h4>
+                            <p>Elige un perfil preconfigurado. Usa <strong>Odisea</strong> si quieres una progresión exponencial dura donde llegar a Núcleo sea una verdadera proeza.</p>
+                        </div>
+                        <div id="levelsPresetsWrap">${renderCurvePresets(difficulty)}</div>
+                    </div>
+
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Ajuste manual</h4>
+                            <p>Afina la fórmula <code>XP = base × nivel<sup>exp</sup></code>. La curva, hitos y umbrales se actualizan en tiempo real.</p>
                         </div>
                         <div class="levels-field-grid">
                             <div class="levels-field">
                                 <label for="levelingBaseXp">XP base del nivel 1</label>
                                 <input type="number" min="50" max="5000" id="levelingBaseXp" class="form-control" value="${difficulty.baseXp}">
-                                <small>Entre 50 y 5000. Valor inicial sugerido: 280.</small>
+                                <small>Entre 50 y 5000. Sugerido: 200–400 para servidores serios.</small>
                             </div>
                             <div class="levels-field">
                                 <label for="levelingExponent">Exponente de dificultad</label>
                                 <input type="number" min="1.2" max="3.5" step="0.01" id="levelingExponent" class="form-control" value="${difficulty.exponent.toFixed(2)}">
-                                <small>1.2 = suave, 3.5 = extremo. Sugerido: 2.08.</small>
+                                <small>1.6 suave · 2.0 equilibrado · 2.3 exigente · 2.5+ odisea.</small>
                             </div>
                         </div>
                     </div>
@@ -4935,10 +5085,20 @@ async function loadLevelsPanel(guildId) {
                     <div class="levels-section">
                         <div class="levels-section-head">
                             <h4>Curva de experiencia</h4>
-                            <p>XP requerido para subir a cada nivel con tu configuración actual.</p>
+                            <p>XP por nivel y fronteras de cada rango. Las marcas de colores señalan cuándo se desbloquea cada rango.</p>
                         </div>
                         <div class="levels-curve-wrap" id="levelsCurveWrap">
                             ${renderLevelCurveSvg(difficulty)}
+                        </div>
+                    </div>
+
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Rangos y umbrales</h4>
+                            <p>Así se traducen tus niveles a rangos visuales (con insignia) que verán los miembros.</p>
+                        </div>
+                        <div id="levelsTierLadderWrap">
+                            ${renderTierLadder(difficulty)}
                         </div>
                     </div>
 
@@ -4983,6 +5143,7 @@ async function loadLevelsPanel(guildId) {
 
         bindLevelsTabs(container);
         bindLevelsCurveLive(container, config);
+        bindLevelsPresets(container, config);
 
         const refreshBtn = container.querySelector('#levelsRefreshBtn');
         if (refreshBtn) {
@@ -5098,6 +5259,8 @@ function bindLevelsCurveLive(container, initialConfig) {
     const expInput = container.querySelector('#levelingExponent');
     const curveWrap = container.querySelector('#levelsCurveWrap');
     const milestonesWrap = container.querySelector('#levelsMilestonesWrap');
+    const ladderWrap = container.querySelector('#levelsTierLadderWrap');
+    const presetsWrap = container.querySelector('#levelsPresetsWrap');
 
     if (!baseInput || !expInput || !curveWrap) return;
 
@@ -5115,6 +5278,11 @@ function bindLevelsCurveLive(container, initialConfig) {
         };
         curveWrap.innerHTML = renderLevelCurveSvg(difficulty);
         if (milestonesWrap) milestonesWrap.innerHTML = renderLevelMilestones(difficulty, config);
+        if (ladderWrap) ladderWrap.innerHTML = renderTierLadder(difficulty);
+        if (presetsWrap) {
+            presetsWrap.innerHTML = renderCurvePresets(difficulty);
+            attachPresetHandlers(container, presetsWrap);
+        }
     };
 
     ['input', 'change'].forEach((evt) => {
@@ -5130,6 +5298,29 @@ function bindLevelsCurveLive(container, initialConfig) {
     ].filter(Boolean);
 
     otherInputs.forEach((input) => input.addEventListener('input', refresh));
+}
+
+function bindLevelsPresets(container) {
+    const presetsWrap = container.querySelector('#levelsPresetsWrap');
+    if (!presetsWrap) return;
+    attachPresetHandlers(container, presetsWrap);
+}
+
+function attachPresetHandlers(container, presetsWrap) {
+    presetsWrap.querySelectorAll('[data-preset]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const baseXp = Number(btn.getAttribute('data-base'));
+            const exponent = Number(btn.getAttribute('data-exp'));
+            const baseInput = container.querySelector('#levelingBaseXp');
+            const expInput = container.querySelector('#levelingExponent');
+            if (!baseInput || !expInput) return;
+            baseInput.value = String(baseXp);
+            expInput.value = exponent.toFixed(2);
+            baseInput.dispatchEvent(new Event('input', { bubbles: true }));
+            expInput.dispatchEvent(new Event('input', { bubbles: true }));
+            showToast(`Preset aplicado: ${btn.querySelector('.levels-preset-name')?.textContent || ''}`, 'success');
+        });
+    });
 }
 
 function updateRewardCardBadge(card, roles) {
