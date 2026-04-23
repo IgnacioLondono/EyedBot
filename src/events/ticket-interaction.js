@@ -1217,10 +1217,7 @@ async function handleTicketButton(interaction) {
     if (interaction.customId.startsWith(PANEL_CANCEL_PREFIX)) {
         const guildId = interaction.customId.slice(PANEL_CANCEL_PREFIX.length);
         clearDraftForUser(guildId, interaction.user.id);
-        await interaction.reply({
-            content: 'Solicitud cancelada para tu sesión. El panel sigue disponible para todos.',
-            flags: 64
-        }).catch(() => null);
+        await interaction.deferUpdate().catch(() => null);
         return true;
     }
 
@@ -1271,10 +1268,7 @@ async function handleTicketSelectMenu(interaction) {
         draft.commonIssue = categoryIssues[0].value;
         draft.updatedAt = Date.now();
 
-        await interaction.reply({
-            content: `Categoria seleccionada: **${optionLabelByValue(optionsConfig.categories, draft.category)}**`,
-            flags: 64
-        }).catch(() => null);
+        await interaction.deferUpdate().catch(() => null);
         return true;
     }
 
@@ -1294,10 +1288,7 @@ async function handleTicketSelectMenu(interaction) {
         draft.commonIssue = valid ? selected : categoryIssues[0].value;
         draft.updatedAt = Date.now();
 
-        await interaction.reply({
-            content: `Caso seleccionado: **${optionLabelByValue(categoryIssues, draft.commonIssue)}**`,
-            flags: 64
-        }).catch(() => null);
+        await interaction.deferUpdate().catch(() => null);
         return true;
     }
 

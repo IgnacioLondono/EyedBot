@@ -4947,97 +4947,163 @@ async function loadTicketPanel(guildId) {
             .filter((role) => role && role.id && role.name && role.name !== '@everyone')
             .sort((a, b) => (b.position || 0) - (a.position || 0));
 
-        container.innerHTML = `
-            <h3 class="welcome-panel-title">Sistema de Tickets</h3>
-            <p class="welcome-panel-subtitle">Publica un embed interactivo con el boton <code>Solicitar ticket</code>; al pulsarlo, se pedira el motivo y se abrira un canal privado para los roles que elijas para gestionar solicitudes.</p>
-            <div class="welcome-layout">
-                <div class="welcome-editor">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="ticketChannelSelect">Canal para publicar panel</label>
-                            <select id="ticketChannelSelect" class="form-control">
-                                <option value="">Selecciona un canal</option>
-                                ${channels.map((c) => `<option value="${c.id}" ${cfg.panelChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="ticketRequestChannelSelect">Canal para recibir peticiones pendientes</label>
-                            <select id="ticketRequestChannelSelect" class="form-control">
-                                <option value="">Usar canal del panel</option>
-                                ${channels.map((c) => `<option value="${c.id}" ${cfg.requestChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="ticketReceiptHistoryChannelSelect">Canal de historial de comprobantes</label>
-                            <select id="ticketReceiptHistoryChannelSelect" class="form-control">
-                                <option value="">No reenviar al servidor</option>
-                                ${channels.map((c) => `<option value="${c.id}" ${cfg.receiptHistoryChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="ticketColor">Color del embed</label>
-                            <input type="color" id="ticketColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
-                        </div>
-                    </div>
+        const panelChannelName = cfg.panelChannelId ? (channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Desconocido') : 'No configurado';
+        const requestChannelName = cfg.requestChannelId
+            ? (channels.find((c) => c.id === cfg.requestChannelId)?.name || 'Desconocido')
+            : (cfg.panelChannelId ? (channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Mismo canal del panel') : 'No configurado');
+        const receiptChannelName = cfg.receiptHistoryChannelId ? (channels.find((c) => c.id === cfg.receiptHistoryChannelId)?.name || 'Desconocido') : 'No configurado';
 
-                    <div class="form-row">
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="ticketEnabled" ${cfg.enabled ? 'checked' : ''}> <span>Activar sistema de tickets</span></label>
-                        </div>
-                    </div>
+        const heroHtml = dpxRenderHero({
+            kicker: 'Tickets',
+            title: 'Centro de Soporte',
+            description: 'Diseña el panel de tickets con interfaz moderna, tabs y flujo de solicitud guiada para tus miembros.',
+            accent: '#a070ff',
+            glow1: 'rgba(160,112,255,0.22)',
+            glow2: 'rgba(255,102,196,0.2)',
+            actionsHtml: `
+                <span class="dpx-status-chip ${cfg.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${cfg.enabled ? 'Sistema activo' : 'Sistema inactivo'}</span>
+                <button type="button" id="saveTicketBtn" class="btn btn-secondary">Guardar configuración</button>
+                <button type="button" id="publishTicketBtn" class="btn btn-primary">Publicar panel</button>
+            `
+        });
 
-                    <div class="form-group">
-                        <label for="ticketAdminRoles">Roles que pueden gestionar solicitudes</label>
-                        <select id="ticketAdminRoles" class="form-control" multiple size="7">
-                            ${roles.map((r) => `<option value="${r.id}" ${selectedRoleIds.has(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
-                        </select>
-                        <small style="color: var(--text-muted);">Mantén <code>Ctrl</code> (o <code>Cmd</code>) para seleccionar varios roles.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="ticketTitle">Titulo</label>
-                        <input type="text" id="ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="ticketMessage">Mensaje</label>
-                        <textarea id="ticketMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.')}</textarea>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="ticketButtonLabel">Texto del boton</label>
-                            <input type="text" id="ticketButtonLabel" class="form-control" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}" maxlength="80">
-                        </div>
-                        <div class="form-group">
-                            <label for="ticketFooter">Footer</label>
-                            <input type="text" id="ticketFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || 'Sistema de Tickets')}">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="ticketMessageId">Message ID publicado</label>
-                        <input type="text" id="ticketMessageId" class="form-control" value="${escapeHtmlForValue(cfg.messageId || '')}" readonly>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="button" id="saveTicketBtn" class="btn btn-secondary">Guardar Configuracion</button>
-                        <button type="button" id="publishTicketBtn" class="btn btn-primary">Publicar Panel de Tickets</button>
-                    </div>
-                </div>
-
-                <div class="welcome-preview-panel">
-                    <h4>Resumen</h4>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal: <strong>${cfg.panelChannelId ? escapeHtml(channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal de peticiones: <strong>${cfg.requestChannelId ? escapeHtml(channels.find((c) => c.id === cfg.requestChannelId)?.name || 'Desconocido') : (cfg.panelChannelId ? escapeHtml(channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Mismo canal del panel') : 'No configurado')}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Canal de historial de comprobantes: <strong>${cfg.receiptHistoryChannelId ? escapeHtml(channels.find((c) => c.id === cfg.receiptHistoryChannelId)?.name || 'Desconocido') : 'No configurado'}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Roles admin: <strong>${selectedRoleIds.size}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Boton: <strong>${escapeHtml(cfg.buttonLabel || 'Solicitar ticket')}</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Estado: <strong>${cfg.enabled ? 'Activo' : 'Inactivo'}</strong></p>
-                    ${cfg.messageId ? `<p style="color: var(--text-secondary);">Message ID: <code>${escapeHtml(cfg.messageId)}</code></p>` : '<p style="color: var(--text-secondary);">Aun no publicado.</p>'}
-                </div>
+        const statsHtml = `
+            <div class="dpx-stats-grid">
+                ${dpxRenderStatCard({ label: 'Canal panel', value: cfg.panelChannelId ? `# ${escapeHtml(panelChannelName)}` : 'Sin configurar', hint: 'Donde se publica el embed interactivo', accent: '#a070ff' })}
+                ${dpxRenderStatCard({ label: 'Canal solicitudes', value: requestChannelName ? `# ${escapeHtml(requestChannelName)}` : 'No configurado', hint: 'Bandeja de peticiones pendientes', accent: '#7c4dff' })}
+                ${dpxRenderStatCard({ label: 'Roles staff', value: `${selectedRoleIds.size}<span class="dpx-stat-pill"> seleccionados</span>`, hint: 'Roles con permisos para gestionar tickets', accent: '#ff78d1' })}
+                ${dpxRenderStatCard({ label: 'Estado panel', value: `<span class="dpx-stat-pill ${cfg.messageId ? 'is-on' : 'is-off'}">${cfg.messageId ? 'Publicado' : 'Sin publicar'}</span>`, hint: cfg.messageId ? `Message ID: ${escapeHtml(cfg.messageId)}` : 'Publica el panel para habilitarlo', accent: '#9a6dff' })}
             </div>
         `;
+
+        const tabsHtml = dpxRenderTabs([
+            { key: 'ticket-panel', label: 'Panel', iconName: 'sparkles' },
+            { key: 'ticket-roles', label: 'Roles y canales', iconName: 'shield' },
+            { key: 'ticket-preview', label: 'Vista previa', iconName: 'info' },
+            { key: 'ticket-labs', label: 'Labs', iconName: 'calendar' }
+        ], 'ticket-panel');
+
+        container.innerHTML = `
+            <div class="dpx-panel">
+                ${heroHtml}
+                ${statsHtml}
+                ${tabsHtml}
+
+                <section class="dpx-tab-panel is-active" data-dpx-panel="ticket-panel">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Contenido del embed</h4>
+                                <p>Configura el texto principal que verá el usuario antes de abrir una solicitud.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-toggle-grid">
+                            ${dpxRenderToggle({ id: 'ticketEnabled', checked: !!cfg.enabled, title: 'Activar sistema de tickets', description: 'Permite procesar solicitudes y crear canales privados.' })}
+                        </div>
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field">
+                                <label for="ticketColor">Color del embed</label>
+                                <input type="color" id="ticketColor" class="form-control color-input" value="#${(cfg.color || '7c4dff').replace('#', '')}">
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="ticketTitle">Título</label>
+                                <input type="text" id="ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="ticketMessage">Mensaje</label>
+                                <textarea id="ticketMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.')}</textarea>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="ticketButtonLabel">Texto del botón</label>
+                                <input type="text" id="ticketButtonLabel" class="form-control" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}" maxlength="80">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="ticketFooter">Footer</label>
+                                <input type="text" id="ticketFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || 'Sistema de Tickets')}">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="ticket-roles">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Canales y permisos</h4>
+                                <p>Define dónde se publica el panel, dónde llegan solicitudes y qué roles pueden gestionarlas.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid">
+                            <div class="dpx-field">
+                                <label for="ticketChannelSelect">Canal para publicar panel</label>
+                                <select id="ticketChannelSelect" class="form-control">
+                                    <option value="">Selecciona un canal</option>
+                                    ${channels.map((c) => `<option value="${c.id}" ${cfg.panelChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="ticketRequestChannelSelect">Canal para peticiones pendientes</label>
+                                <select id="ticketRequestChannelSelect" class="form-control">
+                                    <option value="">Usar canal del panel</option>
+                                    ${channels.map((c) => `<option value="${c.id}" ${cfg.requestChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="ticketReceiptHistoryChannelSelect">Canal de historial de comprobantes</label>
+                                <select id="ticketReceiptHistoryChannelSelect" class="form-control">
+                                    <option value="">No reenviar al servidor</option>
+                                    ${channels.map((c) => `<option value="${c.id}" ${cfg.receiptHistoryChannelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="ticketAdminRoles">Roles que pueden gestionar solicitudes</label>
+                                <select id="ticketAdminRoles" class="form-control" multiple size="7">
+                                    ${roles.map((r) => `<option value="${r.id}" ${selectedRoleIds.has(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                                </select>
+                                <small>Mantén <code>Ctrl</code> (o <code>Cmd</code>) para seleccionar varios roles.</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="ticket-preview">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Vista rápida de configuración</h4>
+                                <p>Resumen actual para validar que todo está listo antes de publicar.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid is-wide">
+                            <div class="dpx-field"><label>Canal panel</label><input class="form-control" value="# ${escapeHtmlForValue(panelChannelName)}" readonly></div>
+                            <div class="dpx-field"><label>Canal solicitudes</label><input class="form-control" value="# ${escapeHtmlForValue(requestChannelName)}" readonly></div>
+                            <div class="dpx-field"><label>Canal historial</label><input class="form-control" value="# ${escapeHtmlForValue(receiptChannelName)}" readonly></div>
+                            <div class="dpx-field"><label>Roles staff</label><input class="form-control" value="${selectedRoleIds.size}" readonly></div>
+                            <div class="dpx-field is-full"><label>Message ID publicado</label><input type="text" id="ticketMessageId" class="form-control" value="${escapeHtmlForValue(cfg.messageId || '')}" readonly></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="ticket-labs">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Funciones en construcción</h4>
+                                <p>Estamos preparando mejoras avanzadas para tickets con automatizaciones más inteligentes.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-tip">
+                            ${dpxIcon('sparkles')}
+                            <div>
+                                <strong>Próximamente:</strong> formularios dinámicos por categoría, SLA por prioridad, auto-asignación por turno y plantillas por tipo de ticket.
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        `;
+
+        bindDpxTabs(container);
 
         const saveBtn = document.getElementById('saveTicketBtn');
         const publishBtn = document.getElementById('publishTicketBtn');

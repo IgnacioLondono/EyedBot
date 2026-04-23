@@ -219,10 +219,10 @@ body::before {
 .dropdown-item:hover { background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14)) !important; transform: translateX(2px); }
 
 /* ---------- Main content / secciones ---------- */
-.main-content { padding: 2.25rem 2rem 2rem; }
+.main-content { padding: 1.35rem 2rem 2rem; }
 
 /* Encabezado con kicker + acento gradiente */
-.section-header { margin-bottom: 1.75rem; padding-bottom: 0.5rem; }
+.section-header { margin-bottom: 1.05rem; padding-bottom: 0.35rem; }
 .section-title {
     display: inline-flex !important;
     align-items: center;
@@ -591,6 +591,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 /* ---------- Server shell (settings por servidor) ---------- */
 .server-shell {
     gap: 1.5rem !important;
+    margin-top: -0.45rem;
 }
 .server-side-menu {
     background: linear-gradient(180deg, rgba(18, 11, 34, 0.88), rgba(10, 6, 22, 0.88)) !important;
@@ -670,6 +671,10 @@ label { color: var(--text-secondary); font-weight: 500; }
     box-shadow: var(--pro-shadow-md);
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+.section#serverSection .container {
+    gap: 0.55rem !important;
 }
 
 .server-pane-surface {
