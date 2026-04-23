@@ -5480,6 +5480,58 @@ mark.receipt-highlight {
     border-radius: 12px;
     padding: 0.75rem;
     border: 1px solid rgba(154, 109, 255, 0.18);
+    max-height: min(45vh, 480px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+}
+
+.levels-curve-wrap::-webkit-scrollbar {
+    width: 8px;
+}
+
+.levels-curve-wrap::-webkit-scrollbar-track {
+    background: rgba(20, 11, 42, 0.45);
+    border-radius: 999px;
+}
+
+.levels-curve-wrap::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    border-radius: 999px;
+    border: 2px solid rgba(20, 11, 42, 0.45);
+}
+
+/* Rangos: scroll interna (escalera de tarjetas) */
+#levelsTierLadderWrap {
+    max-height: min(50vh, 520px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-right: 0.1rem;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+    border-radius: 12px;
+}
+
+#levelsTierLadderWrap::-webkit-scrollbar {
+    width: 8px;
+}
+
+#levelsTierLadderWrap::-webkit-scrollbar-track {
+    background: rgba(20, 11, 42, 0.45);
+    border-radius: 999px;
+}
+
+#levelsTierLadderWrap::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    border-radius: 999px;
+    border: 2px solid rgba(20, 11, 42, 0.45);
 }
 
 .levels-curve-svg {
@@ -7323,20 +7375,53 @@ mark.receipt-highlight {
 
 .embed-split {
     grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-    align-items: start;
+    align-items: stretch;
+    min-height: 0;
+}
+
+/* Columnas con scroll interno (editor + preview) */
+.embed-builder-main,
+.embed-preview-aside {
+    min-width: 0;
+    min-height: 0;
+    max-height: min(72vh, calc(100dvh - 11rem));
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+    padding-right: 0.15rem; /* alinea con gutter del scrollbar */
+}
+
+.embed-builder-main::-webkit-scrollbar,
+.embed-preview-aside::-webkit-scrollbar {
+    width: 8px;
+}
+
+.embed-builder-main::-webkit-scrollbar-track,
+.embed-preview-aside::-webkit-scrollbar-track {
+    background: rgba(20, 11, 42, 0.45);
+    border-radius: 999px;
+}
+
+.embed-builder-main::-webkit-scrollbar-thumb,
+.embed-preview-aside::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    border-radius: 999px;
+    border: 2px solid rgba(20, 11, 42, 0.45);
 }
 
 .embed-builder-main {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    min-width: 0;
 }
 
 .embed-preview-aside {
-    position: sticky;
-    top: 1rem;
-    align-self: start;
+    position: static;
+    align-self: stretch;
 }
 
 .embed-preview-card {
@@ -7477,6 +7562,10 @@ mark.receipt-highlight {
     .embed-hero h3 { font-size: 1.1rem; }
     .embed-hero .dpx-hero-actions { flex-wrap: wrap; }
     .embed-hero .dpx-hero-actions .btn { flex: 1 1 100%; justify-content: center; }
+    .embed-builder-main,
+    .embed-preview-aside {
+        max-height: min(58vh, calc(100dvh - 8.5rem));
+    }
 }
 
 @media (max-width: 480px) {
