@@ -1987,6 +1987,7 @@ function showSection(sectionId, options = {}) {
 
     if (sectionId === 'embedSection') {
         loadGuildsForEmbed();
+        initEmbedPanel();
     } else if (sectionId === 'statsSection') {
         loadStats();
     } else if (sectionId === 'logsSection') {
@@ -2503,6 +2504,104 @@ function resizeImageFile(file, scalePercent = 100, maxSide = 1600, crop = { x: 0
         reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
         reader.readAsDataURL(file);
     });
+}
+
+let embedPanelInitialized = false;
+function initEmbedPanel() {
+    const section = document.getElementById('embedSection');
+    if (!section) return;
+
+    if (!embedPanelInitialized) {
+        const tabsNav = section.querySelector('#embedTabs');
+        if (tabsNav) {
+            const tabs = Array.from(tabsNav.querySelectorAll('[data-dpx-tab]'));
+            const panels = Array.from(section.querySelectorAll('[data-dpx-panel]'));
+            tabs.forEach((tab) => {
+                tab.addEventListener('click', () => {
+                    const key = tab.getAttribute('data-dpx-tab');
+                    tabs.forEach((t) => t.classList.toggle('is-active', t === tab));
+                    panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
+                });
+            });
+        }
+
+        const guildSelect = document.getElementById('guildSelect');
+        const channelSelect = document.getElementById('channelSelect');
+        const templateSelect = document.getElementById('templateSelect');
+        const fieldsContainer = document.getElementById('fieldsContainer');
+
+        if (guildSelect) guildSelect.addEventListener('change', updateEmbedStats);
+        if (channelSelect) channelSelect.addEventListener('change', updateEmbedStats);
+        if (templateSelect) templateSelect.addEventListener('change', updateEmbedStats);
+
+        if (fieldsContainer && 'MutationObserver' in window) {
+            const observer = new MutationObserver(() => updateEmbedStats());
+            observer.observe(fieldsContainer, { childList: true, subtree: true });
+        }
+
+        const imgScale = document.getElementById('embedImageScale');
+        const imgScaleVal = document.getElementById('embedImageScaleValue');
+        if (imgScale && imgScaleVal) {
+            const syncImg = () => { imgScaleVal.textContent = `${imgScale.value}%`; };
+            imgScale.addEventListener('input', syncImg);
+            syncImg();
+        }
+        const thumbScale = document.getElementById('embedThumbnailScale');
+        const thumbScaleVal = document.getElementById('embedThumbnailScaleValue');
+        if (thumbScale && thumbScaleVal) {
+            const syncThumb = () => { thumbScaleVal.textContent = `${thumbScale.value}%`; };
+            thumbScale.addEventListener('input', syncThumb);
+            syncThumb();
+        }
+
+        embedPanelInitialized = true;
+    }
+
+    updateEmbedStats();
+}
+
+function updateEmbedStats() {
+    const guildSelect = document.getElementById('guildSelect');
+    const channelSelect = document.getElementById('channelSelect');
+    const templateSelect = document.getElementById('templateSelect');
+    const fieldsContainer = document.getElementById('fieldsContainer');
+
+    const guildVal = document.getElementById('embedStatGuild');
+    const guildHint = document.getElementById('embedStatGuildHint');
+    const channelVal = document.getElementById('embedStatChannel');
+    const channelHint = document.getElementById('embedStatChannelHint');
+    const fieldsVal = document.getElementById('embedStatFields');
+    const templatesVal = document.getElementById('embedStatTemplates');
+
+    if (guildSelect && guildVal && guildHint) {
+        const opt = guildSelect.options[guildSelect.selectedIndex];
+        const name = guildSelect.value ? (opt?.textContent || '—') : '—';
+        guildVal.textContent = name.length > 28 ? `${name.slice(0, 28)}…` : name;
+        guildHint.textContent = guildSelect.value ? 'Servidor seleccionado' : 'Selecciona el servidor destino';
+    }
+
+    if (channelSelect && channelVal && channelHint) {
+        if (channelSelect.disabled || !channelSelect.value) {
+            channelVal.textContent = '—';
+            channelHint.textContent = channelSelect.disabled ? 'Primero elige servidor' : 'Selecciona un canal';
+        } else {
+            const opt = channelSelect.options[channelSelect.selectedIndex];
+            const name = opt?.textContent || '—';
+            channelVal.textContent = name.length > 28 ? `${name.slice(0, 28)}…` : name;
+            channelHint.textContent = 'Canal listo para enviar';
+        }
+    }
+
+    if (fieldsContainer && fieldsVal) {
+        const count = fieldsContainer.querySelectorAll('.field-row, .field-entry, [data-embed-field]').length
+            || fieldsContainer.children.length;
+        fieldsVal.innerHTML = `${count}<span class="dpx-stat-pill">/ 25</span>`;
+    }
+
+    if (templateSelect && templatesVal) {
+        const realOptions = Array.from(templateSelect.options).filter((o) => o.value);
+        templatesVal.textContent = String(realOptions.length);
+    }
 }
 
 // Enviar embed
@@ -5243,17 +5342,102 @@ function renderCurvePresets(currentDifficulty) {
     `;
 }
 
-function renderTierLadder(difficulty) {
+function levelingRoleColorHex(role) {
+    if (!role) return null;
+    const raw = Number(role.color || 0);
+    if (!raw) return null;
+    return `#${raw.toString(16).padStart(6, '0')}`;
+}
+
+function tierRolesMap(rewards, roles) {
+    const map = {};
+    const rewardList = Array.isArray(rewards) ? rewards.filter((r) => r && r.roleId) : [];
+    for (const tier of LEVEL_TIERS) {
+        const matching = rewardList
+            .filter((r) => {
+                const lvl = Number(r.level) || 0;
+                return lvl >= tier.minLevel && lvl <= tier.maxLevel;
+            })
+            .sort((a, b) => Number(a.level) - Number(b.level));
+        if (matching.length) {
+            const reward = matching[0];
+            const role = (roles || []).find((r) => String(r.id) === String(reward.roleId));
+            if (role) map[tier.id] = { role, reward, extra: matching.length - 1 };
+        }
+    }
+    return map;
+}
+
+function tierStatsFromLeaderboard(leaderboard) {
+    const stats = { total: 0, perTier: {}, sumLevel: 0, avgLevel: 0, maxLevel: 0 };
+    const rows = Array.isArray(leaderboard?.leaderboard) ? leaderboard.leaderboard : [];
+    stats.total = rows.length;
+    for (const row of rows) {
+        const lvl = Math.max(1, Number(row?.level) || 1);
+        const tier = tierForLevel(lvl);
+        stats.perTier[tier.id] = (stats.perTier[tier.id] || 0) + 1;
+        stats.sumLevel += lvl;
+        if (lvl > stats.maxLevel) stats.maxLevel = lvl;
+    }
+    if (rows.length) stats.avgLevel = stats.sumLevel / rows.length;
+    return stats;
+}
+
+function renderTierLadder(difficulty, options = {}) {
+    const { config = {}, leaderboard = null, roles = [] } = options;
+    const rewards = Array.isArray(config.roleRewards) ? config.roleRewards : [];
+    const roleMap = tierRolesMap(rewards, roles);
+    const stats = tierStatsFromLeaderboard(leaderboard);
+    const totalUsers = stats.total;
+    const hasLeaderboard = Array.isArray(leaderboard?.leaderboard);
+
     const cards = LEVEL_TIERS.map((tier) => {
         const xp = levelingTotalXpForLevel(tier.minLevel, difficulty);
         const rangeLabel = tier.maxLevel === Infinity ? `Nv ${tier.minLevel}+` : `Nv ${tier.minLevel}–${tier.maxLevel}`;
+        const countInTier = stats.perTier[tier.id] || 0;
+        const percent = totalUsers ? (countInTier / totalUsers) * 100 : 0;
+
+        const roleInfo = roleMap[tier.id];
+        const roleHex = levelingRoleColorHex(roleInfo?.role) || tier.color;
+        const rolePillHtml = roleInfo
+            ? `
+                <span class="levels-tier-role is-set" style="--tier-role-color:${roleHex};" title="Rol asignado a este rango">
+                    <span class="levels-tier-role-dot"></span>
+                    <span class="levels-tier-role-name">@${escapeHtml(roleInfo.role.name)}</span>
+                    <span class="levels-tier-role-lvl">Nv ${roleInfo.reward.level}</span>
+                    ${roleInfo.extra > 0 ? `<span class="levels-tier-role-extra">+${roleInfo.extra}</span>` : ''}
+                </span>
+            `
+            : `
+                <span class="levels-tier-role is-empty" title="No hay rol asignado en este rango">
+                    <svg viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M7 13l6-6M7 7l6 6"/></svg>
+                    Sin rol asignado
+                </span>
+            `;
+
+        const distributionHtml = hasLeaderboard
+            ? `
+                <div class="levels-tier-card-dist">
+                    <div class="levels-tier-card-dist-head">
+                        <span><strong>${countInTier}</strong> ${countInTier === 1 ? 'miembro' : 'miembros'}</span>
+                        <span>${totalUsers ? percent.toFixed(0) : 0}%</span>
+                    </div>
+                    <div class="levels-tier-card-dist-bar">
+                        <div class="levels-tier-card-dist-fill" style="width:${Math.min(100, percent)}%;"></div>
+                    </div>
+                </div>
+            `
+            : '';
+
         return `
-            <div class="levels-tier-card" style="--tier-color:${tier.color}; --tier-accent:${tier.accent};">
+            <div class="levels-tier-card ${roleInfo ? 'has-role' : 'no-role'}" style="--tier-color:${tier.color}; --tier-accent:${tier.accent};">
                 <div class="levels-tier-card-icon">${renderTierIcon(tier.icon, 26)}</div>
                 <div class="levels-tier-card-body">
                     <div class="levels-tier-card-name">${tier.name}</div>
                     <div class="levels-tier-card-range">${rangeLabel}</div>
                     <div class="levels-tier-card-tagline">${escapeHtml(tier.tagline)}</div>
+                    ${rolePillHtml}
+                    ${distributionHtml}
                 </div>
                 <div class="levels-tier-card-threshold">
                     <span class="levels-tier-card-threshold-label">Umbral</span>
@@ -5262,7 +5446,19 @@ function renderTierLadder(difficulty) {
             </div>
         `;
     }).join('');
-    return `<div class="levels-tier-ladder">${cards}</div>`;
+
+    const assigned = Object.keys(roleMap).length;
+    const ladderSummary = `
+        <div class="levels-tier-ladder-summary">
+            <span class="levels-tier-sum-pill ${assigned === LEVEL_TIERS.length ? 'is-complete' : assigned > 0 ? 'is-partial' : 'is-empty'}">
+                ${assigned}/${LEVEL_TIERS.length} rangos con rol
+            </span>
+            ${hasLeaderboard ? `<span class="levels-tier-sum-pill">${totalUsers} miembros rastreados</span>` : ''}
+            ${stats.maxLevel ? `<span class="levels-tier-sum-pill">Nivel máximo actual: Nv ${stats.maxLevel}</span>` : ''}
+        </div>
+    `;
+
+    return `${ladderSummary}<div class="levels-tier-ladder">${cards}</div>`;
 }
 
 function renderLevelMilestones(difficulty, config) {
@@ -5283,13 +5479,19 @@ function renderLevelMilestones(difficulty, config) {
     return `<div class="levels-milestones">${milestones}</div>`;
 }
 
-function renderLevelsStatsHeader(config, leaderboard) {
+function renderLevelsStatsHeader(config, leaderboard, roles = []) {
     const enabled = config?.enabled === true;
-    const totalUsers = Number(leaderboard?.totalTrackedUsers || 0);
+    const totalUsers = Number(leaderboard?.totalTrackedUsers || (Array.isArray(leaderboard?.leaderboard) ? leaderboard.leaderboard.length : 0));
     const topUser = Array.isArray(leaderboard?.leaderboard) ? leaderboard.leaderboard[0] : null;
     const msgOn = config?.messageXpEnabled !== false;
     const voiceOn = config?.voiceXpEnabled !== false;
     const diff = levelingSanitizeDifficulty(config?.difficulty);
+
+    const rewards = Array.isArray(config?.roleRewards) ? config.roleRewards.filter((r) => r && r.roleId) : [];
+    const roleMap = tierRolesMap(rewards, roles);
+    const tiersAssigned = Object.keys(roleMap).length;
+    const stats = tierStatsFromLeaderboard(leaderboard);
+    const avgLevelLabel = stats.avgLevel ? `Nv ${stats.avgLevel.toFixed(1)}` : 'Nv —';
 
     return `
         <div class="levels-stats-grid">
@@ -5316,7 +5518,7 @@ function renderLevelsStatsHeader(config, leaderboard) {
             <div class="levels-stat-card">
                 <div class="levels-stat-label">Usuarios rastreados</div>
                 <div class="levels-stat-value">${levelingFormatNumber(totalUsers)}</div>
-                <div class="levels-stat-hint">Miembros con XP acumulado</div>
+                <div class="levels-stat-hint">${stats.avgLevel ? `Nivel promedio ${avgLevelLabel}` : 'Miembros con XP acumulado'}</div>
             </div>
             <div class="levels-stat-card levels-stat-card--top">
                 <div class="levels-stat-label">Top actual</div>
@@ -5333,6 +5535,13 @@ function renderLevelsStatsHeader(config, leaderboard) {
                     </div>
                     `;
                 })() : `<div class="levels-stat-hint">Aún sin ranking</div>`}
+            </div>
+            <div class="levels-stat-card levels-stat-card--rewards">
+                <div class="levels-stat-label">Rangos con rol</div>
+                <div class="levels-stat-value">
+                    <span class="levels-stat-pill ${tiersAssigned === LEVEL_TIERS.length ? 'is-complete' : tiersAssigned > 0 ? '' : 'is-empty'}">${tiersAssigned}/${LEVEL_TIERS.length}</span>
+                </div>
+                <div class="levels-stat-hint">${rewards.length} recompensa${rewards.length === 1 ? '' : 's'} configurada${rewards.length === 1 ? '' : 's'}</div>
             </div>
             <div class="levels-stat-card levels-stat-card--diff">
                 <div class="levels-stat-label">Dificultad</div>
@@ -5474,7 +5683,7 @@ async function loadLevelsPanel(guildId) {
                     </div>
                 </div>
 
-                ${renderLevelsStatsHeader(config, leaderboard)}
+                <div id="levelsStatsHeaderWrap">${renderLevelsStatsHeader(config, leaderboard, roles)}</div>
 
                 <div class="levels-tabs" role="tablist">
                     <button type="button" class="levels-tab is-active" data-levels-tab="config" role="tab">Configuración</button>
@@ -5614,7 +5823,7 @@ async function loadLevelsPanel(guildId) {
                             <p>Así se traducen tus niveles a rangos visuales (con insignia) que verán los miembros.</p>
                         </div>
                         <div id="levelsTierLadderWrap">
-                            ${renderTierLadder(difficulty)}
+                            ${renderTierLadder(difficulty, { config, leaderboard, roles })}
                         </div>
                     </div>
 
@@ -5658,8 +5867,9 @@ async function loadLevelsPanel(guildId) {
         `;
 
         bindLevelsTabs(container);
-        bindLevelsCurveLive(container, config);
+        bindLevelsCurveLive(container, config, { roles, leaderboard });
         bindLevelsPresets(container, config);
+        bindLevelsRewardsLive(container, { roles, leaderboard, initialConfig: config });
 
         const refreshBtn = container.querySelector('#levelsRefreshBtn');
         if (refreshBtn) {
@@ -5770,36 +5980,54 @@ function bindLevelsTabs(container) {
     });
 }
 
-function bindLevelsCurveLive(container, initialConfig) {
+function readLevelingLiveConfig(container, initialConfig) {
     const baseInput = container.querySelector('#levelingBaseXp');
     const expInput = container.querySelector('#levelingExponent');
+    return {
+        ...initialConfig,
+        enabled: container.querySelector('#levelingEnabled')?.checked ?? initialConfig?.enabled,
+        messageXpEnabled: container.querySelector('#levelingMessageEnabled')?.checked ?? initialConfig?.messageXpEnabled,
+        voiceXpEnabled: container.querySelector('#levelingVoiceEnabled')?.checked ?? initialConfig?.voiceXpEnabled,
+        messageXpMin: Number(container.querySelector('#levelingMsgXpMin')?.value) || initialConfig?.messageXpMin,
+        messageXpMax: Number(container.querySelector('#levelingMsgXpMax')?.value) || initialConfig?.messageXpMax,
+        messageCooldownMs: (Number(container.querySelector('#levelingMsgCooldown')?.value) || 45) * 1000,
+        voiceXpPerMinute: Number(container.querySelector('#levelingVoiceXp')?.value) || initialConfig?.voiceXpPerMinute,
+        difficulty: {
+            baseXp: Number(baseInput?.value) || initialConfig?.difficulty?.baseXp || 280,
+            exponent: Number(expInput?.value) || initialConfig?.difficulty?.exponent || 2.08
+        },
+        roleRewards: typeof getLevelingRewardRows === 'function' ? getLevelingRewardRows() : (initialConfig?.roleRewards || [])
+    };
+}
+
+function refreshLevelsDerivedViews(container, initialConfig, context = {}) {
+    const { roles = [], leaderboard = null } = context;
+    const config = readLevelingLiveConfig(container, initialConfig);
+    const difficulty = levelingSanitizeDifficulty(config.difficulty);
+
     const curveWrap = container.querySelector('#levelsCurveWrap');
     const milestonesWrap = container.querySelector('#levelsMilestonesWrap');
     const ladderWrap = container.querySelector('#levelsTierLadderWrap');
     const presetsWrap = container.querySelector('#levelsPresetsWrap');
+    const statsWrap = container.querySelector('#levelsStatsHeaderWrap');
 
+    if (curveWrap) curveWrap.innerHTML = renderLevelCurveSvg(difficulty);
+    if (milestonesWrap) milestonesWrap.innerHTML = renderLevelMilestones(difficulty, config);
+    if (ladderWrap) ladderWrap.innerHTML = renderTierLadder(difficulty, { config, leaderboard, roles });
+    if (statsWrap) statsWrap.innerHTML = renderLevelsStatsHeader(config, leaderboard, roles);
+    if (presetsWrap) {
+        presetsWrap.innerHTML = renderCurvePresets(difficulty);
+        attachPresetHandlers(container, presetsWrap);
+    }
+}
+
+function bindLevelsCurveLive(container, initialConfig, context = {}) {
+    const baseInput = container.querySelector('#levelingBaseXp');
+    const expInput = container.querySelector('#levelingExponent');
+    const curveWrap = container.querySelector('#levelsCurveWrap');
     if (!baseInput || !expInput || !curveWrap) return;
 
-    const refresh = () => {
-        const difficulty = levelingSanitizeDifficulty({
-            baseXp: baseInput.value,
-            exponent: expInput.value
-        });
-        const config = {
-            ...initialConfig,
-            messageXpMin: container.querySelector('#levelingMsgXpMin')?.value || initialConfig.messageXpMin,
-            messageXpMax: container.querySelector('#levelingMsgXpMax')?.value || initialConfig.messageXpMax,
-            messageCooldownMs: (container.querySelector('#levelingMsgCooldown')?.value || 45) * 1000,
-            voiceXpPerMinute: container.querySelector('#levelingVoiceXp')?.value || initialConfig.voiceXpPerMinute
-        };
-        curveWrap.innerHTML = renderLevelCurveSvg(difficulty);
-        if (milestonesWrap) milestonesWrap.innerHTML = renderLevelMilestones(difficulty, config);
-        if (ladderWrap) ladderWrap.innerHTML = renderTierLadder(difficulty);
-        if (presetsWrap) {
-            presetsWrap.innerHTML = renderCurvePresets(difficulty);
-            attachPresetHandlers(container, presetsWrap);
-        }
-    };
+    const refresh = () => refreshLevelsDerivedViews(container, initialConfig, context);
 
     ['input', 'change'].forEach((evt) => {
         baseInput.addEventListener(evt, refresh);
@@ -5810,10 +6038,38 @@ function bindLevelsCurveLive(container, initialConfig) {
         container.querySelector('#levelingMsgCooldown'),
         container.querySelector('#levelingMsgXpMin'),
         container.querySelector('#levelingMsgXpMax'),
-        container.querySelector('#levelingVoiceXp')
+        container.querySelector('#levelingVoiceXp'),
+        container.querySelector('#levelingEnabled'),
+        container.querySelector('#levelingMessageEnabled'),
+        container.querySelector('#levelingVoiceEnabled')
     ].filter(Boolean);
 
-    otherInputs.forEach((input) => input.addEventListener('input', refresh));
+    otherInputs.forEach((input) => {
+        input.addEventListener('input', refresh);
+        input.addEventListener('change', refresh);
+    });
+}
+
+function bindLevelsRewardsLive(container, context = {}) {
+    const rewardsWrap = container.querySelector('#levelRewardRows');
+    if (!rewardsWrap) return;
+    const refresh = () => refreshLevelsDerivedViews(container, context.initialConfig, context);
+
+    const observer = new MutationObserver(() => refresh());
+    observer.observe(rewardsWrap, { childList: true, subtree: false });
+
+    rewardsWrap.addEventListener('input', (event) => {
+        const target = event.target;
+        if (target && (target.classList.contains('level-reward-level') || target.classList.contains('level-reward-role'))) {
+            refresh();
+        }
+    });
+    rewardsWrap.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target && (target.classList.contains('level-reward-level') || target.classList.contains('level-reward-role'))) {
+            refresh();
+        }
+    });
 }
 
 function bindLevelsPresets(container) {

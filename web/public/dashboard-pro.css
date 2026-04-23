@@ -7113,3 +7113,373 @@ mark.receipt-highlight {
         grid-template-columns: 1fr;
     }
 }
+
+/* ====================================================== */
+/*   Levels - Tier ladder live (roles + stats)             */
+/* ====================================================== */
+.levels-tier-ladder-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+}
+
+.levels-tier-sum-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.32rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.levels-tier-sum-pill.is-complete {
+    color: #a7f3d0;
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+.levels-tier-sum-pill.is-partial {
+    color: #fde68a;
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.levels-tier-sum-pill.is-empty {
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.levels-tier-card.no-role {
+    border-style: dashed;
+}
+
+.levels-tier-card.has-role {
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--tier-color) 22%, transparent);
+}
+
+.levels-tier-role {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    margin-top: 0.3rem;
+    padding: 0.28rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    max-width: 100%;
+    line-height: 1.1;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.levels-tier-role.is-set {
+    color: var(--tier-role-color, var(--tier-color));
+    background: color-mix(in srgb, var(--tier-role-color, var(--tier-color)) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tier-role-color, var(--tier-color)) 45%, transparent);
+}
+
+@supports not (background: color-mix(in srgb, red, blue)) {
+    .levels-tier-role.is-set {
+        background: rgba(154, 109, 255, 0.14);
+        border-color: rgba(154, 109, 255, 0.4);
+    }
+}
+
+.levels-tier-role.is-empty {
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.levels-tier-role-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+.levels-tier-role-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+.levels-tier-role-lvl {
+    padding: 0.08rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.levels-tier-role-extra {
+    padding: 0.08rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    font-size: 0.64rem;
+    font-weight: 700;
+}
+
+.levels-tier-card-dist {
+    margin-top: 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+}
+
+.levels-tier-card-dist-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+
+.levels-tier-card-dist-head strong {
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 0.78rem;
+    margin-right: 0.2rem;
+}
+
+.levels-tier-card-dist-bar {
+    position: relative;
+    height: 5px;
+    width: 100%;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+
+.levels-tier-card-dist-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0%;
+    background: linear-gradient(90deg, var(--tier-color), color-mix(in srgb, var(--tier-color) 60%, #fff));
+    border-radius: inherit;
+    transition: width 0.35s ease;
+}
+
+@supports not (background: color-mix(in srgb, red, blue)) {
+    .levels-tier-card-dist-fill {
+        background: var(--tier-color);
+    }
+}
+
+.levels-stat-card--rewards .levels-stat-pill.is-complete {
+    color: #a7f3d0;
+    background: rgba(34, 197, 94, 0.14);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.levels-stat-card--rewards .levels-stat-pill.is-empty {
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.32);
+}
+
+@media (max-width: 640px) {
+    .levels-tier-role-name { max-width: 100px; }
+    .levels-tier-ladder-summary { gap: 0.35rem; }
+}
+
+/* ====================================================== */
+/*   Embed Sender - rediseño completo                      */
+/* ====================================================== */
+.embed-panel {
+    padding: 1.4rem;
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(20, 11, 42, 0.9), rgba(14, 7, 30, 0.95));
+    border: 1px solid rgba(154, 109, 255, 0.2);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.embed-hero h3 {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.embed-hero h3 svg { color: #6ec8ff; }
+
+.embed-stats-grid { margin: 0; }
+
+.embed-split {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    align-items: start;
+}
+
+.embed-builder-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.embed-preview-aside {
+    position: sticky;
+    top: 1rem;
+    align-self: start;
+}
+
+.embed-preview-card {
+    padding: 1.1rem 1.2rem 1.3rem;
+}
+
+.embed-preview-hint {
+    margin: 0 0 0.9rem 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.embed-preview-card .embed-preview {
+    min-height: 260px;
+    border-radius: 14px;
+    border: 1px dashed rgba(154, 109, 255, 0.25);
+    background: rgba(10, 5, 20, 0.55);
+    padding: 1rem;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.embed-preview-card .embed-placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2rem 1rem;
+}
+
+.embed-preview-card .embed-placeholder svg {
+    width: 34px;
+    height: 34px;
+    color: rgba(154, 109, 255, 0.55);
+}
+
+.embed-preview-card .embed-placeholder p {
+    margin: 0;
+    font-size: 0.88rem;
+}
+
+.embed-destination .dpx-field-grid { gap: 0.9rem; }
+
+.embed-crop-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+.embed-crop-grid .dpx-field { gap: 0.3rem; }
+
+.embed-crop-grid .dpx-field label {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.embed-crop-grid input[type="range"] { width: 100%; }
+
+.dpx-field-value {
+    margin-left: 0.45rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(154, 109, 255, 0.14);
+    color: var(--lavender);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.dpx-field-hint {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+}
+
+.embed-fields-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.7rem;
+}
+
+.embed-fields-list:empty::before {
+    content: 'No hay campos todavía. Usa los botones de abajo para añadir alguno.';
+    display: block;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    background: rgba(154, 109, 255, 0.06);
+    border: 1px dashed rgba(154, 109, 255, 0.22);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.embed-templates-actions .dpx-actions .btn { justify-content: center; }
+
+/* Color picker ajustado al nuevo sistema */
+.embed-panel .color-input {
+    padding: 0.15rem;
+    height: 44px;
+    cursor: pointer;
+}
+
+.embed-panel input[type="range"] {
+    accent-color: #9a6dff;
+}
+
+.embed-panel input[type="file"] {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.85rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+    .embed-split {
+        grid-template-columns: 1fr;
+    }
+    .embed-preview-aside {
+        position: static;
+        order: -1;
+    }
+}
+
+@media (max-width: 720px) {
+    .embed-panel { padding: 1rem; border-radius: 18px; }
+    .embed-crop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .embed-hero h3 { font-size: 1.1rem; }
+    .embed-hero .dpx-hero-actions { flex-wrap: wrap; }
+    .embed-hero .dpx-hero-actions .btn { flex: 1 1 100%; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+    .embed-crop-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .embed-preview-card .embed-preview { min-height: 200px; }
+}
