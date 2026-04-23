@@ -504,11 +504,27 @@
             .feature-list { display: none; }
         }
         @media (max-width: 480px) {
-            body { padding: 1rem; }
-            .brand-panel, .login-panel { padding: 1.8rem 1.5rem; }
-            .login-title { font-size: 1.45rem; }
-            .brand-hero h1 { font-size: 1.5rem; }
+            body { padding: 0.75rem; }
+            .login-shell { max-width: 100%; border-radius: 22px; }
+            .brand-panel, .login-panel { padding: 1.6rem 1.25rem; }
+            .login-title { font-size: 1.35rem; }
+            .brand-hero h1 { font-size: 1.4rem; }
+            .brand-hero p { font-size: 0.85rem; }
+            .discord-community-btn { padding: 0.7rem 0.85rem; }
+            .discord-community-btn-icon { width: 36px; height: 36px; }
+            .trust-row { flex-wrap: wrap; gap: 0.45rem; }
+            .trust-badge { font-size: 0.72rem; padding: 0.3rem 0.55rem; }
         }
+
+        @media (max-width: 380px) {
+            body { padding: 0.5rem; }
+            .brand-panel, .login-panel { padding: 1.3rem 1rem; }
+            .login-title { font-size: 1.2rem; }
+            .brand-hero h1 { font-size: 1.25rem; }
+        }
+
+        html, body { max-width: 100%; overflow-x: hidden; }
+        img, svg, video { max-width: 100%; height: auto; }
     </style>
 </head>
 <body>

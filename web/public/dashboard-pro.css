@@ -4892,3 +4892,123 @@ mark.receipt-highlight {
 
 /* --- Cache bump marker: v=20260422-10 ------------------------------ */
 
+/* ============================================================
+   Dashboard Pro — mobile safety net
+   Ensures the server dashboard never overflows horizontally
+   on phones (360px–480px) regardless of which module is open.
+   ============================================================ */
+@media (max-width: 768px) {
+    .dashpro-shell,
+    .dashpro-layout,
+    .dashpro-main,
+    .dashpro-sidebar,
+    .dashpro-content,
+    .dashpro-topbar,
+    .dashpro-panel,
+    .dashpro-section {
+        max-width: 100%;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .dashpro-content,
+    .dashpro-panel {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+        overflow-x: hidden;
+    }
+
+    /* Any grid → single column */
+    .dashpro-grid,
+    .dashpro-cards,
+    .dashpro-metrics,
+    .dashpro-modules,
+    .dashpro-two-col,
+    .dashpro-three-col {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem !important;
+    }
+
+    /* Tabs / pills row: allow horizontal scroll instead of overflow */
+    .dashpro-tabs,
+    .dashpro-pills,
+    .dashpro-nav-row {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: thin;
+    }
+    .dashpro-tabs::-webkit-scrollbar,
+    .dashpro-pills::-webkit-scrollbar,
+    .dashpro-nav-row::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    /* Forms: inputs full-width */
+    .dashpro-form-row,
+    .dashpro-form-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .dashpro-form-row > *,
+    .dashpro-form-group > * {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* Tables: horizontal scroll within wrapper */
+    .dashpro-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .dashpro-table {
+        min-width: 520px;
+    }
+
+    /* Break long titles / descriptions */
+    .dashpro-card-title,
+    .dashpro-card-desc,
+    .dashpro-title,
+    .dashpro-subtitle {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashpro-content,
+    .dashpro-panel {
+        padding-left: 0.7rem;
+        padding-right: 0.7rem;
+    }
+
+    .dashpro-card,
+    .dashpro-module,
+    .dashpro-section {
+        padding: 0.85rem !important;
+    }
+
+    .dashpro-topbar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .dashpro-btn,
+    .dashpro-action {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .dashpro-content,
+    .dashpro-panel {
+        padding-left: 0.55rem;
+        padding-right: 0.55rem;
+    }
+
+    .dashpro-card,
+    .dashpro-module,
+    .dashpro-section {
+        padding: 0.7rem !important;
+    }
+}
