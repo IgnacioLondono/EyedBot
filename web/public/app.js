@@ -3220,6 +3220,49 @@ function bindDpxTabs(container) {
     }
 }
 
+function dpxIcon(name = '', className = 'dpx-icon') {
+    const paths = {
+        gear: '<circle cx="10" cy="10" r="3"/><path d="M10 1v3M10 16v3M4.22 4.22l2.12 2.12M13.66 13.66l2.12 2.12M1 10h3M16 10h3M4.22 15.78l2.12-2.12M13.66 6.34l2.12-2.12"/>',
+        shield: '<path d="M10 2l6 2.5v5c0 4-2.8 7.5-6 8.5-3.2-1-6-4.5-6-8.5v-5L10 2z"/>',
+        book: '<path d="M4 3h9a2 2 0 012 2v12H5a1 1 0 01-1-1V3zM4 17a2 2 0 002 2h9"/>',
+        bell: '<path d="M6 9a4 4 0 118 0c0 3.5 1.5 5 1.5 5h-11S6 12.5 6 9z"/><path d="M8.5 17a1.5 1.5 0 003 0"/>',
+        calendar: '<rect x="3" y="4" width="14" height="13" rx="2"/><path d="M3 8h14M7 2v4M13 2v4"/>',
+        bolt: '<path d="M11 2L4 11h5l-1 7 7-9h-5l1-7z"/>',
+        chat: '<path d="M4 4h12a2 2 0 012 2v7a2 2 0 01-2 2H9l-4 3v-3H4a2 2 0 01-2-2V6a2 2 0 012-2z"/>',
+        check: '<path d="M4 10l4 4 8-9"/>',
+        palette: '<path d="M10 2a8 8 0 00-1 16c1.5 0 2-.7 2-1.5 0-.5-.2-.8-.5-1.1-.4-.4-.4-1 0-1.4.3-.3.7-.4 1.3-.4h1A3.7 3.7 0 0018 9.8 8 8 0 0010 2z"/><circle cx="6" cy="9" r=".9"/><circle cx="9" cy="5" r=".9"/><circle cx="13" cy="5" r=".9"/><circle cx="15" cy="9" r=".9"/>',
+        image: '<rect x="2.5" y="3.5" width="15" height="13" rx="2"/><circle cx="7.5" cy="8" r="1.5"/><path d="M2.5 13.5L7 10l4 4 3-2 3.5 3"/>',
+        ban: '<circle cx="10" cy="10" r="7.5"/><path d="M4.7 4.7l10.6 10.6"/>',
+        sparkles: '<path d="M10 2v4M10 14v4M2 10h4M14 10h4M4.8 4.8l2.5 2.5M12.7 12.7l2.5 2.5M4.8 15.2l2.5-2.5M12.7 7.3l2.5-2.5"/>',
+        broadcast: '<circle cx="10" cy="10" r="2.5"/><path d="M5.7 5.7a6 6 0 000 8.6M14.3 14.3a6 6 0 000-8.6M2.8 2.8a10 10 0 000 14.4M17.2 17.2a10 10 0 000-14.4"/>',
+        antenna: '<path d="M10 11v8M6 19h8M10 3v5"/><circle cx="10" cy="8" r="1.5"/><path d="M5 7.5A6 6 0 0110 3.5M15 7.5A6 6 0 0010 3.5"/>',
+        leaf: '<path d="M3 17c0-8 5-13 14-13 0 9-5 14-13 14L3 17zM7 17L13 9"/>',
+        sword: '<path d="M14 2l4 4-8 8M10 14l-4-4M5 13l2 2M14 2l-8 8M4 16l4-4"/><path d="M3 17l2-2 1 1-2 2H3z"/>',
+        info: '<circle cx="10" cy="10" r="7.5"/><path d="M10 9v4.5M10 6.2v.5"/>',
+        close: '<path d="M4 4l12 12M16 4L4 16"/>',
+        twitch: '<path d="M4 3l-1 4v10h3v3h3l3-3h3l4-4V3H4zm3 2h10v8l-3 3h-3l-3 3v-3H7V5z"/><path d="M10 7v5M13 7v5"/>',
+        youtube: '<rect x="2.5" y="4.5" width="15" height="11" rx="3"/><path d="M8.5 8l4 2.2-4 2.1z" fill="currentColor" stroke="none"/>',
+        tiktok: '<path d="M13 3v8.5a3.5 3.5 0 11-3.5-3.5"/><path d="M13 3c.5 2 2 3.5 4 3.5"/>',
+        rss: '<path d="M4 4a12 12 0 0112 12M4 10a6 6 0 016 6"/><circle cx="5" cy="15" r="1.5"/>',
+        mic: '<rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M4 9a6 6 0 0012 0M10 15v3M7 18h6"/>',
+        plus: '<path d="M10 4v12M4 10h12"/>',
+        search: '<circle cx="9" cy="9" r="5"/><path d="M13 13l4 4"/>',
+        trash: '<path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/>',
+        clock: '<circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l3 2"/>',
+        send: '<path d="M17 3L3 10l5 2 2 5L17 3zM9 11l4-4"/>',
+        filter: '<path d="M3 4h14l-5 7v5l-4-2v-3L3 4z"/>',
+        users: '<circle cx="7" cy="8" r="3"/><path d="M2 17a5 5 0 0110 0M14 7.5a2.5 2.5 0 110 5M13 17a5 5 0 016-5"/>',
+        eye: '<path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z"/><circle cx="10" cy="10" r="2.5"/>',
+        radio: '<rect x="2" y="6" width="16" height="10" rx="2"/><circle cx="13" cy="11" r="2"/><path d="M6 10h3M6 13h3M4 6l10-3"/>',
+        sprout: '<path d="M10 17v-6M10 11c0-3 2-5 5-5-.5 3-2 5-5 5zM10 11c0-3-2-5-5-5 .5 3 2 5 5 5z"/>',
+        voice: '<path d="M5 8v4a5 5 0 0010 0V8"/><path d="M10 17v2M7 19h6"/><rect x="7.5" y="3" width="5" height="9" rx="2.5"/>',
+        door: '<rect x="4.5" y="2.5" width="11" height="15" rx="1"/><circle cx="12" cy="10" r=".8" fill="currentColor" stroke="none"/>'
+    };
+    const path = paths[name];
+    if (!path) return '';
+    return `<svg class="${className}" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+}
+
 function dpxRenderToggle({ id, checked = false, title = '', description = '', dataPrefKey = '' } = {}) {
     const idAttr = id ? `id="${id}"` : '';
     const prefAttr = dataPrefKey ? `data-pref-key="${dataPrefKey}"` : '';
@@ -3254,12 +3297,14 @@ function dpxRenderTabs(tabs, activeKey) {
     const activeKeyEffective = activeKey || tabs[0].key;
     return `
         <nav class="dpx-tabs" role="tablist">
-            ${tabs.map((tab) => `
+            ${tabs.map((tab) => {
+                const iconHtml = tab.iconName ? dpxIcon(tab.iconName, 'dpx-tab-icon') : '';
+                return `
                 <button type="button" class="dpx-tab ${tab.key === activeKeyEffective ? 'is-active' : ''}" data-dpx-tab="${escapeHtml(tab.key)}" role="tab">
-                    ${tab.icon ? `<span aria-hidden="true">${tab.icon}</span>` : ''}
+                    ${iconHtml}
                     <span>${escapeHtml(tab.label)}</span>
-                </button>
-            `).join('')}
+                </button>`;
+            }).join('')}
         </nav>
     `;
 }
@@ -3324,9 +3369,9 @@ async function loadVoiceCreatorPanel(guildId) {
         `;
 
         const tabsHtml = dpxRenderTabs([
-            { key: 'config', label: 'Configuración', icon: '⚙️' },
-            { key: 'rules', label: 'Reglas', icon: '🛡️' },
-            { key: 'guide', label: 'Guía & comandos', icon: '📘' }
+            { key: 'config', label: 'Configuración', iconName: 'gear' },
+            { key: 'rules', label: 'Reglas', iconName: 'shield' },
+            { key: 'guide', label: 'Guía & comandos', iconName: 'book' }
         ], 'config');
 
         container.innerHTML = `
@@ -3410,15 +3455,15 @@ async function loadVoiceCreatorPanel(guildId) {
                             </div>
                         </div>
                         <div class="dpx-field-grid is-wide">
-                            <div class="dpx-tip"><strong>1.</strong>&nbsp;Entran al canal creador y se les genera su canal personal.</div>
-                            <div class="dpx-tip"><strong>2.</strong>&nbsp;Charlan dentro libremente con sus amigos.</div>
-                            <div class="dpx-tip"><strong>3.</strong>&nbsp;Cuando todos salen, el canal desaparece automáticamente.</div>
+                            <div class="dpx-tip">${dpxIcon('door')}<div><strong>Entrar:</strong>&nbsp;Al unirse al canal creador se genera el canal personal.</div></div>
+                            <div class="dpx-tip">${dpxIcon('voice')}<div><strong>Usar:</strong>&nbsp;Los miembros hablan libremente en su canal.</div></div>
+                            <div class="dpx-tip">${dpxIcon('trash')}<div><strong>Cierre:</strong>&nbsp;Cuando queda vacío, el canal se elimina solo.</div></div>
                         </div>
                         <div class="dpx-field-grid is-wide" style="margin-top:1rem;">
-                            <div class="dpx-tip"><strong>Renombrar:</strong>&nbsp;<code>/voznombre nombre:&lt;tu nombre&gt;</code></div>
-                            <div class="dpx-tip"><strong>Privado/Público:</strong>&nbsp;<code>/vozprivado activar:true|false</code></div>
-                            <div class="dpx-tip"><strong>Invitar:</strong>&nbsp;<code>/vozinvitar usuario:@alguien</code></div>
-                            <div class="dpx-tip"><strong>Quitar:</strong>&nbsp;<code>/vozquitar usuario:@alguien</code></div>
+                            <div class="dpx-tip">${dpxIcon('gear')}<div><strong>Renombrar:</strong>&nbsp;<code>/voznombre nombre:&lt;tu nombre&gt;</code></div></div>
+                            <div class="dpx-tip">${dpxIcon('shield')}<div><strong>Privado/Público:</strong>&nbsp;<code>/vozprivado activar:true|false</code></div></div>
+                            <div class="dpx-tip">${dpxIcon('users')}<div><strong>Invitar:</strong>&nbsp;<code>/vozinvitar usuario:@alguien</code></div></div>
+                            <div class="dpx-tip">${dpxIcon('close')}<div><strong>Quitar:</strong>&nbsp;<code>/vozquitar usuario:@alguien</code></div></div>
                         </div>
                     </div>
                 </section>
@@ -3551,11 +3596,11 @@ async function loadAutomationPanel(guildId) {
     `;
 
     const tabsHtml = dpxRenderTabs([
-        { key: 'antispam', label: 'Anti-spam', icon: '🚫' },
-        { key: 'content', label: 'Contenido', icon: '🧹' },
-        { key: 'raid', label: 'Modo anti-raid', icon: '🛡️' },
-        { key: 'stream-embed', label: 'Stream alerts', icon: '🔴' },
-        { key: 'stream-sources', label: 'Fuentes', icon: '📡' }
+        { key: 'antispam', label: 'Anti-spam', iconName: 'ban' },
+        { key: 'content', label: 'Contenido', iconName: 'sparkles' },
+        { key: 'raid', label: 'Modo anti-raid', iconName: 'shield' },
+        { key: 'stream-embed', label: 'Stream alerts', iconName: 'broadcast' },
+        { key: 'stream-sources', label: 'Fuentes', iconName: 'antenna' }
     ], 'antispam');
 
     container.innerHTML = `
@@ -3623,8 +3668,8 @@ async function loadAutomationPanel(guildId) {
                         </div>
                     </div>
                     <div class="dpx-chip-row" style="margin-bottom:0.85rem;">
-                        <button type="button" class="dpx-chip" id="presetSoftAutomationBtn">🌿 Preset Suave</button>
-                        <button type="button" class="dpx-chip" id="presetStrictAutomationBtn">⚔️ Preset Estricto</button>
+                        <button type="button" class="dpx-chip" id="presetSoftAutomationBtn">${dpxIcon('leaf')} Preset Suave</button>
+                        <button type="button" class="dpx-chip" id="presetStrictAutomationBtn">${dpxIcon('sword')} Preset Estricto</button>
                     </div>
                     <div class="dpx-field-grid">
                         <div class="dpx-field">
@@ -3689,7 +3734,7 @@ async function loadAutomationPanel(guildId) {
                             <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot Stream Alerts')}">
                         </div>
                     </div>
-                    <div class="dpx-tip" style="margin-top:1rem;"><span aria-hidden="true">🛈</span><div>Variables disponibles: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>.</div></div>
+                    <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>Variables disponibles: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>.</div></div>
                     <div class="dpx-actions">
                         <button type="button" class="btn btn-secondary" id="testStreamAlertsBtn">Enviar prueba</button>
                     </div>
@@ -3712,7 +3757,7 @@ async function loadAutomationPanel(guildId) {
                         </div>
                     </div>
                     <div id="streamSourcesList" class="dpx-item-list"></div>
-                    <div class="dpx-tip" style="margin-top:1rem;"><span aria-hidden="true">🛈</span><div>YouTube acepta URL de canal o feed RSS · TikTok requiere feed RSS · Twitch acepta URL de canal (modo live) o feed.</div></div>
+                    <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>YouTube acepta URL de canal o feed RSS · TikTok requiere feed RSS · Twitch acepta URL de canal (modo live) o feed.</div></div>
                 </div>
             </section>
         </div>
@@ -3777,17 +3822,17 @@ async function loadAutomationPanel(guildId) {
     };
     let streamSourcesSearchQuery = '';
 
-    const platformIcons = { twitch: '🟣', youtube: '▶️', tiktok: '🎵', custom: '🌐' };
+    const platformIconNames = { twitch: 'twitch', youtube: 'youtube', tiktok: 'tiktok', custom: 'rss' };
     const platformLabels = { twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok', custom: 'Custom / RSS' };
     const sourceCardHtml = (source, index) => {
         const platform = String(source.platform || 'custom');
         const platformLabel = platformLabels[platform] || 'Custom';
-        const platformIcon = platformIcons[platform] || '🌐';
+        const platformIconName = platformIconNames[platform] || 'rss';
         return `
         <div class="stream-source-card dpx-item-card" data-index="${index}">
             <div class="dpx-item-head">
                 <div class="dpx-item-head-title">
-                    <span class="dpx-platform-badge platform-${platform}">${platformIcon}</span>
+                    <span class="dpx-platform-badge platform-${platform}">${dpxIcon(platformIconName, 'dpx-platform-icon')}</span>
                     <span>${escapeHtml(source.name || 'Nueva fuente')}</span>
                     <span class="dpx-source-meta">${escapeHtml(platformLabel)}</span>
                 </div>
@@ -3797,7 +3842,7 @@ async function loadAutomationPanel(guildId) {
                         <span class="dpx-toggle-switch"></span>
                         <span class="dpx-toggle-info"><strong style="font-size:0.78rem;">${source.enabled !== false ? 'Activa' : 'Pausada'}</strong></span>
                     </label>
-                    <button type="button" class="dpx-icon-btn stream-remove-source-btn" data-remove-index="${index}">✕ Quitar</button>
+                    <button type="button" class="dpx-icon-btn stream-remove-source-btn" data-remove-index="${index}">${dpxIcon('close')} Quitar</button>
                 </div>
             </div>
             <div class="dpx-field-grid">
@@ -4033,10 +4078,10 @@ async function loadSecurityPanel(guildId) {
         `;
 
         const tabsHtml = dpxRenderTabs([
-            { key: 'state', label: 'Estado y acción', icon: '⚡' },
-            { key: 'messages', label: 'Mensajes', icon: '💬' },
-            { key: 'entry', label: 'Entrada y destrucción', icon: '🛡️' },
-            { key: 'trusted', label: 'Roles confiables', icon: '✅' }
+            { key: 'state', label: 'Estado y acción', iconName: 'bolt' },
+            { key: 'messages', label: 'Mensajes', iconName: 'chat' },
+            { key: 'entry', label: 'Entrada y destrucción', iconName: 'shield' },
+            { key: 'trusted', label: 'Roles confiables', iconName: 'check' }
         ], 'state');
 
         const trustedChipsHtml = trustedRoleNames.length
@@ -4128,7 +4173,7 @@ async function loadSecurityPanel(guildId) {
                                 <p>Detecta oleadas de joins y cambios masivos en canales o roles.</p>
                             </div>
                         </div>
-                        <div class="dpx-tip"><span aria-hidden="true">🛈</span> Verificación Discord actual: <strong>${escapeHtml(verificationLevel)}</strong>. Sube este nivel desde Discord si recibes raids constantes.</div>
+                        <div class="dpx-tip">${dpxIcon('info')}<div>Verificación Discord actual: <strong>${escapeHtml(verificationLevel)}</strong>. Sube este nivel desde Discord si recibes raids constantes.</div></div>
                         <div class="dpx-field-grid" style="margin-top:1rem;">
                             <div class="dpx-field">
                                 <label for="antiRaidJoinRateThreshold">Joins por minuto (umbral raid)</label>
@@ -4284,9 +4329,9 @@ async function loadNotificationsPanel(guildId) {
     `;
 
     const tabsHtml = dpxRenderTabs([
-        { key: 'channel', label: 'Canal', icon: '📡' },
-        { key: 'events', label: 'Eventos', icon: '🔔' },
-        { key: 'digest', label: 'Resumen diario', icon: '📅' }
+        { key: 'channel', label: 'Canal', iconName: 'antenna' },
+        { key: 'events', label: 'Eventos', iconName: 'bell' },
+        { key: 'digest', label: 'Resumen diario', iconName: 'calendar' }
     ], 'channel');
 
     container.innerHTML = `
@@ -4551,9 +4596,9 @@ async function loadVerifyPanel(guildId) {
         `;
 
         const tabsHtml = dpxRenderTabs([
-            { key: 'config', label: 'Configuración', icon: '⚙️' },
-            { key: 'embed', label: 'Apariencia', icon: '🎨' },
-            { key: 'media', label: 'Imagen y publicación', icon: '🖼️' }
+            { key: 'config', label: 'Configuración', iconName: 'gear' },
+            { key: 'embed', label: 'Apariencia', iconName: 'palette' },
+            { key: 'media', label: 'Imagen y publicación', iconName: 'image' }
         ], 'config');
 
         container.innerHTML = `

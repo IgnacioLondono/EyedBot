@@ -6592,6 +6592,45 @@ mark.receipt-highlight {
     justify-content: center;
 }
 
+.dpx-icon {
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.dpx-tab-icon {
+    width: 16px;
+    height: 16px;
+    opacity: 0.9;
+}
+
+.dpx-tab.is-active .dpx-tab-icon {
+    opacity: 1;
+}
+
+.dpx-chip .dpx-icon {
+    width: 15px;
+    height: 15px;
+}
+
+.dpx-icon-btn .dpx-icon {
+    width: 13px;
+    height: 13px;
+}
+
+.dpx-tip .dpx-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--iris-300);
+    margin-top: 0.1rem;
+}
+
+.dpx-platform-badge .dpx-platform-icon {
+    width: 16px;
+    height: 16px;
+    color: #fff;
+    stroke-width: 1.9;
+}
+
 .dpx-tab:hover {
     background: rgba(154, 109, 255, 0.1);
     color: var(--text-primary);
