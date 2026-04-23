@@ -5915,7 +5915,7 @@ async function loadLevelsPanel(guildId) {
                     <div class="levels-section">
                         <div class="levels-section-head">
                             <h4>Recompensas por nivel</h4>
-                            <p>Asigna roles automáticamente cuando un miembro llega al nivel especificado.</p>
+                            <p>Asigna roles automáticamente cuando un miembro llega al nivel especificado. <strong>Quitar rol anterior al adquirir el nuevo:</strong> al subir de hito, se retira el rol de recompensa del nivel inferior y solo queda el del nivel más alto alcanzado.</p>
                         </div>
                         <div class="levels-rewards-list" id="levelRewardRows">${renderLevelRewardRows(roles, rewards)}</div>
                         <div class="levels-rewards-actions">
