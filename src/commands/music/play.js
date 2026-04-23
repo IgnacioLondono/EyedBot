@@ -253,9 +253,9 @@ async function getProviderMetadata(url) {
 
 async function trySearchCandidates(player, candidates, requestedBy) {
     const unique = [...new Set((candidates || []).map((c) => (c || '').toString().trim()).filter(Boolean))];
-    const engines = ['auto', 'youtube'];
 
     for (const candidate of unique) {
+        const engines = isUrl(candidate) ? inferEnginesForUrl(candidate) : ['youtube'];
         for (const engine of engines) {
             const result = await player.search(candidate, {
                 requestedBy,
@@ -266,6 +266,13 @@ async function trySearchCandidates(player, candidates, requestedBy) {
     }
 
     return null;
+}
+
+function inferEnginesForUrl(url) {
+    const lower = url.toLowerCase();
+    if (lower.includes('soundcloud.com')) return ['soundcloud', 'auto'];
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return ['youtube'];
+    return ['youtube', 'auto'];
 }
 
 async function getProviderFallbackQuery(url) {
@@ -476,11 +483,15 @@ async function playSingleTrackFlow(interaction, voiceChannel, musicSystem, { que
     if (providerMeta?.title) strictTrack.title = providerMeta.title;
     if (providerMeta?.artist) strictTrack.author = providerMeta.artist;
 
+    const strictUrl = strictTrack?.url || query;
+    const playEngine = inferEnginesForUrl(strictUrl)[0] || 'youtube';
+
     let played = null;
     try {
-        played = await interaction.client.player.play(voiceChannel, strictTrack, {
+        played = await interaction.client.player.play(voiceChannel, strictUrl, {
             requestedBy,
-            nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
+            nodeOptions: musicSystem.buildNodeOptions(interaction.channel),
+            searchEngine: playEngine
         });
     } catch {
         const first = result?.tracks?.[0];
@@ -493,16 +504,24 @@ async function playSingleTrackFlow(interaction, voiceChannel, musicSystem, { que
             ], requestedBy);
             if (fallbackResult?.hasTracks?.()) {
                 const fallbackTrack = fallbackResult.tracks[0] || null;
-                if (providerMeta?.title && fallbackTrack) fallbackTrack.title = providerMeta.title;
-                if (providerMeta?.artist && fallbackTrack) fallbackTrack.author = providerMeta.artist;
-
-                played = await interaction.client.player.play(voiceChannel, fallbackTrack || fallbackResult, {
+                const fallbackUrl = fallbackTrack?.url || fallbackQuery;
+                played = await interaction.client.player.play(voiceChannel, fallbackUrl, {
                     requestedBy,
-                    nodeOptions: musicSystem.buildNodeOptions(interaction.channel)
+                    nodeOptions: musicSystem.buildNodeOptions(interaction.channel),
+                    searchEngine: 'youtube'
                 }).catch(() => null);
+                if (played?.track) {
+                    if (providerMeta?.title) played.track.title = providerMeta.title;
+                    if (providerMeta?.artist) played.track.author = providerMeta.artist;
+                }
                 result = fallbackResult;
             }
         }
+    }
+
+    if (played?.track) {
+        if (providerMeta?.title) played.track.title = providerMeta.title;
+        if (providerMeta?.artist) played.track.author = providerMeta.artist;
     }
 
     if (!played) {
@@ -650,16 +669,31 @@ module.exports = {
             return playSingleTrackFlow(interaction, voiceChannel, musicSystem, { query, providerMeta });
         }
 
-        const videos = await YouTube.search(query, {
-            type: 'video',
-            limit: 10,
-            safeSearch: false
-        }).catch(() => []);
+        const { title: parsedTitle, artist: parsedArtist } = splitQueryTitleArtist(query);
 
-        const cleanedVideos = (videos || []).filter((v) => !isLikelyBadUploadTitle(v?.title || ''));
-        const sourceVideos = cleanedVideos.length ? cleanedVideos : (videos || []);
+        const searchQueries = buildTextSearchQueries(query, parsedTitle, parsedArtist);
+        const collected = [];
+        const seenIds = new Set();
+        for (const q of searchQueries) {
+            const found = await YouTube.search(q, { type: 'video', limit: 10, safeSearch: false }).catch(() => []);
+            for (const v of (found || [])) {
+                const id = v?.id || v?.url;
+                if (!id || seenIds.has(id)) continue;
+                seenIds.add(id);
+                collected.push(v);
+            }
+            if (collected.length >= 30) break;
+        }
 
-        const tracks = sourceVideos.map(mapVideo).filter((t) => t.url || t.id);
+        const cleanedVideos = collected.filter((v) => !isLikelyBadUploadTitle(v?.title || ''));
+        const sourceVideos = cleanedVideos.length ? cleanedVideos : collected;
+
+        const scored = sourceVideos
+            .map((v) => ({ video: v, score: scoreYoutubeCandidate(v, parsedTitle || query, parsedArtist || '') }))
+            .sort((a, b) => b.score - a.score)
+            .map((entry) => entry.video);
+
+        const tracks = scored.map(mapVideo).filter((t) => t.url || t.id).slice(0, 10);
         if (!tracks.length) {
             return safeEditReply(interaction, {
                 embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Sin resultados').setDescription(`No encontré resultados para **${query}**.`)]
@@ -670,3 +704,41 @@ module.exports = {
         return safeEditReply(interaction, { embeds: [embed], components: rows });
     }
 };
+
+function splitQueryTitleArtist(rawQuery) {
+    if (!rawQuery) return { title: '', artist: '' };
+    const value = rawQuery.toString().trim();
+    const separators = [' - ', ' – ', ' — ', ' by ', ' de '];
+    for (const sep of separators) {
+        const idx = value.toLowerCase().indexOf(sep.toLowerCase());
+        if (idx > 0 && idx < value.length - sep.length) {
+            const left = value.slice(0, idx).trim();
+            const right = value.slice(idx + sep.length).trim();
+            if (left && right) {
+                if (sep.toLowerCase() === ' de ') return { title: left, artist: right };
+                if (sep.toLowerCase() === ' by ') return { title: left, artist: right };
+                return { title: left, artist: right };
+            }
+        }
+    }
+    return { title: value, artist: '' };
+}
+
+function buildTextSearchQueries(rawQuery, parsedTitle, parsedArtist) {
+    const queries = [];
+    const title = (parsedTitle || rawQuery || '').trim();
+    const artist = (parsedArtist || '').trim();
+
+    if (artist && title) {
+        queries.push(`${artist} - ${title} official audio`);
+        queries.push(`${artist} ${title} topic`);
+        queries.push(`${artist} ${title}`);
+        queries.push(`${title} ${artist}`);
+    }
+
+    queries.push(rawQuery);
+    if (title && title !== rawQuery) queries.push(title);
+    if (title && !/official audio|topic/i.test(rawQuery)) queries.push(`${title} official audio`);
+
+    return [...new Set(queries.filter(Boolean))].slice(0, 5);
+}
