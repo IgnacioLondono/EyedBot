@@ -677,6 +677,38 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 0.55rem !important;
 }
 
+/* -----------------------------------------------------------------
+   Compact mode visual: más contenido visible en 100% de zoom
+   (similar a usar zoom ~67-75% en la vista de configuración servidor)
+   ----------------------------------------------------------------- */
+:root {
+    --server-ui-scale: 0.74;
+}
+
+.section#serverSection .container {
+    zoom: var(--server-ui-scale);
+}
+
+@supports not (zoom: 1) {
+    .section#serverSection .container {
+        transform: scale(var(--server-ui-scale));
+        transform-origin: top center;
+        width: calc(100% / var(--server-ui-scale));
+    }
+}
+
+@media (max-width: 1366px) {
+    :root {
+        --server-ui-scale: 0.82;
+    }
+}
+
+@media (max-width: 992px) {
+    :root {
+        --server-ui-scale: 1;
+    }
+}
+
 .server-pane-surface {
     background: transparent;
 }
