@@ -4458,50 +4458,320 @@ function collectLevelingConfigFromForm() {
 
 function renderLevelRewardRows(roles, rewards) {
     const rows = Array.isArray(rewards) ? rewards : [];
-    if (!rows.length) return '<p style="color: var(--text-muted);">Aún no hay roles por nivel configurados.</p>';
+    if (!rows.length) {
+        return `
+            <div class="levels-empty-card">
+                <div class="levels-empty-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 15l-3 3m6-3l3 3M6 9V5a2 2 0 012-2h8a2 2 0 012 2v4"/>
+                        <path d="M5 9h14l-1 7a3 3 0 01-3 3H9a3 3 0 01-3-3L5 9z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h5>Aún no hay roles por nivel</h5>
+                    <p>Agrega recompensas automáticas para premiar a quienes alcancen cierto nivel.</p>
+                </div>
+            </div>
+        `;
+    }
 
-    return rows.map((reward, index) => `
-        <div class="form-row level-reward-row" data-index="${index}" style="margin-bottom:0.5rem;">
-            <div class="form-group" style="max-width:140px;">
-                <label>Nivel</label>
-                <input type="number" min="1" max="500" class="form-control level-reward-level" value="${Math.max(1, Number.parseInt(reward.level || '1', 10) || 1)}">
+    return rows.map((reward, index) => renderLevelRewardCard(roles, reward, index)).join('');
+}
+
+function renderLevelRewardCard(roles, reward, index) {
+    const level = Math.max(1, Number.parseInt(reward?.level || '1', 10) || 1);
+    const selectedRole = roles.find((r) => String(r.id) === String(reward?.roleId));
+    const roleColor = selectedRole?.color ? `#${Number(selectedRole.color).toString(16).padStart(6, '0')}` : '#9a6dff';
+
+    return `
+        <div class="level-reward-card" data-index="${index}">
+            <div class="level-reward-card-badge" style="--reward-color:${roleColor};">Nv ${level}</div>
+            <div class="level-reward-card-fields">
+                <div class="level-reward-field">
+                    <label>Nivel requerido</label>
+                    <input type="number" min="1" max="500" class="form-control level-reward-level" value="${level}">
+                </div>
+                <div class="level-reward-field level-reward-field--role">
+                    <label>Rol a otorgar</label>
+                    <select class="form-control level-reward-role">
+                        <option value="">Selecciona un rol</option>
+                        ${roles.map((role) => {
+                            const color = role.color ? `#${Number(role.color).toString(16).padStart(6, '0')}` : null;
+                            const style = color ? ` style="color:${color};"` : '';
+                            return `<option value="${role.id}"${style} ${String(reward?.roleId) === String(role.id) ? 'selected' : ''}>${escapeHtml(role.name)}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
             </div>
-            <div class="form-group" style="flex:1;">
-                <label>Rol</label>
-                <select class="form-control level-reward-role">
-                    <option value="">Selecciona un rol</option>
-                    ${roles.map((role) => `<option value="${role.id}" ${String(reward.roleId) === String(role.id) ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
-                </select>
+            <button type="button" class="level-reward-remove" title="Eliminar recompensa" aria-label="Eliminar recompensa">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                </svg>
+            </button>
+        </div>
+    `;
+}
+
+/* ==== Leveling math mirror (client-side) ======================= */
+function levelingSanitizeDifficulty(raw) {
+    const baseXp = Math.max(50, Math.min(5000, Number.parseInt(raw?.baseXp ?? 280, 10) || 280));
+    const exponentRaw = Number.parseFloat(raw?.exponent ?? 2.08);
+    const exponent = Number.isFinite(exponentRaw) ? Math.max(1.2, Math.min(3.5, exponentRaw)) : 2.08;
+    return { baseXp, exponent };
+}
+
+function levelingXpForLevel(level, difficulty) {
+    const d = levelingSanitizeDifficulty(difficulty);
+    const n = Math.max(1, Number.parseInt(level, 10) || 1);
+    return Math.floor(d.baseXp * Math.pow(n, d.exponent));
+}
+
+function levelingTotalXpForLevel(level, difficulty) {
+    const n = Math.max(0, Number.parseInt(level, 10) || 0);
+    let total = 0;
+    for (let i = 1; i <= n; i += 1) total += levelingXpForLevel(i, difficulty);
+    return total;
+}
+
+function levelingFormatNumber(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n)) return '0';
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+    return Math.round(n).toLocaleString('es-ES');
+}
+
+function levelingEstimateTimeToLevel(targetLevel, difficulty, config) {
+    const totalXp = levelingTotalXpForLevel(targetLevel, difficulty);
+    const msgMin = Math.max(1, Number.parseInt(config?.messageXpMin || 10, 10) || 10);
+    const msgMax = Math.max(msgMin, Number.parseInt(config?.messageXpMax || 16, 10) || 16);
+    const avgMsgXp = (msgMin + msgMax) / 2;
+    const cooldownSec = Math.max(10, Math.round((config?.messageCooldownMs || 45000) / 1000));
+    const msgsNeeded = Math.ceil(totalXp / avgMsgXp);
+    const msgHours = (msgsNeeded * cooldownSec) / 3600;
+
+    const voiceXpPerMin = Math.max(1, Number.parseInt(config?.voiceXpPerMinute || 6, 10) || 6);
+    const voiceHours = totalXp / voiceXpPerMin / 60;
+
+    return { totalXp, msgsNeeded, msgHours, voiceHours };
+}
+
+function renderLevelCurveSvg(difficulty, maxLevel = 40) {
+    const width = 520;
+    const height = 180;
+    const padding = { top: 14, right: 12, bottom: 22, left: 36 };
+    const innerW = width - padding.left - padding.right;
+    const innerH = height - padding.top - padding.bottom;
+
+    const points = [];
+    let maxY = 0;
+    for (let lvl = 1; lvl <= maxLevel; lvl += 1) {
+        const xp = levelingXpForLevel(lvl, difficulty);
+        points.push({ lvl, xp });
+        if (xp > maxY) maxY = xp;
+    }
+    if (maxY <= 0) maxY = 1;
+
+    const xStep = innerW / (maxLevel - 1);
+    const pathData = points.map((p, i) => {
+        const x = padding.left + i * xStep;
+        const y = padding.top + innerH - (p.xp / maxY) * innerH;
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    const areaPath = `${pathData} L${padding.left + innerW},${padding.top + innerH} L${padding.left},${padding.top + innerH} Z`;
+
+    const yTicks = [0.25, 0.5, 0.75, 1].map((ratio) => {
+        const y = padding.top + innerH - innerH * ratio;
+        const label = levelingFormatNumber(maxY * ratio);
+        return `
+            <line x1="${padding.left}" y1="${y}" x2="${padding.left + innerW}" y2="${y}" class="levels-curve-grid"/>
+            <text x="${padding.left - 6}" y="${y + 3}" class="levels-curve-axis" text-anchor="end">${label}</text>
+        `;
+    }).join('');
+
+    const xTickLevels = [1, Math.round(maxLevel * 0.25), Math.round(maxLevel * 0.5), Math.round(maxLevel * 0.75), maxLevel];
+    const xTicks = xTickLevels.map((lvl) => {
+        const i = lvl - 1;
+        const x = padding.left + i * xStep;
+        return `<text x="${x}" y="${height - 6}" class="levels-curve-axis" text-anchor="middle">Nv ${lvl}</text>`;
+    }).join('');
+
+    return `
+        <svg class="levels-curve-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="Curva de dificultad">
+            <defs>
+                <linearGradient id="levelsCurveFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="rgba(154, 109, 255, 0.55)"/>
+                    <stop offset="100%" stop-color="rgba(154, 109, 255, 0.02)"/>
+                </linearGradient>
+                <linearGradient id="levelsCurveStroke" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#9a6dff"/>
+                    <stop offset="100%" stop-color="#ff78d1"/>
+                </linearGradient>
+            </defs>
+            ${yTicks}
+            <path d="${areaPath}" fill="url(#levelsCurveFill)"/>
+            <path d="${pathData}" fill="none" stroke="url(#levelsCurveStroke)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            ${xTicks}
+        </svg>
+    `;
+}
+
+function renderLevelMilestones(difficulty, config) {
+    const milestones = [5, 10, 25, 50].map((lvl) => {
+        const info = levelingEstimateTimeToLevel(lvl, difficulty, config);
+        return `
+            <div class="levels-milestone-card">
+                <div class="levels-milestone-level">Nv ${lvl}</div>
+                <div class="levels-milestone-xp">${levelingFormatNumber(info.totalXp)} XP</div>
+                <div class="levels-milestone-estimates">
+                    <span title="Tiempo aprox. solo con mensajes al ritmo de cooldown"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> ${info.msgHours < 1 ? `${Math.round(info.msgHours * 60)}min` : `${info.msgHours.toFixed(1)}h`}</span>
+                    <span title="Tiempo aprox. solo en voz"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> ${info.voiceHours < 1 ? `${Math.round(info.voiceHours * 60)}min` : `${info.voiceHours.toFixed(1)}h`}</span>
+                </div>
             </div>
-            <div class="form-group" style="max-width:130px; display:flex; align-items:flex-end;">
-                <button type="button" class="btn btn-secondary remove-level-reward" style="width:100%;">Eliminar</button>
+        `;
+    }).join('');
+
+    return `<div class="levels-milestones">${milestones}</div>`;
+}
+
+function renderLevelsStatsHeader(config, leaderboard) {
+    const enabled = config?.enabled === true;
+    const totalUsers = Number(leaderboard?.totalTrackedUsers || 0);
+    const topUser = Array.isArray(leaderboard?.leaderboard) ? leaderboard.leaderboard[0] : null;
+    const msgOn = config?.messageXpEnabled !== false;
+    const voiceOn = config?.voiceXpEnabled !== false;
+    const diff = levelingSanitizeDifficulty(config?.difficulty);
+
+    return `
+        <div class="levels-stats-grid">
+            <div class="levels-stat-card ${enabled ? 'is-active' : 'is-inactive'}">
+                <div class="levels-stat-label">Estado</div>
+                <div class="levels-stat-value">
+                    <span class="levels-stat-pill">${enabled ? '✓ Activo' : '○ Desactivado'}</span>
+                </div>
+                <div class="levels-stat-hint">${enabled ? 'Los miembros están ganando XP' : 'Activa el sistema para empezar a contar XP'}</div>
+            </div>
+            <div class="levels-stat-card">
+                <div class="levels-stat-label">Fuentes de XP</div>
+                <div class="levels-stat-value levels-stat-sources">
+                    <span class="levels-source-chip ${msgOn ? 'is-on' : ''}" title="XP por mensajes">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        Mensajes
+                    </span>
+                    <span class="levels-source-chip ${voiceOn ? 'is-on' : ''}" title="XP por voz">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        Voz
+                    </span>
+                </div>
+            </div>
+            <div class="levels-stat-card">
+                <div class="levels-stat-label">Usuarios rastreados</div>
+                <div class="levels-stat-value">${levelingFormatNumber(totalUsers)}</div>
+                <div class="levels-stat-hint">Miembros con XP acumulado</div>
+            </div>
+            <div class="levels-stat-card levels-stat-card--top">
+                <div class="levels-stat-label">Top actual</div>
+                ${topUser ? `
+                    <div class="levels-top-user">
+                        ${topUser.avatar ? `<img src="${topUser.avatar}" alt="avatar">` : `<div class="levels-top-user-placeholder">${(topUser.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                        <div>
+                            <div class="levels-top-user-name">${escapeHtml(topUser.tag || topUser.username || 'Usuario')}</div>
+                            <div class="levels-top-user-meta">Nv ${topUser.level} · ${levelingFormatNumber(topUser.xp)} XP</div>
+                        </div>
+                    </div>
+                ` : `<div class="levels-stat-hint">Aún sin ranking</div>`}
+            </div>
+            <div class="levels-stat-card levels-stat-card--diff">
+                <div class="levels-stat-label">Dificultad</div>
+                <div class="levels-stat-value">base ${levelingFormatNumber(diff.baseXp)} · exp ${diff.exponent.toFixed(2)}</div>
+                <div class="levels-stat-hint">XP Nv 10 ≈ ${levelingFormatNumber(levelingTotalXpForLevel(10, diff))}</div>
             </div>
         </div>
-    `).join('');
+    `;
+}
+
+function renderLeaderboardPodium(entries) {
+    const order = [entries[1], entries[0], entries[2]];
+    return `
+        <div class="levels-podium">
+            ${order.map((entry, idx) => {
+                if (!entry) return '<div class="levels-podium-slot is-empty"></div>';
+                const realRank = entries.indexOf(entry) + 1;
+                const positionClass = realRank === 1 ? 'levels-podium-slot--first' : realRank === 2 ? 'levels-podium-slot--second' : 'levels-podium-slot--third';
+                return `
+                    <div class="levels-podium-slot ${positionClass}">
+                        <div class="levels-podium-medal">${realRank === 1 ? '🥇' : realRank === 2 ? '🥈' : '🥉'}</div>
+                        ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                        <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
+                        <div class="levels-podium-level">Nivel ${entry.level}</div>
+                        <div class="levels-podium-xp">${levelingFormatNumber(entry.xp)} XP</div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
 }
 
 function buildLeaderboardHtml(payload) {
     const rows = Array.isArray(payload?.leaderboard) ? payload.leaderboard : [];
     if (!rows.length) {
-        return '<p style="color: var(--text-muted);">Todavía no hay datos de niveles.</p>';
+        return `
+            <div class="levels-empty-card">
+                <div class="levels-empty-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </div>
+                <div>
+                    <h5>Todavía no hay datos</h5>
+                    <p>Cuando los miembros empiecen a ganar XP aparecerán aquí.</p>
+                </div>
+            </div>
+        `;
     }
 
-    return rows.slice(0, 10).map((item, index) => `
-        <div style="display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0; border-bottom:1px solid var(--border-color);">
-            <strong style="min-width:28px; color: var(--fate-gold);">#${index + 1}</strong>
-            <img src="${item.avatar || ''}" alt="avatar" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">
-            <div style="flex:1; min-width:0;">
-                <div style="font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.tag || item.username || 'Usuario')}</div>
-                <div style="font-size:0.82rem; color:var(--text-secondary);">Nivel ${item.level} • XP ${item.xp} • Msg ${item.messageCount} • Voz ${item.voiceMinutes}m</div>
+    const top3 = rows.slice(0, 3);
+    const rest = rows.slice(3, 15);
+
+    const restHtml = rest.map((item, idx) => {
+        const rank = idx + 4;
+        const progress = Math.max(0, Math.min(100, Number(item.progressPercent) || 0));
+        return `
+            <div class="levels-rank-row">
+                <div class="levels-rank-number">#${rank}</div>
+                ${item.avatar ? `<img src="${item.avatar}" alt="avatar" class="levels-rank-avatar">` : `<div class="levels-rank-avatar levels-rank-avatar--placeholder">${(item.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                <div class="levels-rank-body">
+                    <div class="levels-rank-head">
+                        <span class="levels-rank-name">${escapeHtml(item.tag || item.username || 'Usuario')}</span>
+                        <span class="levels-rank-level">Nv ${item.level}</span>
+                    </div>
+                    <div class="levels-rank-progress">
+                        <div class="levels-rank-progress-bar" style="width:${progress}%"></div>
+                    </div>
+                    <div class="levels-rank-meta">
+                        <span>${levelingFormatNumber(item.xp)} XP</span>
+                        <span>${levelingFormatNumber(item.messageCount)} msgs</span>
+                        <span>${levelingFormatNumber(item.voiceMinutes)} min voz</span>
+                    </div>
+                </div>
             </div>
-            <span style="font-size:0.78rem; color: var(--text-secondary);">${item.progressPercent || 0}%</span>
+        `;
+    }).join('');
+
+    return `
+        ${renderLeaderboardPodium(top3)}
+        <div class="levels-rank-list">
+            ${restHtml || '<div class="levels-rank-empty">Solo hay ' + rows.length + ' miembro(s) con XP. ¡Invita a más gente a participar!</div>'}
         </div>
-    `).join('');
+    `;
 }
 
 async function loadLevelsPanel(guildId) {
     const container = document.getElementById('levelsContainer');
     if (!container) return;
+
+    container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de niveles...</p></div>';
 
     try {
         const [infoResponse, configResponse, leaderboardResponse] = await Promise.all([
@@ -4511,7 +4781,7 @@ async function loadLevelsPanel(guildId) {
         ]);
 
         if (!infoResponse.ok || !configResponse.ok || !leaderboardResponse.ok) {
-            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">No se pudo cargar el sistema de niveles.</div>';
+            container.innerHTML = '<div class="levels-error">No se pudo cargar el sistema de niveles.</div>';
             return;
         }
 
@@ -4524,124 +4794,249 @@ async function loadLevelsPanel(guildId) {
             .sort((a, b) => (b.position || 0) - (a.position || 0));
 
         const rewards = Array.isArray(config.roleRewards) ? config.roleRewards : [];
-        const difficulty = config.difficulty || {};
+        const difficulty = levelingSanitizeDifficulty(config.difficulty || {});
 
         container.innerHTML = `
-            <h3 class="welcome-panel-title">Sistema de Niveles</h3>
-            <p class="welcome-panel-subtitle">Asigna XP por mensajes y tiempo en voz. Es un sistema más difícil de subir para mantener el progreso equilibrado y premiar actividad real.</p>
-            <div class="welcome-layout">
-                <div class="welcome-editor">
-                    <div class="form-row">
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="levelingEnabled" ${config.enabled ? 'checked' : ''}> <span>Activar niveles</span></label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="levelingMessageEnabled" ${config.messageXpEnabled !== false ? 'checked' : ''}> <span>Dar XP por mensajes</span></label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label><input type="checkbox" id="levelingVoiceEnabled" ${config.voiceXpEnabled !== false ? 'checked' : ''}> <span>Dar XP por voz</span></label>
-                        </div>
+            <div class="levels-panel">
+                <div class="levels-panel-hero">
+                    <div class="levels-panel-hero-text">
+                        <div class="levels-panel-kicker">Sistema de progresión</div>
+                        <h3>Niveles y recompensas</h3>
+                        <p>Premia la actividad real de tu servidor con XP por mensajes y por tiempo en voz. Diseñado para que subir de nivel sea un logro, no una rutina.</p>
                     </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="levelingMsgCooldown">Cooldown mensajes (segundos)</label>
-                            <input type="number" min="10" max="300" id="levelingMsgCooldown" class="form-control" value="${Math.max(10, Math.round((config.messageCooldownMs || 45000) / 1000))}">
-                        </div>
-                        <div class="form-group">
-                            <label for="levelingVoiceXp">XP por minuto en voz</label>
-                            <input type="number" min="1" max="100" id="levelingVoiceXp" class="form-control" value="${Math.max(1, Number.parseInt(config.voiceXpPerMinute || 6, 10) || 6)}">
-                        </div>
-                        <div class="form-group checkbox-group" style="align-self:end;">
-                            <label><input type="checkbox" id="levelingVoicePeers" ${config.voiceRequirePeers !== false ? 'checked' : ''}> <span>Voz exige al menos 2 usuarios</span></label>
-                        </div>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="levelingMsgXpMin">XP mínimo por mensaje</label>
-                            <input type="number" min="1" max="300" id="levelingMsgXpMin" class="form-control" value="${Math.max(1, Number.parseInt(config.messageXpMin || 10, 10) || 10)}">
-                        </div>
-                        <div class="form-group">
-                            <label for="levelingMsgXpMax">XP máximo por mensaje</label>
-                            <input type="number" min="1" max="500" id="levelingMsgXpMax" class="form-control" value="${Math.max(1, Number.parseInt(config.messageXpMax || 16, 10) || 16)}">
-                        </div>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="levelingBaseXp">Dificultad base XP</label>
-                            <input type="number" min="50" max="5000" id="levelingBaseXp" class="form-control" value="${Math.max(50, Number.parseInt(difficulty.baseXp || 280, 10) || 280)}">
-                        </div>
-                        <div class="form-group">
-                            <label for="levelingExponent">Exponente de dificultad</label>
-                            <input type="number" min="1.2" max="3.5" step="0.01" id="levelingExponent" class="form-control" value="${Number.parseFloat(difficulty.exponent || 2.08).toFixed(2)}">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Roles por nivel</label>
-                        <div id="levelRewardRows">${renderLevelRewardRows(roles, rewards)}</div>
-                        <div class="form-actions" style="margin-top:0.5rem;">
-                            <button type="button" id="addLevelRewardBtn" class="btn btn-secondary">Agregar rol por nivel</button>
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="button" id="saveLevelingBtn" class="btn btn-primary">Guardar sistema de niveles</button>
+                    <div class="levels-panel-hero-actions">
+                        <button type="button" class="btn btn-secondary" id="levelsRefreshBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10"/><path d="M20.49 15a9 9 0 01-14.85 3.36L1 14"/></svg>
+                            Recargar
+                        </button>
+                        <button type="button" class="btn btn-primary" id="saveLevelingBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Guardar cambios
+                        </button>
                     </div>
                 </div>
 
-                <div class="welcome-preview-panel">
-                    <h4>Leaderboard</h4>
-                    <p style="color: var(--text-secondary); margin-bottom:0.75rem;">Usuarios seguidos: <strong>${leaderboard.totalTrackedUsers || 0}</strong></p>
-                    <div id="levelingLeaderboardWrap">${buildLeaderboardHtml(leaderboard)}</div>
+                ${renderLevelsStatsHeader(config, leaderboard)}
+
+                <div class="levels-tabs" role="tablist">
+                    <button type="button" class="levels-tab is-active" data-levels-tab="config" role="tab">Configuración</button>
+                    <button type="button" class="levels-tab" data-levels-tab="curve" role="tab">Progresión</button>
+                    <button type="button" class="levels-tab" data-levels-tab="rewards" role="tab">Recompensas</button>
+                    <button type="button" class="levels-tab" data-levels-tab="leaderboard" role="tab">Leaderboard</button>
+                </div>
+
+                <div class="levels-tab-panel is-active" data-levels-panel="config">
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Estado general</h4>
+                            <p>Activa el sistema y decide qué fuentes de XP están habilitadas.</p>
+                        </div>
+                        <div class="levels-toggle-grid">
+                            <label class="levels-toggle">
+                                <input type="checkbox" id="levelingEnabled" ${config.enabled ? 'checked' : ''}>
+                                <span class="levels-toggle-switch"></span>
+                                <span class="levels-toggle-info">
+                                    <strong>Sistema activo</strong>
+                                    <span>Enciende o apaga los niveles para todo el servidor.</span>
+                                </span>
+                            </label>
+                            <label class="levels-toggle">
+                                <input type="checkbox" id="levelingMessageEnabled" ${config.messageXpEnabled !== false ? 'checked' : ''}>
+                                <span class="levels-toggle-switch"></span>
+                                <span class="levels-toggle-info">
+                                    <strong>XP por mensajes</strong>
+                                    <span>Cada mensaje válido otorga XP (respeta el cooldown).</span>
+                                </span>
+                            </label>
+                            <label class="levels-toggle">
+                                <input type="checkbox" id="levelingVoiceEnabled" ${config.voiceXpEnabled !== false ? 'checked' : ''}>
+                                <span class="levels-toggle-switch"></span>
+                                <span class="levels-toggle-info">
+                                    <strong>XP por voz</strong>
+                                    <span>Tiempo en canales de voz suma XP automáticamente.</span>
+                                </span>
+                            </label>
+                            <label class="levels-toggle">
+                                <input type="checkbox" id="levelingVoicePeers" ${config.voiceRequirePeers !== false ? 'checked' : ''}>
+                                <span class="levels-toggle-switch"></span>
+                                <span class="levels-toggle-info">
+                                    <strong>Voz requiere acompañantes</strong>
+                                    <span>Exige al menos 2 usuarios conectados para sumar XP.</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Mensajes</h4>
+                            <p>Controla cuánto XP da cada mensaje y cada cuánto tiempo.</p>
+                        </div>
+                        <div class="levels-field-grid">
+                            <div class="levels-field">
+                                <label for="levelingMsgCooldown">Cooldown entre mensajes</label>
+                                <div class="levels-input-with-suffix">
+                                    <input type="number" min="10" max="300" id="levelingMsgCooldown" class="form-control" value="${Math.max(10, Math.round((config.messageCooldownMs || 45000) / 1000))}">
+                                    <span>segundos</span>
+                                </div>
+                                <small>Entre 10 y 300 s. Evita farmear XP con spam.</small>
+                            </div>
+                            <div class="levels-field">
+                                <label for="levelingMsgXpMin">XP mínimo por mensaje</label>
+                                <input type="number" min="1" max="300" id="levelingMsgXpMin" class="form-control" value="${Math.max(1, Number.parseInt(config.messageXpMin || 10, 10) || 10)}">
+                                <small>Se elige un valor aleatorio entre min y max.</small>
+                            </div>
+                            <div class="levels-field">
+                                <label for="levelingMsgXpMax">XP máximo por mensaje</label>
+                                <input type="number" min="1" max="500" id="levelingMsgXpMax" class="form-control" value="${Math.max(1, Number.parseInt(config.messageXpMax || 16, 10) || 16)}">
+                                <small>Debe ser ≥ al mínimo.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Voz</h4>
+                            <p>XP por cada minuto que un miembro pase conectado.</p>
+                        </div>
+                        <div class="levels-field-grid">
+                            <div class="levels-field">
+                                <label for="levelingVoiceXp">XP por minuto en voz</label>
+                                <div class="levels-input-with-suffix">
+                                    <input type="number" min="1" max="100" id="levelingVoiceXp" class="form-control" value="${Math.max(1, Number.parseInt(config.voiceXpPerMinute || 6, 10) || 6)}">
+                                    <span>XP / min</span>
+                                </div>
+                                <small>Típico: 4–10 XP por minuto.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="levels-tab-panel" data-levels-panel="curve">
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Dificultad</h4>
+                            <p>Ajusta la fórmula de XP por nivel. La curva y los hitos se actualizan en tiempo real.</p>
+                        </div>
+                        <div class="levels-field-grid">
+                            <div class="levels-field">
+                                <label for="levelingBaseXp">XP base del nivel 1</label>
+                                <input type="number" min="50" max="5000" id="levelingBaseXp" class="form-control" value="${difficulty.baseXp}">
+                                <small>Entre 50 y 5000. Valor inicial sugerido: 280.</small>
+                            </div>
+                            <div class="levels-field">
+                                <label for="levelingExponent">Exponente de dificultad</label>
+                                <input type="number" min="1.2" max="3.5" step="0.01" id="levelingExponent" class="form-control" value="${difficulty.exponent.toFixed(2)}">
+                                <small>1.2 = suave, 3.5 = extremo. Sugerido: 2.08.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Curva de experiencia</h4>
+                            <p>XP requerido para subir a cada nivel con tu configuración actual.</p>
+                        </div>
+                        <div class="levels-curve-wrap" id="levelsCurveWrap">
+                            ${renderLevelCurveSvg(difficulty)}
+                        </div>
+                    </div>
+
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Hitos clave</h4>
+                            <p>Tiempo estimado para alcanzar cada nivel usando solo una fuente (mensajes o voz continua).</p>
+                        </div>
+                        <div id="levelsMilestonesWrap">
+                            ${renderLevelMilestones(difficulty, config)}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="levels-tab-panel" data-levels-panel="rewards">
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Recompensas por nivel</h4>
+                            <p>Asigna roles automáticamente cuando un miembro llega al nivel especificado.</p>
+                        </div>
+                        <div class="levels-rewards-list" id="levelRewardRows">${renderLevelRewardRows(roles, rewards)}</div>
+                        <div class="levels-rewards-actions">
+                            <button type="button" id="addLevelRewardBtn" class="btn btn-primary">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Agregar recompensa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="levels-tab-panel" data-levels-panel="leaderboard">
+                    <div class="levels-section">
+                        <div class="levels-section-head">
+                            <h4>Top del servidor</h4>
+                            <p>${leaderboard.totalTrackedUsers || 0} miembro(s) con XP acumulado.</p>
+                        </div>
+                        <div id="levelingLeaderboardWrap">${buildLeaderboardHtml(leaderboard)}</div>
+                    </div>
                 </div>
             </div>
         `;
 
-        const rewardRows = document.getElementById('levelRewardRows');
-        const addRewardBtn = document.getElementById('addLevelRewardBtn');
-        const saveBtn = document.getElementById('saveLevelingBtn');
+        bindLevelsTabs(container);
+        bindLevelsCurveLive(container, config);
+
+        const refreshBtn = container.querySelector('#levelsRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => loadLevelsPanel(guildId));
+        }
+
+        const rewardRows = container.querySelector('#levelRewardRows');
+        const addRewardBtn = container.querySelector('#addLevelRewardBtn');
+        const saveBtn = container.querySelector('#saveLevelingBtn');
 
         if (rewardRows) {
             rewardRows.addEventListener('click', (event) => {
                 const target = event.target;
                 if (!(target instanceof HTMLElement)) return;
-                if (!target.classList.contains('remove-level-reward')) return;
-                const row = target.closest('.level-reward-row');
-                if (row) row.remove();
+                const removeBtn = target.closest('.level-reward-remove');
+                if (!removeBtn) return;
+                const row = removeBtn.closest('.level-reward-card');
+                if (row) {
+                    row.classList.add('is-removing');
+                    setTimeout(() => row.remove(), 180);
+                }
+            });
+
+            rewardRows.addEventListener('change', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+                if (target.classList.contains('level-reward-role')) {
+                    updateRewardCardBadge(target.closest('.level-reward-card'), roles);
+                } else if (target.classList.contains('level-reward-level')) {
+                    updateRewardCardBadge(target.closest('.level-reward-card'), roles);
+                }
             });
         }
 
         if (addRewardBtn) {
             addRewardBtn.addEventListener('click', () => {
-                const wrapper = document.getElementById('levelRewardRows');
+                const wrapper = container.querySelector('#levelRewardRows');
                 if (!wrapper) return;
 
-                const empty = wrapper.querySelector('p');
+                const empty = wrapper.querySelector('.levels-empty-card');
                 if (empty) wrapper.innerHTML = '';
 
-                const row = document.createElement('div');
-                row.className = 'form-row level-reward-row';
-                row.style.marginBottom = '0.5rem';
-                row.innerHTML = `
-                    <div class="form-group" style="max-width:140px;">
-                        <label>Nivel</label>
-                        <input type="number" min="1" max="500" class="form-control level-reward-level" value="1">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label>Rol</label>
-                        <select class="form-control level-reward-role">
-                            <option value="">Selecciona un rol</option>
-                            ${roles.map((role) => `<option value="${role.id}">${escapeHtml(role.name)}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="form-group" style="max-width:130px; display:flex; align-items:flex-end;">
-                        <button type="button" class="btn btn-secondary remove-level-reward" style="width:100%;">Eliminar</button>
-                    </div>
-                `;
-                wrapper.appendChild(row);
+                const nextLevel = Array.from(wrapper.querySelectorAll('.level-reward-level'))
+                    .map((input) => Number(input.value) || 0)
+                    .reduce((max, n) => Math.max(max, n), 0) + 5 || 5;
+
+                const holder = document.createElement('div');
+                holder.innerHTML = renderLevelRewardCard(roles, { level: nextLevel, roleId: '' }, wrapper.children.length);
+                const card = holder.firstElementChild;
+                if (card) {
+                    wrapper.appendChild(card);
+                    card.classList.add('is-entering');
+                    requestAnimationFrame(() => card.classList.remove('is-entering'));
+                }
             });
         }
 
@@ -4653,6 +5048,8 @@ async function loadLevelsPanel(guildId) {
                     return;
                 }
 
+                saveBtn.disabled = true;
+                saveBtn.classList.add('is-loading');
                 try {
                     const response = await fetchWithCredentials(`/api/guild/${guildId}/leveling-config`, {
                         method: 'POST',
@@ -4669,13 +5066,84 @@ async function loadLevelsPanel(guildId) {
                 } catch (error) {
                     console.error('Error guardando sistema de niveles:', error);
                     showToast('Error guardando sistema de niveles', 'error');
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtn.classList.remove('is-loading');
                 }
             });
         }
     } catch (error) {
         console.error('Error cargando panel de niveles:', error);
-        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de niveles.</div>';
+        container.innerHTML = '<div class="levels-error">Error cargando sistema de niveles.</div>';
     }
+}
+
+function bindLevelsTabs(container) {
+    const tabs = container.querySelectorAll('[data-levels-tab]');
+    const panels = container.querySelectorAll('[data-levels-panel]');
+
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+            const target = tab.getAttribute('data-levels-tab');
+            tabs.forEach((t) => t.classList.toggle('is-active', t === tab));
+            panels.forEach((panel) => {
+                panel.classList.toggle('is-active', panel.getAttribute('data-levels-panel') === target);
+            });
+        });
+    });
+}
+
+function bindLevelsCurveLive(container, initialConfig) {
+    const baseInput = container.querySelector('#levelingBaseXp');
+    const expInput = container.querySelector('#levelingExponent');
+    const curveWrap = container.querySelector('#levelsCurveWrap');
+    const milestonesWrap = container.querySelector('#levelsMilestonesWrap');
+
+    if (!baseInput || !expInput || !curveWrap) return;
+
+    const refresh = () => {
+        const difficulty = levelingSanitizeDifficulty({
+            baseXp: baseInput.value,
+            exponent: expInput.value
+        });
+        const config = {
+            ...initialConfig,
+            messageXpMin: container.querySelector('#levelingMsgXpMin')?.value || initialConfig.messageXpMin,
+            messageXpMax: container.querySelector('#levelingMsgXpMax')?.value || initialConfig.messageXpMax,
+            messageCooldownMs: (container.querySelector('#levelingMsgCooldown')?.value || 45) * 1000,
+            voiceXpPerMinute: container.querySelector('#levelingVoiceXp')?.value || initialConfig.voiceXpPerMinute
+        };
+        curveWrap.innerHTML = renderLevelCurveSvg(difficulty);
+        if (milestonesWrap) milestonesWrap.innerHTML = renderLevelMilestones(difficulty, config);
+    };
+
+    ['input', 'change'].forEach((evt) => {
+        baseInput.addEventListener(evt, refresh);
+        expInput.addEventListener(evt, refresh);
+    });
+
+    const otherInputs = [
+        container.querySelector('#levelingMsgCooldown'),
+        container.querySelector('#levelingMsgXpMin'),
+        container.querySelector('#levelingMsgXpMax'),
+        container.querySelector('#levelingVoiceXp')
+    ].filter(Boolean);
+
+    otherInputs.forEach((input) => input.addEventListener('input', refresh));
+}
+
+function updateRewardCardBadge(card, roles) {
+    if (!card) return;
+    const levelInput = card.querySelector('.level-reward-level');
+    const roleSelect = card.querySelector('.level-reward-role');
+    const badge = card.querySelector('.level-reward-card-badge');
+    if (!badge) return;
+
+    const level = Math.max(1, Number(levelInput?.value) || 1);
+    const selectedRole = roles.find((r) => String(r.id) === String(roleSelect?.value));
+    const color = selectedRole?.color ? `#${Number(selectedRole.color).toString(16).padStart(6, '0')}` : '#9a6dff';
+    badge.textContent = `Nv ${level}`;
+    badge.style.setProperty('--reward-color', color);
 }
 
 // Cargar información del servidor
