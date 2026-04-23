@@ -7748,6 +7748,60 @@ function renderModerationMemberCards(members, guildId) {
     `).join('');
 }
 
+function renderModerationBanRows(rows, guildId) {
+    if (!Array.isArray(rows) || !rows.length) {
+        return `
+            <div class="modx-empty">
+                <div class="modx-empty-icon">${dpxIcon('ban')}</div>
+                <h4>Sin baneos registrados</h4>
+                <p>No hay usuarios baneados actualmente en este servidor.</p>
+            </div>
+        `;
+    }
+
+    return rows.map((row) => {
+        const reason = String(row.reason || 'Sin razón especificada');
+        return `
+            <article class="modx-ban-card">
+                <div class="modx-ban-head">
+                    <div class="modx-ban-user">
+                        <div class="modx-ban-avatar">${escapeHtml(String(row.username || 'U').slice(0, 1).toUpperCase())}</div>
+                        <div>
+                            <h4>${escapeHtml(row.tag || row.username || row.userId || 'Usuario')}</h4>
+                            <p>ID: ${escapeHtml(row.userId || '')}</p>
+                        </div>
+                    </div>
+                    <button class="modx-action-btn is-unban" onclick="unbanUser('${guildId}', '${row.userId}')">
+                        <span class="modx-action-icon">${dpxIcon('check')}</span>
+                        <span>Desbanear</span>
+                    </button>
+                </div>
+                <div class="modx-ban-reason">${escapeHtml(reason)}</div>
+            </article>
+        `;
+    }).join('');
+}
+
+async function loadModerationBanHistory(guildId) {
+    const wrap = document.getElementById('modBanHistoryList');
+    if (!wrap) return;
+
+    wrap.innerHTML = '<div class="modx-inline-loading"><div class="loading-spinner"></div><p>Cargando baneados...</p></div>';
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/bans`);
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            wrap.innerHTML = `<div class="modx-empty"><h4>Error</h4><p>${escapeHtml(data.error || 'No se pudo cargar historial de baneos')}</p></div>`;
+            return;
+        }
+
+        const rows = await response.json().catch(() => []);
+        wrap.innerHTML = renderModerationBanRows(rows, guildId);
+    } catch (error) {
+        wrap.innerHTML = '<div class="modx-empty"><h4>Error</h4><p>Error cargando historial de baneos.</p></div>';
+    }
+}
+
 function displayMembers(members, guildId, initialQuery = '') {
     const container = document.getElementById('moderationContainer');
     if (!container) return;
@@ -7782,6 +7836,7 @@ function displayMembers(members, guildId, initialQuery = '') {
     const tabsHtml = dpxRenderTabs([
         { key: 'mod-members', label: 'Miembros', iconName: 'users' },
         { key: 'mod-actions', label: 'Acciones', iconName: 'shield' },
+        { key: 'mod-bans', label: 'Baneados', iconName: 'ban' },
         { key: 'mod-guide', label: 'Guía', iconName: 'info' }
     ], 'mod-members');
 
@@ -7838,6 +7893,19 @@ function displayMembers(members, guildId, initialQuery = '') {
                 </div>
             </section>
 
+            <section class="dpx-tab-panel" data-dpx-panel="mod-bans">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Historial de usuarios baneados</h4>
+                            <p>Consulta baneos activos, revisa la razón registrada y revoca el ban desde aquí.</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="modRefreshBansBtn">${dpxIcon('sparkles')}Actualizar baneos</button>
+                    </div>
+                    <div id="modBanHistoryList"></div>
+                </div>
+            </section>
+
             <section class="dpx-tab-panel" data-dpx-panel="mod-guide">
                 <div class="dpx-section">
                     <div class="dpx-section-head">
@@ -7858,6 +7926,10 @@ function displayMembers(members, guildId, initialQuery = '') {
     const refreshBtn = document.getElementById('modRefreshBtn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => loadServerMembers(guildId));
+    }
+    const refreshBansBtn = document.getElementById('modRefreshBansBtn');
+    if (refreshBansBtn) {
+        refreshBansBtn.addEventListener('click', () => loadModerationBanHistory(guildId));
     }
 
     const searchInput = document.getElementById('moderationSearchInput');
@@ -7885,6 +7957,8 @@ function displayMembers(members, guildId, initialQuery = '') {
             if (list) list.innerHTML = renderModerationMemberCards(filtered, guildId);
         }).catch(() => null);
     }
+
+    loadModerationBanHistory(guildId);
 }
 
 function getGreetingPanelMeta(mode) {
@@ -8401,6 +8475,29 @@ async function moderateUser(guildId, userId, action) {
     }
 }
 
+async function unbanUser(guildId, userId) {
+    const reason = prompt('Razón para desbanear:');
+    if (!reason) return;
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/unban`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, reason })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo desbanear al usuario', 'error');
+            return;
+        }
+        showToast(data.message || 'Usuario desbaneado', 'success');
+        await loadModerationBanHistory(guildId);
+    } catch (error) {
+        console.error('Error desbaneando usuario:', error);
+        showToast('Error al desbanear usuario', 'error');
+    }
+}
+
 
 // Funciones globales
 window.selectGuild = async function(guildId) {
@@ -8419,6 +8516,7 @@ window.selectGuild = async function(guildId) {
 
 window.removeField = removeField;
 window.moderateUser = moderateUser;
+window.unbanUser = unbanUser;
 
 // Mostrar toast (tarjeta unica que se actualiza en vez de apilarse)
 function showToast(message, type = 'success') {

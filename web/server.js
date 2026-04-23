@@ -3475,6 +3475,58 @@ app.get('/api/guild/:guildId/members', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/api/guild/:guildId/bans', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const bans = await guild.bans.fetch().catch(() => null);
+        if (!bans) return res.status(500).json({ error: 'No se pudo obtener la lista de baneos' });
+
+        const rows = Array.from(bans.values()).slice(0, 200).map((ban) => ({
+            userId: ban.user?.id || '',
+            username: ban.user?.username || '',
+            tag: ban.user?.tag || '',
+            reason: ban.reason || ''
+        }));
+
+        res.json(rows);
+    } catch (error) {
+        console.error('Error obteniendo baneados:', error);
+        res.status(500).json({ error: 'Error al obtener baneados' });
+    }
+});
+
+app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const { userId, reason } = req.body || {};
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!userId) return res.status(400).json({ error: 'Falta userId' });
+
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const moderator = req.session.user?.username || 'staff-web';
+        const unbanReason = String(reason || `Desbaneado por ${moderator} desde panel web`).slice(0, 500);
+        await guild.members.unban(String(userId), unbanReason);
+
+        res.json({ success: true, message: 'Usuario desbaneado correctamente' });
+    } catch (error) {
+        console.error('Error desbaneando usuario:', error);
+        res.status(500).json({ error: error.message || 'Error al desbanear usuario' });
+    }
+});
+
 // Ruta para login (mostrar página de login)
 app.get('/login', (req, res) => {
     // Si ya está autenticado, redirigir al dashboard
