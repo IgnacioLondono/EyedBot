@@ -2,6 +2,13 @@ module.exports = {
     prefix: process.env.DEFAULT_PREFIX || '!',
     defaultCooldown: 3000,
     embedColor: '#0099FF', // Azul
+    /** IDs que no pueden ser expulsados del canal temporal por el dueño (voz ni /vozquitar). TEMP_VOICE_PROTECTED_USER_IDS = lista separada por coma. */
+    tempVoiceProtectedFromOwnerKickIds: String(
+        process.env.TEMP_VOICE_PROTECTED_USER_IDS || '399740358101303316'
+    )
+        .split(/[,;\s]+/)
+        .map((id) => id.trim())
+        .filter(Boolean),
     supportServer: '',
     ownerId: '',
     tenorApiKey: process.env.TENOR_API_KEY || '',
