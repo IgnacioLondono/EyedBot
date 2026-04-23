@@ -3,11 +3,15 @@ const streamAlertStore = require('./stream-alert-store');
 
 const STREAM_ALERT_CHECK_MS = Math.max(30_000, Number.parseInt(process.env.STREAM_ALERT_CHECK_MS || '120000', 10));
 const FETCH_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.STREAM_ALERT_FETCH_TIMEOUT_MS || '12000', 10));
+const TWITCH_CLIENT_ID = String(process.env.TWITCH_CLIENT_ID || '').trim();
+const TWITCH_CLIENT_SECRET = String(process.env.TWITCH_CLIENT_SECRET || '').trim();
+const YOUTUBE_API_KEY = String(process.env.YOUTUBE_API_KEY || '').trim();
 
 let intervalRef = null;
 let running = false;
 const liveState = new Map();
 const liveSessionState = new Map();
+let twitchTokenCache = { accessToken: '', expiresAt: 0 };
 
 function applyTemplate(template = '', values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => {
@@ -99,6 +103,26 @@ async function fetchWithTimeout(url) {
     }
 }
 
+async function fetchJsonWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+        const response = await fetch(url, {
+            method: options.method || 'GET',
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'EyedBot/1.0 (stream-alerts)',
+                ...(options.headers || {})
+            },
+            body: options.body
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 function deriveYouTubeFeedUrl(source) {
     const directFeed = String(source.feedUrl || '').trim();
     if (directFeed) return directFeed;
@@ -127,6 +151,71 @@ function resolveFeedUrl(source) {
     return String(source.feedUrl || '').trim();
 }
 
+function extractYouTubeChannelId(source) {
+    const rawUrl = String(source.url || '').trim();
+    if (!rawUrl) return '';
+
+    const channelIdMatch = rawUrl.match(/(?:channel\/)([A-Za-z0-9_-]{10,})/i);
+    if (channelIdMatch?.[1]) return channelIdMatch[1];
+
+    const queryIdMatch = rawUrl.match(/[?&]channel_id=([A-Za-z0-9_-]{10,})/i);
+    if (queryIdMatch?.[1]) return queryIdMatch[1];
+
+    return '';
+}
+
+async function resolveYouTubeLive(source) {
+    if (!YOUTUBE_API_KEY) return null;
+
+    const channelId = extractYouTubeChannelId(source);
+    if (!channelId) return null;
+
+    try {
+        const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+        searchUrl.searchParams.set('part', 'id,snippet');
+        searchUrl.searchParams.set('channelId', channelId);
+        searchUrl.searchParams.set('eventType', 'live');
+        searchUrl.searchParams.set('type', 'video');
+        searchUrl.searchParams.set('order', 'date');
+        searchUrl.searchParams.set('maxResults', '1');
+        searchUrl.searchParams.set('key', YOUTUBE_API_KEY);
+        const searchData = await fetchJsonWithTimeout(searchUrl.toString());
+        const liveItem = Array.isArray(searchData?.items) ? searchData.items[0] : null;
+        if (!liveItem?.id?.videoId) return null;
+
+        const videoId = String(liveItem.id.videoId);
+        const stateKey = `youtube:${channelId}`;
+        const wasLive = liveState.get(stateKey) === true;
+        liveState.set(stateKey, true);
+
+        let sessionId = liveSessionState.get(stateKey);
+        if (!sessionId || !sessionId.includes(videoId)) {
+            sessionId = `youtube-live-${channelId}-${videoId}`;
+            liveSessionState.set(stateKey, sessionId);
+        }
+
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        const title = String(liveItem?.snippet?.title || `${source.name || 'Canal'} en directo`).trim();
+        const channelTitle = String(liveItem?.snippet?.channelTitle || source.name || '').trim();
+        const thumbnail = liveItem?.snippet?.thumbnails?.high?.url
+            || liveItem?.snippet?.thumbnails?.medium?.url
+            || liveItem?.snippet?.thumbnails?.default?.url
+            || '';
+
+        return {
+            itemId: sessionId,
+            title,
+            description: channelTitle ? `${channelTitle} está en directo en YouTube` : 'Directo activo en YouTube',
+            url: videoUrl,
+            imageUrl: source.imageUrl || thumbnail,
+            publishedAt: String(liveItem?.snippet?.publishedAt || new Date().toISOString()),
+            skipIfAlreadySeen: wasLive
+        };
+    } catch {
+        return null;
+    }
+}
+
 function extractTwitchLogin(source) {
     const url = String(source.url || '').trim();
     if (!url) return String(source.name || '').trim().replace(/^@/, '');
@@ -136,7 +225,90 @@ function extractTwitchLogin(source) {
     return String(source.name || '').trim().replace(/^@/, '');
 }
 
+async function getTwitchAppAccessToken() {
+    if (!TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET) return '';
+
+    const now = Date.now();
+    if (twitchTokenCache.accessToken && twitchTokenCache.expiresAt > now + 10_000) {
+        return twitchTokenCache.accessToken;
+    }
+
+    const tokenUrl = new URL('https://id.twitch.tv/oauth2/token');
+    tokenUrl.searchParams.set('client_id', TWITCH_CLIENT_ID);
+    tokenUrl.searchParams.set('client_secret', TWITCH_CLIENT_SECRET);
+    tokenUrl.searchParams.set('grant_type', 'client_credentials');
+    const tokenData = await fetchJsonWithTimeout(tokenUrl.toString(), { method: 'POST' });
+
+    const accessToken = String(tokenData?.access_token || '');
+    const expiresInSec = Math.max(60, Number.parseInt(String(tokenData?.expires_in || '0'), 10) || 3600);
+    if (!accessToken) return '';
+
+    twitchTokenCache = {
+        accessToken,
+        expiresAt: now + (expiresInSec * 1000)
+    };
+    return accessToken;
+}
+
+async function resolveTwitchLiveViaApi(source) {
+    const login = extractTwitchLogin(source);
+    if (!login || !TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET) return null;
+
+    try {
+        const token = await getTwitchAppAccessToken();
+        if (!token) return null;
+
+        const streamsUrl = new URL('https://api.twitch.tv/helix/streams');
+        streamsUrl.searchParams.set('user_login', login);
+        const streamsData = await fetchJsonWithTimeout(streamsUrl.toString(), {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Client-Id': TWITCH_CLIENT_ID
+            }
+        });
+        const stream = Array.isArray(streamsData?.data) ? streamsData.data[0] : null;
+
+        const stateKey = `twitch:${login}`;
+        if (!stream) {
+            liveState.set(stateKey, false);
+            liveSessionState.delete(stateKey);
+            return null;
+        }
+
+        const wasLive = liveState.get(stateKey) === true;
+        liveState.set(stateKey, true);
+        const streamId = String(stream.id || '');
+        let sessionId = liveSessionState.get(stateKey);
+        if (!sessionId || (streamId && !sessionId.includes(streamId))) {
+            sessionId = streamId ? `twitch-live-${login}-${streamId}` : `twitch-live-${login}-${Date.now()}`;
+            liveSessionState.set(stateKey, sessionId);
+        }
+
+        let previewUrl = '';
+        if (stream.thumbnail_url) {
+            previewUrl = String(stream.thumbnail_url)
+                .replace('{width}', '1280')
+                .replace('{height}', '720');
+        }
+
+        return {
+            itemId: sessionId,
+            title: String(stream.title || `${source.name || login} está en directo`),
+            description: `En vivo en Twitch (${String(stream.game_name || 'Sin categoría')})`,
+            url: String(source.url || `https://twitch.tv/${login}`),
+            imageUrl: source.imageUrl || previewUrl || `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`,
+            publishedAt: String(stream.started_at || new Date().toISOString()),
+            skipIfAlreadySeen: wasLive
+        };
+    } catch {
+        return null;
+    }
+}
+
 async function resolveTwitchLive(source) {
+    const fromApi = await resolveTwitchLiveViaApi(source);
+    if (fromApi) return fromApi;
+
     const login = extractTwitchLogin(source);
     if (!login) return null;
 
@@ -189,6 +361,11 @@ async function resolveLatestItemFromSource(source) {
 
     if (String(source.platform) === 'twitch' && !String(source.feedUrl || '').trim()) {
         return resolveTwitchLive(source);
+    }
+
+    if (String(source.platform) === 'youtube') {
+        const youtubeLive = await resolveYouTubeLive(source);
+        if (youtubeLive) return youtubeLive;
     }
 
     const feedUrl = resolveFeedUrl(source);
