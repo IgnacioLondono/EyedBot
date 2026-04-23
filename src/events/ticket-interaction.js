@@ -22,6 +22,10 @@ const CATEGORY_SELECT_PREFIX = 'ticket_cat_';
 const COMMON_SELECT_PREFIX = 'ticket_common_';
 const CONTINUE_PREFIX = 'ticket_continue_';
 const CANCEL_PREFIX = 'ticket_cancel_';
+const PANEL_CATEGORY_SELECT_PREFIX = 'ticket_panel_cat_';
+const PANEL_COMMON_SELECT_PREFIX = 'ticket_panel_common_';
+const PANEL_CONTINUE_PREFIX = 'ticket_panel_continue_';
+const PANEL_CANCEL_PREFIX = 'ticket_panel_cancel_';
 const DRAFT_TTL_MS = 15 * 60 * 1000;
 
 const DEFAULT_CATEGORIES = [
@@ -541,6 +545,43 @@ function buildSetupComponents(guildId, optionsConfig, draft) {
 
     const cancelButton = new ButtonBuilder()
         .setCustomId(`${CANCEL_PREFIX}${guildId}`)
+        .setLabel('Cancelar')
+        .setStyle(ButtonStyle.Secondary);
+
+    return [
+        new ActionRowBuilder().addComponents(categorySelect),
+        new ActionRowBuilder().addComponents(issueSelect),
+        new ActionRowBuilder().addComponents(cancelButton, continueButton)
+    ];
+}
+
+function buildTicketPanelComponents(guildId, cfg) {
+    const optionsConfig = buildSelectionConfig(cfg || {});
+    const defaultDraft = {
+        category: optionsConfig.categories[0]?.value || 'soporte-general',
+        commonIssue: (getCommonIssuesForCategory(optionsConfig, optionsConfig.categories[0]?.value || 'soporte-general')[0]?.value || 'otro')
+    };
+    const categoryIssues = getCommonIssuesForCategory(optionsConfig, defaultDraft.category);
+
+    const categorySelect = buildSelectMenu(
+        `${PANEL_CATEGORY_SELECT_PREFIX}${guildId}`,
+        'Selecciona una categoria',
+        optionsConfig.categories,
+        defaultDraft.category
+    );
+    const issueSelect = buildSelectMenu(
+        `${PANEL_COMMON_SELECT_PREFIX}${guildId}`,
+        'Selecciona un problema frecuente',
+        categoryIssues,
+        defaultDraft.commonIssue
+    );
+    const continueButton = new ButtonBuilder()
+        .setCustomId(`${PANEL_CONTINUE_PREFIX}${guildId}`)
+        .setLabel('Continuar')
+        .setStyle(ButtonStyle.Success);
+
+    const cancelButton = new ButtonBuilder()
+        .setCustomId(`${PANEL_CANCEL_PREFIX}${guildId}`)
         .setLabel('Cancelar')
         .setStyle(ButtonStyle.Secondary);
 
@@ -1123,12 +1164,62 @@ async function handleTicketButton(interaction) {
         return true;
     }
 
+    if (interaction.customId.startsWith(PANEL_CONTINUE_PREFIX)) {
+        const guildId = interaction.customId.slice(PANEL_CONTINUE_PREFIX.length);
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+            return true;
+        }
+
+        const optionsConfig = buildSelectionConfig(cfg);
+        const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+        const categoryLabel = optionLabelByValue(optionsConfig.categories, draft.category);
+        const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+        const commonIssueLabel = optionLabelByValue(categoryIssues, draft.commonIssue);
+
+        if (String(draft.category) === 'solicitud-ingreso-minecraft' && shouldOpenMinecraftApplication(draft.commonIssue)) {
+            await showTicketReasonModal(interaction, guildId, { mode: 'minecraft-application' });
+            return true;
+        }
+
+        if (shouldOpenDetailModal(draft.commonIssue, commonIssueLabel, draft.category)) {
+            await showTicketReasonModal(interaction, guildId, {
+                category: categoryLabel,
+                commonIssue: commonIssueLabel,
+                categoryValue: draft.category
+            });
+            return true;
+        }
+
+        await interaction.deferReply({ flags: 64 }).catch(() => null);
+        await submitPendingTicketRequest(interaction, guildId, {
+            category: categoryLabel,
+            commonIssue: commonIssueLabel,
+            categoryValue: draft.category,
+            commonIssueValue: draft.commonIssue,
+            noMatchIssue: 'No aplica',
+            reason: commonIssueLabel
+        });
+        return true;
+    }
+
     if (interaction.customId.startsWith(CANCEL_PREFIX)) {
         const guildId = interaction.customId.slice(CANCEL_PREFIX.length);
         clearDraftForUser(guildId, interaction.user.id);
         await interaction.update({
             content: 'Solicitud cancelada. Puedes volver a abrir el formulario cuando quieras.',
             components: []
+        }).catch(() => null);
+        return true;
+    }
+
+    if (interaction.customId.startsWith(PANEL_CANCEL_PREFIX)) {
+        const guildId = interaction.customId.slice(PANEL_CANCEL_PREFIX.length);
+        clearDraftForUser(guildId, interaction.user.id);
+        await interaction.reply({
+            content: 'Solicitud cancelada para tu sesión. El panel sigue disponible para todos.',
+            flags: 64
         }).catch(() => null);
         return true;
     }
@@ -1160,6 +1251,53 @@ async function handleTicketSelectMenu(interaction) {
             const valid = categoryIssues.some((item) => item.value === selected);
             draft.commonIssue = valid ? selected : categoryIssues[0].value;
         });
+        return true;
+    }
+
+    if (interaction.customId.startsWith(PANEL_CATEGORY_SELECT_PREFIX)) {
+        const guildId = interaction.customId.slice(PANEL_CATEGORY_SELECT_PREFIX.length);
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+            return true;
+        }
+
+        const optionsConfig = buildSelectionConfig(cfg);
+        const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+        const selected = interaction.values?.[0] || optionsConfig.categories[0].value;
+        const valid = optionsConfig.categories.some((item) => item.value === selected);
+        draft.category = valid ? selected : optionsConfig.categories[0].value;
+        const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+        draft.commonIssue = categoryIssues[0].value;
+        draft.updatedAt = Date.now();
+
+        await interaction.reply({
+            content: `Categoria seleccionada: **${optionLabelByValue(optionsConfig.categories, draft.category)}**`,
+            flags: 64
+        }).catch(() => null);
+        return true;
+    }
+
+    if (interaction.customId.startsWith(PANEL_COMMON_SELECT_PREFIX)) {
+        const guildId = interaction.customId.slice(PANEL_COMMON_SELECT_PREFIX.length);
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+            return true;
+        }
+
+        const optionsConfig = buildSelectionConfig(cfg);
+        const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
+        const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+        const selected = interaction.values?.[0] || categoryIssues[0].value;
+        const valid = categoryIssues.some((item) => item.value === selected);
+        draft.commonIssue = valid ? selected : categoryIssues[0].value;
+        draft.updatedAt = Date.now();
+
+        await interaction.reply({
+            content: `Caso seleccionado: **${optionLabelByValue(categoryIssues, draft.commonIssue)}**`,
+            flags: 64
+        }).catch(() => null);
         return true;
     }
 
@@ -1785,6 +1923,7 @@ module.exports = {
     handleTicketSelectMenu,
     handleTicketModal,
     ticketButtonCustomIdForGuild,
+    buildTicketPanelComponents,
     // Helpers web
     acceptPendingFromWeb,
     claimTicketFromWeb,
