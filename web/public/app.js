@@ -7685,15 +7685,16 @@ function displayServerInfoEnhanced(info) {
 // Cargar miembros del servidor
 async function loadServerMembers(guildId) {
     const container = document.getElementById('moderationContainer');
-    
+    if (!container) return;
+
     try {
         container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando miembros...</p></div>';
-        
+
         const response = await fetchWithCredentials(`/api/guild/${guildId}/members`);
         if (response.ok) {
             const members = await response.json();
             if (members && members.length > 0) {
-                displayMembers(members, guildId);
+                displayMembers(members, guildId, '');
             } else {
                 container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><p>No hay miembros disponibles</p></div>';
             }
@@ -7707,58 +7708,183 @@ async function loadServerMembers(guildId) {
     }
 }
 
-function displayMembers(members, guildId) {
-    const container = document.getElementById('moderationContainer');
-    container.innerHTML = `
-        <h3 style="margin-bottom: 1.5rem; color: var(--fate-red); font-family: 'Cinzel', serif;">Moderación</h3>
-        <div class="member-search">
-            <input type="text" id="memberSearch" class="form-control" placeholder="Buscar miembro...">
-        </div>
-        <div class="member-list" id="memberList">
-            ${members.map(member => `
-                <div class="member-item">
-                    <div class="member-info">
-                        <img src="${member.avatar}" alt="${member.tag}" class="member-avatar">
-                        <div class="member-details">
-                            <h4>${escapeHtml(member.tag)}</h4>
-                            <p>ID: ${member.id}</p>
-                        </div>
-                    </div>
-                    <div class="member-actions">
-                        <button class="action-btn btn-kick" onclick="moderateUser('${guildId}', '${member.id}', 'kick')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 6L6 18M6 6l12 12"></path>
-                            </svg>
-                            Kick
-                        </button>
-                        <button class="action-btn btn-ban" onclick="moderateUser('${guildId}', '${member.id}', 'ban')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 6L6 18M6 6l12 12"></path>
-                            </svg>
-                            Ban
-                        </button>
-                        <button class="action-btn btn-timeout" onclick="moderateUser('${guildId}', '${member.id}', 'timeout')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                            Timeout
-                        </button>
-                    </div>
+function renderModerationMemberCards(members, guildId) {
+    if (!Array.isArray(members) || !members.length) {
+        return `
+            <div class="modx-empty">
+                <div class="modx-empty-icon">${dpxIcon('users')}</div>
+                <h4>Sin resultados</h4>
+                <p>No hay miembros que coincidan con la búsqueda actual.</p>
+            </div>
+        `;
+    }
+
+    return members.map((member) => `
+        <article class="modx-member-card">
+            <div class="modx-member-avatar-wrap">
+                <img src="${escapeHtml(member.avatar || '')}" alt="${escapeHtml(member.tag || 'Miembro')}" class="modx-member-avatar">
+            </div>
+            <div class="modx-member-body">
+                <div class="modx-member-top">
+                    <h4>${escapeHtml(member.tag || 'Usuario')}</h4>
+                    <span class="modx-member-id">ID ${escapeHtml(member.id || '')}</span>
                 </div>
-            `).join('')}
+                <div class="modx-member-actions">
+                    <button class="modx-action-btn is-timeout" onclick="moderateUser('${guildId}', '${member.id}', 'timeout')">
+                        <span class="modx-action-icon">${dpxIcon('clock')}</span>
+                        <span>Timeout</span>
+                    </button>
+                    <button class="modx-action-btn is-kick" onclick="moderateUser('${guildId}', '${member.id}', 'kick')">
+                        <span class="modx-action-icon">${dpxIcon('close')}</span>
+                        <span>Kick</span>
+                    </button>
+                    <button class="modx-action-btn is-ban" onclick="moderateUser('${guildId}', '${member.id}', 'ban')">
+                        <span class="modx-action-icon">${dpxIcon('ban')}</span>
+                        <span>Ban</span>
+                    </button>
+                </div>
+            </div>
+        </article>
+    `).join('');
+}
+
+function displayMembers(members, guildId, initialQuery = '') {
+    const container = document.getElementById('moderationContainer');
+    if (!container) return;
+
+    const safeMembers = Array.isArray(members) ? members : [];
+    const totalMembers = safeMembers.length;
+    const withAvatar = safeMembers.filter((m) => String(m.avatar || '').trim()).length;
+    const actionSummary = 'Timeout · Kick · Ban';
+
+    const heroHtml = dpxRenderHero({
+        kicker: 'Moderación',
+        title: 'Centro de Moderación',
+        description: 'Busca usuarios y aplica acciones rápidas con una interfaz visual por pestañas para que el staff actúe más rápido.',
+        accent: '#ff8b8b',
+        glow1: 'rgba(255,139,139,0.2)',
+        glow2: 'rgba(124,77,255,0.2)',
+        actionsHtml: `
+            <span class="dpx-status-chip is-on"><span class="dot"></span>${totalMembers} miembros cargados</span>
+            <button type="button" class="btn btn-secondary" id="modRefreshBtn">${dpxIcon('sparkles')}Actualizar</button>
+        `
+    });
+
+    const statsHtml = `
+        <div class="dpx-stats-grid">
+            ${dpxRenderStatCard({ label: 'Miembros visibles', value: `${totalMembers}`, hint: 'Listado cargado para moderación rápida', accent: '#ff8b8b' })}
+            ${dpxRenderStatCard({ label: 'Acciones rápidas', value: actionSummary, hint: 'Operaciones disponibles por usuario', accent: '#ffb778' })}
+            ${dpxRenderStatCard({ label: 'Perfiles con avatar', value: `${withAvatar}<span class="dpx-stat-pill"> / ${totalMembers || 1}</span>`, hint: 'Mejor identificación visual del miembro', accent: '#7c4dff' })}
+            ${dpxRenderStatCard({ label: 'Estado del módulo', value: '<span class="dpx-stat-pill is-on">Activo</span>', hint: 'Moderación online y lista para uso', accent: '#9a6dff' })}
         </div>
     `;
-    
-    // Buscar miembros
-    document.getElementById('memberSearch').addEventListener('input', async (e) => {
-        const query = e.target.value;
-        const response = await fetchWithCredentials(`/api/guild/${guildId}/members?q=${encodeURIComponent(query)}`);
-        if (response.ok) {
-            const members = await response.json();
-            displayMembers(members, guildId);
-        }
-    });
+
+    const tabsHtml = dpxRenderTabs([
+        { key: 'mod-members', label: 'Miembros', iconName: 'users' },
+        { key: 'mod-actions', label: 'Acciones', iconName: 'shield' },
+        { key: 'mod-guide', label: 'Guía', iconName: 'info' }
+    ], 'mod-members');
+
+    container.innerHTML = `
+        <div class="dpx-panel">
+            ${heroHtml}
+            ${statsHtml}
+            ${tabsHtml}
+
+            <section class="dpx-tab-panel is-active" data-dpx-panel="mod-members">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Listado de miembros</h4>
+                            <p>Busca por nombre o tag para ejecutar acciones con iconos grandes y color por tipo de sanción.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-field-grid is-wide">
+                        <div class="dpx-field is-full">
+                            <label for="moderationSearchInput">Buscar miembro</label>
+                            <input type="text" id="moderationSearchInput" class="form-control" placeholder="Ej: usuario#1234 o parte del nombre..." value="${escapeHtmlForValue(initialQuery)}">
+                            <small>Tip: la búsqueda se actualiza automáticamente.</small>
+                        </div>
+                    </div>
+                    <div class="modx-members-grid" id="moderationMemberList">${renderModerationMemberCards(safeMembers, guildId)}</div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="mod-actions">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Acciones rápidas del staff</h4>
+                            <p>Atajos y criterios de uso para aplicar medidas sin fricción en incidentes comunes.</p>
+                        </div>
+                    </div>
+                    <div class="modx-action-grid">
+                        <article class="modx-action-card is-timeout">
+                            <div class="modx-action-card-icon">${dpxIcon('clock')}</div>
+                            <h5>Timeout</h5>
+                            <p>Úsalo para spam, flood o conductas temporales que requieren enfriar el chat.</p>
+                        </article>
+                        <article class="modx-action-card is-kick">
+                            <div class="modx-action-card-icon">${dpxIcon('close')}</div>
+                            <h5>Kick</h5>
+                            <p>Expulsión inmediata sin veto permanente, ideal para reincidencias leves.</p>
+                        </article>
+                        <article class="modx-action-card is-ban">
+                            <div class="modx-action-card-icon">${dpxIcon('ban')}</div>
+                            <h5>Ban</h5>
+                            <p>Bloqueo permanente para infracciones graves o ataques al servidor.</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="mod-guide">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Guía de operación</h4>
+                            <p>Buenas prácticas para mantener consistencia en decisiones de moderación.</p>
+                        </div>
+                    </div>
+                    <div class="dpx-tip">${dpxIcon('info')}<div>Antes de aplicar una sanción, registra siempre una razón clara y verificable. Esto ayuda al equipo a auditar casos y mantener coherencia en apelaciones.</div></div>
+                    <div class="dpx-tip" style="margin-top:0.7rem;">${dpxIcon('sparkles')}<div>Próximamente: historial por usuario, presets de sanción y panel de apelaciones integrado.</div></div>
+                </div>
+            </section>
+        </div>
+    `;
+
+    bindDpxTabs(container);
+
+    const refreshBtn = document.getElementById('modRefreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => loadServerMembers(guildId));
+    }
+
+    const searchInput = document.getElementById('moderationSearchInput');
+    let searchTimer = null;
+    if (searchInput) {
+        searchInput.addEventListener('input', async (e) => {
+            const query = String(e.target.value || '').trim();
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(async () => {
+                const response = await fetchWithCredentials(`/api/guild/${guildId}/members?q=${encodeURIComponent(query)}`);
+                if (!response.ok) return;
+                const filtered = await response.json().catch(() => []);
+                const list = document.getElementById('moderationMemberList');
+                if (list) list.innerHTML = renderModerationMemberCards(filtered, guildId);
+            }, 220);
+        });
+    }
+
+    // Mantener compatibilidad con flujo anterior de búsqueda por query inicial
+    if (initialQuery) {
+        fetchWithCredentials(`/api/guild/${guildId}/members?q=${encodeURIComponent(initialQuery)}`).then(async (response) => {
+            if (!response.ok) return;
+            const filtered = await response.json().catch(() => []);
+            const list = document.getElementById('moderationMemberList');
+            if (list) list.innerHTML = renderModerationMemberCards(filtered, guildId);
+        }).catch(() => null);
+    }
 }
 
 function getGreetingPanelMeta(mode) {
