@@ -153,17 +153,29 @@
 
         <section id="controlCenterSection" class="section">
             <div class="container dashboard-shell about-shell">
-                <section class="about-block about-hero reveal-on-scroll" data-reveal="up">
-                    <div class="hero-eyebrow">
-                        <span class="hero-eyebrow-dot"></span>
-                        Acerca de EyedBot
+                <section class="about-block about-hero about-hero-pro reveal-on-scroll" data-reveal="up">
+                    <div class="about-hero-main">
+                        <div class="hero-eyebrow">
+                            <span class="hero-eyebrow-dot"></span>
+                            Plataforma EyedBot
+                        </div>
+                        <h2>Un centro operativo profesional para administrar, automatizar y escalar tu comunidad en Discord</h2>
+                        <p>
+                            EyedBot integra moderacion, engagement, automatizaciones y herramientas visuales en una experiencia de gestion moderna.
+                            Esta plataforma fue pensada para equipos de staff que necesitan velocidad en la operacion diaria, consistencia en las reglas
+                            y una interfaz clara para tomar decisiones con mas contexto.
+                        </p>
                     </div>
-                    <h2>Un bot diseñado para hacer tu comunidad más activa, clara y divertida</h2>
-                    <p>
-                        EyedBot es un asistente para servidores de Discord que reúne herramientas de comunidad,
-                        automatización y entretenimiento en una experiencia simple para administradores y miembros.
-                        Su meta es ayudarte a mantener el orden, impulsar la participación y ahorrar tiempo en tareas repetitivas.
-                    </p>
+                    <aside class="about-hero-side">
+                        <article class="about-side-card">
+                            <h4>Principio de diseño</h4>
+                            <p>Menos friccion para el staff, mas claridad para los miembros y controles seguros para crecer sin perder orden.</p>
+                        </article>
+                        <article class="about-side-card">
+                            <h4>Enfoque de producto</h4>
+                            <p>Funciones modulares, panel unificado y mejoras continuas orientadas a rendimiento comunitario.</p>
+                        </article>
+                    </aside>
                     <div class="about-kpis">
                         <article class="about-kpi-card">
                             <span class="about-kpi-label">Presencia actual</span>
@@ -171,35 +183,115 @@
                             <span class="about-kpi-caption">servidores con EyedBot</span>
                         </article>
                         <article class="about-kpi-card">
-                            <span class="about-kpi-label">Cobertura de funciones</span>
-                            <strong class="about-kpi-value">Comunidad + Moderación</strong>
-                            <span class="about-kpi-caption">todo en un solo flujo</span>
+                            <span class="about-kpi-label">Arquitectura funcional</span>
+                            <strong class="about-kpi-value">Comunidad + Seguridad + Automatizacion</strong>
+                            <span class="about-kpi-caption">operacion centralizada en un flujo</span>
                         </article>
                         <article class="about-kpi-card">
                             <span class="about-kpi-label">Comandos disponibles</span>
                             <strong id="aboutTotalCommands" class="about-kpi-value">--</strong>
-                            <span class="about-kpi-caption">atajos listos para usar</span>
+                            <span class="about-kpi-caption">atajos listos para produccion</span>
                         </article>
                     </div>
                 </section>
 
-                <section class="about-block about-band reveal-on-scroll" data-reveal="up">
+                <section class="about-block about-tabs-wrap reveal-on-scroll" data-reveal="up">
                     <header class="about-band-head">
-                        <h3>Visión General</h3>
-                        <p>Todo lo importante sobre EyedBot, explicado de forma clara para cualquier usuario.</p>
+                        <h3>Acerca de la plataforma</h3>
+                        <p>Navega por pilares clave de EyedBot con una estructura de tabs profesional.</p>
                     </header>
-                    <div class="about-info-grid">
-                        <article class="about-info-card">
-                            <h3>¿Qué es EyedBot?</h3>
-                            <p>Un bot multipropósito para Discord que te ayuda a organizar tu comunidad y mejorar la experiencia diaria dentro del servidor.</p>
+
+                    <div class="about-pro-tabs" role="tablist" aria-label="Secciones de Acerca de">
+                        <button class="about-pro-tab active" type="button" role="tab" aria-selected="true" data-about-tab="vision">Vision</button>
+                        <button class="about-pro-tab" type="button" role="tab" aria-selected="false" data-about-tab="capacidades">Capacidades</button>
+                        <button class="about-pro-tab" type="button" role="tab" aria-selected="false" data-about-tab="flujo">Flujo operativo</button>
+                        <button class="about-pro-tab" type="button" role="tab" aria-selected="false" data-about-tab="roadmap">Roadmap</button>
+                    </div>
+
+                    <div class="about-pro-panels">
+                        <article class="about-pro-panel active" data-about-panel="vision">
+                            <div class="about-info-grid">
+                                <article class="about-info-card">
+                                    <h3>Que es EyedBot</h3>
+                                    <p>Una plataforma de gestion para Discord que unifica herramientas de moderacion, comunicacion, automatizacion y dinamicas de comunidad en un panel consistente.</p>
+                                </article>
+                                <article class="about-info-card">
+                                    <h3>Mision del producto</h3>
+                                    <p>Reducir carga operativa del staff, mantener estandares de convivencia y elevar la experiencia del miembro con flujos claros y accionables.</p>
+                                </article>
+                                <article class="about-info-card">
+                                    <h3>Propuesta de valor</h3>
+                                    <p>Resolver tareas criticas del dia a dia sin fragmentar herramientas, permitiendo escalar comunidades con mejor control y menor friccion.</p>
+                                </article>
+                            </div>
                         </article>
-                        <article class="about-info-card">
-                            <h3>¿Para qué sirve?</h3>
-                            <p>Permite automatizar mensajes, moderar con más control, simplificar dinámicas de comunidad y tener herramientas listas sin complicaciones.</p>
+
+                        <article class="about-pro-panel" data-about-panel="capacidades">
+                            <div class="about-pillars">
+                                <article class="about-pillar-card">
+                                    <h4>Moderacion inteligente</h4>
+                                    <p>Controles de seguridad, acciones de respuesta rapida y capas de proteccion para escenarios de riesgo.</p>
+                                </article>
+                                <article class="about-pillar-card">
+                                    <h4>Automatizacion de operaciones</h4>
+                                    <p>Disena procesos repetitivos para mejorar tiempos de respuesta y mantener consistencia en reglas internas.</p>
+                                </article>
+                                <article class="about-pillar-card">
+                                    <h4>Experiencia de miembro</h4>
+                                    <p>Estructuras de onboarding, engagement y comunicacion visual para aumentar participacion y retencion.</p>
+                                </article>
+                                <article class="about-pillar-card">
+                                    <h4>Control desde dashboard</h4>
+                                    <p>Gestion centralizada de modulos, configuraciones y monitoreo en una interfaz clara para equipos de staff.</p>
+                                </article>
+                            </div>
                         </article>
-                        <article class="about-info-card">
-                            <h3>¿Cuál es su propósito?</h3>
-                            <p>Crear comunidades más saludables y participativas, donde la administración sea más fácil y la interacción de los usuarios más natural.</p>
+
+                        <article class="about-pro-panel" data-about-panel="flujo">
+                            <div class="about-story about-story-pro">
+                                <article class="about-story-block">
+                                    <h3>1. Activacion y estructura</h3>
+                                    <p>Configura las bases del servidor, define canales clave y activa modulos necesarios para operar con estabilidad.</p>
+                                </article>
+                                <article class="about-story-block">
+                                    <h3>2. Automatizacion de tareas</h3>
+                                    <p>Reduce intervencion manual en procesos repetitivos para que el staff enfoque energia en casos de alto impacto.</p>
+                                </article>
+                                <article class="about-story-block">
+                                    <h3>3. Supervisar y ajustar</h3>
+                                    <p>Evalua resultados, ajusta reglas y refina mensajes para mantener una experiencia consistente para toda la comunidad.</p>
+                                </article>
+                                <article class="about-story-block">
+                                    <h3>4. Escalar con confianza</h3>
+                                    <p>Incrementa capacidad operativa del servidor con controles robustos y una base preparada para crecer.</p>
+                                </article>
+                            </div>
+                        </article>
+
+                        <article class="about-pro-panel" data-about-panel="roadmap">
+                            <div class="about-timeline">
+                                <article class="about-timeline-item">
+                                    <span class="about-timeline-dot"></span>
+                                    <div>
+                                        <h4>Fase 1 · Estandarizacion</h4>
+                                        <p>Consolidacion de modulos base y mejoras de usabilidad para operaciones diarias de staff.</p>
+                                    </div>
+                                </article>
+                                <article class="about-timeline-item">
+                                    <span class="about-timeline-dot"></span>
+                                    <div>
+                                        <h4>Fase 2 · Inteligencia operativa</h4>
+                                        <p>Mas analitica, reglas avanzadas y componentes de automatizacion para equipos en crecimiento.</p>
+                                    </div>
+                                </article>
+                                <article class="about-timeline-item">
+                                    <span class="about-timeline-dot"></span>
+                                    <div>
+                                        <h4>Fase 3 · Escala premium</h4>
+                                        <p>Funciones orientadas a alto volumen, segmentacion y experiencias de administracion de nivel profesional.</p>
+                                    </div>
+                                </article>
+                            </div>
                         </article>
                     </div>
                 </section>
@@ -207,7 +299,7 @@
                 <section class="about-block about-carousel-wrap reveal-on-scroll" data-reveal="zoom">
                     <header class="about-carousel-head">
                         <h3>Lo que puedes hacer con EyedBot</h3>
-                        <p>Explora funciones clave en tarjetas interactivas con navegación horizontal.</p>
+                        <p>Explora capacidades clave en un carrusel con interacciones suaves y enfoque visual profesional.</p>
                     </header>
                     <div class="about-carousel">
                         <button type="button" class="about-carousel-arrow" id="aboutCarouselPrev" aria-label="Anterior">
@@ -218,24 +310,24 @@
                         <div id="aboutCarouselViewport" class="about-carousel-viewport" tabindex="0" aria-label="Tarjetas destacadas de EyedBot">
                             <div class="about-carousel-track">
                                 <article class="about-carousel-card">
-                                    <h4>Automatización útil</h4>
-                                    <p>Centraliza avisos, respuestas frecuentes y flujos de bienvenida para mantener actividad constante sin esfuerzo manual.</p>
+                                    <h4>Operacion mas eficiente</h4>
+                                    <p>Convierte tareas manuales en flujos repetibles para mantener tiempos de respuesta consistentes.</p>
                                 </article>
                                 <article class="about-carousel-card">
-                                    <h4>Moderación clara</h4>
-                                    <p>Accede rápidamente a acciones de control para responder mejor ante situaciones del día a día en la comunidad.</p>
+                                    <h4>Seguridad adaptable</h4>
+                                    <p>Ajusta controles de moderacion y proteccion segun el contexto de cada servidor.</p>
                                 </article>
                                 <article class="about-carousel-card">
-                                    <h4>Experiencia visual</h4>
-                                    <p>Personaliza anuncios y mensajes con formato atractivo para comunicar reglas, eventos y novedades con mayor impacto.</p>
+                                    <h4>Comunicacion de alto impacto</h4>
+                                    <p>Diseña mensajes mas claros y atractivos para mejorar alcance, comprension y participacion.</p>
                                 </article>
                                 <article class="about-carousel-card">
-                                    <h4>Dinámicas de comunidad</h4>
-                                    <p>Impulsa interacción con comandos de utilidad y diversión para que los miembros participen más y regresen con frecuencia.</p>
+                                    <h4>Experiencia de miembro consistente</h4>
+                                    <p>Desde onboarding hasta dinamicas de retencion, EyedBot mantiene continuidad en la experiencia.</p>
                                 </article>
                                 <article class="about-carousel-card">
-                                    <h4>Escalable para crecer</h4>
-                                    <p>EyedBot acompaña tanto a servidores pequeños como comunidades grandes, manteniendo una experiencia consistente.</p>
+                                    <h4>Escalabilidad continua</h4>
+                                    <p>Una base operativa preparada para evolucionar con tu comunidad sin perder estabilidad.</p>
                                 </article>
                             </div>
                         </div>
@@ -244,31 +336,6 @@
                                 <path d="M9 18l6-6-6-6"></path>
                             </svg>
                         </button>
-                    </div>
-                </section>
-
-                <section class="about-block about-band reveal-on-scroll" data-reveal="up">
-                    <header class="about-band-head">
-                        <h3>Cómo te acompaña en el día a día</h3>
-                        <p>Un flujo progresivo para administrar y hacer crecer tu comunidad con menos fricción.</p>
-                    </header>
-                    <div class="about-story">
-                        <article class="about-story-block reveal-on-scroll" data-reveal="left">
-                            <h3>1. Integración rápida</h3>
-                            <p>Una vez añadido al servidor, puedes empezar a usar sus funciones principales de inmediato, con una curva de aprendizaje suave para todo el equipo.</p>
-                        </article>
-                        <article class="about-story-block reveal-on-scroll" data-reveal="right">
-                            <h3>2. Operación diaria más simple</h3>
-                            <p>Las acciones frecuentes se vuelven más ágiles: comunicar, moderar y mantener orden en canales con menos fricción para el staff.</p>
-                        </article>
-                        <article class="about-story-block reveal-on-scroll" data-reveal="left">
-                            <h3>3. Mejor experiencia para miembros</h3>
-                            <p>Las personas entienden mejor lo que ocurre en la comunidad gracias a flujos más claros, mensajes mejor estructurados y respuestas oportunas.</p>
-                        </article>
-                        <article class="about-story-block reveal-on-scroll" data-reveal="right">
-                            <h3>4. Comunidad sostenible</h3>
-                            <p>EyedBot no solo resuelve tareas puntuales; ayuda a construir una base estable para que tu servidor crezca con consistencia y buena convivencia.</p>
-                        </article>
                     </div>
                 </section>
             </div>
