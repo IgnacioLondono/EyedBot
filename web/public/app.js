@@ -1609,18 +1609,57 @@ function setupEventListeners() {
         });
     }
 
+    const aboutTabs = Array.from(document.querySelectorAll('.about-pro-tab'));
+    const aboutPanels = Array.from(document.querySelectorAll('.about-pro-panel'));
+    if (aboutTabs.length && aboutPanels.length) {
+        const switchAboutTab = (tabKey = '') => {
+            aboutTabs.forEach((btn) => {
+                const active = btn.dataset.aboutTab === tabKey;
+                btn.classList.toggle('active', active);
+                btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            aboutPanels.forEach((panel) => {
+                panel.classList.toggle('active', panel.dataset.aboutPanel === tabKey);
+            });
+        };
+
+        aboutTabs.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                switchAboutTab(btn.dataset.aboutTab || '');
+            });
+        });
+    }
+
     const aboutCarouselPrev = document.getElementById('aboutCarouselPrev');
     const aboutCarouselNext = document.getElementById('aboutCarouselNext');
     const aboutCarouselViewport = document.getElementById('aboutCarouselViewport');
-    if (aboutCarouselPrev && aboutCarouselNext && aboutCarouselViewport) {
-        aboutCarouselPrev.addEventListener('click', () => {
+    if (aboutCarouselPrev && aboutCarouselNext && aboutCarouselViewport && !aboutCarouselBound) {
+        const moveByViewport = (dir = 1) => {
             const width = Math.max(260, Math.round(aboutCarouselViewport.clientWidth * 0.82));
-            aboutCarouselViewport.scrollBy({ left: -width, behavior: 'smooth' });
-        });
-        aboutCarouselNext.addEventListener('click', () => {
-            const width = Math.max(260, Math.round(aboutCarouselViewport.clientWidth * 0.82));
-            aboutCarouselViewport.scrollBy({ left: width, behavior: 'smooth' });
-        });
+            aboutCarouselViewport.scrollBy({ left: width * dir, behavior: 'smooth' });
+        };
+
+        aboutCarouselPrev.addEventListener('click', () => moveByViewport(-1));
+        aboutCarouselNext.addEventListener('click', () => moveByViewport(1));
+
+        let aboutCarouselAutoScroll = setInterval(() => moveByViewport(1), 5400);
+        const pauseAboutAuto = () => {
+            if (aboutCarouselAutoScroll) {
+                clearInterval(aboutCarouselAutoScroll);
+                aboutCarouselAutoScroll = null;
+            }
+        };
+        const resumeAboutAuto = () => {
+            if (aboutCarouselAutoScroll) return;
+            aboutCarouselAutoScroll = setInterval(() => moveByViewport(1), 5400);
+        };
+
+        aboutCarouselViewport.addEventListener('mouseenter', pauseAboutAuto);
+        aboutCarouselViewport.addEventListener('mouseleave', resumeAboutAuto);
+        aboutCarouselViewport.addEventListener('focusin', pauseAboutAuto);
+        aboutCarouselViewport.addEventListener('focusout', resumeAboutAuto);
+
+        aboutCarouselBound = true;
     }
 
     document.addEventListener('click', (event) => {
