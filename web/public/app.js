@@ -1196,6 +1196,8 @@ function restoreEmbedForm(state) {
                 container.insertAdjacentHTML('beforeend', fieldHTML);
             });
             updateEmbedPreview();
+            updateEmbedStats();
+            syncEmbedTextCounters();
         }
     }
 }
@@ -1726,10 +1728,12 @@ function setupEventListeners() {
         saveState();
     });
     document.getElementById('embedTitle').addEventListener('input', () => {
+        syncEmbedTextCounters();
         updateEmbedPreview();
         saveState();
     });
     document.getElementById('embedDescription').addEventListener('input', () => {
+        syncEmbedTextCounters();
         updateEmbedPreview();
         saveState();
     });
@@ -1780,6 +1784,7 @@ function setupEventListeners() {
     });
     document.getElementById('channelSelect').addEventListener('change', saveState);
     document.getElementById('previewBtn').addEventListener('click', updateEmbedPreview);
+    document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
     document.getElementById('addFieldBtn').addEventListener('click', addField);
     document.getElementById('addTitleFieldBtn').addEventListener('click', function() {
@@ -1809,6 +1814,7 @@ function setupEventListeners() {
         `;
         container.insertAdjacentHTML('beforeend', fieldHTML);
         updateEmbedPreview();
+        updateEmbedStats();
         saveState();
     });
 
@@ -1822,6 +1828,7 @@ function setupEventListeners() {
         desc.value = before + titleBlock + after;
         desc.focus();
         desc.selectionStart = desc.selectionEnd = before.length + titleBlock.length;
+        syncEmbedTextCounters();
         updateEmbedPreview();
         saveState();
     });
@@ -2262,6 +2269,7 @@ function addField() {
     
     container.insertAdjacentHTML('beforeend', fieldHTML);
     updateEmbedPreview();
+    updateEmbedStats();
     saveState();
 }
 
@@ -2269,6 +2277,7 @@ function addField() {
 function removeField(fieldId) {
     document.getElementById(fieldId).remove();
     updateEmbedPreview();
+    updateEmbedStats();
     saveState();
 }
 
@@ -2336,6 +2345,8 @@ function applyEmbedToForm(embed = {}) {
     });
 
     updateEmbedPreview();
+    updateEmbedStats();
+    syncEmbedTextCounters();
     saveState();
 }
 
@@ -2439,6 +2450,66 @@ function updateEmbedPreview() {
             ${footer || timestamp ? `<div class="discord-embed-footer">${footer || ''} ${timestamp ? '• ' + new Date().toLocaleString() : ''}</div>` : ''}
         </div>
     `;
+}
+
+function syncEmbedTextCounters() {
+    const titleInput = document.getElementById('embedTitle');
+    const descInput = document.getElementById('embedDescription');
+    const titleCount = document.getElementById('embedTitleCount');
+    const descCount = document.getElementById('embedDescriptionCount');
+
+    if (titleInput && titleCount) {
+        titleCount.textContent = String((titleInput.value || '').length);
+    }
+    if (descInput && descCount) {
+        descCount.textContent = String((descInput.value || '').length);
+    }
+}
+
+function clearEmbedComposer({ keepDestination = true, silent = false } = {}) {
+    document.getElementById('embedTitle').value = '';
+    document.getElementById('embedDescription').value = '';
+    document.getElementById('embedFooter').value = '';
+    document.getElementById('embedImage').value = '';
+    document.getElementById('embedThumbnail').value = '';
+    document.getElementById('embedImageFile').value = '';
+    document.getElementById('embedThumbnailFile').value = '';
+    document.getElementById('embedColor').value = '#C41E3A';
+    document.getElementById('embedImageScale').value = '100';
+    document.getElementById('embedThumbnailScale').value = '100';
+    document.getElementById('embedImageScaleValue').textContent = '100%';
+    document.getElementById('embedThumbnailScaleValue').textContent = '100%';
+    document.getElementById('embedImageCropX').value = '0';
+    document.getElementById('embedImageCropY').value = '0';
+    document.getElementById('embedImageCropW').value = '100';
+    document.getElementById('embedImageCropH').value = '100';
+    document.getElementById('embedThumbnailCropX').value = '0';
+    document.getElementById('embedThumbnailCropY').value = '0';
+    document.getElementById('embedThumbnailCropW').value = '100';
+    document.getElementById('embedThumbnailCropH').value = '100';
+    document.getElementById('embedTimestamp').checked = false;
+    document.getElementById('fieldsContainer').innerHTML = '';
+
+    if (!keepDestination) {
+        const channelSelect = document.getElementById('channelSelect');
+        if (channelSelect) channelSelect.value = '';
+    }
+
+    if (uploadedImagePreviewUrl) URL.revokeObjectURL(uploadedImagePreviewUrl);
+    if (uploadedThumbnailPreviewUrl) URL.revokeObjectURL(uploadedThumbnailPreviewUrl);
+    uploadedImageFile = null;
+    uploadedImagePreviewUrl = '';
+    uploadedThumbnailFile = null;
+    uploadedThumbnailPreviewUrl = '';
+
+    syncEmbedTextCounters();
+    updateEmbedStats();
+    updateEmbedPreview();
+    saveState();
+
+    if (!silent) {
+        showToast('Editor de embed reiniciado', 'success');
+    }
 }
 
 function handleImageFileSelection(event, target) {
@@ -2596,6 +2667,7 @@ function initEmbedPanel() {
         embedPanelInitialized = true;
     }
 
+    syncEmbedTextCounters();
     updateEmbedStats();
 }
 
@@ -2635,6 +2707,8 @@ function updateEmbedStats() {
         const count = fieldsContainer.querySelectorAll('.field-row, .field-entry, [data-embed-field]').length
             || fieldsContainer.children.length;
         fieldsVal.innerHTML = `${count}<span class="dpx-stat-pill">/ 25</span>`;
+        const fieldsUsage = document.getElementById('embedFieldsUsage');
+        if (fieldsUsage) fieldsUsage.textContent = `${count} / 25 campos usados`;
     }
 
     if (templateSelect && templatesVal) {
@@ -2687,36 +2761,7 @@ async function sendEmbed() {
 
         if (response.ok) {
             showToast('Embed enviado correctamente', 'success');
-            // Limpiar formulario
-            document.getElementById('embedTitle').value = '';
-            document.getElementById('embedDescription').value = '';
-            document.getElementById('embedFooter').value = '';
-            document.getElementById('embedImage').value = '';
-            document.getElementById('embedThumbnail').value = '';
-            document.getElementById('embedImageFile').value = '';
-            document.getElementById('embedThumbnailFile').value = '';
-            document.getElementById('embedImageScale').value = '100';
-            document.getElementById('embedThumbnailScale').value = '100';
-            document.getElementById('embedImageScaleValue').textContent = '100%';
-            document.getElementById('embedThumbnailScaleValue').textContent = '100%';
-            document.getElementById('embedImageCropX').value = '0';
-            document.getElementById('embedImageCropY').value = '0';
-            document.getElementById('embedImageCropW').value = '100';
-            document.getElementById('embedImageCropH').value = '100';
-            document.getElementById('embedThumbnailCropX').value = '0';
-            document.getElementById('embedThumbnailCropY').value = '0';
-            document.getElementById('embedThumbnailCropW').value = '100';
-            document.getElementById('embedThumbnailCropH').value = '100';
-            document.getElementById('embedTimestamp').checked = false;
-            document.getElementById('fieldsContainer').innerHTML = '';
-            if (uploadedImagePreviewUrl) URL.revokeObjectURL(uploadedImagePreviewUrl);
-            if (uploadedThumbnailPreviewUrl) URL.revokeObjectURL(uploadedThumbnailPreviewUrl);
-            uploadedImageFile = null;
-            uploadedImagePreviewUrl = '';
-            uploadedThumbnailFile = null;
-            uploadedThumbnailPreviewUrl = '';
-            updateEmbedPreview();
-            saveState(); // Guardar estado limpio
+            clearEmbedComposer({ keepDestination: true, silent: true });
         } else {
             showToast(data.error || 'Error al enviar embed', 'error');
         }
