@@ -2823,7 +2823,6 @@ app.post('/api/send-owner-attachment', requireOwner, ownerAttachmentUpload.singl
         }
 
         await channel.send({
-            content: `📎 Archivo enviado por owner (${req.session.user?.username || 'owner'})`,
             files: [{
                 attachment: uploadedPath,
                 name: req.file.originalname || path.basename(uploadedPath)
