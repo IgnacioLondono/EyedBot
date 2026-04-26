@@ -1789,7 +1789,7 @@ function setupEventListeners() {
     document.getElementById('previewBtn').addEventListener('click', updateEmbedPreview);
     document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
-    document.getElementById('sendOwnerAttachmentBtn').addEventListener('click', sendOwnerAttachmentToChannel);
+    document.getElementById('sendOwnerAttachmentBtn')?.addEventListener('click', sendOwnerAttachmentToChannel);
     document.getElementById('addFieldBtn').addEventListener('click', addField);
     document.getElementById('addTitleFieldBtn').addEventListener('click', function() {
         // Agrega un field con formato de título destacado
@@ -2578,7 +2578,16 @@ async function sendOwnerAttachmentToChannel() {
         return;
     }
 
+    const sendBtn = document.getElementById('sendOwnerAttachmentBtn');
+    const defaultLabel = sendBtn ? sendBtn.querySelector('span')?.textContent : '';
+
     try {
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            const label = sendBtn.querySelector('span');
+            if (label) label.textContent = 'Enviando…';
+        }
+
         const formData = new FormData();
         formData.append('guildId', guildId);
         formData.append('channelId', channelId);
@@ -2588,10 +2597,16 @@ async function sendOwnerAttachmentToChannel() {
             method: 'POST',
             body: formData
         });
-        const data = await response.json().catch(() => ({}));
+        let data = {};
+        const raw = await response.text();
+        try {
+            data = raw ? JSON.parse(raw) : {};
+        } catch {
+            data = { error: raw?.slice(0, 200) || 'Respuesta inválida del servidor' };
+        }
 
         if (!response.ok) {
-            showToast(data.error || 'No se pudo enviar el archivo', 'error');
+            showToast(data.error || `No se pudo enviar el archivo (${response.status})`, 'error');
             return;
         }
 
@@ -2600,6 +2615,12 @@ async function sendOwnerAttachmentToChannel() {
     } catch (error) {
         console.error('Error enviando adjunto owner:', error);
         showToast('Error al enviar archivo', 'error');
+    } finally {
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            const label = sendBtn.querySelector('span');
+            if (label && defaultLabel) label.textContent = defaultLabel;
+        }
     }
 }
 
