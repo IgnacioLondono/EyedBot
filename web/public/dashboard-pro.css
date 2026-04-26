@@ -1653,6 +1653,32 @@ label { color: var(--text-secondary); font-weight: 500; }
     margin-left: auto;
 }
 
+/* Este panel quedó fuera del bloque .server-pane … .btn-ghost (ver más abajo); sin esto el <button> usa estilo nativo (fondo claro) y el texto no contrasta. */
+#serverPaneTicketsManage .ticket-manage-actions .btn.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    background: rgba(12, 6, 30, 0.78) !important;
+    border: 1px solid rgba(190, 155, 255, 0.35) !important;
+    color: #f4eeff !important;
+    border-radius: 12px !important;
+    padding: 0.55rem 1rem !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+}
+#serverPaneTicketsManage .ticket-manage-actions .btn.btn-ghost:hover {
+    background: rgba(124, 77, 255, 0.2) !important;
+    border-color: rgba(190, 155, 255, 0.55) !important;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+}
+#serverPaneTicketsManage .ticket-manage-actions .btn.btn-ghost svg {
+    flex-shrink: 0;
+    color: inherit !important;
+    stroke: currentColor !important;
+}
+
 .ticket-manage-autorefresh {
     display: inline-flex;
     align-items: center;
