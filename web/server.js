@@ -8,6 +8,7 @@ const DiscordOauth2 = require('discord-oauth2');
 const axios = require('axios');
 const cors = require('cors');
 const fs = require('fs');
+const os = require('os');
 const multer = require('multer');
 const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
@@ -53,6 +54,19 @@ const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID', '399740358101303316');
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 8 * 1024 * 1024 }
+});
+const ownerAttachmentUploadDir = path.join(os.tmpdir(), 'eyedbot-owner-uploads');
+if (!fs.existsSync(ownerAttachmentUploadDir)) fs.mkdirSync(ownerAttachmentUploadDir, { recursive: true });
+const ownerAttachmentUpload = multer({
+    storage: multer.diskStorage({
+        destination: (_req, _file, cb) => cb(null, ownerAttachmentUploadDir),
+        filename: (_req, file, cb) => {
+            const safeBase = sanitizeUploadName(path.parse(file.originalname || 'archivo').name || 'archivo');
+            const ext = path.extname(file.originalname || '') || '';
+            cb(null, `${Date.now()}_${safeBase}${ext.slice(0, 12)}`);
+        }
+    }),
+    limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 function timeoutAfter(ms, label = 'timeout') {
@@ -2780,6 +2794,51 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
     } catch (error) {
         console.error('Error enviando embed:', error);
         res.status(500).json({ error: error.message || 'Error al enviar embed' });
+    }
+});
+
+app.post('/api/send-owner-attachment', requireOwner, ownerAttachmentUpload.single('attachmentFile'), async (req, res) => {
+    const uploadedPath = req.file?.path || '';
+    try {
+        const { guildId, channelId } = req.body || {};
+        if (!guildId || !channelId) {
+            return res.status(400).json({ error: 'Faltan servidor o canal' });
+        }
+        if (!botClient) {
+            return res.status(500).json({ error: 'Bot no disponible' });
+        }
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se recibió ningún archivo' });
+        }
+
+        const guild = botClient.guilds.cache.get(String(guildId));
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const channel = guild.channels.cache.get(String(channelId));
+        if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
+
+        const requiredPerms = ['SendMessages', 'AttachFiles'];
+        if (!channel.permissionsFor(guild.members.me)?.has(requiredPerms)) {
+            return res.status(403).json({ error: 'El bot no tiene permisos para adjuntar archivos en este canal' });
+        }
+
+        await channel.send({
+            content: `📎 Archivo enviado por owner (${req.session.user?.username || 'owner'})`,
+            files: [{
+                attachment: uploadedPath,
+                name: req.file.originalname || path.basename(uploadedPath)
+            }]
+        });
+
+        console.log(`[OwnerAttachment] ${req.session.user?.username || 'owner'} envió archivo en ${guild.name}/${channel.name}`);
+        return res.json({ success: true, message: 'Archivo enviado correctamente' });
+    } catch (error) {
+        console.error('Error enviando adjunto owner:', error);
+        return res.status(500).json({ error: error.message || 'Error al enviar archivo' });
+    } finally {
+        if (uploadedPath) {
+            fs.promises.unlink(uploadedPath).catch(() => {});
+        }
     }
 });
 

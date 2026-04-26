@@ -1405,7 +1405,10 @@ function updateUserUI() {
         '[data-section="statsSection"]',
         '[data-section="logsSection"]',
         '[data-quick-section="statsSection"]',
-        '[data-quick-section="logsSection"]'
+        '[data-quick-section="logsSection"]',
+        '#embedTabs [data-dpx-tab="attachments"]',
+        '#embedSection [data-dpx-panel="attachments"]',
+        '#sendOwnerAttachmentBtn'
     ];
 
     ownerRestrictedSelectors.forEach((selector) => {
@@ -1786,6 +1789,7 @@ function setupEventListeners() {
     document.getElementById('previewBtn').addEventListener('click', updateEmbedPreview);
     document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
+    document.getElementById('sendOwnerAttachmentBtn').addEventListener('click', sendOwnerAttachmentToChannel);
     document.getElementById('addFieldBtn').addEventListener('click', addField);
     document.getElementById('addTitleFieldBtn').addEventListener('click', function() {
         // Agrega un field con formato de título destacado
@@ -2548,6 +2552,57 @@ function handleImageFileSelection(event, target) {
     saveState();
 }
 
+async function sendOwnerAttachmentToChannel() {
+    if (!isOwnerUser) {
+        showToast('Esta función está disponible solo para el owner', 'warning');
+        return;
+    }
+
+    const guildId = document.getElementById('guildSelect')?.value;
+    const channelId = document.getElementById('channelSelect')?.value;
+    const fileInput = document.getElementById('ownerAttachmentFile');
+    const file = fileInput?.files?.[0];
+
+    if (!guildId || !channelId) {
+        showToast('Selecciona servidor y canal antes de enviar archivos', 'warning');
+        return;
+    }
+    if (!file) {
+        showToast('Selecciona un archivo para enviar', 'warning');
+        return;
+    }
+
+    const maxSizeBytes = 100 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+        showToast('El archivo supera el límite de 100MB', 'warning');
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('guildId', guildId);
+        formData.append('channelId', channelId);
+        formData.append('attachmentFile', file, file.name);
+
+        const response = await fetchWithCredentials('/api/send-owner-attachment', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo enviar el archivo', 'error');
+            return;
+        }
+
+        showToast('Archivo enviado correctamente', 'success');
+        if (fileInput) fileInput.value = '';
+    } catch (error) {
+        console.error('Error enviando adjunto owner:', error);
+        showToast('Error al enviar archivo', 'error');
+    }
+}
+
 function getCropSettings(target) {
     if (target === 'thumbnail') {
         return {
@@ -2628,11 +2683,26 @@ function initEmbedPanel() {
             const panels = Array.from(section.querySelectorAll('[data-dpx-panel]'));
             tabs.forEach((tab) => {
                 tab.addEventListener('click', () => {
+                    if (!isOwnerUser && tab.getAttribute('data-dpx-tab') === 'attachments') return;
                     const key = tab.getAttribute('data-dpx-tab');
                     tabs.forEach((t) => t.classList.toggle('is-active', t === tab));
                     panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
                 });
             });
+
+            if (!isOwnerUser) {
+                const activeTab = tabs.find((t) => t.classList.contains('is-active'));
+                if (activeTab && activeTab.getAttribute('data-dpx-tab') === 'attachments') {
+                    const fallbackTab = tabs.find((t) => t.getAttribute('data-dpx-tab') === 'content');
+                    if (fallbackTab) {
+                        fallbackTab.classList.add('is-active');
+                        tabs.forEach((t) => {
+                            if (t !== fallbackTab) t.classList.remove('is-active');
+                        });
+                        panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === 'content'));
+                    }
+                }
+            }
         }
 
         const guildSelect = document.getElementById('guildSelect');
