@@ -8151,6 +8151,25 @@ mark.receipt-highlight {
     margin-bottom: 0.7rem;
 }
 
+.embed-fields-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 0.55rem;
+}
+
+.embed-fields-usage {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(154, 109, 255, 0.12);
+    border: 1px solid rgba(154, 109, 255, 0.24);
+}
+
 .embed-fields-list:empty::before {
     content: 'No hay campos todavía. Usa los botones de abajo para añadir alguno.';
     display: block;
@@ -8164,6 +8183,16 @@ mark.receipt-highlight {
 }
 
 .embed-templates-actions .dpx-actions .btn { justify-content: center; }
+
+#resetEmbedBtn {
+    border-color: rgba(255, 120, 209, 0.45);
+    background: rgba(255, 120, 209, 0.08);
+}
+
+#resetEmbedBtn:hover {
+    border-color: rgba(255, 120, 209, 0.8);
+    background: rgba(255, 120, 209, 0.14);
+}
 
 /* Color picker ajustado al nuevo sistema */
 .embed-panel .color-input {
