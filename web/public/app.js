@@ -609,6 +609,52 @@ async function fetchWithCredentials(url, options = {}) {
     });
 }
 
+const apiGetCache = new Map();
+const API_CACHE_TTL = {
+    guilds: 10000,
+    channels: 8000,
+    templates: 6000
+};
+
+function debounce(fn, delay = 180) {
+    let timeoutId = null;
+    return (...args) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn(...args), delay);
+    };
+}
+
+async function fetchCachedGetJSON(url, ttlMs = 30000, options = {}) {
+    const now = Date.now();
+    const cached = apiGetCache.get(url);
+    if (cached && cached.expiresAt > now) {
+        return cached.data;
+    }
+
+    const response = await fetchWithCredentials(url, options);
+    if (!response.ok) {
+        const error = new Error(`GET ${url} failed (${response.status})`);
+        error.status = response.status;
+        throw error;
+    }
+
+    const data = await response.json();
+    apiGetCache.set(url, { data, expiresAt: now + ttlMs });
+    return data;
+}
+
+function invalidateGetCache(prefix = '') {
+    if (!prefix) {
+        apiGetCache.clear();
+        return;
+    }
+    for (const key of apiGetCache.keys()) {
+        if (key.startsWith(prefix)) {
+            apiGetCache.delete(key);
+        }
+    }
+}
+
 // Clave para localStorage
 const STORAGE_KEY = 'tulabot_panel_state';
 
@@ -1687,7 +1733,7 @@ function setupEventListeners() {
 
     const serverTabSearch = document.getElementById('serverTabSearch');
     if (serverTabSearch) {
-        serverTabSearch.addEventListener('input', (event) => {
+        const handleServerTabSearch = debounce((event) => {
             const query = String(event.target?.value || '').trim().toLowerCase();
             document.querySelectorAll('.side-menu-btn').forEach((btn) => {
                 const label = (btn.textContent || '').trim().toLowerCase();
@@ -1700,7 +1746,8 @@ function setupEventListeners() {
                 const visibleButtons = group.querySelectorAll('.side-menu-btn:not(.hidden)');
                 if (title) title.classList.toggle('hidden', visibleButtons.length === 0);
             });
-        });
+        }, 160);
+        serverTabSearch.addEventListener('input', handleServerTabSearch);
     }
 
     // Menú de usuario
@@ -2071,14 +2118,9 @@ function showSection(sectionId, options = {}) {
 // Cargar servidores
 async function loadGuilds() {
     try {
-        const response = await fetchWithCredentials('/api/guilds');
-        if (response.ok) {
-            const guilds = await response.json();
-            dashboardGuildsCache = Array.isArray(guilds) ? guilds : [];
-            displayGuilds(getFilteredDashboardGuilds());
-        } else {
-            showToast('Error al cargar servidores', 'error');
-        }
+        const guilds = await fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds);
+        dashboardGuildsCache = Array.isArray(guilds) ? guilds : [];
+        displayGuilds(getFilteredDashboardGuilds());
     } catch (error) {
         console.error('Error cargando servidores:', error);
         showToast('Error al cargar servidores', 'error');
@@ -2138,38 +2180,35 @@ function displayGuilds(guilds) {
 // Cargar servidores para el formulario de embed
 async function loadGuildsForEmbed() {
     try {
-        const response = await fetchWithCredentials('/api/guilds');
-        if (response.ok) {
-            const guilds = await response.json();
-            const select = document.getElementById('guildSelect');
-            const channelSelect = document.getElementById('channelSelect');
+        const guilds = await fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds);
+        const select = document.getElementById('guildSelect');
+        const channelSelect = document.getElementById('channelSelect');
 
-            if (!hasSelectedGuildContext()) {
-                select.disabled = true;
-                select.innerHTML = '<option value="">Selecciona un servidor en el Dashboard</option>';
-                if (channelSelect) {
-                    channelSelect.disabled = true;
-                    channelSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
-                }
-                return;
-            }
-
-            const selectedGuild = guilds.find((g) => String(g.id) === String(currentServerGuildId));
-            if (!selectedGuild) {
-                select.disabled = true;
-                select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
-                if (channelSelect) {
-                    channelSelect.disabled = true;
-                    channelSelect.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
-                }
-                return;
-            }
-
+        if (!hasSelectedGuildContext()) {
             select.disabled = true;
-            select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
-            select.value = selectedGuild.id;
-            await handleGuildSelect();
+            select.innerHTML = '<option value="">Selecciona un servidor en el Dashboard</option>';
+            if (channelSelect) {
+                channelSelect.disabled = true;
+                channelSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
+            }
+            return;
         }
+
+        const selectedGuild = (Array.isArray(guilds) ? guilds : []).find((g) => String(g.id) === String(currentServerGuildId));
+        if (!selectedGuild) {
+            select.disabled = true;
+            select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+            if (channelSelect) {
+                channelSelect.disabled = true;
+                channelSelect.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+            }
+            return;
+        }
+
+        select.disabled = true;
+        select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
+        select.value = selectedGuild.id;
+        await handleGuildSelect();
     } catch (error) {
         console.error('Error cargando servidores:', error);
     }
@@ -2188,18 +2227,13 @@ async function handleGuildSelect() {
     }
 
     try {
-        const response = await fetchWithCredentials(`/api/guild/${guildId}/channels`);
-        if (response.ok) {
-            const channels = await response.json();
-            channelSelect.disabled = false;
-            channelSelect.innerHTML = '<option value="">Selecciona un canal</option>' +
-                channels
-                    .filter(ch => ch.type === 0) // Solo canales de texto
-                    .map(ch => `<option value="${ch.id}"># ${ch.name}</option>`).join('');
-            await loadEmbedTemplates(guildId);
-        } else {
-            showToast('Error al cargar canales', 'error');
-        }
+        const channels = await fetchCachedGetJSON(`/api/guild/${guildId}/channels`, API_CACHE_TTL.channels);
+        channelSelect.disabled = false;
+        channelSelect.innerHTML = '<option value="">Selecciona un canal</option>' +
+            (Array.isArray(channels) ? channels : [])
+                .filter(ch => ch.type === 0) // Solo canales de texto
+                .map(ch => `<option value="${ch.id}"># ${ch.name}</option>`).join('');
+        await loadEmbedTemplates(guildId);
     } catch (error) {
         console.error('Error cargando canales:', error);
         showToast('Error al cargar canales', 'error');
@@ -2230,13 +2264,7 @@ async function loadEmbedTemplates(guildId) {
     }
 
     try {
-        const response = await fetchWithCredentials(`/api/embed-templates/${guildId}`);
-        if (!response.ok) {
-            renderTemplateSelect([]);
-            return;
-        }
-
-        const templates = await response.json();
+        const templates = await fetchCachedGetJSON(`/api/embed-templates/${guildId}`, API_CACHE_TTL.templates);
         renderTemplateSelect(templates);
     } catch (error) {
         console.error('Error cargando plantillas:', error);
@@ -2371,6 +2399,7 @@ async function saveEmbedTemplate() {
         if (!response.ok) return showToast(data.error || 'No se pudo guardar la plantilla', 'error');
 
         showToast('Plantilla guardada', 'success');
+        invalidateGetCache(`/api/embed-templates/${guildId}`);
         await loadEmbedTemplates(guildId);
     } catch (error) {
         console.error('Error guardando plantilla:', error);
@@ -2399,6 +2428,7 @@ async function deleteSelectedTemplate() {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) return showToast(data.error || 'No se pudo eliminar la plantilla', 'error');
         showToast('Plantilla eliminada', 'success');
+        invalidateGetCache(`/api/embed-templates/${guildId}`);
         await loadEmbedTemplates(guildId);
     } catch (error) {
         console.error('Error eliminando plantilla:', error);
