@@ -21,7 +21,7 @@ const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const {
     ticketButtonCustomIdForGuild,
     acceptPendingFromWeb,
@@ -68,6 +68,18 @@ const ownerAttachmentUpload = multer({
     }),
     limits: { fileSize: 1024 * 1024 * 1024 }
 });
+
+function handleOwnerAttachmentUpload(req, res, next) {
+    ownerAttachmentUpload.single('attachmentFile')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'El archivo supera el límite de 1 GB' });
+            }
+            return res.status(400).json({ error: err.message || 'Error al procesar el archivo' });
+        }
+        return next();
+    });
+}
 
 function timeoutAfter(ms, label = 'timeout') {
     return new Promise((_, reject) => {
@@ -2797,7 +2809,7 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
     }
 });
 
-app.post('/api/send-owner-attachment', requireOwner, ownerAttachmentUpload.single('attachmentFile'), async (req, res) => {
+app.post('/api/send-owner-attachment', requireOwner, handleOwnerAttachmentUpload, async (req, res) => {
     const uploadedPath = req.file?.path || '';
     try {
         const { guildId, channelId } = req.body || {};
@@ -2811,23 +2823,36 @@ app.post('/api/send-owner-attachment', requireOwner, ownerAttachmentUpload.singl
             return res.status(400).json({ error: 'No se recibió ningún archivo' });
         }
 
-        const guild = botClient.guilds.cache.get(String(guildId));
-        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+        let guild = botClient.guilds.cache.get(String(guildId));
+        if (!guild) {
+            try {
+                guild = await botClient.guilds.fetch(String(guildId));
+            } catch {
+                return res.status(404).json({ error: 'Servidor no encontrado' });
+            }
+        }
 
-        const channel = guild.channels.cache.get(String(channelId));
-        if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
+        let channel = guild.channels.cache.get(String(channelId));
+        if (!channel) {
+            try {
+                channel = await guild.channels.fetch(String(channelId));
+            } catch {
+                return res.status(404).json({ error: 'Canal no encontrado' });
+            }
+        }
 
-        const requiredPerms = ['SendMessages', 'AttachFiles'];
+        if (!channel.isTextBased()) {
+            return res.status(400).json({ error: 'El canal no admite mensajes de texto' });
+        }
+
+        const requiredPerms = ['ViewChannel', 'SendMessages', 'AttachFiles'];
         if (!channel.permissionsFor(guild.members.me)?.has(requiredPerms)) {
             return res.status(403).json({ error: 'El bot no tiene permisos para adjuntar archivos en este canal' });
         }
 
-        await channel.send({
-            files: [{
-                attachment: uploadedPath,
-                name: req.file.originalname || path.basename(uploadedPath)
-            }]
-        });
+        const displayName = req.file.originalname || path.basename(uploadedPath);
+        const attachment = new AttachmentBuilder(uploadedPath, { name: displayName });
+        await channel.send({ files: [attachment] });
 
         console.log(`[OwnerAttachment] ${req.session.user?.username || 'owner'} envió archivo en ${guild.name}/${channel.name}`);
         return res.json({ success: true, message: 'Archivo enviado correctamente' });
