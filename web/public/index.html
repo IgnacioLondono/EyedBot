@@ -564,6 +564,10 @@
                                     <svg class="dpx-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4z"/><path d="M13 4h7v4h-7z"/><path d="M13 11h7v9h-7z"/><path d="M4 13h7v7H4z"/></svg>
                                     <span>Plantillas</span>
                                 </button>
+                                <button type="button" class="dpx-tab" data-dpx-tab="attachments" data-owner-only="true" role="tab">
+                                    <svg class="dpx-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 01-7.78-7.78l8.49-8.49a3.5 3.5 0 014.95 4.95l-8.49 8.49a1.5 1.5 0 11-2.12-2.12l7.78-7.78"/></svg>
+                                    <span>Adjuntos</span>
+                                </button>
                             </nav>
 
                             <!-- Destino (servidor + canal) siempre visible -->
@@ -798,6 +802,27 @@
                                                 </button>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- ADJUNTOS (SOLO OWNER) -->
+                            <section class="dpx-tab-panel" data-dpx-panel="attachments" data-owner-only="true">
+                                <div class="dpx-section">
+                                    <header class="dpx-section-head">
+                                        <h4>Adjuntar archivo pesado</h4>
+                                        <p>Sube un archivo y envíalo al canal seleccionado. Esta acción está restringida al owner.</p>
+                                    </header>
+                                    <div class="dpx-field">
+                                        <label for="ownerAttachmentFile">Archivo</label>
+                                        <input type="file" id="ownerAttachmentFile" class="form-control">
+                                        <small class="dpx-field-hint">Límite: 100MB por archivo (según el límite real de Discord para el servidor).</small>
+                                    </div>
+                                    <div class="dpx-actions" style="justify-content:flex-start;">
+                                        <button type="button" id="sendOwnerAttachmentBtn" class="btn btn-primary" data-owner-only="true">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 01-7.78-7.78l8.49-8.49a3.5 3.5 0 014.95 4.95l-8.49 8.49a1.5 1.5 0 11-2.12-2.12l7.78-7.78"/></svg>
+                                            <span>Enviar adjunto</span>
+                                        </button>
                                     </div>
                                 </div>
                             </section>
