@@ -2572,9 +2572,9 @@ async function sendOwnerAttachmentToChannel() {
         return;
     }
 
-    const maxSizeBytes = 100 * 1024 * 1024;
+    const maxSizeBytes = 1024 * 1024 * 1024;
     if (file.size > maxSizeBytes) {
-        showToast('El archivo supera el límite de 100MB', 'warning');
+        showToast('El archivo supera el límite de 1 GB', 'warning');
         return;
     }
 

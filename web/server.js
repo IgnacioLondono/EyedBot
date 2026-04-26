@@ -66,7 +66,7 @@ const ownerAttachmentUpload = multer({
             cb(null, `${Date.now()}_${safeBase}${ext.slice(0, 12)}`);
         }
     }),
-    limits: { fileSize: 100 * 1024 * 1024 }
+    limits: { fileSize: 1024 * 1024 * 1024 }
 });
 
 function timeoutAfter(ms, label = 'timeout') {
