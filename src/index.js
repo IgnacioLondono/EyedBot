@@ -25,7 +25,7 @@ const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startStreamAlertScheduler, stopStreamAlertScheduler } = require('./utils/stream-alert-scheduler');
 const { startFreeGamesScheduler, stopFreeGamesScheduler } = require('./utils/free-games-service');
-const { startBumpReminderScheduler, stopBumpReminderScheduler } = require('./utils/bump-reminder-scheduler');
+const { startBumpReminderScheduler, stopBumpReminderScheduler, handleDisboardBumpMessage } = require('./utils/bump-reminder-scheduler');
 require('dotenv').config();
 
 let webPanel = null;
@@ -330,6 +330,7 @@ client.on('guildCreate', (guild) => {
 
 client.on('messageCreate', async (message) => {
     try {
+        await handleDisboardBumpMessage(message);
         await handleCountingMessage(message);
         await handleMessageCreate(message);
         await antiRaidGuard.handleMessageCreate(message);
