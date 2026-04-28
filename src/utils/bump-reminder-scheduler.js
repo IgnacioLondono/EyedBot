@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const bumpReminderStore = require('./bump-reminder-store');
 
 const CHECK_MS = Math.max(30_000, Number.parseInt(process.env.BUMP_REMINDER_CHECK_MS || '60000', 10));
+const DISBOARD_BOT_ID = '302050872383242240';
 let intervalRef = null;
 let running = false;
 
@@ -88,9 +89,60 @@ function stopBumpReminderScheduler() {
     }
 }
 
+function extractMessageText(message) {
+    const parts = [];
+    if (message?.content) parts.push(String(message.content));
+    const embeds = Array.isArray(message?.embeds) ? message.embeds : [];
+    for (const embed of embeds) {
+        if (embed?.title) parts.push(String(embed.title));
+        if (embed?.description) parts.push(String(embed.description));
+    }
+    return parts.join('\n').toLowerCase();
+}
+
+function isDisboardBumpMessage(message) {
+    if (!message?.guildId) return false;
+    if (String(message?.author?.id || '') !== DISBOARD_BOT_ID) return false;
+
+    const interactionCommand = String(message?.interaction?.commandName || message?.interactionMetadata?.name || '').toLowerCase();
+    if (interactionCommand === 'bump') return true;
+
+    const text = extractMessageText(message);
+    if (!text) return false;
+
+    // Patrones comunes de confirmación de bump en Disboard
+    return (
+        text.includes('bump done') ||
+        text.includes('please wait another') ||
+        text.includes('you can bump again') ||
+        text.includes('/bump') ||
+        text.includes('disboard')
+    );
+}
+
+async function handleDisboardBumpMessage(message) {
+    if (!isDisboardBumpMessage(message)) return false;
+
+    const guildId = String(message.guildId || '');
+    if (!guildId) return false;
+
+    const config = await bumpReminderStore.getBumpReminderConfig(guildId);
+    if (!config || config.enabled !== true) return false;
+
+    const nextConfig = {
+        ...config,
+        nextReminderAt: buildNextReminderAt(config.intervalMinutes),
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'disboard-detect'
+    };
+    await bumpReminderStore.setBumpReminderConfig(guildId, nextConfig);
+    return true;
+}
+
 module.exports = {
     buildNextReminderAt,
     startBumpReminderScheduler,
     stopBumpReminderScheduler,
-    runBumpReminderSweep
+    runBumpReminderSweep,
+    handleDisboardBumpMessage
 };
