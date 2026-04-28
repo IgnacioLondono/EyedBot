@@ -21,6 +21,7 @@ const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
+const gachaStore = require('../src/utils/gacha-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const {
     ticketButtonCustomIdForGuild,
@@ -2093,6 +2094,22 @@ function normalizeStreamAlertConfigInput(body = {}, current = null, userId = 'un
     };
 }
 
+function normalizeGachaConfigInput(body = {}, current = null, userId = 'unknown') {
+    const base = current && typeof current === 'object' ? current : gachaStore.defaultConfig();
+    return gachaStore.normalizeConfig({
+        ...base,
+        enabled: body.enabled === true,
+        channelId: String(body.channelId ?? base.channelId ?? '').trim(),
+        rollCooldownSec: Number.parseInt(body.rollCooldownSec ?? base.rollCooldownSec ?? 60, 10),
+        claimCooldownSec: Number.parseInt(body.claimCooldownSec ?? base.claimCooldownSec ?? 30, 10),
+        claimWindowSec: Number.parseInt(body.claimWindowSec ?? base.claimWindowSec ?? 120, 10),
+        pityThreshold: Number.parseInt(body.pityThreshold ?? base.pityThreshold ?? 30, 10),
+        coinsPerClaim: Number.parseInt(body.coinsPerClaim ?? base.coinsPerClaim ?? 10, 10),
+        updatedAt: new Date().toISOString(),
+        updatedBy: userId
+    });
+}
+
 app.get('/api/guild/:guildId/anti-raid-config', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -2256,6 +2273,154 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
     } catch (error) {
         console.error('Error enviando stream alert test:', error);
         res.status(500).json({ error: 'Error al enviar prueba de stream alert' });
+    }
+});
+
+app.get('/api/guild/:guildId/gacha-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await gachaStore.getConfig(guildId);
+        res.json(config || gachaStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo gacha config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración gacha' });
+    }
+});
+
+app.post('/api/guild/:guildId/gacha-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!hasAdminOrManageGuildPermission(userGuild)) {
+            return res.status(403).json({ error: 'Necesitas permisos de gestión en este servidor' });
+        }
+
+        const current = await gachaStore.getConfig(guildId);
+        const config = normalizeGachaConfigInput(req.body || {}, current, req.session.user?.id || 'unknown');
+        if (config.enabled && !config.channelId) {
+            return res.status(400).json({ error: 'Debes seleccionar un canal para activar gacha' });
+        }
+
+        const saved = await gachaStore.setConfig(guildId, config);
+        res.json({ success: true, config: saved });
+    } catch (error) {
+        console.error('Error guardando gacha config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración gacha' });
+    }
+});
+
+app.get('/api/guild/:guildId/gacha-stats', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const guild = botClient?.guilds?.cache?.get(guildId) || null;
+        const config = await gachaStore.getConfig(guildId);
+        const stats = await gachaStore.getGuildStats(guildId);
+        const top = await Promise.all((stats.topClaimers || []).slice(0, 15).map(async (item) => {
+            const member = guild?.members?.cache?.get(item.userId)
+                || await guild?.members?.fetch?.(item.userId).catch(() => null);
+            const user = member?.user || botClient?.users?.cache?.get(item.userId) || null;
+            return {
+                userId: item.userId,
+                username: user?.username || `ID ${item.userId}`,
+                tag: user?.tag || `ID ${item.userId}`,
+                avatar: user?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null,
+                totalClaims: item.totalClaims || 0,
+                totalRolls: item.totalRolls || 0,
+                collectionCount: item.collectionCount || 0,
+                coins: item.coins || 0,
+                bestRarity: item.bestRarity || 'N'
+            };
+        }));
+
+        res.json({
+            success: true,
+            config,
+            stats: {
+                ...stats,
+                topClaimers: top
+            }
+        });
+    } catch (error) {
+        console.error('Error obteniendo gacha stats:', error);
+        res.status(500).json({ error: 'Error al obtener estadísticas gacha' });
+    }
+});
+
+app.get('/api/guild/:guildId/gacha-inventory', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const userId = String(req.query.userId || req.session.user?.id || '').trim();
+        if (!userId) return res.status(400).json({ error: 'userId requerido' });
+
+        const rarity = String(req.query.rarity || '').trim();
+        const series = String(req.query.series || '').trim();
+        const q = String(req.query.q || '').trim();
+        const limit = Math.max(1, Math.min(500, Number.parseInt(`${req.query.limit || 100}`, 10) || 100));
+        const inv = await gachaStore.listInventory(guildId, userId, { rarity, series, q, limit });
+        res.json({ success: true, ...inv });
+    } catch (error) {
+        console.error('Error obteniendo inventario gacha:', error);
+        res.status(500).json({ error: 'Error al obtener inventario gacha' });
+    }
+});
+
+app.get('/api/guild/:guildId/gacha-market', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const market = await gachaStore.getGuildMarket(guildId);
+        res.json({ success: true, listings: market });
+    } catch (error) {
+        console.error('Error obteniendo mercado gacha:', error);
+        res.status(500).json({ error: 'Error al obtener mercado gacha' });
+    }
+});
+
+app.post('/api/guild/:guildId/gacha-market/list', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const userId = req.session.user?.id;
+        if (!userId) return res.status(401).json({ error: 'No autenticado' });
+
+        const itemUid = String(req.body?.itemUid || '').trim();
+        const price = Number.parseInt(`${req.body?.price || 0}`, 10);
+        const result = await gachaStore.createMarketListing(guildId, userId, itemUid, price);
+        if (!result.ok) return res.status(400).json({ error: result.reason || 'No se pudo publicar' });
+        res.json({ success: true, listing: result.listing });
+    } catch (error) {
+        console.error('Error creando listing gacha:', error);
+        res.status(500).json({ error: 'Error al publicar listing' });
+    }
+});
+
+app.post('/api/guild/:guildId/gacha-market/buy', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const userId = req.session.user?.id;
+        if (!userId) return res.status(401).json({ error: 'No autenticado' });
+
+        const listingId = String(req.body?.listingId || '').trim();
+        const result = await gachaStore.buyMarketListing(guildId, userId, listingId);
+        if (!result.ok) return res.status(400).json({ error: result.reason || 'No se pudo comprar' });
+        res.json({ success: true, purchased: result.listing });
+    } catch (error) {
+        console.error('Error comprando listing gacha:', error);
+        res.status(500).json({ error: 'Error al comprar listing' });
     }
 });
 

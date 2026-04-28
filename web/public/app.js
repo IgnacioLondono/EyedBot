@@ -3330,6 +3330,7 @@ async function selectServerGuild(guildId, options = {}) {
     const automationContainer = document.getElementById('automationContainer');
     const securityContainer = document.getElementById('securityContainer');
     const notificationsContainer = document.getElementById('notificationsContainer');
+    const gachaContainer = document.getElementById('gachaContainer');
     const serverSelect = document.getElementById('serverSelect');
     const { preserveInsight = false } = options;
 
@@ -3348,6 +3349,7 @@ async function selectServerGuild(guildId, options = {}) {
         if (automationContainer) automationContainer.innerHTML = '';
         if (securityContainer) securityContainer.innerHTML = '';
         if (notificationsContainer) notificationsContainer.innerHTML = '';
+        if (gachaContainer) gachaContainer.innerHTML = '';
         saveState();
         return;
     }
@@ -3391,6 +3393,9 @@ async function selectServerGuild(guildId, options = {}) {
     if (notificationsContainer) {
         notificationsContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando notificaciones...</p></div>';
     }
+    if (gachaContainer) {
+        gachaContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema gacha...</p></div>';
+    }
 
     try {
         await Promise.all([
@@ -3403,7 +3408,8 @@ async function selectServerGuild(guildId, options = {}) {
             loadVoiceCreatorPanel(guildId),
             loadAutomationPanel(guildId),
             loadSecurityPanel(guildId),
-            loadNotificationsPanel(guildId)
+            loadNotificationsPanel(guildId),
+            loadGachaPanel(guildId)
         ]);
         saveState();
     } finally {
@@ -3425,6 +3431,7 @@ async function loadGuildsForServer() {
         const automationContainer = document.getElementById('automationContainer');
         const securityContainer = document.getElementById('securityContainer');
         const notificationsContainer = document.getElementById('notificationsContainer');
+        const gachaContainer = document.getElementById('gachaContainer');
         
         // Limpiar contenedores
         if (serverInfoContainer) serverInfoContainer.innerHTML = '';
@@ -3437,6 +3444,7 @@ async function loadGuildsForServer() {
         if (automationContainer) automationContainer.innerHTML = '';
         if (securityContainer) securityContainer.innerHTML = '';
         if (notificationsContainer) notificationsContainer.innerHTML = '';
+        if (gachaContainer) gachaContainer.innerHTML = '';
         if (tabsContainer) tabsContainer.innerHTML = '';
         
         if (!hasSelectedGuildContext()) {
@@ -4730,6 +4738,347 @@ async function loadNotificationsPanel(guildId) {
             setServerPreference(guildId, 'notifications', values);
             showToast('Opciones de notificaciones guardadas', 'success');
         });
+    }
+}
+
+async function loadGachaPanel(guildId) {
+    const container = document.getElementById('gachaContainer');
+    if (!container) return;
+
+    try {
+        const [channelsResponse, configResponse, statsResponse, myInventoryResponse, marketResponse] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/channels`).catch(() => null),
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-config`).catch(() => null),
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-stats`).catch(() => null),
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-inventory?limit=150`).catch(() => null),
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-market`).catch(() => null)
+        ]);
+
+        const channels = channelsResponse && channelsResponse.ok
+            ? (await channelsResponse.json()).filter((c) => c.type === 0)
+            : [];
+
+        const defaultConfig = {
+            enabled: false,
+            channelId: '',
+            rollCooldownSec: 60,
+            claimCooldownSec: 30,
+            claimWindowSec: 120,
+            pityThreshold: 30,
+            coinsPerClaim: 10
+        };
+        let config = { ...defaultConfig };
+        if (configResponse && configResponse.ok) {
+            const cfg = await configResponse.json().catch(() => ({}));
+            config = { ...defaultConfig, ...(cfg || {}) };
+        }
+
+        let stats = {
+            totalUsers: 0,
+            totalRolls: 0,
+            totalClaims: 0,
+            totalCollection: 0,
+            topClaimers: []
+        };
+        if (statsResponse && statsResponse.ok) {
+            const payload = await statsResponse.json().catch(() => ({}));
+            stats = { ...stats, ...(payload.stats || {}) };
+        }
+        const myInventory = myInventoryResponse && myInventoryResponse.ok
+            ? await myInventoryResponse.json().catch(() => ({ items: [] }))
+            : { items: [] };
+        const marketPayload = marketResponse && marketResponse.ok
+            ? await marketResponse.json().catch(() => ({ listings: [] }))
+            : { listings: [] };
+        const marketListings = Array.isArray(marketPayload.listings) ? marketPayload.listings : [];
+
+        const topRows = Array.isArray(stats.topClaimers) ? stats.topClaimers.slice(0, 10) : [];
+        const topHtml = topRows.length
+            ? topRows.map((row, index) => `
+                <div class="dpx-item-row">
+                    <div class="dpx-item-main">
+                        <div class="dpx-item-title">#${index + 1} ${escapeHtml(row.username || row.tag || `ID ${row.userId}`)}</div>
+                        <div class="dpx-item-sub">Claims: ${Number(row.totalClaims || 0).toLocaleString('es-ES')} · Colección: ${Number(row.collectionCount || 0).toLocaleString('es-ES')} · Monedas: ${Number(row.coins || 0).toLocaleString('es-ES')}</div>
+                    </div>
+                    <div class="dpx-item-meta">${escapeHtml(row.bestRarity || 'N')}</div>
+                </div>
+            `).join('')
+            : '<div class="dpx-empty">Aún no hay actividad en gacha.</div>';
+
+        container.innerHTML = `
+            <div class="dpx-panel">
+                ${dpxRenderHero({
+                    kicker: 'Módulo Gacha',
+                    title: 'Configura tu sistema estilo waifu',
+                    description: 'Ajusta canal, cooldowns y economía. Además revisa estadísticas y ranking de usuarios.',
+                    accent: '#f6c244',
+                    glow1: 'rgba(246,194,68,0.22)',
+                    glow2: 'rgba(124,77,255,0.24)',
+                    actionsHtml: `
+                        <span class="dpx-status-chip ${config.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${config.enabled ? 'Activo' : 'Inactivo'}</span>
+                        <button type="button" class="btn btn-primary" id="saveGachaConfigBtn">Guardar</button>
+                    `
+                })}
+                <div class="dpx-stats-grid">
+                    ${dpxRenderStatCard({ label: 'Usuarios', value: Number(stats.totalUsers || 0).toLocaleString('es-ES'), hint: 'Perfiles con actividad gacha', accent: '#7c4dff' })}
+                    ${dpxRenderStatCard({ label: 'Rolls totales', value: Number(stats.totalRolls || 0).toLocaleString('es-ES'), hint: 'Rolls registrados', accent: '#ff78d1' })}
+                    ${dpxRenderStatCard({ label: 'Claims totales', value: Number(stats.totalClaims || 0).toLocaleString('es-ES'), hint: 'Personajes reclamados', accent: '#7ef0b4' })}
+                    ${dpxRenderStatCard({ label: 'Colección global', value: Number(stats.totalCollection || 0).toLocaleString('es-ES'), hint: 'Suma de colecciones del servidor', accent: '#f6c244' })}
+                </div>
+                ${dpxRenderTabs([
+                    { key: 'gacha-config', label: 'Configuración', iconName: 'gear' },
+                    { key: 'gacha-top', label: 'Top usuarios', iconName: 'users' },
+                    { key: 'gacha-inventory', label: 'Inventario', iconName: 'book' },
+                    { key: 'gacha-market', label: 'Mercado', iconName: 'sparkles' }
+                ], 'gacha-config')}
+
+                <section class="dpx-tab-panel is-active" data-dpx-panel="gacha-config">
+                    <div class="dpx-section">
+                        <div class="dpx-toggle-grid">
+                            ${dpxRenderToggle({ id: 'gachaEnabled', checked: !!config.enabled, title: 'Activar sistema gacha', description: 'Permite /gacha roll, /gacha claim, perfiles y top.' })}
+                        </div>
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field is-full">
+                                <label for="gachaChannelId">Canal de gacha</label>
+                                <select id="gachaChannelId" class="form-control">
+                                    <option value="">Selecciona un canal</option>
+                                    ${channels.map((c) => `<option value="${c.id}" ${String(config.channelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaRollCooldownSec">Cooldown roll (s)</label>
+                                <input id="gachaRollCooldownSec" class="form-control" type="number" min="10" max="3600" value="${Number(config.rollCooldownSec || 60)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaClaimCooldownSec">Cooldown claim (s)</label>
+                                <input id="gachaClaimCooldownSec" class="form-control" type="number" min="5" max="1800" value="${Number(config.claimCooldownSec || 30)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaClaimWindowSec">Ventana claim (s)</label>
+                                <input id="gachaClaimWindowSec" class="form-control" type="number" min="30" max="600" value="${Number(config.claimWindowSec || 120)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaPityThreshold">Pity SSR</label>
+                                <input id="gachaPityThreshold" class="form-control" type="number" min="5" max="200" value="${Number(config.pityThreshold || 30)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaCoinsPerClaim">Monedas por claim</label>
+                                <input id="gachaCoinsPerClaim" class="form-control" type="number" min="1" max="1000" value="${Number(config.coinsPerClaim || 10)}">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="gacha-top">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Ranking del servidor</h4>
+                                <p>Usuarios con más actividad y colección en el sistema gacha.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-item-list">${topHtml}</div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="gacha-inventory">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Inventario (usuario logueado)</h4>
+                                <p>Filtra por rareza o serie para encontrar personajes rápidamente.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid">
+                            <div class="dpx-field">
+                                <label for="gachaInvRarity">Rareza</label>
+                                <select id="gachaInvRarity" class="form-control">
+                                    <option value="">Todas</option>
+                                    <option value="SSR">SSR</option>
+                                    <option value="SR">SR</option>
+                                    <option value="R">R</option>
+                                    <option value="N">N</option>
+                                </select>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaInvSeries">Serie</label>
+                                <input id="gachaInvSeries" class="form-control" placeholder="Ej: Celestial Archive">
+                            </div>
+                            <div class="dpx-field">
+                                <label>&nbsp;</label>
+                                <button id="gachaInvApplyBtn" type="button" class="btn btn-secondary">Aplicar filtros</button>
+                            </div>
+                        </div>
+                        <div id="gachaInventoryList" class="dpx-item-list" style="margin-top:1rem;">
+                            ${(Array.isArray(myInventory.items) ? myInventory.items : []).slice(0, 50).map((it, i) => `
+                                <div class="dpx-item-row">
+                                    <div class="dpx-item-main">
+                                        <div class="dpx-item-title">#${i + 1} [${escapeHtml(it.uid)}] ${escapeHtml(it.name)}</div>
+                                        <div class="dpx-item-sub">${escapeHtml(it.series)} · ${escapeHtml(it.rarity)} · Valor ${Number(it.value || 0).toLocaleString('es-ES')}</div>
+                                    </div>
+                                </div>
+                            `).join('') || '<div class="dpx-empty">No hay items en inventario.</div>'}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="gacha-market">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Mercado del servidor</h4>
+                                <p>Compra y publica personajes entre usuarios.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid">
+                            <div class="dpx-field">
+                                <label for="gachaMarketItemUid">UID para publicar</label>
+                                <input id="gachaMarketItemUid" class="form-control" placeholder="inv_...">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaMarketPrice">Precio</label>
+                                <input id="gachaMarketPrice" class="form-control" type="number" min="1" value="100">
+                            </div>
+                            <div class="dpx-field">
+                                <label>&nbsp;</label>
+                                <button id="gachaMarketPublishBtn" type="button" class="btn btn-primary">Publicar</button>
+                            </div>
+                        </div>
+                        <div class="dpx-field-grid" style="margin-top:0.75rem;">
+                            <div class="dpx-field">
+                                <label for="gachaMarketListingId">Comprar por listing ID</label>
+                                <input id="gachaMarketListingId" class="form-control" placeholder="mk_...">
+                            </div>
+                            <div class="dpx-field">
+                                <label>&nbsp;</label>
+                                <button id="gachaMarketBuyBtn" type="button" class="btn btn-secondary">Comprar</button>
+                            </div>
+                        </div>
+                        <div class="dpx-item-list" style="margin-top:1rem;">
+                            ${marketListings.slice(0, 30).map((row, i) => `
+                                <div class="dpx-item-row">
+                                    <div class="dpx-item-main">
+                                        <div class="dpx-item-title">#${i + 1} [${escapeHtml(row.id)}] ${escapeHtml(row.item?.name || 'Item')}</div>
+                                        <div class="dpx-item-sub">${escapeHtml(row.item?.series || '—')} · ${escapeHtml(row.item?.rarity || 'N')} · Precio ${Number(row.price || 0).toLocaleString('es-ES')}</div>
+                                    </div>
+                                </div>
+                            `).join('') || '<div class="dpx-empty">Sin listings activos.</div>'}
+                        </div>
+                    </div>
+                </section>
+            </div>
+        `;
+
+        bindDpxTabs(container);
+
+        const saveBtn = document.getElementById('saveGachaConfigBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                const payload = {
+                    enabled: document.getElementById('gachaEnabled')?.checked === true,
+                    channelId: document.getElementById('gachaChannelId')?.value || '',
+                    rollCooldownSec: Number.parseInt(document.getElementById('gachaRollCooldownSec')?.value || '60', 10),
+                    claimCooldownSec: Number.parseInt(document.getElementById('gachaClaimCooldownSec')?.value || '30', 10),
+                    claimWindowSec: Number.parseInt(document.getElementById('gachaClaimWindowSec')?.value || '120', 10),
+                    pityThreshold: Number.parseInt(document.getElementById('gachaPityThreshold')?.value || '30', 10),
+                    coinsPerClaim: Number.parseInt(document.getElementById('gachaCoinsPerClaim')?.value || '10', 10)
+                };
+
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-config`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.error || 'No se pudo guardar gacha', 'error');
+                        return;
+                    }
+                    showToast('Configuración gacha guardada', 'success');
+                    await loadGachaPanel(guildId);
+                } catch (error) {
+                    console.error('Error guardando gacha config:', error);
+                    showToast('Error guardando configuración gacha', 'error');
+                }
+            });
+        }
+
+        const invApplyBtn = document.getElementById('gachaInvApplyBtn');
+        if (invApplyBtn) {
+            invApplyBtn.addEventListener('click', async () => {
+                const rarity = document.getElementById('gachaInvRarity')?.value || '';
+                const series = document.getElementById('gachaInvSeries')?.value || '';
+                const listContainer = document.getElementById('gachaInventoryList');
+                try {
+                    const qs = new URLSearchParams({ limit: '150' });
+                    if (rarity) qs.set('rarity', rarity);
+                    if (series) qs.set('series', series);
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-inventory?${qs.toString()}`);
+                    const data = await response.json().catch(() => ({ items: [] }));
+                    if (!response.ok) throw new Error(data.error || 'No se pudo cargar inventario');
+                    const rows = Array.isArray(data.items) ? data.items : [];
+                    if (listContainer) {
+                        listContainer.innerHTML = rows.length
+                            ? rows.slice(0, 80).map((it, i) => `
+                                <div class="dpx-item-row">
+                                    <div class="dpx-item-main">
+                                        <div class="dpx-item-title">#${i + 1} [${escapeHtml(it.uid)}] ${escapeHtml(it.name)}</div>
+                                        <div class="dpx-item-sub">${escapeHtml(it.series)} · ${escapeHtml(it.rarity)} · Valor ${Number(it.value || 0).toLocaleString('es-ES')}</div>
+                                    </div>
+                                </div>
+                            `).join('')
+                            : '<div class="dpx-empty">Sin resultados.</div>';
+                    }
+                } catch (error) {
+                    showToast(error.message || 'Error cargando inventario', 'error');
+                }
+            });
+        }
+
+        const marketPublishBtn = document.getElementById('gachaMarketPublishBtn');
+        if (marketPublishBtn) {
+            marketPublishBtn.addEventListener('click', async () => {
+                const itemUid = document.getElementById('gachaMarketItemUid')?.value || '';
+                const price = Number.parseInt(document.getElementById('gachaMarketPrice')?.value || '0', 10);
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-market/list`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ itemUid, price })
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.error || 'No se pudo publicar');
+                    showToast('Listing publicado', 'success');
+                    await loadGachaPanel(guildId);
+                } catch (error) {
+                    showToast(error.message || 'Error publicando listing', 'error');
+                }
+            });
+        }
+
+        const marketBuyBtn = document.getElementById('gachaMarketBuyBtn');
+        if (marketBuyBtn) {
+            marketBuyBtn.addEventListener('click', async () => {
+                const listingId = document.getElementById('gachaMarketListingId')?.value || '';
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-market/buy`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ listingId })
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.error || 'No se pudo comprar');
+                    showToast('Compra realizada', 'success');
+                    await loadGachaPanel(guildId);
+                } catch (error) {
+                    showToast(error.message || 'Error comprando', 'error');
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error cargando panel gacha:', error);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema gacha.</div>';
     }
 }
 
