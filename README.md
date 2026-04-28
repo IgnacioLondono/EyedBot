@@ -1,4 +1,4 @@
-# 🤖 TulaBot - Bot de Discord Profesional
+# 🤖 EyedBot - Bot de Discord Profesional
 
 Un bot de Discord completo y profesional con **60+ comandos** que incluye moderación, música, diversión, utilidades e integración con IA (Google Gemini).
 
