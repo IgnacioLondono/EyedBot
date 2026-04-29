@@ -3,8 +3,10 @@ const bumpReminderStore = require('./bump-reminder-store');
 
 const CHECK_MS = Math.max(30_000, Number.parseInt(process.env.BUMP_REMINDER_CHECK_MS || '60000', 10));
 const DISBOARD_BOT_ID = '302050872383242240';
+const DETECT_COOLDOWN_MS = Math.max(10_000, Number.parseInt(process.env.BUMP_DETECT_COOLDOWN_MS || '45000', 10));
 let intervalRef = null;
 let running = false;
+const lastDetectionByGuild = new Map();
 
 function buildNextReminderAt(intervalMinutes) {
     const mins = Math.max(15, Number(intervalMinutes) || 120);
@@ -111,13 +113,10 @@ function isDisboardBumpMessage(message) {
     if (!text) return false;
 
     // Patrones comunes de confirmación de bump en Disboard
-    return (
-        text.includes('bump done') ||
-        text.includes('please wait another') ||
-        text.includes('you can bump again') ||
-        text.includes('/bump') ||
-        text.includes('disboard')
-    );
+    return text.includes('bump done')
+        || text.includes('please wait another')
+        || text.includes('you can bump again')
+        || text.includes('/bump');
 }
 
 async function handleDisboardBumpMessage(message) {
@@ -125,6 +124,9 @@ async function handleDisboardBumpMessage(message) {
 
     const guildId = String(message.guildId || '');
     if (!guildId) return false;
+    const now = Date.now();
+    const last = Number(lastDetectionByGuild.get(guildId) || 0);
+    if (now - last < DETECT_COOLDOWN_MS) return false;
 
     const config = await bumpReminderStore.getBumpReminderConfig(guildId);
     if (!config || config.enabled !== true) return false;
@@ -136,6 +138,20 @@ async function handleDisboardBumpMessage(message) {
         updatedBy: 'disboard-detect'
     };
     await bumpReminderStore.setBumpReminderConfig(guildId, nextConfig);
+    lastDetectionByGuild.set(guildId, now);
+
+    const guild = message.guild || message.client.guilds.cache.get(guildId);
+    const channel = guild?.channels?.cache?.get(config.channelId)
+        || await guild?.channels?.fetch?.(config.channelId).catch(() => null);
+    if (channel?.isTextBased()) {
+        const nextTs = Math.floor(Date.parse(nextConfig.nextReminderAt) / 1000);
+        const bumperId = message.interaction?.user?.id || message.interactionMetadata?.user?.id || '';
+        const mention = bumperId ? `<@${bumperId}> ` : '';
+        await channel.send({
+            content: `${mention}✅ Bump detectado. Próximo recordatorio <t:${nextTs}:R>.`
+        }).catch(() => null);
+    }
+
     return true;
 }
 
