@@ -10685,11 +10685,15 @@ function renderFreeGamesPane() {
                         Configuración
                     </h4>
 
-                    <div class="form-group">
+                    <div class="form-group fg-enable-block">
                         <label class="fg-switch-label">
-                            <input type="checkbox" id="fgEnabled" ${cfg.enabled ? 'checked' : ''}>
-                            <span class="fg-switch"><span class="fg-switch-knob"></span></span>
-                            <span>Activar notificaciones de juegos gratis</span>
+                            <span class="fg-switch" aria-hidden="true"><span class="fg-switch-knob"></span></span>
+                            <span class="fg-switch-copy">
+                                <span id="fgEnabledBadge" class="fg-status-badge ${cfg.enabled ? 'is-on' : 'is-off'}">${cfg.enabled ? 'Activado' : 'Desactivado'}</span>
+                                <span class="fg-switch-title" id="fgSwitchTitle">Notificaciones de juegos gratis</span>
+                                <span class="fg-switch-hint">El bot solo publicará en el canal si está activado y guardas la configuración.</span>
+                            </span>
+                            <input type="checkbox" id="fgEnabled" class="fg-switch-input" role="switch" aria-checked="${cfg.enabled ? 'true' : 'false'}" aria-labelledby="fgSwitchTitle fgEnabledBadge" ${cfg.enabled ? 'checked' : ''}>
                         </label>
                     </div>
 
@@ -10816,6 +10820,22 @@ function wireFreeGamesControls() {
             fetchFreeGamesPreview(true);
         });
     });
+
+    const fgEnabled = document.getElementById('fgEnabled');
+    const fgBadge = document.getElementById('fgEnabledBadge');
+    const syncFgEnabledUi = () => {
+        const on = !!fgEnabled?.checked;
+        if (fgBadge) {
+            fgBadge.textContent = on ? 'Activado' : 'Desactivado';
+            fgBadge.classList.toggle('is-on', on);
+            fgBadge.classList.toggle('is-off', !on);
+        }
+        fgEnabled?.setAttribute('aria-checked', on ? 'true' : 'false');
+    };
+    if (fgEnabled) {
+        fgEnabled.addEventListener('change', syncFgEnabledUi);
+        syncFgEnabledUi();
+    }
 }
 
 function collectFreeGamesInput() {
