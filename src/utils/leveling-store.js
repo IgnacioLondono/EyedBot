@@ -189,6 +189,56 @@ async function listGuildUsers(guildId) {
     }));
 }
 
+function mergeLevelingRows(a, b) {
+    const ax = Number.parseInt(a.xp || 0, 10) || 0;
+    const bx = Number.parseInt(b.xp || 0, 10) || 0;
+    return normalizeUserState({
+        xp: Math.max(ax, bx),
+        messageCount: Math.max(
+            Number.parseInt(a.messageCount || 0, 10) || 0,
+            Number.parseInt(b.messageCount || 0, 10) || 0
+        ),
+        voiceMinutes: Math.max(
+            Number.parseInt(a.voiceMinutes || 0, 10) || 0,
+            Number.parseInt(b.voiceMinutes || 0, 10) || 0
+        ),
+        updatedAt: a.updatedAt || b.updatedAt
+    });
+}
+
+/** Usuarios con datos de nivelación en archivo local + MySQL (unión por userId). */
+async function listGuildUsersMerged(guildId) {
+    const map = new Map();
+    const fromFile = listGuildUsers(guildId);
+    for (const row of fromFile) {
+        if (!row?.userId) continue;
+        map.set(row.userId, { userId: row.userId, ...normalizeUserState(row) });
+    }
+
+    let fromDb = [];
+    try {
+        fromDb = await db.listLevelingUserKeysForGuild(guildId);
+    } catch {
+        fromDb = [];
+    }
+
+    const prefix = `leveling_user_${guildId}_`;
+    for (const { key, value } of fromDb) {
+        if (!key || typeof key !== 'string' || !key.startsWith(prefix)) continue;
+        const userId = key.slice(prefix.length);
+        if (!/^\d{5,30}$/.test(userId)) continue;
+        const normalized = normalizeUserState(value && typeof value === 'object' ? value : {});
+        const prev = map.get(userId);
+        if (!prev) {
+            map.set(userId, { userId, ...normalized });
+        } else {
+            map.set(userId, { userId, ...mergeLevelingRows(prev, normalized) });
+        }
+    }
+
+    return Array.from(map.values());
+}
+
 module.exports = {
     defaultConfig,
     normalizeUserState,
@@ -197,5 +247,6 @@ module.exports = {
     getUserState,
     setUserState,
     incrementUserStats,
-    listGuildUsers
+    listGuildUsers,
+    listGuildUsersMerged
 };
