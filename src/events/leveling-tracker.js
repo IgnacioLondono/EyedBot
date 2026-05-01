@@ -2,6 +2,7 @@ const { ChannelType, PermissionsBitField } = require('discord.js');
 const levelingStore = require('../utils/leveling-store');
 const guildActivityStore = require('../utils/guild-activity-store');
 const { getLevelFromXp, sanitizeDifficulty } = require('../utils/leveling-math');
+const { parseRoleRewards } = require('../utils/leveling-rewards');
 
 const messageCooldownMap = new Map();
 const voiceAnalyticsSessions = new Map();
@@ -45,17 +46,6 @@ function randInt(min, max) {
     const low = Math.max(0, Number.parseInt(min, 10) || 0);
     const high = Math.max(low, Number.parseInt(max, 10) || low);
     return low + Math.floor(Math.random() * (high - low + 1));
-}
-
-function parseRoleRewards(rawRewards) {
-    if (!Array.isArray(rawRewards)) return [];
-    return rawRewards
-        .map((reward) => ({
-            level: Math.max(1, Number.parseInt(reward?.level, 10) || 1),
-            roleId: String(reward?.roleId || '').trim()
-        }))
-        .filter((reward) => reward.roleId)
-        .sort((a, b) => a.level - b.level);
 }
 
 async function applyRoleRewards(member, level, rewards) {
