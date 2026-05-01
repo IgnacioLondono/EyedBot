@@ -43,11 +43,27 @@ module.exports = {
             }
 
             const state = await countingStore.setChannel(interaction.guild.id, channel.id);
+
+            const siguiente = state.current + 1;
+            const avisoCanal = Embeds.success(
+                'Canal de contador configurado',
+                [
+                    'Este canal quedo como **canal del contador**.',
+                    '',
+                    '• En cada mensaje de cuenta manden **solo el numero** (si escriben texto, ese mensaje se ignora).',
+                    '• **No pueden contar dos veces seguidas** el mismo usuario: esperen a otro.',
+                    `• Siguiente numero valido: **${siguiente}**.`,
+                    '',
+                    `Configurado por ${interaction.user}.`
+                ].join('\n')
+            );
+            await channel.send({ embeds: [avisoCanal] }).catch(() => null);
+
             return interaction.reply({
                 embeds: [
                     Embeds.success(
                         'Contador configurado',
-                        `Canal establecido en ${channel}.\nNumero actual: **${state.current}**\nSiguiente numero: **${state.current + 1}**`
+                        `Canal establecido en ${channel}.\nNumero actual: **${state.current}**\nSiguiente numero: **${siguiente}**`
                     )
                 ]
             });
