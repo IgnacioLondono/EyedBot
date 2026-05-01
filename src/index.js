@@ -436,6 +436,14 @@ client.on('interactionCreate', async interaction => {
                 if (handled) return;
             }
 
+            if (interaction.customId.startsWith('help_nav:')) {
+                const helpCmd = interaction.client.commands?.get?.('help');
+                if (helpCmd && typeof helpCmd.handleHelpButton === 'function') {
+                    const handled = await helpCmd.handleHelpButton(interaction);
+                    if (handled) return;
+                }
+            }
+
             if (interaction.customId.startsWith('search_select_')) {
                 if (!MUSIC_ENABLED) {
                     await safeReply(interaction, { content: '🎵 La música está desactivada temporalmente.', flags: 64 }).catch(() => {});
