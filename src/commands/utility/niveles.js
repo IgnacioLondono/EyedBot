@@ -103,7 +103,7 @@ async function runRango(interaction) {
         }
     }
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
 async function runTop(interaction) {
@@ -123,8 +123,7 @@ async function runTop(interaction) {
 
     if (!sorted.length) {
         return interaction.reply({
-            content: 'Aún no hay datos suficientes para un ranking en este servidor.',
-            flags: 64
+            content: 'Aún no hay datos suficientes para un ranking en este servidor.'
         });
     }
 
@@ -160,11 +159,11 @@ async function runTop(interaction) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('niveles')
-        .setDescription('Consulta tu progreso de nivel y los rankings del servidor')
+        .setDescription('Tu rango (solo tú lo ves) y rankings públicos del servidor')
         .addSubcommand((sub) =>
             sub
                 .setName('rango')
-                .setDescription('Nivel, XP total y barra de progreso al siguiente rango')
+                .setDescription('Tu embed de nivel y roles (solo visible para ti)')
                 .addUserOption((opt) =>
                     opt.setName('usuario').setDescription('Miembro a consultar (por defecto tú)').setRequired(false)
                 )
@@ -172,7 +171,7 @@ module.exports = {
         .addSubcommand((sub) =>
             sub
                 .setName('top')
-                .setDescription('Lista de los usuarios más destacados')
+                .setDescription('Ranking público en el canal')
                 .addStringOption((opt) =>
                     opt
                         .setName('orden')
