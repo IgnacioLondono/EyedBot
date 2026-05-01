@@ -97,8 +97,7 @@ module.exports = {
                 embed.setThumbnail(welcomeConfig.thumbnailUrl);
             }
 
-            const content = welcomeConfig.mentionUser === false ? null : `${member}`;
-            await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files })).catch(() => null);
+            await enqueueWelcomeSend(queueKey, () => channel.send({ embeds: [embed], files })).catch(() => null);
 
             if (welcomeConfig.dmEnabled && welcomeConfig.dmMessage) {
                 await member.send({ content: applyTemplate(welcomeConfig.dmMessage, member) }).catch(() => null);
