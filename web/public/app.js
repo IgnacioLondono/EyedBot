@@ -18,6 +18,10 @@ let currentGreetingMode = 'welcome';
 const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
+/** Evita dos loadGuildsForServer en paralelo (showSection + restore a los 100ms). */
+let loadGuildsForServerPromise = null;
+/** Ignora respuestas viejas si se dispara otra carga del generador de canales. */
+let channelSetupFetchGeneration = 0;
 let dashboardGuildsCache = [];
 let dashboardGuildSearchQuery = '';
 const serverActivityCharts = new Map();
@@ -1287,6 +1291,10 @@ function restoreServerState(state) {
             // Disparar evento change para cargar la informacion
             const event = new Event('change');
             document.getElementById('serverSelect').dispatchEvent(event);
+        }
+        // Tras la segunda carga (restore), volver a aplicar el panel activo (p. ej. generador de canales).
+        if (typeof getActiveSectionId === 'function' && getActiveSectionId() === 'serverSection') {
+            switchServerPane(currentServerPaneId || 'serverPaneOverview');
         }
     }, 100);
 }
@@ -3425,15 +3433,16 @@ async function selectServerGuild(guildId, options = {}) {
             loadGachaPanel(guildId)
         ]);
         saveState();
-        if (currentServerPaneId === 'serverPaneChannelSetup') {
-            openChannelSetupPane();
-        }
     } finally {
         setServerSwitchingState(false);
     }
 }
 
 async function loadGuildsForServer() {
+    if (loadGuildsForServerPromise) {
+        return loadGuildsForServerPromise;
+    }
+    loadGuildsForServerPromise = (async () => {
     try {
         const select = document.getElementById('serverSelect');
         const tabsContainer = document.getElementById('serverTabs');
@@ -3506,7 +3515,11 @@ async function loadGuildsForServer() {
     } catch (error) {
         console.error('Error cargando servidores:', error);
         showToast('Error al cargar servidores', 'error');
+    } finally {
+        loadGuildsForServerPromise = null;
     }
+    })();
+    return loadGuildsForServerPromise;
 }
 
 function collectPanelValues(containerId) {
@@ -11232,19 +11245,23 @@ async function openChannelSetupPane() {
         return;
     }
 
+    const myGen = ++channelSetupFetchGeneration;
     container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando plantillas...</p></div>';
 
     try {
         const response = await fetchWithCredentials(`/api/guild/${guildId}/channel-setup`);
         const payload = await response.json().catch(() => ({}));
+        if (myGen !== channelSetupFetchGeneration) return;
         if (!response.ok) {
             container.innerHTML = `<div class="chs-empty chs-error"><p>${escapeHtml(payload.error || 'No se pudo cargar')}</p></div>`;
             return;
         }
         _channelSetupState.guildId = guildId;
         _channelSetupState.data = payload;
+        if (myGen !== channelSetupFetchGeneration) return;
         renderChannelSetupPane();
     } catch (error) {
+        if (myGen !== channelSetupFetchGeneration) return;
         console.error('openChannelSetupPane:', error);
         container.innerHTML = `<div class="chs-empty chs-error"><p>${escapeHtml(error.message || 'Error de red')}</p></div>`;
     }
