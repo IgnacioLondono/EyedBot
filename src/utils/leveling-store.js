@@ -180,9 +180,10 @@ async function incrementUserStats(guildId, userId, changes = {}) {
     return setUserState(guildId, userId, next);
 }
 
-async function listGuildUsers(guildId) {
+function listGuildUsers(guildId) {
     const store = readStore();
-    const users = store.guilds[guildId]?.users || {};
+    const gid = String(guildId);
+    const users = store.guilds[guildId]?.users || store.guilds[gid]?.users || {};
     return Object.entries(users).map(([userId, state]) => ({
         userId,
         ...normalizeUserState(state)
@@ -208,8 +209,9 @@ function mergeLevelingRows(a, b) {
 
 /** Usuarios con datos de nivelación en archivo local + MySQL (unión por userId). */
 async function listGuildUsersMerged(guildId) {
+    const gid = String(guildId);
     const map = new Map();
-    const fromFile = listGuildUsers(guildId);
+    const fromFile = listGuildUsers(gid);
     for (const row of fromFile) {
         if (!row?.userId) continue;
         map.set(row.userId, { userId: row.userId, ...normalizeUserState(row) });
@@ -217,16 +219,16 @@ async function listGuildUsersMerged(guildId) {
 
     let fromDb = [];
     try {
-        fromDb = await db.listLevelingUserKeysForGuild(guildId);
+        fromDb = await db.listLevelingUserKeysForGuild(gid);
     } catch {
         fromDb = [];
     }
 
-    const prefix = `leveling_user_${guildId}_`;
+    const prefix = `leveling_user_${gid}_`;
     for (const { key, value } of fromDb) {
         if (!key || typeof key !== 'string' || !key.startsWith(prefix)) continue;
         const userId = key.slice(prefix.length);
-        if (!/^\d{5,30}$/.test(userId)) continue;
+        if (!/^\d{10,25}$/.test(userId)) continue;
         const normalized = normalizeUserState(value && typeof value === 'object' ? value : {});
         const prev = map.get(userId);
         if (!prev) {
