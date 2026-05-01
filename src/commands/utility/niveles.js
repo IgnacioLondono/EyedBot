@@ -2,11 +2,21 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
 const levelingStore = require('../../utils/leveling-store');
 const { getLevelFromXp, getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
+const { parseRoleRewards, getRoleRewardTiersForLevel } = require('../../utils/leveling-rewards');
 
 function progressBar(percent, width = 14) {
     const p = Math.max(0, Math.min(100, Number(percent) || 0));
     const filled = Math.round((p / 100) * width);
     return `${'█'.repeat(Math.min(width, filled))}${'░'.repeat(Math.max(0, width - filled))}`;
+}
+
+async function formatRoleLine(guild, roleId) {
+    const id = String(roleId || '').trim();
+    if (!id) return null;
+    const role =
+        guild.roles.cache.get(id) || (await guild.roles.fetch(id).catch(() => null));
+    if (role) return `<@&${role.id}> (${role.name})`;
+    return `\`${id}\` (rol no encontrado)`;
 }
 
 async function runRango(interaction) {
@@ -59,6 +69,39 @@ async function runRango(interaction) {
                     : `Sistema de niveles desactivado (solo lectura) · ${interaction.user.tag}`
         })
         .setTimestamp();
+
+    const rewardsSorted = parseRoleRewards(cfg?.roleRewards);
+    if (rewardsSorted.length > 0) {
+        const { current, next } = getRoleRewardTiersForLevel(level, rewardsSorted);
+        const member = await guild.members.fetch(target.id).catch(() => null);
+
+        if (current) {
+            const line = await formatRoleLine(guild, current.roleId);
+            const tiene = member ? member.roles.cache.has(current.roleId) : false;
+            const enServidor = !member ? '—' : tiene ? 'Sí' : 'No';
+            if (line) {
+                embed.addFields({
+                    name: '🎭 Rol del sistema (tramo actual)',
+                    value: `${line}\nNivel mínimo: **${current.level}** · En Discord: **${enServidor}**`
+                });
+            }
+        }
+
+        if (next) {
+            const lineNext = await formatRoleLine(guild, next.roleId);
+            if (lineNext) {
+                embed.addFields({
+                    name: '⏭️ Siguiente rol',
+                    value: `${lineNext}\nSe desbloquea al llegar a nivel **${next.level}**`
+                });
+            }
+        } else if (current && rewardsSorted.length > 0) {
+            embed.addFields({
+                name: '⏭️ Siguiente rol',
+                value: 'No hay más roles configurados por encima de tu tramo.'
+            });
+        }
+    }
 
     return interaction.reply({ embeds: [embed] });
 }
