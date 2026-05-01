@@ -209,7 +209,7 @@ module.exports = {
         .addSubcommand((sub) =>
             sub
                 .setName('rango')
-                .setDescription('Ver progreso de nivel de un usuario')
+                .setDescription('Ver el progreso de un usuario')
                 .addUserOption((opt) =>
                     opt.setName('usuario').setDescription('Miembro a consultar (por defecto tú)').setRequired(false)
                 )

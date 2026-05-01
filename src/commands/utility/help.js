@@ -176,7 +176,7 @@ function buildEmbed(activeKey, grouped, totalCommands, showModeration) {
 
     if (activeKey === 'levels') {
         const lines = [
-            '• `/niveles rango` — Tu nivel, XP total, barra al siguiente nivel, puesto en el servidor, mensajes/voz y roles configurados en el sistema de niveles *(solo lo ves tú)*.',
+            '• `/niveles rango` — Ver el progreso de un usuario (tú u otro): nivel, XP total, barra al siguiente nivel, puesto en el servidor, mensajes/voz y roles del sistema de niveles *(solo lo ves tú)*.',
             '• `/niveles top` — Ranking público del servidor por XP, mensajes o minutos en voz (cantidad 5–25).'
         ];
         return new EmbedBuilder()
