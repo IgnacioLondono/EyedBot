@@ -320,7 +320,7 @@ function clearServerBoundSectionState() {
         serverSelect.innerHTML = '<option value="">Selecciona un servidor desde el Dashboard</option>';
     }
 
-    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer', 'levelsContainer', 'voiceCreatorContainer', 'automationContainer', 'securityContainer', 'notificationsContainer', 'freeGamesContainer'];
+    const containerIds = ['serverTabs', 'serverInfoContainer', 'moderationContainer', 'welcomeContainer', 'verifyContainer', 'ticketContainer', 'levelsContainer', 'voiceCreatorContainer', 'automationContainer', 'securityContainer', 'notificationsContainer', 'freeGamesContainer', 'channelSetupContainer'];
     containerIds.forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = '';
@@ -405,6 +405,10 @@ function switchServerPane(paneId, button = null) {
 
     if (paneId === 'serverPaneFreeGames' && typeof openFreeGamesPane === 'function') {
         try { openFreeGamesPane(); } catch (e) { console.error('openFreeGamesPane error', e); }
+    }
+
+    if (paneId === 'serverPaneChannelSetup' && typeof openChannelSetupPane === 'function') {
+        try { openChannelSetupPane(); } catch (e) { console.error('openChannelSetupPane error', e); }
     }
 }
 
@@ -3331,6 +3335,7 @@ async function selectServerGuild(guildId, options = {}) {
     const securityContainer = document.getElementById('securityContainer');
     const notificationsContainer = document.getElementById('notificationsContainer');
     const gachaContainer = document.getElementById('gachaContainer');
+    const channelSetupContainer = document.getElementById('channelSetupContainer');
     const serverSelect = document.getElementById('serverSelect');
     const { preserveInsight = false } = options;
 
@@ -3350,6 +3355,7 @@ async function selectServerGuild(guildId, options = {}) {
         if (securityContainer) securityContainer.innerHTML = '';
         if (notificationsContainer) notificationsContainer.innerHTML = '';
         if (gachaContainer) gachaContainer.innerHTML = '';
+        if (channelSetupContainer) channelSetupContainer.innerHTML = '';
         saveState();
         return;
     }
@@ -3396,6 +3402,9 @@ async function selectServerGuild(guildId, options = {}) {
     if (gachaContainer) {
         gachaContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema gacha...</p></div>';
     }
+    if (channelSetupContainer) {
+        channelSetupContainer.innerHTML = '';
+    }
 
     try {
         await Promise.all([
@@ -3432,6 +3441,7 @@ async function loadGuildsForServer() {
         const securityContainer = document.getElementById('securityContainer');
         const notificationsContainer = document.getElementById('notificationsContainer');
         const gachaContainer = document.getElementById('gachaContainer');
+        const channelSetupContainer = document.getElementById('channelSetupContainer');
         
         // Limpiar contenedores
         if (serverInfoContainer) serverInfoContainer.innerHTML = '';
@@ -3445,6 +3455,7 @@ async function loadGuildsForServer() {
         if (securityContainer) securityContainer.innerHTML = '';
         if (notificationsContainer) notificationsContainer.innerHTML = '';
         if (gachaContainer) gachaContainer.innerHTML = '';
+        if (channelSetupContainer) channelSetupContainer.innerHTML = '';
         if (tabsContainer) tabsContainer.innerHTML = '';
         
         if (!hasSelectedGuildContext()) {
@@ -11069,4 +11080,215 @@ function renderFreeGameCountdown(game) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
         ${game.isUpcoming ? 'Empieza en ' : 'Quedan '}${label}
     </span>`;
+}
+
+// ============================================================
+// GENERADOR DE CANALES (plantillas Discord)
+// ============================================================
+
+const _channelSetupState = { guildId: '', data: null };
+
+function chsPreviewBlocks(data, templateId) {
+    const pack = data?.conflictsByTemplate?.[templateId];
+    if (!pack || pack.error) {
+        return {
+            conflictBanner: pack?.error
+                ? `<div class="chs-banner chs-banner--err">${escapeHtml(pack.error)}</div>`
+                : '',
+            tree: '<p class="chs-muted">Sin vista previa.</p>'
+        };
+    }
+
+    const conflicts = pack.conflicts || [];
+    const preview = pack.preview || [];
+
+    const conflictBanner = conflicts.length
+        ? `<div class="chs-banner chs-banner--warn"><strong>${conflicts.length} elemento(s)</strong> ya existen con el mismo nombre bajo la categoría equivalente. Se <strong>omitirán</strong> si «No crear duplicados» está activado.</div>`
+        : `<div class="chs-banner chs-banner--ok">No hay coincidencias detectadas: se crearán todos los canales nuevos.</div>`;
+
+    const byCat = {};
+    preview.forEach((row) => {
+        const key = row.categoryLabel || row.categorySlug || '—';
+        if (!byCat[key]) byCat[key] = [];
+        byCat[key].push(row);
+    });
+
+    const tree = Object.keys(byCat).length === 0
+        ? '<p class="chs-muted">Esta plantilla no define canales.</p>'
+        : Object.entries(byCat).map(([cat, rows]) => `
+            <div class="chs-tree-cat">
+                <div class="chs-tree-cat-head">${escapeHtml(cat)}</div>
+                <ul class="chs-tree-ul">
+                    ${rows.map((r) => `
+                        <li>
+                            <span class="chs-pill chs-pill--${r.type === 'voice' ? 'voice' : 'text'}">${r.type === 'voice' ? 'Voz' : 'Texto'}</span>
+                            <span class="chs-tree-name">${escapeHtml(r.channelLabel)}</span>
+                            ${r.topic ? `<span class="chs-tree-topic">${escapeHtml(r.topic.slice(0, 120))}${r.topic.length > 120 ? '…' : ''}</span>` : ''}
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `).join('');
+
+    return { conflictBanner, tree };
+}
+
+function wireChannelSetupInteractions(guildId) {
+    const select = document.getElementById('chsTemplateSelect');
+    const skipDup = document.getElementById('chsSkipDup');
+    const applyBtn = document.getElementById('chsApplyBtn');
+    const reloadBtn = document.getElementById('chsReloadBtn');
+
+    if (select) {
+        select.addEventListener('change', () => {
+            const id = select.value || 'standard';
+            const { conflictBanner, tree } = chsPreviewBlocks(_channelSetupState.data, id);
+            const cSlot = document.getElementById('chsConflictSlot');
+            const pSlot = document.getElementById('chsPreviewSlot');
+            if (cSlot) cSlot.innerHTML = conflictBanner;
+            if (pSlot) pSlot.innerHTML = tree;
+        });
+    }
+
+    if (skipDup) {
+        skipDup.addEventListener('change', () => null);
+    }
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => applyChannelSetupGenerate(guildId));
+    }
+
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', () => openChannelSetupPane());
+    }
+}
+
+function renderChannelSetupPane() {
+    const container = document.getElementById('channelSetupContainer');
+    const data = _channelSetupState.data;
+    const guildId = _channelSetupState.guildId;
+    if (!container || !data || !guildId) return;
+
+    const templates = data.templates || [];
+    const defaultTpl = templates[0]?.id || 'standard';
+
+    const templateOptions = templates.map((t) => `
+        <option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>
+    `).join('');
+
+    const tplMeta = templates.find((t) => t.id === defaultTpl);
+    const desc = tplMeta?.description || '';
+
+    const { conflictBanner, tree } = chsPreviewBlocks(data, defaultTpl);
+
+    container.innerHTML = `
+        <h3 class="welcome-panel-title">Generador de estructura</h3>
+        <p class="welcome-panel-subtitle">${escapeHtml(desc)} Requiere que el bot tenga <strong>Gestionar canales</strong>. No borra canales existentes.</p>
+
+        <div class="chs-layout">
+            <div class="chs-main fg-section">
+                <h4 class="fg-section-title"><span class="fg-dot"></span> Opciones</h4>
+                <div class="form-group">
+                    <label for="chsTemplateSelect">Plantilla</label>
+                    <select id="chsTemplateSelect" class="form-control">${templateOptions}</select>
+                </div>
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="chsSkipDup" checked>
+                        <span>No crear duplicados (omitir nombre ya existente en la misma categoría)</span>
+                    </label>
+                </div>
+                <div class="chs-actions">
+                    <button type="button" id="chsApplyBtn" class="btn btn-primary">Crear categorías y canales</button>
+                    <button type="button" id="chsReloadBtn" class="btn btn-secondary">Actualizar vista previa</button>
+                </div>
+                <p class="chs-footnote">Los nombres se adaptan al formato de Discord (minúsculas y guiones). Tras crear canales, revisa permisos y orden en la configuración del servidor.</p>
+            </div>
+
+            <aside class="chs-aside fg-section">
+                <h4 class="fg-section-title"><span class="fg-dot fg-dot-live"></span> Vista previa</h4>
+                <div id="chsConflictSlot">${conflictBanner}</div>
+                <div id="chsPreviewSlot" class="chs-preview-slot">${tree}</div>
+            </aside>
+        </div>
+    `;
+
+    wireChannelSetupInteractions(guildId);
+}
+
+async function openChannelSetupPane() {
+    const guildId = currentServerGuildId;
+    const container = document.getElementById('channelSetupContainer');
+    if (!container) return;
+
+    if (!guildId) {
+        container.innerHTML = '<div class="chs-empty"><p>Selecciona un servidor en el panel para usar el generador.</p></div>';
+        return;
+    }
+
+    container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando plantillas...</p></div>';
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/channel-setup`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            container.innerHTML = `<div class="chs-empty chs-error"><p>${escapeHtml(payload.error || 'No se pudo cargar')}</p></div>`;
+            return;
+        }
+        _channelSetupState.guildId = guildId;
+        _channelSetupState.data = payload;
+        renderChannelSetupPane();
+    } catch (error) {
+        console.error('openChannelSetupPane:', error);
+        container.innerHTML = `<div class="chs-empty chs-error"><p>${escapeHtml(error.message || 'Error de red')}</p></div>`;
+    }
+}
+
+async function applyChannelSetupGenerate(guildId) {
+    const templateId = document.getElementById('chsTemplateSelect')?.value || 'standard';
+    const skipExisting = document.getElementById('chsSkipDup')?.checked !== false;
+
+    const confirmMsg = '¿Crear en este servidor las categorías y canales de la plantilla?\n\n'
+        + 'No se eliminará ningún canal existente.'
+        + (skipExisting ? '\nLos duplicados detectados se omitirán.' : '\nSi ya existe un canal con el mismo nombre, Discord puede rechazar la creación.');
+
+    if (!window.confirm(confirmMsg)) return;
+
+    const btn = document.getElementById('chsApplyBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('is-loading');
+    }
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/channel-setup/apply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ templateId, skipExisting })
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            showToast(payload.error || 'No se pudo aplicar la plantilla', 'error');
+            return;
+        }
+
+        const createdN = payload.created?.length || 0;
+        const skippedN = payload.skipped?.length || 0;
+        showToast(`Listo: ${createdN} elemento(s) creados · ${skippedN} omitido(s).`, 'success');
+
+        if (Array.isArray(payload.errors) && payload.errors.length) {
+            showToast(payload.errors.map((e) => e.message || e.name || 'Error').slice(0, 3).join(' · '), 'warning');
+        }
+
+        await openChannelSetupPane();
+    } catch (error) {
+        console.error('applyChannelSetupGenerate:', error);
+        showToast(error.message || 'Error al crear canales', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('is-loading');
+        }
+    }
 }

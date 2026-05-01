@@ -21,6 +21,7 @@ const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
+const channelSetupTemplates = require('../src/utils/channel-setup-templates');
 const gachaStore = require('../src/utils/gacha-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const {
@@ -318,6 +319,7 @@ const LOGIN_ANALYTICS_VERSION = 1;
 const LOGIN_ANALYTICS_FILE_PATH = path.join(__dirname, '..', 'data', 'web-login-registry.json');
 const PERMISSION_ADMINISTRATOR = 0x8n;
 const PERMISSION_MANAGE_GUILD = 0x20n;
+const PERMISSION_MANAGE_CHANNELS = 0x10n;
 
 function isOwnerUser(user = null) {
     return String(user?.id || '') === String(OWNER_DISCORD_ID);
@@ -343,6 +345,20 @@ function hasAdminOrManageGuildPermission(guild = {}) {
         if (raw === undefined || raw === null || raw === '') return false;
         const permissions = BigInt(String(raw));
         return (permissions & PERMISSION_ADMINISTRATOR) !== 0n || (permissions & PERMISSION_MANAGE_GUILD) !== 0n;
+    } catch {
+        return false;
+    }
+}
+
+/** Administrador, gestionar servidor o gestionar canales (OAuth del usuario). */
+function canManageServerChannels(sessionGuild = {}) {
+    try {
+        const raw = sessionGuild?.permissions;
+        if (raw === undefined || raw === null || raw === '') return false;
+        const p = BigInt(String(raw));
+        return (p & PERMISSION_ADMINISTRATOR) !== 0n
+            || (p & PERMISSION_MANAGE_GUILD) !== 0n
+            || (p & PERMISSION_MANAGE_CHANNELS) !== 0n;
     } catch {
         return false;
     }
@@ -2570,6 +2586,89 @@ app.post('/api/guild/:guildId/free-games/test', requireAuth, async (req, res) =>
     } catch (error) {
         console.error('Error enviando free-games test:', error);
         res.status(500).json({ error: 'Error al enviar prueba' });
+    }
+});
+
+// ============================================================
+// GENERADOR DE CANALES (plantillas)
+// ============================================================
+
+app.get('/api/guild/:guildId/channel-setup', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!canManageServerChannels(userGuild)) {
+            return res.status(403).json({ error: 'Necesitas administrador, gestionar servidor o gestionar canales en Discord' });
+        }
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'El bot no está en este servidor' });
+
+        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        if (!me?.permissions?.has('ManageChannels')) {
+            return res.status(403).json({ error: 'El bot necesita el permiso «Gestionar canales»' });
+        }
+
+        const templates = channelSetupTemplates.listTemplateSummaries();
+        const conflictsByTemplate = {};
+        for (const t of templates) {
+            const payload = channelSetupTemplates.listConflicts(guild, t.id);
+            if (payload.error) {
+                conflictsByTemplate[t.id] = { error: payload.error };
+            } else {
+                conflictsByTemplate[t.id] = {
+                    conflicts: payload.conflicts,
+                    preview: payload.preview
+                };
+            }
+        }
+
+        res.json({ templates, conflictsByTemplate });
+    } catch (error) {
+        console.error('Error channel-setup GET:', error);
+        res.status(500).json({ error: 'Error al cargar el generador de canales' });
+    }
+});
+
+app.post('/api/guild/:guildId/channel-setup/apply', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!canManageServerChannels(userGuild)) {
+            return res.status(403).json({ error: 'Necesitas administrador, gestionar servidor o gestionar canales en Discord' });
+        }
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'El bot no está en este servidor' });
+
+        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        if (!me?.permissions?.has('ManageChannels')) {
+            return res.status(403).json({ error: 'El bot necesita el permiso «Gestionar canales»' });
+        }
+
+        const templateId = String(req.body?.templateId || 'standard');
+        const skipExisting = req.body?.skipExisting !== false;
+
+        if (!channelSetupTemplates.TEMPLATES[templateId]) {
+            return res.status(400).json({
+                success: false,
+                error: 'Plantilla no válida',
+                created: [],
+                skipped: [],
+                errors: []
+            });
+        }
+
+        const result = await channelSetupTemplates.applyTemplate(guild, templateId, { skipExisting });
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error channel-setup apply:', error);
+        res.status(500).json({ error: error.message || 'Error al crear canales' });
     }
 });
 
