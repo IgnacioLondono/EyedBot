@@ -4445,7 +4445,7 @@ mark.receipt-highlight {
     top: 84px;
     height: fit-content;
 }
-.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel h4 {
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-heading {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
@@ -4458,9 +4458,9 @@ mark.receipt-highlight {
     background: color-mix(in srgb, var(--pane-accent) 12%, rgba(7, 3, 20, 0.5));
     border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(190, 155, 255, 0.2));
     border-radius: 999px;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.55rem !important;
 }
-.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel h4::before {
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-heading::before {
     content: "";
     width: 6px;
     height: 6px;
@@ -4468,6 +4468,51 @@ mark.receipt-highlight {
     background: var(--pane-accent);
     box-shadow: 0 0 8px var(--pane-accent);
     animation: premiumDotPulse 1.6s ease-in-out infinite;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel__sub {
+    padding-left: 0.15rem;
+    color: #9a8cba !important;
+    font-size: 0.82rem !important;
+    line-height: 1.45 !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-stage {
+    background: linear-gradient(180deg, #1e1f22 0%, #2b2d31 28%) !important;
+    border: 1px solid rgba(0, 0, 0, 0.45) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 12px 28px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Tarjetas del editor de bienvenida / despedida */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-card {
+    border-radius: 16px !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 14%, rgba(190, 155, 255, 0.12)) !important;
+    background:
+        linear-gradient(165deg,
+            color-mix(in srgb, var(--pane-accent) 5%, rgba(12, 6, 30, 0.35)),
+            rgba(10, 5, 22, 0.55)) !important;
+    padding: 1.15rem 1.25rem !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-card__title {
+    color: #f4eeff !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-card__badge {
+    border-color: color-mix(in srgb, var(--pane-accent) 40%, rgba(190, 155, 255, 0.25)) !important;
+    color: color-mix(in srgb, var(--pane-accent) 72%, #ffffff) !important;
+    background: color-mix(in srgb, var(--pane-accent) 14%, rgba(7, 3, 20, 0.45)) !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-var-strip {
+    border-color: color-mix(in srgb, var(--pane-accent) 28%, rgba(190, 155, 255, 0.2)) !important;
+    background: color-mix(in srgb, var(--pane-accent) 8%, rgba(7, 3, 20, 0.35)) !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-var-chip {
+    border-color: color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.2)) !important;
+    background: rgba(10, 5, 24, 0.65) !important;
+    color: #e8e0ff !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-var-chip:hover {
+    border-color: var(--pane-accent) !important;
+    background: color-mix(in srgb, var(--pane-accent) 22%, rgba(10, 5, 24, 0.8)) !important;
 }
 @keyframes premiumDotPulse {
     0%, 100% { transform: scale(1); opacity: 1; }

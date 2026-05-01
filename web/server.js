@@ -1078,7 +1078,7 @@ function buildDefaultGreetingConfig(mode, fallbackChannel = '') {
     return {
         enabled: Boolean(fallbackChannel),
         channelId: fallbackChannel || '',
-        mentionUser: true,
+        mentionUser: false,
         title: '¡Bienvenido!',
         message: '¡Hola {user}! Bienvenido a **{server}**. Eres el miembro #{memberCount}.',
         color: '7c4dff',
@@ -1099,7 +1099,7 @@ function normalizeGreetingConfigInput(body = {}, mode, userId) {
     return {
         enabled: body.enabled !== false,
         channelId: String(body.channelId || ''),
-        mentionUser: body.mentionUser !== false,
+        mentionUser: body.mentionUser === true,
         title: String(body.title || fallback.title).slice(0, 256),
         message: String(body.message || fallback.message).slice(0, 2000),
         color: String(body.color || (mode === 'goodbye' ? 'ff5f9e' : '7c4dff')).replace('#', '').slice(0, 6),
@@ -2785,8 +2785,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
 
-        const content = cfg?.mentionUser ? `<@${member.id}>` : null;
-        await channel.send({ content, embeds: [embed], files });
+        await channel.send({ embeds: [embed], files });
 
         res.json({ success: true, message: 'Prueba de bienvenida enviada' });
     } catch (error) {

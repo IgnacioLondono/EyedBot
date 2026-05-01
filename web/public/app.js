@@ -8585,123 +8585,157 @@ function renderGreetingPanel(guildId, channels, mode) {
 
     container.innerHTML = `
         <h3 class="welcome-panel-title">Bienvenida y Despedida</h3>
-        <div class="greeting-tabs" role="tablist" aria-label="Pestañas de configuración">
-            <button type="button" class="greeting-tab-btn ${mode === 'welcome' ? 'active' : ''}" data-greeting-tab="welcome" role="tab" aria-selected="${mode === 'welcome' ? 'true' : 'false'}">Bienvenida</button>
-            <button type="button" class="greeting-tab-btn ${mode === 'goodbye' ? 'active' : ''}" data-greeting-tab="goodbye" role="tab" aria-selected="${mode === 'goodbye' ? 'true' : 'false'}">Despedida</button>
+        <div class="greeting-intro">
+            <div class="greeting-tabs" role="tablist" aria-label="Pestañas de configuración">
+                <button type="button" class="greeting-tab-btn ${mode === 'welcome' ? 'active' : ''}" data-greeting-tab="welcome" role="tab" aria-selected="${mode === 'welcome' ? 'true' : 'false'}">Bienvenida</button>
+                <button type="button" class="greeting-tab-btn ${mode === 'goodbye' ? 'active' : ''}" data-greeting-tab="goodbye" role="tab" aria-selected="${mode === 'goodbye' ? 'true' : 'false'}">Despedida</button>
+            </div>
+            <p class="welcome-panel-subtitle">${subtitleHtml}</p>
         </div>
-        <p class="welcome-panel-subtitle">${subtitleHtml}</p>
         <div class="welcome-layout">
-            <div class="welcome-editor">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="welcomeChannelSelect">${escapeHtml(meta.channelLabel)}</label>
-                        <select id="welcomeChannelSelect" class="form-control">
-                            <option value="">Selecciona un canal</option>
-                            ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                        </select>
+            <div class="welcome-editor greeting-editor">
+                <section class="greeting-card" aria-labelledby="greeting-section-basics">
+                    <div class="greeting-card__head">
+                        <h4 id="greeting-section-basics" class="greeting-card__title">Canal y apariencia</h4>
+                        <span class="greeting-card__badge">Esencial</span>
                     </div>
-                    <div class="form-group">
-                        <label for="welcomeColor">Color del embed</label>
-                        <input type="color" id="welcomeColor" class="form-control color-input" value="#${(cfg.color || meta.defaultColor).replace('#', '')}">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group checkbox-group">
-                        <label><input type="checkbox" id="welcomeEnabled" ${cfg.enabled !== false ? 'checked' : ''}> <span>${escapeHtml(meta.toggleLabel)}</span></label>
-                    </div>
-                    <div class="form-group checkbox-group">
-                        <label><input type="checkbox" id="welcomeMentionUser" ${cfg.mentionUser !== false ? 'checked' : ''}> <span>Mencionar usuario</span></label>
-                    </div>
-                    <div class="form-group checkbox-group">
-                        <label><input type="checkbox" id="welcomeDmEnabled" ${cfg.dmEnabled ? 'checked' : ''}> <span>Enviar DM</span></label>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="welcomeTitle">Titulo</label>
-                    <input type="text" id="welcomeTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || meta.defaultTitle)}">
-                </div>
-
-                <div class="form-group">
-                    <label for="welcomeMessage">Mensaje</label>
-                    <textarea id="welcomeMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || meta.defaultMessage)}</textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="welcomeFooter">Footer</label>
-                    <input type="text" id="welcomeFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || meta.defaultFooter)}">
-                </div>
-
-                <div class="welcome-image-editor">
-                    <h4>Editor de Imagen</h4>
-                    <div class="form-group">
-                        <label for="welcomeImageUrl">URL de imagen principal</label>
-                        <input type="url" id="welcomeImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
-                    </div>
-                    <div class="form-group">
-                        <label for="welcomeImageFile">Subir imagen para editar</label>
-                        <input type="file" id="welcomeImageFile" class="form-control" accept="image/*">
-                    </div>
-                    <div class="form-group">
-                        <label for="welcomeImageScale">Escala</label>
-                        <input type="range" id="welcomeImageScale" class="form-control" min="25" max="100" step="5" value="100">
-                        <small id="welcomeImageScaleValue">100%</small>
-                    </div>
-                    <div class="form-row">
+                    <div class="form-grid greeting-card__grid">
                         <div class="form-group">
-                            <label for="welcomeImageCropX">X (%)</label>
-                            <input type="range" id="welcomeImageCropX" class="form-control" min="0" max="80" step="1" value="0">
+                            <label for="welcomeChannelSelect">${escapeHtml(meta.channelLabel)}</label>
+                            <select id="welcomeChannelSelect" class="form-control">
+                                <option value="">Selecciona un canal</option>
+                                ${channels.map((c) => `<option value="${c.id}" ${cfg.channelId === c.id ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label for="welcomeImageCropY">Y (%)</label>
-                            <input type="range" id="welcomeImageCropY" class="form-control" min="0" max="80" step="1" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="welcomeImageCropW">Ancho (%)</label>
-                            <input type="range" id="welcomeImageCropW" class="form-control" min="20" max="100" step="1" value="100">
-                        </div>
-                        <div class="form-group">
-                            <label for="welcomeImageCropH">Alto (%)</label>
-                            <input type="range" id="welcomeImageCropH" class="form-control" min="20" max="100" step="1" value="100">
+                            <label for="welcomeColor">Color del embed</label>
+                            <input type="color" id="welcomeColor" class="form-control color-input" value="#${(cfg.color || meta.defaultColor).replace('#', '')}">
                         </div>
                     </div>
-                    <div class="form-actions welcome-editor-actions">
-                        <button type="button" id="welcomeUploadImageBtn" class="btn btn-secondary">Procesar y Subir Imagen</button>
-                        <small id="welcomeImageUploadStatus"></small>
+                    <div class="greeting-toggle-row">
+                        <div class="form-group checkbox-group greeting-toggle">
+                            <label><input type="checkbox" id="welcomeEnabled" ${cfg.enabled !== false ? 'checked' : ''}> <span>${escapeHtml(meta.toggleLabel)}</span></label>
+                        </div>
+                        <div class="form-group checkbox-group greeting-toggle">
+                            <label><input type="checkbox" id="welcomeDmEnabled" ${cfg.dmEnabled ? 'checked' : ''}> <span>Enviar DM al usuario</span></label>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="welcomeThumbnailMode">Miniatura</label>
-                        <select id="welcomeThumbnailMode" class="form-control">
-                            <option value="avatar" ${cfg.thumbnailMode === 'avatar' ? 'selected' : ''}>Avatar del usuario</option>
-                            <option value="url" ${cfg.thumbnailMode === 'url' ? 'selected' : ''}>URL personalizada</option>
-                            <option value="none" ${cfg.thumbnailMode === 'none' ? 'selected' : ''}>Sin miniatura</option>
-                        </select>
+                <section class="greeting-card" aria-labelledby="greeting-section-embed">
+                    <div class="greeting-card__head">
+                        <h4 id="greeting-section-embed" class="greeting-card__title">Texto del embed</h4>
                     </div>
                     <div class="form-group">
-                        <label for="welcomeThumbnailUrl">URL miniatura</label>
-                        <input type="url" id="welcomeThumbnailUrl" class="form-control" value="${escapeHtmlForValue(cfg.thumbnailUrl || '')}" placeholder="https://...">
+                        <label for="welcomeTitle">Título</label>
+                        <input type="text" id="welcomeTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || meta.defaultTitle)}">
                     </div>
-                </div>
+                    <div class="form-group">
+                        <label for="welcomeMessage">Descripción</label>
+                        <textarea id="welcomeMessage" class="form-control greeting-textarea-main" rows="5">${escapeHtmlForValue(cfg.message || meta.defaultMessage)}</textarea>
+                    </div>
+                    <div class="greeting-var-strip" role="group" aria-label="Insertar variables en la descripción">
+                        <span class="greeting-var-strip__label">Insertar</span>
+                        <button type="button" class="greeting-var-chip" data-var="{user}" title="Mención del miembro">{user}</button>
+                        <button type="button" class="greeting-var-chip" data-var="{username}" title="Nombre de usuario">{username}</button>
+                        <button type="button" class="greeting-var-chip" data-var="{server}" title="Nombre del servidor">{server}</button>
+                        <button type="button" class="greeting-var-chip" data-var="{memberCount}" title="Número de miembros">{memberCount}</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeFooter">Pie del embed</label>
+                        <input type="text" id="welcomeFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || meta.defaultFooter)}">
+                    </div>
+                </section>
 
-                <div class="form-group">
-                    <label for="welcomeDmMessage">Mensaje DM (opcional)</label>
-                    <textarea id="welcomeDmMessage" class="form-control" rows="3">${escapeHtmlForValue(cfg.dmMessage || '')}</textarea>
-                </div>
+                <section class="greeting-card greeting-card--media" aria-labelledby="greeting-section-thumb">
+                    <div class="greeting-card__head">
+                        <h4 id="greeting-section-thumb" class="greeting-card__title">Miniatura e imagen</h4>
+                        <p class="greeting-card__hint">La miniatura aparece arriba a la derecha; la imagen grande va debajo del texto.</p>
+                    </div>
+                    <div class="form-row greeting-thumb-row">
+                        <div class="form-group">
+                            <label for="welcomeThumbnailMode">Modo de miniatura</label>
+                            <select id="welcomeThumbnailMode" class="form-control">
+                                <option value="avatar" ${cfg.thumbnailMode === 'avatar' ? 'selected' : ''}>Avatar del usuario</option>
+                                <option value="url" ${cfg.thumbnailMode === 'url' ? 'selected' : ''}>URL personalizada</option>
+                                <option value="none" ${cfg.thumbnailMode === 'none' ? 'selected' : ''}>Sin miniatura</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeThumbnailUrl">URL de miniatura</label>
+                            <input type="url" id="welcomeThumbnailUrl" class="form-control" value="${escapeHtmlForValue(cfg.thumbnailUrl || '')}" placeholder="https://...">
+                        </div>
+                    </div>
 
-                <div class="form-actions">
+                    <div class="welcome-image-editor greeting-image-tools">
+                        <div class="greeting-card__head greeting-card__head--nested">
+                            <h4 class="greeting-card__title greeting-card__title--sm">Imagen principal</h4>
+                            <p class="greeting-card__hint">Sube o enlaza una imagen; puedes recortar y escalar antes de subirla.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeImageUrl">URL de imagen</label>
+                            <input type="url" id="welcomeImageUrl" class="form-control" value="${escapeHtmlForValue(cfg.imageUrl || '')}" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeImageFile">Archivo local</label>
+                            <input type="file" id="welcomeImageFile" class="form-control" accept="image/*">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeImageScale">Escala</label>
+                            <input type="range" id="welcomeImageScale" class="form-control" min="25" max="100" step="5" value="100">
+                            <small id="welcomeImageScaleValue">100%</small>
+                        </div>
+                        <div class="form-row greeting-crop-grid">
+                            <div class="form-group">
+                                <label for="welcomeImageCropX">Recorte X (%)</label>
+                                <input type="range" id="welcomeImageCropX" class="form-control" min="0" max="80" step="1" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="welcomeImageCropY">Recorte Y (%)</label>
+                                <input type="range" id="welcomeImageCropY" class="form-control" min="0" max="80" step="1" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="welcomeImageCropW">Ancho (%)</label>
+                                <input type="range" id="welcomeImageCropW" class="form-control" min="20" max="100" step="1" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="welcomeImageCropH">Alto (%)</label>
+                                <input type="range" id="welcomeImageCropH" class="form-control" min="20" max="100" step="1" value="100">
+                            </div>
+                        </div>
+                        <div class="form-actions welcome-editor-actions greeting-upload-row">
+                            <button type="button" id="welcomeUploadImageBtn" class="btn btn-secondary">Procesar y subir imagen</button>
+                            <small id="welcomeImageUploadStatus"></small>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="greeting-card" aria-labelledby="greeting-section-dm">
+                    <div class="greeting-card__head">
+                        <h4 id="greeting-section-dm" class="greeting-card__title">Mensaje directo</h4>
+                        <p class="greeting-card__hint">Opcional. Solo se envía si activas «Enviar DM al usuario».</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeDmMessage">Texto del DM</label>
+                        <textarea id="welcomeDmMessage" class="form-control" rows="3" placeholder="Ej.: Lee las reglas en #reglas">${escapeHtmlForValue(cfg.dmMessage || '')}</textarea>
+                    </div>
+                </section>
+
+                <div class="greeting-actions-bar form-actions">
                     <button type="button" id="saveWelcomeBtn" class="btn btn-primary">${escapeHtml(meta.saveButton)}</button>
                     <button type="button" id="testWelcomeBtn" class="btn btn-secondary">${escapeHtml(meta.testButton)}</button>
                 </div>
             </div>
 
-            <div class="welcome-preview-panel">
-                <h4>Vista Previa del Embed</h4>
-                <div id="welcomePreviewCard" class="embed-preview"></div>
-            </div>
+            <aside class="welcome-preview-panel">
+                <div class="welcome-preview-panel__top">
+                    <h4 class="welcome-preview-heading">Vista previa del embed</h4>
+                    <p class="welcome-preview-panel__sub">Se actualiza al cambiar título, descripción, color o imágenes.</p>
+                </div>
+                <div class="welcome-preview-stage" aria-label="Simulación aproximada del mensaje en Discord">
+                    <div id="welcomePreviewCard" class="embed-preview"></div>
+                </div>
+            </aside>
         </div>
     `;
 
@@ -8709,7 +8743,6 @@ function renderGreetingPanel(guildId, channels, mode) {
         'welcomeChannelSelect',
         'welcomeColor',
         'welcomeEnabled',
-        'welcomeMentionUser',
         'welcomeDmEnabled',
         'welcomeTitle',
         'welcomeMessage',
@@ -8743,6 +8776,21 @@ function renderGreetingPanel(guildId, channels, mode) {
 
             renderWelcomeEmbedPreview(guildId);
         });
+    });
+
+    container.querySelector('.greeting-var-strip')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.greeting-var-chip');
+        if (!btn || !btn.dataset.var) return;
+        const ta = document.getElementById('welcomeMessage');
+        if (!ta) return;
+        const ins = btn.dataset.var;
+        const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+        const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : ta.value.length;
+        ta.value = `${ta.value.slice(0, start)}${ins}${ta.value.slice(end)}`;
+        ta.focus();
+        const caret = start + ins.length;
+        ta.setSelectionRange(caret, caret);
+        renderWelcomeEmbedPreview(guildId);
     });
 
     container.querySelectorAll('[data-greeting-tab]').forEach((tabBtn) => {
@@ -8943,7 +8991,7 @@ function collectWelcomeConfigFromForm() {
     return {
         enabled: document.getElementById('welcomeEnabled')?.checked ?? true,
         channelId: document.getElementById('welcomeChannelSelect')?.value || '',
-        mentionUser: document.getElementById('welcomeMentionUser')?.checked ?? true,
+        mentionUser: false,
         title: document.getElementById('welcomeTitle')?.value || meta.defaultTitle,
         message: document.getElementById('welcomeMessage')?.value || meta.defaultMessage,
         color: (document.getElementById('welcomeColor')?.value || `#${meta.defaultColor}`).replace('#', ''),
