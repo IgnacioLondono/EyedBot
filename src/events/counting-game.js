@@ -16,7 +16,7 @@ function enqueueGuild(guildId, task) {
     return next;
 }
 
-async function resetCountingDueToFailure(message, state, reasonSentence) {
+async function resetCountingDueToFailure(message, guildId, state, reasonSentence) {
     await message.react('❌').catch(() => null);
     const reached = Math.max(0, Number.parseInt(state.current || 0, 10) || 0);
     await countingStore.resetProgress(guildId);
@@ -47,19 +47,7 @@ async function handleCountingMessage(message) {
         const parsed = Number.parseInt(content, 10);
 
         if (parsed === expected) {
-            const lastId = state.lastUserId ? String(state.lastUserId) : '';
-            if (lastId && lastId === message.author.id) {
-                await resetCountingDueToFailure(
-                    message,
-                    state,
-                    'no puede contar dos veces seguidas; tiene que esperar a que otro usuario escriba el siguiente numero.'
-                );
-                return;
-            }
-            await countingStore.setProgress(guildId, {
-                current: parsed,
-                lastUserId: message.author.id
-            });
+            await countingStore.setProgress(guildId, { current: parsed });
             await message.react('✅').catch(() => null);
             return;
         }
@@ -67,6 +55,7 @@ async function handleCountingMessage(message) {
         const provided = String(parsed);
         await resetCountingDueToFailure(
             message,
+            guildId,
             state,
             `fallo la secuencia. Se esperaba **${expected}** y llego **${provided}**.`
         );

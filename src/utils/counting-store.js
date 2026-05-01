@@ -55,7 +55,6 @@ function normalizeConfig(raw) {
         enabled: raw?.enabled === true,
         channelId: raw?.channelId ? String(raw.channelId) : null,
         current,
-        lastUserId: raw?.lastUserId ? String(raw.lastUserId) : null,
         updatedAt: raw?.updatedAt || null
     };
 }
@@ -134,8 +133,7 @@ async function resetProgress(guildId) {
     const current = await getGuildConfig(guildId);
     return setGuildConfig(guildId, {
         ...current,
-        current: 0,
-        lastUserId: null
+        current: 0
     });
 }
 
@@ -143,8 +141,7 @@ async function setProgress(guildId, progress) {
     const current = await getGuildConfig(guildId);
     return setGuildConfig(guildId, {
         ...current,
-        current: Math.max(0, Number.parseInt(progress?.current || 0, 10) || 0),
-        lastUserId: progress?.lastUserId ? String(progress.lastUserId) : null
+        current: Math.max(0, Number.parseInt(progress?.current || 0, 10) || 0)
     });
 }
 

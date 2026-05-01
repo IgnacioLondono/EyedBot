@@ -51,7 +51,6 @@ module.exports = {
                     'Este canal quedo como **canal del contador**.',
                     '',
                     '• En cada mensaje de cuenta manden **solo el numero** (si escriben texto, ese mensaje se ignora).',
-                    '• **No pueden contar dos veces seguidas** el mismo usuario: esperen a otro.',
                     `• Siguiente numero valido: **${siguiente}**.`,
                     '',
                     `Configurado por ${interaction.user}.`
