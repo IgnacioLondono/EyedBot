@@ -16,6 +16,20 @@ function enqueueGuild(guildId, task) {
     return next;
 }
 
+async function resetCountingDueToFailure(message, state, reasonSentence) {
+    await message.react('❌').catch(() => null);
+    const reached = Math.max(0, Number.parseInt(state.current || 0, 10) || 0);
+    await countingStore.resetProgress(guildId);
+    await message.channel.send({
+        embeds: [
+            Embeds.error(
+                'Contador reiniciado',
+                `${message.author} ${reasonSentence}\nNumero alcanzado: **${reached}**.\nEmpiecen de nuevo en **1**.`
+            )
+        ]
+    }).catch(() => null);
+}
+
 async function handleCountingMessage(message) {
     if (!message || !message.guild || message.author?.bot) return;
 
@@ -26,11 +40,22 @@ async function handleCountingMessage(message) {
         if (message.channel.id !== state.channelId) return;
 
         const content = (message.content || '').trim();
+        // Solo cuenta mensajes que son únicamente dígitos; el resto se ignora para poder charlar en el mismo canal.
+        if (!/^\d+$/.test(content)) return;
+
         const expected = Math.max(0, Number.parseInt(state.current || 0, 10) || 0) + 1;
         const parsed = Number.parseInt(content, 10);
-        const isValidNumber = /^\d+$/.test(content);
 
-        if (isValidNumber && parsed === expected) {
+        if (parsed === expected) {
+            const lastId = state.lastUserId ? String(state.lastUserId) : '';
+            if (lastId && lastId === message.author.id) {
+                await resetCountingDueToFailure(
+                    message,
+                    state,
+                    'no puede contar dos veces seguidas; tiene que esperar a que otro usuario escriba el siguiente numero.'
+                );
+                return;
+            }
             await countingStore.setProgress(guildId, {
                 current: parsed,
                 lastUserId: message.author.id
@@ -39,19 +64,12 @@ async function handleCountingMessage(message) {
             return;
         }
 
-        await message.react('❌').catch(() => null);
-        const reached = Math.max(0, Number.parseInt(state.current || 0, 10) || 0);
-        await countingStore.resetProgress(guildId);
-
-        const provided = isValidNumber ? String(parsed) : 'mensaje no valido';
-        await message.channel.send({
-            embeds: [
-                Embeds.error(
-                    'Contador reiniciado',
-                    `${message.author} fallo la secuencia. Se esperaba **${expected}** y llego **${provided}**.\nNumero alcanzado: **${reached}**.\nEmpiecen de nuevo en **1**.`
-                )
-            ]
-        }).catch(() => null);
+        const provided = String(parsed);
+        await resetCountingDueToFailure(
+            message,
+            state,
+            `fallo la secuencia. Se esperaba **${expected}** y llego **${provided}**.`
+        );
     });
 }
 

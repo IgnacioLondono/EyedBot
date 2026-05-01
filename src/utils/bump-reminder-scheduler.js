@@ -112,11 +112,11 @@ function isDisboardBumpMessage(message) {
     const text = extractMessageText(message);
     if (!text) return false;
 
-    // Patrones comunes de confirmación de bump en Disboard
+    // Solo considerar confirmaciones reales de bump exitoso.
+    // No debemos detectar respuestas de cooldown como "please wait...".
     return text.includes('bump done')
-        || text.includes('please wait another')
-        || text.includes('you can bump again')
-        || text.includes('/bump');
+        || text.includes('check it out on disboard')
+        || text.includes('has bumped');
 }
 
 async function handleDisboardBumpMessage(message) {
