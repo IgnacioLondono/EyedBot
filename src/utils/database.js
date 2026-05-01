@@ -324,6 +324,32 @@ const database = {
         }
     },
 
+    /**
+     * Lista pares key/value con clave leveling_user_{guildId}_{userId} (MySQL REGEXP).
+     */
+    listLevelingUserKeysForGuild: async (guildId) => {
+        if (shouldSkipDbCall()) return [];
+        const gid = String(guildId || '').replace(/\\/g, '\\\\').replace(/[.^$*+?()[\]{}|]/g, '\\$&');
+        const pattern = `^leveling_user_${gid}_[0-9]+$`;
+        try {
+            const conn = await getConnection();
+            const [rows] = await executeWithSchemaRecovery(
+                conn,
+                'SELECT `key`, `value` FROM key_value_store WHERE `key` REGEXP ?',
+                [pattern],
+                `listLevelingUserKeysForGuild:${guildId}`
+            );
+            return rows.map((row) => ({ key: row.key, value: deserializeValue(row.value) }));
+        } catch (error) {
+            if (isConnectionError(error)) {
+                setDbUnavailable(error, `listLevelingUserKeysForGuild:${guildId}`);
+                return [];
+            }
+            console.error(`Error en database.listLevelingUserKeysForGuild("${guildId}"):`, error.message);
+            return [];
+        }
+    },
+
     // Métodos adicionales para MySQL
     query: async (sql, params = []) => {
         if (shouldSkipDbCall()) {
