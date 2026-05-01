@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
-const { fetchInteractionGif, createReturnComponents, incrementMentionCount } = require('../../utils/fun-return');
+const { fetchInteractionGif, createReturnComponents, incrementMentionCount, addAnimeSourceField } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,8 +17,8 @@ module.exports = {
         const user = interaction.options.getUser('usuario');
         
         try {
-            const gifUrl = await fetchInteractionGif('punch');
-            if (!gifUrl) {
+            const media = await fetchInteractionGif('punch');
+            if (!media?.url) {
                 return interaction.editReply({
                     embeds: [new EmbedBuilder()
                         .setColor('#FF0000')
@@ -33,8 +33,9 @@ module.exports = {
                 .setColor(config.embedColor)
                 .setTitle('👊 Puñetazo')
                 .setDescription(`${interaction.user} golpeó a ${user}`)
-                .setImage(gifUrl)
                 .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+
+            addAnimeSourceField(embed, media?.source);
 
             if (Number.isFinite(counts?.total) && Number.isFinite(counts?.actionCount)) {
                 embed.addFields({
@@ -43,6 +44,8 @@ module.exports = {
                     inline: false
                 });
             }
+
+            embed.setImage(media.url);
 
             const components = createReturnComponents('punch', interaction.user.id, user.id);
 

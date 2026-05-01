@@ -79,14 +79,35 @@ async function incrementMentionCount(action, guildId, userId) {
     return { total, actionCount };
 }
 
+function truncateEmbedFieldValue(text, maxLen = 1024) {
+    const s = String(text).trim();
+    if (!s) return '';
+    if (s.length <= maxLen) return s;
+    return `${s.slice(0, maxLen - 3)}...`;
+}
+
+function addAnimeSourceField(embed, source) {
+    const v = source && String(source).trim();
+    if (!v) return;
+    embed.addFields({
+        name: '🎬 Anime',
+        value: truncateEmbedFieldValue(v),
+        inline: false
+    });
+}
+
 async function fetchFromWaifuPics(action) {
     const response = await axios.get(`https://api.waifu.pics/sfw/${action}`, { timeout: 8000 });
-    return response?.data?.url || null;
+    const url = response?.data?.url || null;
+    return url ? { url, source: null } : null;
 }
 
 async function fetchFromNekosBest(action) {
     const response = await axios.get(`https://nekos.best/api/v2/${action}`, { timeout: 8000 });
-    return response?.data?.results?.[0]?.url || null;
+    const row = response?.data?.results?.[0];
+    const url = row?.url || null;
+    const source = row?.anime_name?.trim() || null;
+    return url ? { url, source } : null;
 }
 
 async function fetchFromTenor(action) {
@@ -107,21 +128,26 @@ async function fetchFromTenor(action) {
     });
 
     const item = response?.data?.results?.[0];
-    return item?.media_formats?.gif?.url || null;
+    const url = item?.media_formats?.gif?.url || null;
+    if (!url) return null;
+    const desc = item?.content_description?.trim();
+    const title = item?.title?.trim();
+    const source = desc || title || null;
+    return { url, source };
 }
 
 async function fetchInteractionGif(action) {
-    const providers = [fetchFromWaifuPics, fetchFromNekosBest, fetchFromTenor];
+    const providers = [fetchFromNekosBest, fetchFromWaifuPics, fetchFromTenor];
     for (const provider of providers) {
         try {
-            const url = await provider(action);
-            if (url) return url;
+            const result = await provider(action);
+            if (result?.url) return result;
         } catch {
             // try next provider
         }
     }
 
-    return null;
+    return { url: null, source: null };
 }
 
 function createReturnComponents(action, authorId, targetId) {
@@ -166,7 +192,7 @@ async function handleReturnInteraction(interaction) {
         return true;
     }
 
-    const gifUrl = await fetchInteractionGif(parsed.action);
+    const media = await fetchInteractionGif(parsed.action);
     const counts = await incrementMentionCount(parsed.action, interaction.guild?.id || null, parsed.authorId).catch(() => ({ total: null, actionCount: null }));
 
     const embed = new EmbedBuilder()
@@ -174,6 +200,8 @@ async function handleReturnInteraction(interaction) {
         .setTitle(`${meta.title} (Devolución)`)
         .setDescription(`<@${interaction.user.id}> ${meta.verb} a <@${parsed.authorId}>`)
         .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+
+    addAnimeSourceField(embed, media?.source);
 
     if (Number.isFinite(counts?.total) && Number.isFinite(counts?.actionCount)) {
         embed.addFields({
@@ -183,7 +211,7 @@ async function handleReturnInteraction(interaction) {
         });
     }
 
-    if (gifUrl) embed.setImage(gifUrl);
+    if (media?.url) embed.setImage(media.url);
 
     const disabledRows = (interaction.message.components || []).map((row) => {
         const clone = ActionRowBuilder.from(row);
@@ -199,6 +227,7 @@ async function handleReturnInteraction(interaction) {
 module.exports = {
     getActionMeta,
     fetchInteractionGif,
+    addAnimeSourceField,
     incrementMentionCount,
     createReturnComponents,
     handleReturnInteraction
