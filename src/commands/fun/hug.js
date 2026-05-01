@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
-const { fetchInteractionGif, createReturnComponents, incrementMentionCount } = require('../../utils/fun-return');
+const { fetchInteractionGif, createReturnComponents, incrementMentionCount, addAnimeSourceField } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,7 +17,7 @@ module.exports = {
         const user = interaction.options.getUser('usuario');
         
         try {
-            const gifUrl = await fetchInteractionGif('hug');
+            const media = await fetchInteractionGif('hug');
             const counts = await incrementMentionCount('hug', interaction.guild?.id || null, user.id).catch(() => ({ total: null, actionCount: null }));
 
             const embed = new EmbedBuilder()
@@ -25,6 +25,8 @@ module.exports = {
                 .setTitle('🤗 Abrazo')
                 .setDescription(`${interaction.user} abrazó a ${user}`)
                 .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+
+            addAnimeSourceField(embed, media?.source);
 
             if (Number.isFinite(counts?.total) && Number.isFinite(counts?.actionCount)) {
                 embed.addFields({
@@ -34,7 +36,7 @@ module.exports = {
                 });
             }
 
-            if (gifUrl) embed.setImage(gifUrl);
+            if (media?.url) embed.setImage(media.url);
             const components = createReturnComponents('hug', interaction.user.id, user.id);
 
             return interaction.editReply({ embeds: [embed], components });
