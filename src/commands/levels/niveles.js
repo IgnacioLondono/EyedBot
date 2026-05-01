@@ -205,7 +205,7 @@ async function runTop(interaction) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('niveles')
-        .setDescription('Tu rango (solo tú lo ves) y rankings públicos del servidor')
+        .setDescription('Sistema de niveles y XP del servidor')
         .addSubcommand((sub) =>
             sub
                 .setName('rango')

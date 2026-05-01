@@ -18,12 +18,13 @@ const CATEGORY_META = {
     music: { label: '🎵 Música', title: '🎵 Música' },
     fun: { label: '🎮 Diversión', title: '🎮 Diversión' },
     utility: { label: '⚙️ Utilidades', title: '⚙️ Utilidades' },
+    levels: { label: '📊 Niveles', title: '📊 Niveles y XP' },
     config: { label: '🔧 Configuración', title: '🔧 Configuración' }
 };
 
 /** Carpeta del comando según el archivo en disco (sin opción /help categoria). */
 function findCommandCategory(commandName) {
-    const folders = ['moderation', 'music', 'fun', 'utility', 'config'];
+    const folders = ['moderation', 'music', 'fun', 'levels', 'utility', 'config'];
     for (const folder of folders) {
         const fp = path.join(COMMAND_ROOT, folder, `${commandName}.js`);
         if (fs.existsSync(fp)) return folder;
@@ -33,7 +34,7 @@ function findCommandCategory(commandName) {
 
 function groupCommands(commands) {
     const map = new Map();
-    for (const folder of ['moderation', 'music', 'fun', 'utility', 'config']) {
+    for (const folder of ['moderation', 'music', 'fun', 'levels', 'utility', 'config']) {
         map.set(folder, []);
     }
     for (const cmd of commands.values()) {
@@ -67,6 +68,7 @@ function countBrowsableCommands(grouped, showModeration) {
     let n =
         (grouped.get('fun') || []).length +
         (grouped.get('utility') || []).length +
+        (grouped.get('levels') || []).length +
         (grouped.get('music') || []).length +
         (grouped.get('config') || []).length;
     if (showModeration) n += (grouped.get('moderation') || []).length;
@@ -102,6 +104,9 @@ function buildComponentRows(activeKey, requesterId, grouped, showModeration) {
     const row1comps = [];
     if (showModeration) row1comps.push(categoryButton('moderation', activeKey, requesterId));
     row1comps.push(categoryButton('fun', activeKey, requesterId), categoryButton('utility', activeKey, requesterId));
+    if ((grouped.get('levels') || []).length > 0) {
+        row1comps.push(categoryButton('levels', activeKey, requesterId));
+    }
     const row1 = new ActionRowBuilder().addComponents(...row1comps);
 
     const row2comps = [];
@@ -138,6 +143,11 @@ function buildEmbed(activeKey, grouped, totalCommands, showModeration) {
                 inline: true
             },
             {
+                name: CATEGORY_META.levels.title,
+                value: `${(grouped.get('levels') || []).length} comandos`,
+                inline: true
+            },
+            {
                 name: CATEGORY_META.music.title,
                 value: `${(grouped.get('music') || []).length} comandos`,
                 inline: true
@@ -162,6 +172,19 @@ function buildEmbed(activeKey, grouped, totalCommands, showModeration) {
             .setTimestamp();
 
         return embed;
+    }
+
+    if (activeKey === 'levels') {
+        const lines = [
+            '• `/niveles rango` — Tu nivel, XP total, barra al siguiente nivel, puesto en el servidor, mensajes/voz y roles configurados en el sistema de niveles *(solo lo ves tú)*.',
+            '• `/niveles top` — Ranking público del servidor por XP, mensajes o minutos en voz (cantidad 5–25).'
+        ];
+        return new EmbedBuilder()
+            .setColor(config.embedColor)
+            .setTitle(CATEGORY_META.levels.title)
+            .setDescription(fitDescription(lines, 3900))
+            .setFooter({ text: `${(grouped.get('levels') || []).length} comando(s) · Prefijo: ${config.prefix}` })
+            .setTimestamp();
     }
 
     const list = grouped.get(activeKey) || [];
