@@ -19,6 +19,35 @@ async function formatRoleLine(guild, roleId) {
     return `\`${id}\` (rol no encontrado)`;
 }
 
+/** Evita que nicks rompan el markdown del embed y que `<@id>` dependa de la caché del cliente. */
+function escapeDiscordEmbed(text) {
+    return String(text)
+        .replace(/\\/g, '\\\\')
+        .replace(/\*/g, '\\*')
+        .replace(/_/g, '\\_')
+        .replace(/`/g, '\\`')
+        .replace(/~/g, '\\~')
+        .replace(/\|/g, '\\|');
+}
+
+async function resolveLeaderboardDisplayName(guild, client, userId) {
+    const id = String(userId);
+    const cached = guild.members.cache.get(id);
+    if (cached) {
+        const n = cached.displayName || cached.user?.username;
+        if (n) return n;
+    }
+    const member = await guild.members.fetch(id).catch(() => null);
+    if (member) {
+        return member.displayName || member.user?.username || id;
+    }
+    const user = await client.users.fetch(id).catch(() => null);
+    if (user) {
+        return user.globalName || user.username || id;
+    }
+    return `Usuario (${id.slice(-6)})`;
+}
+
 async function runRango(interaction) {
     const guild = interaction.guild;
     const target = interaction.options.getUser('usuario') || interaction.user;
@@ -127,33 +156,50 @@ async function runTop(interaction) {
         });
     }
 
+    await interaction.deferReply();
+
     const ordenLabel = orden === 'mensajes' ? 'mensajes' : orden === 'voz' ? 'minutos en voz' : 'XP';
-
-    const lines = [];
     const slice = sorted.slice(0, take);
-    for (let i = 0; i < slice.length; i++) {
-        const row = slice[i];
-        const lvl = getLevelFromXp(Number(row.xp) || 0, difficulty);
-        let sufijo = '';
-        if (orden === 'mensajes') sufijo = ` · **${(Number(row.messageCount) || 0).toLocaleString('es-ES')}** msgs`;
-        else if (orden === 'voz') sufijo = ` · **${(Number(row.voiceMinutes) || 0).toLocaleString('es-ES')}** min`;
-        else sufijo = ` · **${(Number(row.xp) || 0).toLocaleString('es-ES')}** XP`;
-        lines.push(`**${i + 1}.** <@${row.userId}> — Nv **${lvl}**${sufijo}`);
+    const client = interaction.client;
+
+    try {
+        const lines = await Promise.all(
+            slice.map(async (row, i) => {
+                const lvl = getLevelFromXp(Number(row.xp) || 0, difficulty);
+                let sufijo = '';
+                if (orden === 'mensajes') {
+                    sufijo = ` · **${(Number(row.messageCount) || 0).toLocaleString('es-ES')}** msgs`;
+                } else if (orden === 'voz') {
+                    sufijo = ` · **${(Number(row.voiceMinutes) || 0).toLocaleString('es-ES')}** min`;
+                } else {
+                    sufijo = ` · **${(Number(row.xp) || 0).toLocaleString('es-ES')}** XP`;
+                }
+                const label = escapeDiscordEmbed(
+                    await resolveLeaderboardDisplayName(guild, client, row.userId)
+                );
+                return `**${i + 1}.** ${label} — Nv **${lvl}**${sufijo}`;
+            })
+        );
+
+        const embed = new EmbedBuilder()
+            .setColor(config.embedColor)
+            .setTitle(`🏆 Ranking por ${ordenLabel}`)
+            .setDescription(lines.join('\n'))
+            .setFooter({
+                text:
+                    cfg?.enabled === true
+                        ? `Mostrando ${slice.length} de ${sorted.length} · ${interaction.user.tag}`
+                        : `Niveles desactivados (solo datos guardados) · ${interaction.user.tag}`
+            })
+            .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+        console.error('niveles top:', error);
+        return interaction.editReply({
+            content: 'No se pudo armar el ranking. Probá de nuevo en unos segundos.'
+        });
     }
-
-    const embed = new EmbedBuilder()
-        .setColor(config.embedColor)
-        .setTitle(`🏆 Ranking por ${ordenLabel}`)
-        .setDescription(lines.join('\n'))
-        .setFooter({
-            text:
-                cfg?.enabled === true
-                    ? `Mostrando ${slice.length} de ${sorted.length} · ${interaction.user.tag}`
-                    : `Niveles desactivados (solo datos guardados) · ${interaction.user.tag}`
-        })
-        .setTimestamp();
-
-    return interaction.reply({ embeds: [embed] });
 }
 
 module.exports = {
