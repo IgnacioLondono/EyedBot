@@ -5,7 +5,8 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    PermissionFlagsBits
 } = require('discord.js');
 const config = require('../../config');
 
@@ -46,6 +47,32 @@ function groupCommands(commands) {
     return map;
 }
 
+/** Misma lógica que los slash de moderación en src/index.js */
+function canSeeModerationHelp(interaction) {
+    const perms = interaction.memberPermissions;
+    if (!perms) return false;
+
+    return (
+        perms.has(PermissionFlagsBits.Administrator) ||
+        perms.has(PermissionFlagsBits.ManageGuild) ||
+        perms.has(PermissionFlagsBits.ManageMessages) ||
+        perms.has(PermissionFlagsBits.KickMembers) ||
+        perms.has(PermissionFlagsBits.BanMembers) ||
+        perms.has(PermissionFlagsBits.ModerateMembers) ||
+        perms.has(PermissionFlagsBits.ManageChannels)
+    );
+}
+
+function countBrowsableCommands(grouped, showModeration) {
+    let n =
+        (grouped.get('fun') || []).length +
+        (grouped.get('utility') || []).length +
+        (grouped.get('music') || []).length +
+        (grouped.get('config') || []).length;
+    if (showModeration) n += (grouped.get('moderation') || []).length;
+    return n;
+}
+
 function fitDescription(lines, maxLen = 3900) {
     let total = 0;
     const out = [];
@@ -71,12 +98,11 @@ function categoryButton(cat, activeKey, requesterId) {
         .setDisabled(active);
 }
 
-function buildComponentRows(activeKey, requesterId, grouped) {
-    const row1 = new ActionRowBuilder().addComponents(
-        categoryButton('moderation', activeKey, requesterId),
-        categoryButton('fun', activeKey, requesterId),
-        categoryButton('utility', activeKey, requesterId)
-    );
+function buildComponentRows(activeKey, requesterId, grouped, showModeration) {
+    const row1comps = [];
+    if (showModeration) row1comps.push(categoryButton('moderation', activeKey, requesterId));
+    row1comps.push(categoryButton('fun', activeKey, requesterId), categoryButton('utility', activeKey, requesterId));
+    const row1 = new ActionRowBuilder().addComponents(...row1comps);
 
     const row2comps = [];
     if ((grouped.get('music') || []).length > 0) {
@@ -89,41 +115,49 @@ function buildComponentRows(activeKey, requesterId, grouped) {
     return [row1, row2];
 }
 
-function buildEmbed(activeKey, grouped, totalCommands) {
+function buildEmbed(activeKey, grouped, totalCommands, showModeration) {
     if (activeKey === 'overview' || !CATEGORY_META[activeKey]) {
+        const browsable = countBrowsableCommands(grouped, showModeration);
+        const fields = [];
+        if (showModeration) {
+            fields.push({
+                name: CATEGORY_META.moderation.title,
+                value: `${(grouped.get('moderation') || []).length} comandos`,
+                inline: true
+            });
+        }
+        fields.push(
+            {
+                name: CATEGORY_META.fun.title,
+                value: `${(grouped.get('fun') || []).length} comandos`,
+                inline: true
+            },
+            {
+                name: CATEGORY_META.utility.title,
+                value: `${(grouped.get('utility') || []).length} comandos`,
+                inline: true
+            },
+            {
+                name: CATEGORY_META.music.title,
+                value: `${(grouped.get('music') || []).length} comandos`,
+                inline: true
+            },
+            {
+                name: CATEGORY_META.config.title,
+                value: `${(grouped.get('config') || []).length} comandos`,
+                inline: true
+            }
+        );
+
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle(CATEGORY_META.overview.title)
             .setDescription(
-                `Hay **${totalCommands}** comandos slash registrados.\nUsa los botones para ver cada categoría (solo tú puedes usar este panel).`
+                `Aquí puedes ver **${browsable}** comandos agrupados por categoría.\n` +
+                    `*(El bot tiene ${totalCommands} comandos registrados en total.)*\n\n` +
+                    'Usa los botones para navegar (solo tú puedes usar este panel).'
             )
-            .addFields(
-                {
-                    name: CATEGORY_META.moderation.title,
-                    value: `${(grouped.get('moderation') || []).length} comandos`,
-                    inline: true
-                },
-                {
-                    name: CATEGORY_META.fun.title,
-                    value: `${(grouped.get('fun') || []).length} comandos`,
-                    inline: true
-                },
-                {
-                    name: CATEGORY_META.utility.title,
-                    value: `${(grouped.get('utility') || []).length} comandos`,
-                    inline: true
-                },
-                {
-                    name: CATEGORY_META.music.title,
-                    value: `${(grouped.get('music') || []).length} comandos`,
-                    inline: true
-                },
-                {
-                    name: CATEGORY_META.config.title,
-                    value: `${(grouped.get('config') || []).length} comandos`,
-                    inline: true
-                }
-            )
+            .addFields(fields)
             .setFooter({ text: `Prefijo legacy (si aplica): ${config.prefix}` })
             .setTimestamp();
 
@@ -173,9 +207,18 @@ async function handleHelpButton(interaction) {
         return true;
     }
 
+    const showModeration = canSeeModerationHelp(interaction);
+    if (category === 'moderation' && !showModeration) {
+        await interaction.reply({
+            content: '🔒 No tienes permiso para ver la ayuda de moderación.',
+            ephemeral: true
+        });
+        return true;
+    }
+
     const grouped = groupCommands(interaction.client.commands);
-    const embed = buildEmbed(category, grouped, interaction.client.commands.size);
-    const rows = buildComponentRows(category, ownerId, grouped);
+    const embed = buildEmbed(category, grouped, interaction.client.commands.size, showModeration);
+    const rows = buildComponentRows(category, ownerId, grouped, showModeration);
 
     try {
         await interaction.update({ embeds: [embed], components: rows });
@@ -200,8 +243,9 @@ module.exports = {
         try {
             const grouped = groupCommands(interaction.client.commands);
             const uid = interaction.user.id;
-            const embed = buildEmbed('overview', grouped, interaction.client.commands.size);
-            const rows = buildComponentRows('overview', uid, grouped);
+            const showModeration = canSeeModerationHelp(interaction);
+            const embed = buildEmbed('overview', grouped, interaction.client.commands.size, showModeration);
+            const rows = buildComponentRows('overview', uid, grouped, showModeration);
 
             return interaction.reply({
                 embeds: [embed],
