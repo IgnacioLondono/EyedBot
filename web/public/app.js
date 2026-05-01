@@ -419,8 +419,10 @@ function handleServerSideAction(button) {
     const quickSection = button.dataset.quickSection || '';
 
     if (paneId) {
-        showSection('serverSection');
-        switchServerPane(paneId, button);
+        showSection('serverSection', {
+            serverPaneAfterLoad: paneId,
+            serverPaneAfterLoadButton: button
+        });
         return;
     }
 
@@ -2096,8 +2098,13 @@ function showSection(sectionId, options = {}) {
     } else if (sectionId === 'commandsSection') {
         loadCommands();
     } else if (sectionId === 'serverSection') {
-        loadGuildsForServer();
-        switchServerPane(currentServerPaneId || 'serverPaneOverview');
+        if (!options.skipServerDataLoad) {
+            void loadGuildsForServer().then(() => {
+                const pane = options.serverPaneAfterLoad || currentServerPaneId || 'serverPaneOverview';
+                const paneBtn = options.serverPaneAfterLoadButton || null;
+                switchServerPane(pane, paneBtn);
+            });
+        }
     } else if (sectionId === 'controlCenterSection') {
         loadAboutOverview();
         refreshActiveSectionReveal();
@@ -3402,9 +3409,6 @@ async function selectServerGuild(guildId, options = {}) {
     if (gachaContainer) {
         gachaContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema gacha...</p></div>';
     }
-    if (channelSetupContainer) {
-        channelSetupContainer.innerHTML = '';
-    }
 
     try {
         await Promise.all([
@@ -3421,6 +3425,9 @@ async function selectServerGuild(guildId, options = {}) {
             loadGachaPanel(guildId)
         ]);
         saveState();
+        if (currentServerPaneId === 'serverPaneChannelSetup') {
+            openChannelSetupPane();
+        }
     } finally {
         setServerSwitchingState(false);
     }
@@ -3455,7 +3462,6 @@ async function loadGuildsForServer() {
         if (securityContainer) securityContainer.innerHTML = '';
         if (notificationsContainer) notificationsContainer.innerHTML = '';
         if (gachaContainer) gachaContainer.innerHTML = '';
-        if (channelSetupContainer) channelSetupContainer.innerHTML = '';
         if (tabsContainer) tabsContainer.innerHTML = '';
         
         if (!hasSelectedGuildContext()) {
@@ -9119,7 +9125,7 @@ window.selectGuild = async function(guildId) {
     setServerFeaturesNavigationVisible(true);
     updateDashboardButtonState();
 
-    showSection('serverSection');
+    showSection('serverSection', { skipServerDataLoad: true });
     await loadGuildsForServer();
     switchServerPane('serverPaneOverview');
     updateServerMenuIdentity();
