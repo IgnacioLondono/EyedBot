@@ -636,8 +636,8 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 .side-menu-group-title {
     color: #b7a6dc !important;
-    font-size: 0.74rem !important;
-    letter-spacing: 0.13em !important;
+    font-size: 0.82rem !important;
+    letter-spacing: 0.11em !important;
     text-transform: uppercase;
     padding: 0.58rem 0.62rem 0.42rem !important;
     margin-top: 0.24rem !important;
@@ -653,14 +653,17 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 .side-menu-btn {
     border-radius: 12px !important;
-    margin: 0.1rem 0 !important;
+    margin: 0.12rem 0 !important;
+    font-size: 0.92rem !important;
+    line-height: 1.35 !important;
     transition: background 0.22s ease, color 0.2s ease, transform 0.18s ease, border-color 0.22s ease, box-shadow 0.22s ease;
     background: linear-gradient(180deg, rgba(26, 15, 52, 0.7), rgba(18, 10, 38, 0.72)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
 }
 .side-menu-btn-inner {
-    gap: 0.66rem !important;
-    padding: 0.6rem 0.74rem !important;
+    gap: 0.72rem !important;
+    padding: 0.68rem 0.82rem !important;
+    min-height: 44px !important;
     color: #d4c7f1 !important;
 }
 .side-menu-btn:hover {
@@ -674,8 +677,9 @@ label { color: var(--text-secondary); font-weight: 500; }
     transform: scale(1.03);
 }
 .side-menu-icon {
-    width: 18px !important;
-    height: 18px !important;
+    width: 22px !important;
+    height: 22px !important;
+    padding: 3px !important;
     flex-shrink: 0;
     color: #aa96d6;
     transition: color 0.2s ease, transform 0.2s ease, filter 0.2s ease;
@@ -696,9 +700,9 @@ label { color: var(--text-secondary); font-weight: 500; }
     transform: scale(1.05);
 }
 .side-menu-group-icon {
-    width: 20px;
-    height: 20px;
-    padding: 4px;
+    width: 24px;
+    height: 24px;
+    padding: 5px;
     box-sizing: content-box;
 }
 
@@ -725,11 +729,10 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 
 /* -----------------------------------------------------------------
-   Compact mode visual: más contenido visible en 100% de zoom
-   (similar a usar zoom ~67-75% en la vista de configuración servidor)
+   Escala del panel servidor: equilibrio entre densidad y lectura.
    ----------------------------------------------------------------- */
 :root {
-    --server-ui-scale: 0.74;
+    --server-ui-scale: 0.9;
 }
 
 .section#serverSection .container {
@@ -746,7 +749,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 @media (max-width: 1366px) {
     :root {
-        --server-ui-scale: 0.82;
+        --server-ui-scale: 0.94;
     }
 }
 
