@@ -4966,52 +4966,142 @@ mark.receipt-highlight {
     50% { transform: scale(0.7); opacity: 0.5; }
 }
 
-/* Switch custom */
+/* Switch + estado legible (juegos gratis) */
+#serverPaneFreeGames .fg-enable-block.form-group label.fg-switch-label::before {
+    content: none !important;
+    display: none !important;
+}
+
 .fg-switch-label {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 0.7rem !important;
+    position: relative;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
     cursor: pointer !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
-    font-size: 0.95rem !important;
-    color: #f4eeff !important;
-    font-weight: 600 !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    color: inherit !important;
+    padding: 0.85rem 1rem;
+    margin: 0;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(255, 255, 255, 0.08));
+    background: rgba(6, 3, 18, 0.45);
+    transition: border-color 0.2s ease, background 0.2s ease;
 }
-.fg-switch-label::before { display: none !important; }
-.fg-switch-label input[type="checkbox"] {
+
+.fg-switch-label:hover {
+    border-color: color-mix(in srgb, var(--pane-accent) 45%, rgba(255, 255, 255, 0.12));
+}
+
+.fg-switch-label:has(.fg-switch-input:focus-visible) {
+    outline: 2px solid color-mix(in srgb, var(--pane-accent) 75%, #ffffff);
+    outline-offset: 2px;
+}
+
+/* Checkbox cubre toda la tarjeta: siempre clicable */
+.fg-switch-label .fg-switch-input {
     position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
     opacity: 0;
+    cursor: pointer;
+    z-index: 3;
+    appearance: none;
+}
+
+.fg-switch,
+.fg-switch-knob,
+.fg-switch-copy {
     pointer-events: none;
 }
+
 .fg-switch {
     position: relative;
-    width: 44px;
-    height: 24px;
+    width: 48px;
+    height: 26px;
     border-radius: 999px;
-    background: rgba(124, 77, 255, 0.12);
-    border: 1px solid rgba(190, 155, 255, 0.25);
-    transition: background 0.2s ease, border-color 0.2s ease;
     flex-shrink: 0;
+    margin-top: 0.15rem;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+
 .fg-switch-knob {
     position: absolute;
-    top: 2px;
-    left: 2px;
+    top: 3px;
+    left: 3px;
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #f4eeff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease, background 0.2s ease;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), background 0.2s ease;
 }
-.fg-switch-label input[type="checkbox"]:checked + .fg-switch {
+
+.fg-switch-label:has(.fg-switch-input:checked) .fg-switch {
+    background: linear-gradient(135deg, var(--pane-accent), var(--pane-accent-2));
+    border-color: color-mix(in srgb, var(--pane-accent) 55%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--pane-accent) 35%, transparent);
+}
+
+.fg-switch-label:has(.fg-switch-input:checked) .fg-switch-knob {
+    transform: translateX(22px);
+    background: #ffffff;
+}
+
+.fg-switch-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+    flex: 1;
+    z-index: 1;
+}
+
+.fg-status-badge {
+    align-self: flex-start;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.28rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+.fg-status-badge.is-off {
+    color: #b0a8c4;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.fg-status-badge.is-on {
+    color: #062923;
     background: linear-gradient(135deg, var(--pane-accent), var(--pane-accent-2));
     border-color: transparent;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--pane-accent) 40%, transparent);
 }
-.fg-switch-label input[type="checkbox"]:checked + .fg-switch .fg-switch-knob {
-    transform: translateX(20px);
-    background: #ffffff;
+
+.fg-switch-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #f4eeff;
+    line-height: 1.3;
+}
+
+.fg-switch-hint {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #9a92b8;
+    line-height: 1.45;
+    max-width: 42rem;
 }
 
 /* Plataformas - chips */
