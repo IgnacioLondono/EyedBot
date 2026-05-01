@@ -4087,7 +4087,7 @@ body {
 }
 
 .server-shell {
-    grid-template-columns: 290px minmax(0, 1fr);
+    grid-template-columns: 312px minmax(0, 1fr);
     gap: var(--panel-gap);
     height: 100%;
     min-height: 0;
@@ -4214,7 +4214,7 @@ body {
     }
 
     .server-shell {
-        grid-template-columns: 250px minmax(0, 1fr);
+        grid-template-columns: 268px minmax(0, 1fr);
     }
 }
 
