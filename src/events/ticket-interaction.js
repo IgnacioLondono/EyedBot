@@ -1610,16 +1610,21 @@ async function listTicketReports(guildId, limit = 50) {
     const safeGuildId = String(guildId || '');
     if (!safeGuildId) return [];
 
+    const lim = Math.max(1, Math.min(500, Number(limit) || 50));
+    /** Las claves de informe son `ticket_report_${reportId}` con reportId tipo TK-{guildId}-00001 (no mezclar con ticket_report_counter_…). */
+    const keyLike = `ticket_report_TK-${safeGuildId}-%`;
+
     try {
         const rows = await db.query(
-            'SELECT `value` FROM key_value_store WHERE `key` LIKE ? ORDER BY created_at DESC LIMIT ?',
-            [`ticket_report_%`, Math.max(1, Math.min(500, Number(limit) || 50))]
+            'SELECT `value` FROM key_value_store WHERE `key` LIKE ? ORDER BY updated_at DESC LIMIT ?',
+            [keyLike, lim]
         );
 
         const out = [];
         for (const row of rows || []) {
             try {
-                const parsed = JSON.parse(row.value);
+                const raw = row?.value;
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
                 if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) {
                     out.push(parsed);
                 }
