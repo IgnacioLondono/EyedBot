@@ -163,7 +163,7 @@ module.exports = {
         .addSubcommand((sub) =>
             sub
                 .setName('rango')
-                .setDescription('Tu embed de nivel y roles (solo visible para ti)')
+                .setDescription('Ver progreso de nivel de un usuario')
                 .addUserOption((opt) =>
                     opt.setName('usuario').setDescription('Miembro a consultar (por defecto tú)').setRequired(false)
                 )
