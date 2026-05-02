@@ -29,6 +29,16 @@ module.exports = {
                         .setName('mensaje')
                         .setDescription('Mensaje personalizado para el recordatorio')
                         .setMaxLength(1500)
+                        .setRequired(false))
+                .addRoleOption((option) =>
+                    option
+                        .setName('rol')
+                        .setDescription('Rol a mencionar en recordatorios y al detectar bump (opcional)')
+                        .setRequired(false))
+                .addBooleanOption((option) =>
+                    option
+                        .setName('quitar_mencion')
+                        .setDescription('Quitar la mención por rol (no uses esto si eliges un rol nuevo)')
                         .setRequired(false)))
         .addSubcommand((subcommand) =>
             subcommand
@@ -48,24 +58,35 @@ module.exports = {
             const channel = interaction.options.getChannel('canal', true);
             const intervalMinutes = interaction.options.getInteger('intervalo') ?? 120;
             const message = interaction.options.getString('mensaje') || '🔔 Ya puedes hacer `/bump` en Disboard.';
+            const quitarMencion = interaction.options.getBoolean('quitar_mencion') === true;
+            const rol = interaction.options.getRole('rol');
 
             const config = await bumpReminderStore.getBumpReminderConfig(guildId);
+            let pingRoleId = config.pingRoleId || '';
+            if (quitarMencion) pingRoleId = '';
+            else if (rol) pingRoleId = rol.id;
+
             const updated = await bumpReminderStore.setBumpReminderConfig(guildId, {
                 ...config,
                 enabled: true,
                 channelId: channel.id,
                 intervalMinutes,
                 message,
+                pingRoleId,
                 nextReminderAt: buildNextReminderAt(intervalMinutes),
                 updatedAt: new Date().toISOString(),
                 updatedBy: interaction.user.id
             });
 
+            const mencionLine = updated.pingRoleId
+                ? `Mención: <@&${updated.pingRoleId}>`
+                : 'Mención: *ninguna*';
+
             return interaction.reply({
                 embeds: [
                     Embeds.success(
                         'Bump reminder configurado',
-                        `Canal: ${channel}\nIntervalo: **${updated.intervalMinutes} min**\nProximo aviso: <t:${Math.floor(Date.parse(updated.nextReminderAt) / 1000)}:R>`
+                        `Canal: ${channel}\nIntervalo: **${updated.intervalMinutes} min**\n${mencionLine}\nProximo aviso: <t:${Math.floor(Date.parse(updated.nextReminderAt) / 1000)}:R>`
                     )
                 ]
             });
@@ -84,11 +105,15 @@ module.exports = {
                 ? `<t:${Math.floor(Date.parse(config.nextReminderAt) / 1000)}:R>`
                 : 'No definido';
 
+            const mencionEstado = config.pingRoleId
+                ? `Mención (rol): <@&${config.pingRoleId}>`
+                : 'Mención (rol): *ninguna*';
+
             return interaction.reply({
                 embeds: [
                     Embeds.info(
                         'Estado bump reminder',
-                        `Activo: **Si**\nCanal: <#${config.channelId}>\nIntervalo: **${config.intervalMinutes} min**\nProximo aviso: **${nextTs}**\nMensaje: ${config.message}`
+                        `Activo: **Si**\nCanal: <#${config.channelId}>\nIntervalo: **${config.intervalMinutes} min**\n${mencionEstado}\nProximo aviso: **${nextTs}**\nMensaje: ${config.message}`
                     )
                 ],
                 flags: 64

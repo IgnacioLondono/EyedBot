@@ -36,7 +36,9 @@ async function postReminder(client, guildId, config) {
         .setFooter({ text: 'EyedBot • Bump Reminder' })
         .setTimestamp(new Date());
 
-    await channel.send({ embeds: [embed] });
+    const rid = String(config.pingRoleId || '').trim();
+    const content = rid ? `<@&${rid}>` : undefined;
+    await channel.send(content ? { content, embeds: [embed] } : { embeds: [embed] });
     return true;
 }
 
@@ -145,8 +147,8 @@ async function handleDisboardBumpMessage(message) {
         || await guild?.channels?.fetch?.(config.channelId).catch(() => null);
     if (channel?.isTextBased()) {
         const nextTs = Math.floor(Date.parse(nextConfig.nextReminderAt) / 1000);
-        const bumperId = message.interaction?.user?.id || message.interactionMetadata?.user?.id || '';
-        const mention = bumperId ? `<@${bumperId}> ` : '';
+        const rid = String(config.pingRoleId || '').trim();
+        const mention = rid ? `<@&${rid}> ` : '';
         await channel.send({
             content: `${mention}✅ Bump detectado. Próximo recordatorio <t:${nextTs}:R>.`
         }).catch(() => null);

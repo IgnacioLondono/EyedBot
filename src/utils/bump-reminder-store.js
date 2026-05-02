@@ -55,6 +55,7 @@ function defaultConfig() {
         channelId: '',
         intervalMinutes: 120,
         message: '🔔 Ya puedes hacer `/bump` en Disboard.',
+        pingRoleId: '',
         nextReminderAt: '',
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
@@ -71,6 +72,7 @@ function normalizeConfig(raw = {}) {
         channelId: String(raw.channelId || '').trim(),
         intervalMinutes,
         message: String(raw.message || base.message).slice(0, 1500),
+        pingRoleId: String(raw.pingRoleId || '').replace(/\D/g, '').slice(0, 24),
         nextReminderAt: String(raw.nextReminderAt || ''),
         updatedAt: String(raw.updatedAt || new Date().toISOString()),
         updatedBy: String(raw.updatedBy || 'system')
