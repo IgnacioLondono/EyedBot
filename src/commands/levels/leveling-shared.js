@@ -1,8 +1,9 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const config = require('../../config');
 const levelingStore = require('../../utils/leveling-store');
 const { getLevelFromXp, getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
 const { parseRoleRewards, getRoleRewardTiersForLevel } = require('../../utils/leveling-rewards');
+const { EYED_LEVEL_TIERS, formatLevelRange } = require('../../utils/eyed-tier-catalog');
 
 function progressBar(percent, width = 14) {
     const p = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -19,7 +20,6 @@ async function formatRoleLine(guild, roleId) {
     return `\`${id}\` (rol no encontrado)`;
 }
 
-/** Evita que nicks rompan el markdown del embed y que `<@id>` dependa de la caché del cliente. */
 function escapeDiscordEmbed(text) {
     return String(text)
         .replace(/\\/g, '\\\\')
@@ -48,9 +48,13 @@ async function resolveLeaderboardDisplayName(guild, client, userId) {
     return `Usuario (${id.slice(-6)})`;
 }
 
-async function runRango(interaction) {
+/**
+ * Progreso solo para quien ejecuta el comando (consulta propia, ephemeral).
+ */
+async function runNivelSelf(interaction) {
     const guild = interaction.guild;
-    const target = interaction.options.getUser('usuario') || interaction.user;
+    const target = interaction.user;
+
     const cfg = await levelingStore.getLevelingConfig(guild.id);
     const difficulty = sanitizeDifficulty(cfg?.difficulty);
 
@@ -80,7 +84,7 @@ async function runRango(interaction) {
             name: target.globalName || target.username,
             iconURL: target.displayAvatarURL({ size: 128 })
         })
-        .setTitle('📊 Progreso de nivel')
+        .setTitle('📊 Tu nivel')
         .addFields(
             { name: 'Nivel', value: `**${level}**`, inline: true },
             { name: 'XP total', value: `**${xp.toLocaleString('es-ES')}**`, inline: true },
@@ -94,7 +98,7 @@ async function runRango(interaction) {
         .setFooter({
             text:
                 cfg?.enabled === true
-                    ? `Pedido por ${interaction.user.tag}`
+                    ? 'Solo tú ves este mensaje · EyedBot niveles'
                     : `Sistema de niveles desactivado (solo lectura) · ${interaction.user.tag}`
         })
         .setTimestamp();
@@ -131,6 +135,27 @@ async function runRango(interaction) {
             });
         }
     }
+
+    return interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+/** Rangos Eyed actuales (catálogo en código = datos en tiempo real al ejecutar). Ephemeral: consulta propia. */
+async function runRangos(interaction) {
+    const fields = EYED_LEVEL_TIERS.map((tier) => ({
+        name: `${tier.label} · ${formatLevelRange(tier)}`,
+        value: tier.description
+    }));
+
+    const embed = new EmbedBuilder()
+        .setColor(config.embedColor)
+        .setTitle('🌌 Rangos del sistema Eyed')
+        .setDescription(
+            'Lista **actual** de rangos por nivel numérico y su significado. ' +
+                'Los **roles de Discord** y las **recompensas por nivel** los configura el staff en el panel.'
+        )
+        .addFields(fields)
+        .setFooter({ text: 'Solo tú ves este mensaje · Rangos en tiempo real al usar el comando' })
+        .setTimestamp();
 
     return interaction.reply({ embeds: [embed], ephemeral: true });
 }
@@ -195,7 +220,7 @@ async function runTop(interaction) {
 
         return interaction.editReply({ embeds: [embed] });
     } catch (error) {
-        console.error('niveles top:', error);
+        console.error('top niveles:', error);
         return interaction.editReply({
             content: 'No se pudo armar el ranking. Probá de nuevo en unos segundos.'
         });
@@ -203,53 +228,7 @@ async function runTop(interaction) {
 }
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('niveles')
-        .setDescription('Sistema de niveles y XP del servidor')
-        .addSubcommand((sub) =>
-            sub
-                .setName('rango')
-                .setDescription('Ver el progreso de un usuario')
-                .addUserOption((opt) =>
-                    opt.setName('usuario').setDescription('Miembro a consultar (por defecto tú)').setRequired(false)
-                )
-        )
-        .addSubcommand((sub) =>
-            sub
-                .setName('top')
-                .setDescription('Ranking público en el canal')
-                .addStringOption((opt) =>
-                    opt
-                        .setName('orden')
-                        .setDescription('Criterio de clasificación')
-                        .setRequired(false)
-                        .addChoices(
-                            { name: 'XP total', value: 'xp' },
-                            { name: 'Mensajes', value: 'mensajes' },
-                            { name: 'Tiempo en voz', value: 'voz' }
-                        )
-                )
-                .addIntegerOption((opt) =>
-                    opt
-                        .setName('cantidad')
-                        .setDescription('Cantidad de puestos (5 a 25)')
-                        .setMinValue(5)
-                        .setMaxValue(25)
-                        .setRequired(false)
-                )
-        ),
-    cooldown: 4,
-    async execute(interaction) {
-        if (!interaction.guild) {
-            return interaction.reply({
-                content: 'Este comando solo se puede usar dentro de un servidor.',
-                flags: 64
-            });
-        }
-
-        const sub = interaction.options.getSubcommand();
-        if (sub === 'rango') return runRango(interaction);
-        if (sub === 'top') return runTop(interaction);
-        return interaction.reply({ content: 'Subcomando no reconocido.', flags: 64 });
-    }
+    runNivelSelf,
+    runRangos,
+    runTop
 };

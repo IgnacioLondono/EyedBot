@@ -176,8 +176,9 @@ function buildEmbed(activeKey, grouped, totalCommands, showModeration) {
 
     if (activeKey === 'levels') {
         const lines = [
-            '• `/niveles rango` — Ver el progreso de un usuario (tú u otro): nivel, XP total, barra al siguiente nivel, puesto en el servidor, mensajes/voz y roles del sistema de niveles *(solo lo ves tú)*.',
-            '• `/niveles top` — Ranking público del servidor por XP, mensajes o minutos en voz (cantidad 5–25).'
+            '• `/nivel` — Tu progreso: nivel, XP total, barra al siguiente nivel, puesto en el servidor, mensajes/voz y roles del sistema *(solo lo ves tú)*.',
+            '• `/rangos` — Lista los rangos Eyed (por nivel numérico) y la descripción de cada uno *(solo lo ves tú)*.',
+            '• `/top` — Ranking público del servidor por XP, mensajes o minutos en voz (cantidad 5–25).'
         ];
         return new EmbedBuilder()
             .setColor(config.embedColor)
