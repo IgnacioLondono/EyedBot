@@ -3,7 +3,7 @@ const config = require('../../config');
 const levelingStore = require('../../utils/leveling-store');
 const { getLevelFromXp, getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
 const { parseRoleRewards, getRoleRewardTiersForLevel } = require('../../utils/leveling-rewards');
-const { EYED_LEVEL_TIERS, formatLevelRange, tierForLevel } = require('../../utils/eyed-tier-catalog');
+const { EYED_LEVEL_TIERS, formatLevelRange } = require('../../utils/eyed-tier-catalog');
 
 function progressBar(percent, width = 14) {
     const p = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -18,6 +18,16 @@ async function formatRoleLine(guild, roleId) {
         guild.roles.cache.get(id) || (await guild.roles.fetch(id).catch(() => null));
     if (role) return `<@&${role.id}> (${role.name})`;
     return `\`${id}\` (rol no encontrado)`;
+}
+
+/** Solo mención `<@&id>` (sin nombre duplicado); para `/rangos`. */
+async function formatRoleMentionOnly(guild, roleId) {
+    const id = String(roleId || '').trim();
+    if (!id) return null;
+    const role =
+        guild.roles.cache.get(id) || (await guild.roles.fetch(id).catch(() => null));
+    if (role) return `<@&${role.id}>`;
+    return `\`${id}\``;
 }
 
 function escapeDiscordEmbed(text) {
@@ -153,20 +163,12 @@ async function runRangos(interaction) {
     const rewardsSorted = parseRoleRewards(cfg?.roleRewards);
 
     if (rewardsSorted.length === 0) {
-        const fields = EYED_LEVEL_TIERS.map((tier) => ({
-            name: `${tier.label} · ${formatLevelRange(tier)}`,
-            value: tier.description
-        }));
+        const refLines = EYED_LEVEL_TIERS.map((t) => `**${formatLevelRange(t)}** · ${t.label}`).join('\n');
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
-            .setTitle('🌌 Rangos Eyed (referencia)')
-            .setDescription(
-                '**En este servidor aún no hay roles de nivel configurados** en el panel (recompensas por nivel). ' +
-                    'Cuando el staff asigne un rol a cada umbral, `/rangos` mostrará esos roles de Discord. ' +
-                    'Abajo: significado de cada tramo numérico Eyed.'
-            )
-            .addFields(fields)
-            .setFooter({ text: `Pedido por ${interaction.user.tag}` })
+            .setTitle('Nivel para conseguir')
+            .setDescription(`Sin roles en el panel.\n\n${refLines}`)
+            .setFooter({ text: interaction.user.username })
             .setTimestamp();
         return interaction.reply({ embeds: [embed], ephemeral: true });
     }
@@ -181,17 +183,10 @@ async function runRangos(interaction) {
 
     const fields = await Promise.all(
         slice.map(async (reward) => {
-            const line = await formatRoleLine(guild, reward.roleId);
-            const roleDisplay = line || `Rol \`${reward.roleId}\` (no encontrado en el servidor)`;
-            const tier = tierForLevel(reward.level);
-            let value = roleDisplay;
-            if (tier) {
-                value += `\n\n**${tier.label}** (${formatLevelRange(tier)})\n${tier.description}`;
-            }
-            if (value.length > 1024) value = `${value.slice(0, 1020)}…`;
+            const mention = (await formatRoleMentionOnly(guild, reward.roleId)) || `\`${reward.roleId}\``;
             return {
-                name: `Nivel ${reward.level}+`,
-                value
+                name: `Nv ${reward.level}+`,
+                value: mention.slice(0, 1024)
             };
         })
     );
@@ -199,22 +194,15 @@ async function runRangos(interaction) {
     if (moreCount > 0) {
         fields.push({
             name: '…',
-            value: `Hay **${moreCount}** recompensa(s) más en la configuración. Revisá el panel o reducí umbrales para verlas todas aquí.`.slice(
-                0,
-                1024
-            )
+            value: `**+${moreCount}** más en el panel.`.slice(0, 1024)
         });
     }
 
     const embed = new EmbedBuilder()
         .setColor(config.embedColor)
-        .setTitle('🌌 Roles de nivel en este servidor')
-        .setDescription(
-            'Estos son los **roles de Discord** enlazados al sistema de niveles de **este servidor** (umbral mínimo de nivel). ' +
-                'Se configuran en el panel de EyedBot → Sistema de niveles.'
-        )
+        .setTitle('Nivel para conseguir')
         .addFields(fields)
-        .setFooter({ text: `Pedido por ${interaction.user.tag}` })
+        .setFooter({ text: interaction.user.username })
         .setTimestamp();
 
     return interaction.reply({ embeds: [embed], ephemeral: true });
