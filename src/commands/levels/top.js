@@ -23,7 +23,8 @@ module.exports = {
                 .setMinValue(5)
                 .setMaxValue(25)
                 .setRequired(false)
-        ),
+        )
+        .setDefaultMemberPermissions(0n),
     cooldown: 4,
     async execute(interaction) {
         if (!interaction.guild) {
