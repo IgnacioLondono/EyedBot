@@ -49,11 +49,12 @@ async function resolveLeaderboardDisplayName(guild, client, userId) {
 }
 
 /**
- * Progreso solo para quien ejecuta el comando (consulta propia, ephemeral).
+ * Progreso de nivel (tuyo u otro usuario). Respuesta solo visible para quien ejecuta (ephemeral).
  */
 async function runNivelSelf(interaction) {
     const guild = interaction.guild;
-    const target = interaction.user;
+    const target = interaction.options.getUser('usuario') || interaction.user;
+    const isSelf = target.id === interaction.user.id;
 
     const cfg = await levelingStore.getLevelingConfig(guild.id);
     const difficulty = sanitizeDifficulty(cfg?.difficulty);
@@ -76,7 +77,11 @@ async function runNivelSelf(interaction) {
     const siguiente =
         prog.nextNeed > 0
             ? `\`${progressBar(prog.percent)}\` **${prog.percent}%**\n${prog.intoLevel.toLocaleString('es-ES')} / ${prog.nextNeed.toLocaleString('es-ES')} XP → nivel **${level + 1}**`
-            : 'Ya estás en el tramo alto del nivel actual (no hay siguiente requisito calculado).';
+            : isSelf
+                ? 'Ya estás en el tramo alto del nivel actual (no hay siguiente requisito calculado).'
+                : 'Este usuario está en el tramo alto del nivel actual (no hay siguiente requisito calculado).';
+
+    const titleNivel = isSelf ? '📊 Tu nivel' : '📊 Progreso de nivel';
 
     const embed = new EmbedBuilder()
         .setColor(config.embedColor)
@@ -84,7 +89,7 @@ async function runNivelSelf(interaction) {
             name: target.globalName || target.username,
             iconURL: target.displayAvatarURL({ size: 128 })
         })
-        .setTitle('📊 Tu nivel')
+        .setTitle(titleNivel)
         .addFields(
             { name: 'Nivel', value: `**${level}**`, inline: true },
             { name: 'XP total', value: `**${xp.toLocaleString('es-ES')}**`, inline: true },
@@ -98,7 +103,7 @@ async function runNivelSelf(interaction) {
         .setFooter({
             text:
                 cfg?.enabled === true
-                    ? 'Solo tú ves este mensaje · EyedBot niveles'
+                    ? `Pedido por ${interaction.user.tag}`
                     : `Sistema de niveles desactivado (solo lectura) · ${interaction.user.tag}`
         })
         .setTimestamp();
@@ -131,7 +136,9 @@ async function runNivelSelf(interaction) {
         } else if (current && rewardsSorted.length > 0) {
             embed.addFields({
                 name: '⏭️ Siguiente rol',
-                value: 'No hay más roles configurados por encima de tu tramo.'
+                value: isSelf
+                    ? 'No hay más roles configurados por encima de tu tramo.'
+                    : 'No hay más roles configurados por encima de su tramo.'
             });
         }
     }
@@ -139,7 +146,7 @@ async function runNivelSelf(interaction) {
     return interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-/** Rangos Eyed actuales (catálogo en código = datos en tiempo real al ejecutar). Ephemeral: consulta propia. */
+/** Rangos Eyed actuales (catálogo en código = datos al ejecutar el comando). */
 async function runRangos(interaction) {
     const fields = EYED_LEVEL_TIERS.map((tier) => ({
         name: `${tier.label} · ${formatLevelRange(tier)}`,
@@ -154,7 +161,7 @@ async function runRangos(interaction) {
                 'Los **roles de Discord** y las **recompensas por nivel** los configura el staff en el panel.'
         )
         .addFields(fields)
-        .setFooter({ text: 'Solo tú ves este mensaje · Rangos en tiempo real al usar el comando' })
+        .setFooter({ text: `Pedido por ${interaction.user.tag}` })
         .setTimestamp();
 
     return interaction.reply({ embeds: [embed], ephemeral: true });

@@ -4,9 +4,7 @@ const { runRangos } = require('./leveling-shared');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('rangos')
-        .setDescription(
-            'Lista los rangos Eyed del sistema de niveles y la descripción de cada uno (solo tú ves la respuesta)'
-        ),
+        .setDescription('Lista los rangos Eyed del sistema de niveles y la descripción de cada uno.'),
     cooldown: 4,
     async execute(interaction) {
         if (!interaction.guild) {
