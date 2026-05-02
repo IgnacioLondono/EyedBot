@@ -3,7 +3,7 @@ const config = require('../../config');
 const levelingStore = require('../../utils/leveling-store');
 const { getLevelFromXp, getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
 const { parseRoleRewards, getRoleRewardTiersForLevel } = require('../../utils/leveling-rewards');
-const { EYED_LEVEL_TIERS, formatLevelRange } = require('../../utils/eyed-tier-catalog');
+const { EYED_LEVEL_TIERS, formatLevelRange, tierForLevel } = require('../../utils/eyed-tier-catalog');
 
 function progressBar(percent, width = 14) {
     const p = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -146,19 +146,72 @@ async function runNivelSelf(interaction) {
     return interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-/** Rangos Eyed actuales (catálogo en código = datos al ejecutar el comando). */
+/** Lista roles de nivel configurados en el servidor (`roleRewards`); si no hay, muestra referencia Eyed. */
 async function runRangos(interaction) {
-    const fields = EYED_LEVEL_TIERS.map((tier) => ({
-        name: `${tier.label} · ${formatLevelRange(tier)}`,
-        value: tier.description
-    }));
+    const guild = interaction.guild;
+    const cfg = await levelingStore.getLevelingConfig(guild.id);
+    const rewardsSorted = parseRoleRewards(cfg?.roleRewards);
+
+    if (rewardsSorted.length === 0) {
+        const fields = EYED_LEVEL_TIERS.map((tier) => ({
+            name: `${tier.label} · ${formatLevelRange(tier)}`,
+            value: tier.description
+        }));
+        const embed = new EmbedBuilder()
+            .setColor(config.embedColor)
+            .setTitle('🌌 Rangos Eyed (referencia)')
+            .setDescription(
+                '**En este servidor aún no hay roles de nivel configurados** en el panel (recompensas por nivel). ' +
+                    'Cuando el staff asigne un rol a cada umbral, `/rangos` mostrará esos roles de Discord. ' +
+                    'Abajo: significado de cada tramo numérico Eyed.'
+            )
+            .addFields(fields)
+            .setFooter({ text: `Pedido por ${interaction.user.tag}` })
+            .setTimestamp();
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    const MAX_FIELDS = 25;
+    let slice = rewardsSorted;
+    let moreCount = 0;
+    if (rewardsSorted.length > MAX_FIELDS) {
+        slice = rewardsSorted.slice(0, MAX_FIELDS - 1);
+        moreCount = rewardsSorted.length - slice.length;
+    }
+
+    const fields = await Promise.all(
+        slice.map(async (reward) => {
+            const line = await formatRoleLine(guild, reward.roleId);
+            const roleDisplay = line || `Rol \`${reward.roleId}\` (no encontrado en el servidor)`;
+            const tier = tierForLevel(reward.level);
+            let value = roleDisplay;
+            if (tier) {
+                value += `\n\n**${tier.label}** (${formatLevelRange(tier)})\n${tier.description}`;
+            }
+            if (value.length > 1024) value = `${value.slice(0, 1020)}…`;
+            return {
+                name: `Nivel ${reward.level}+`,
+                value
+            };
+        })
+    );
+
+    if (moreCount > 0) {
+        fields.push({
+            name: '…',
+            value: `Hay **${moreCount}** recompensa(s) más en la configuración. Revisá el panel o reducí umbrales para verlas todas aquí.`.slice(
+                0,
+                1024
+            )
+        });
+    }
 
     const embed = new EmbedBuilder()
         .setColor(config.embedColor)
-        .setTitle('🌌 Rangos del sistema Eyed')
+        .setTitle('🌌 Roles de nivel en este servidor')
         .setDescription(
-            'Lista **actual** de rangos por nivel numérico y su significado. ' +
-                'Los **roles de Discord** y las **recompensas por nivel** los configura el staff en el panel.'
+            'Estos son los **roles de Discord** enlazados al sistema de niveles de **este servidor** (umbral mínimo de nivel). ' +
+                'Se configuran en el panel de EyedBot → Sistema de niveles.'
         )
         .addFields(fields)
         .setFooter({ text: `Pedido por ${interaction.user.tag}` })

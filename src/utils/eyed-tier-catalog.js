@@ -56,7 +56,20 @@ const EYED_LEVEL_TIERS = [
     }
 ];
 
+/**
+ * Rango narrativo Eyed que corresponde a un nivel numérico (p. ej. umbral de rol en nivel 15 → Guardián).
+ */
+function tierForLevel(level) {
+    const n = Math.max(1, Number.parseInt(level, 10) || 1);
+    for (const tier of EYED_LEVEL_TIERS) {
+        const max = tier.maxLevel === Infinity ? Number.POSITIVE_INFINITY : tier.maxLevel;
+        if (n >= tier.minLevel && n <= max) return tier;
+    }
+    return EYED_LEVEL_TIERS[EYED_LEVEL_TIERS.length - 1] || null;
+}
+
 module.exports = {
     EYED_LEVEL_TIERS,
-    formatLevelRange
+    formatLevelRange,
+    tierForLevel
 };

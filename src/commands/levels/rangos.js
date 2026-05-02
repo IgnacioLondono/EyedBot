@@ -4,7 +4,9 @@ const { runRangos } = require('./leveling-shared');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('rangos')
-        .setDescription('Lista los rangos Eyed del sistema de niveles y la descripción de cada uno.'),
+        .setDescription(
+            'Roles de nivel del servidor (panel). Si no hay ninguno configurado, muestra la referencia Eyed por nivel.'
+        ),
     cooldown: 4,
     async execute(interaction) {
         if (!interaction.guild) {
