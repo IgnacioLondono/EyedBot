@@ -4,7 +4,13 @@ const { runNivelSelf } = require('./leveling-shared');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('nivel')
-        .setDescription('Ver tu nivel, XP, ranking y roles del sistema (solo tú ves la respuesta)'),
+        .setDescription('Consulta tu progreso de nivel o el de otro usuario (XP, ranking, roles).')
+        .addUserOption((opt) =>
+            opt
+                .setName('usuario')
+                .setDescription('Miembro a consultar (si no eliges a nadie, se muestra el tuyo)')
+                .setRequired(false)
+        ),
     cooldown: 4,
     async execute(interaction) {
         if (!interaction.guild) {
