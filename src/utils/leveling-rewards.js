@@ -1,5 +1,5 @@
 /**
- * Recompensas por nivel (roles). Usado por leveling-tracker y comandos /niveles.
+ * Recompensas por nivel (roles). Usado por leveling-tracker y comandos /nivel.
  */
 
 function parseRoleRewards(rawRewards) {
