@@ -9002,11 +9002,15 @@ async function loadWelcomePanel(guildId) {
 }
 
 function applyWelcomePreviewTemplate(text, sample) {
+    const mention = sample.userMention;
+    const uname = sample.username;
+    const srv = sample.server;
+    const mc = String(sample.memberCount);
     return String(text || '')
-        .replace(/\{user\}/gi, sample.userMention)
-        .replace(/\{username\}/gi, sample.username)
-        .replace(/\{server\}/gi, sample.server)
-        .replace(/\{memberCount\}/gi, String(sample.memberCount));
+        .replace(/\{user\}|\{mention\}/gi, mention)
+        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
+        .replace(/\{server\}|\{guild\}/gi, srv)
+        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
 }
 
 function scheduleWelcomeCardPreview(guildId) {
@@ -11594,6 +11598,37 @@ function openWelcomeCardStudio(guildId) {
         getAvatarUrl: () => getDashboardUserAvatarUrl(),
         processAndUploadBackground: (file) => processAndUploadWelcomeStudioBackground(guildId, file),
         onBackgroundUploaded: () => updateWelcomePreviewPanel(guildId),
+        getRawCardTexts: () => {
+            const cfg = collectWelcomeConfigFromForm();
+            return {
+                title: String(cfg.title != null ? cfg.title : ''),
+                cardNameTemplate: String(cfg.cardNameTemplate != null ? cfg.cardNameTemplate : '{username}').trim() || '{username}',
+                message: String(cfg.message != null ? cfg.message : ''),
+                cardOverlayText: String(cfg.cardOverlayText != null ? cfg.cardOverlayText : '')
+            };
+        },
+        onCardTextsUpdated: (raw) => {
+            const titleEl = document.getElementById('welcomeTitle');
+            const msgEl = document.getElementById('welcomeMessage');
+            const nameLineEl = document.getElementById('welcomeCardNameLine');
+            const overlayEl = document.getElementById('welcomeCardOverlay');
+            if (titleEl && raw.title != null) titleEl.value = raw.title;
+            if (msgEl && raw.message != null) msgEl.value = raw.message;
+            if (nameLineEl && raw.cardNameTemplate != null) nameLineEl.value = raw.cardNameTemplate;
+            if (overlayEl && raw.cardOverlayText != null) overlayEl.value = raw.cardOverlayText;
+            currentWelcomeConfig = {
+                ...currentWelcomeConfig,
+                title: raw.title != null ? String(raw.title) : currentWelcomeConfig.title,
+                message: raw.message != null ? String(raw.message) : currentWelcomeConfig.message,
+                cardNameTemplate:
+                    raw.cardNameTemplate != null
+                        ? String(raw.cardNameTemplate).trim() || '{username}'
+                        : currentWelcomeConfig.cardNameTemplate,
+                cardOverlayText:
+                    raw.cardOverlayText != null ? String(raw.cardOverlayText) : currentWelcomeConfig.cardOverlayText
+            };
+            scheduleWelcomeCardPreview(guildId);
+        },
         getPreviewLines: () => {
             const cfg = collectWelcomeConfigFromForm();
             const guild = currentServerGuilds.find((g) => String(g.id) === String(guildId));

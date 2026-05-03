@@ -155,6 +155,109 @@ function drawStrokedText(ctx, text, x, y, fillHex, strokeRgba = 'rgba(0,0,0,0.72
     ctx.fillText(t, x, y);
 }
 
+/** Trozos de texto con color opcional; formato almacenado: [[#RRGGBB]]...[[/]] */
+function parseColorMarkupSegments(input) {
+    const s = String(input ?? '');
+    const segments = [];
+    let color = null;
+    let buf = '';
+    const flush = () => {
+        if (!buf) return;
+        segments.push({ text: buf, color });
+        buf = '';
+    };
+    const re = /\[\[#([0-9a-fA-F]{6})\]\]|\[\[\/\]\]/gi;
+    let last = 0;
+    let m;
+    while ((m = re.exec(s)) !== null) {
+        buf += s.slice(last, m.index);
+        if (m[0].toLowerCase().startsWith('[[#')) {
+            flush();
+            color = m[1].toLowerCase();
+        } else {
+            flush();
+            color = null;
+        }
+        last = m.index + m[0].length;
+    }
+    buf += s.slice(last);
+    flush();
+    return segments.length ? segments : [{ text: s, color: null }];
+}
+
+function stripColorMarkup(input) {
+    return String(input || '')
+        .replace(/\[\[#([0-9a-fA-F]{6})\]\]/gi, '')
+        .replace(/\[\[\/\]\]/g, '');
+}
+
+function truncatePlainSegments(segments, maxLen) {
+    let n = 0;
+    const out = [];
+    for (const seg of segments) {
+        let t = String(seg.text || '');
+        if (n >= maxLen) break;
+        if (n + t.length > maxLen) t = t.slice(0, maxLen - n);
+        out.push({ text: t, color: seg.color });
+        n += t.length;
+        if (n >= maxLen) break;
+    }
+    return out.length ? out : [{ text: '', color: null }];
+}
+
+function drawRichStrokedLineTopCentered(ctx, segments, xCenter, y, defaultHex, userHint) {
+    const parts = segments
+        .map((seg) => ({
+            text: canvasSafeLine(String(seg.text || ''), userHint),
+            color: seg.color
+        }))
+        .filter((p) => p.text.length);
+    if (!parts.length) return;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    let total = 0;
+    const widths = parts.map((p) => {
+        const w = ctx.measureText(p.text).width;
+        total += w;
+        return w;
+    });
+    let left = xCenter - total / 2;
+    for (let i = 0; i < parts.length; i++) {
+        const cx = left + widths[i] / 2;
+        drawStrokedText(ctx, parts[i].text, cx, y, parts[i].color || defaultHex);
+        left += widths[i];
+    }
+}
+
+function drawRichStrokedLineOverlay(ctx, segments, anchorX, anchorY, defaultHex, alignRight, userHint) {
+    const parts = segments
+        .map((seg) => ({
+            text: canvasSafeLine(String(seg.text || ''), userHint),
+            color: seg.color
+        }))
+        .filter((p) => p.text.length);
+    if (!parts.length) return;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.lineJoin = 'round';
+    let total = 0;
+    const widths = parts.map((p) => {
+        const w = ctx.measureText(p.text).width;
+        total += w;
+        return w;
+    });
+    let left = alignRight ? anchorX - total : anchorX;
+    for (let i = 0; i < parts.length; i++) {
+        const cx = left + widths[i] / 2;
+        ctx.strokeText(parts[i].text, cx, anchorY);
+        ctx.fillStyle = rgbFill(parts[i].color || defaultHex);
+        ctx.fillText(parts[i].text, cx, anchorY);
+        left += widths[i];
+    }
+}
+
 /**
  * @param {object} opts
  * @param {object} [opts.cardLayout] posiciones en px (espacio 920×520); se fusiona con valores por defecto.
@@ -239,24 +342,24 @@ async function renderWelcomeCardPng(opts = {}) {
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    const headline = canvasSafeLine(String(opts.headline || 'Bienvenido').slice(0, 80), userHint);
-    const displayName = canvasSafeLine(String(opts.displayName || 'Usuario').slice(0, 80), userHint);
-    const subtitle = canvasSafeLine(String(opts.subtitle || '').slice(0, 200), userHint);
-    const overlayRaw = canvasSafeLine(String(opts.overlayText || '').slice(0, 160), userHint);
+    const headlineSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.headline || 'Bienvenido')), 80);
+    const displayNameSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.displayName || 'Usuario')), 80);
+    const subtitlePlain = canvasSafeLine(stripColorMarkup(String(opts.subtitle || '').slice(0, 200)), userHint);
+    const overlaySegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.overlayText || '').slice(0, 160)), 160);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.shadowColor = 'transparent';
 
     ctx.font = fonts.title;
-    drawStrokedText(ctx, headline, layout.titleX, layout.titleY, titleColor);
+    drawRichStrokedLineTopCentered(ctx, headlineSegs, layout.titleX, layout.titleY, titleColor, userHint);
 
     ctx.font = fonts.name;
-    drawStrokedText(ctx, displayName, layout.nameX, layout.nameY, nameColor);
+    drawRichStrokedLineTopCentered(ctx, displayNameSegs, layout.nameX, layout.nameY, nameColor, userHint);
 
-    if (subtitle.trim()) {
+    if (subtitlePlain.trim()) {
         ctx.font = fonts.sub;
-        const lines = wrapText(ctx, subtitle, W - 120);
+        const lines = wrapText(ctx, subtitlePlain, W - 120);
         let y = layout.subtitleY;
         for (const line of lines.slice(0, 3)) {
             drawStrokedText(ctx, line, layout.subtitleX, y, subColor);
@@ -264,17 +367,11 @@ async function renderWelcomeCardPng(opts = {}) {
         }
     }
 
-    if (overlayRaw.trim()) {
+    const hasOverlayDraw = overlaySegs.some((seg) => canvasSafeLine(String(seg.text || ''), userHint).trim());
+    if (hasOverlayDraw) {
         ctx.font = fonts.overlay;
         const alignRight = layout.overlayX >= W / 2;
-        ctx.textAlign = alignRight ? 'right' : 'left';
-        ctx.textBaseline = 'bottom';
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-        ctx.lineJoin = 'round';
-        ctx.strokeText(overlayRaw, layout.overlayX, layout.overlayY);
-        ctx.fillStyle = rgbFill(overlayColor);
-        ctx.fillText(overlayRaw, layout.overlayX, layout.overlayY);
+        drawRichStrokedLineOverlay(ctx, overlaySegs, layout.overlayX, layout.overlayY, overlayColor, alignRight, userHint);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
     }
