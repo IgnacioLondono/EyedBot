@@ -4,6 +4,64 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const W = 920;
 const H = 520;
 
+const DEFAULT_CARD_LAYOUT = {
+    bgFocalX: 0.5,
+    bgFocalY: 0.5,
+    avatarCx: 460,
+    avatarCy: 168,
+    avatarR: 78,
+    titleX: 460,
+    titleY: 262,
+    nameX: 460,
+    nameY: 320,
+    subtitleX: 460,
+    subtitleY: 368,
+    overlayX: 892,
+    overlayY: 498
+};
+
+function clamp(n, a, b) {
+    return Math.min(b, Math.max(a, n));
+}
+
+function mergeCardLayout(raw) {
+    const d = { ...DEFAULT_CARD_LAYOUT };
+    if (!raw || typeof raw !== 'object') return d;
+    const num = (v, def, min, max) => {
+        const x = Number(v);
+        return Number.isFinite(x) ? clamp(x, min, max) : def;
+    };
+    return {
+        bgFocalX: num(raw.bgFocalX, d.bgFocalX, 0, 1),
+        bgFocalY: num(raw.bgFocalY, d.bgFocalY, 0, 1),
+        avatarCx: num(raw.avatarCx, d.avatarCx, 0, W),
+        avatarCy: num(raw.avatarCy, d.avatarCy, 0, H),
+        avatarR: num(raw.avatarR, d.avatarR, 36, 150),
+        titleX: num(raw.titleX, d.titleX, 0, W),
+        titleY: num(raw.titleY, d.titleY, 0, H),
+        nameX: num(raw.nameX, d.nameX, 0, W),
+        nameY: num(raw.nameY, d.nameY, 0, H),
+        subtitleX: num(raw.subtitleX, d.subtitleX, 0, W),
+        subtitleY: num(raw.subtitleY, d.subtitleY, 0, H),
+        overlayX: num(raw.overlayX, d.overlayX, 0, W),
+        overlayY: num(raw.overlayY, d.overlayY, 0, H)
+    };
+}
+
+/** Fuentes del sistema (sin comillas internas). */
+const FONT_STACKS = {
+    system: { title: 'bold 44px Arial', name: '26px Arial', sub: 'italic 20px Arial', overlay: 'bold 17px Arial' },
+    serif: { title: 'bold 44px Georgia', name: '26px Georgia', sub: 'italic 20px Georgia', overlay: 'bold 17px Georgia' },
+    mono: { title: 'bold 40px Consolas', name: '24px Consolas', sub: 'italic 18px Consolas', overlay: 'bold 16px Consolas' },
+    rounded: { title: 'bold 44px Verdana', name: '26px Verdana', sub: 'italic 20px Verdana', overlay: 'bold 17px Verdana' },
+    elegant: { title: 'bold 44px Times New Roman', name: '26px Times New Roman', sub: 'italic 20px Times New Roman', overlay: 'bold 17px Times New Roman' }
+};
+
+function resolveFonts(fontKey) {
+    const k = String(fontKey || 'system').toLowerCase();
+    return FONT_STACKS[k] || FONT_STACKS.system;
+}
+
 function hexToRgb(hex) {
     const h = String(hex || '').replace('#', '').trim();
     if (h.length === 3) {
@@ -40,77 +98,103 @@ function roundRectPath(ctx, x, y, w, h, r) {
     ctx.closePath();
 }
 
-async function drawBackground(ctx, backgroundUrl, backgroundFilePath) {
-    let img = null;
+function canvasSafeLine(text, usernameFallback = 'usuario') {
+    let s = String(text || '').trim();
+    s = s.replace(/<@!?([0-9]+)>/g, `@${usernameFallback}`);
+    s = s.replace(/<@&([0-9]+)>/g, '@rol');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '$1');
+    s = s.replace(/\*([^*]+)\*/g, '$1');
+    s = s.replace(/__([^_]+)__/g, '$1');
+    s = s.replace(/`([^`]+)`/g, '$1');
+    return s;
+}
+
+async function loadBackgroundImage(backgroundUrl, backgroundFilePath) {
     try {
         if (backgroundFilePath && fs.existsSync(backgroundFilePath)) {
-            img = await loadImage(backgroundFilePath);
-        } else if (backgroundUrl && String(backgroundUrl).trim()) {
-            img = await loadImage(String(backgroundUrl).trim());
+            return await loadImage(backgroundFilePath);
+        }
+        if (backgroundUrl && String(backgroundUrl).trim()) {
+            return await loadImage(String(backgroundUrl).trim());
         }
     } catch {
-        img = null;
+        // ignore
     }
+    return null;
+}
 
-    if (!img) {
-        const g = ctx.createLinearGradient(0, 0, W, H);
-        g.addColorStop(0, '#38bdf8');
-        g.addColorStop(0.45, '#a78bfa');
-        g.addColorStop(1, '#34d399');
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, W, H);
-        return;
-    }
+function drawBackgroundGradient(ctx) {
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#38bdf8');
+    g.addColorStop(0.45, '#a78bfa');
+    g.addColorStop(1, '#34d399');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+}
 
+function drawBackgroundImage(ctx, img, focalX, focalY) {
+    const fx = clamp(Number(focalX) || 0.5, 0, 1);
+    const fy = clamp(Number(focalY) || 0.5, 0, 1);
     const scale = Math.max(W / img.width, H / img.height);
     const dw = img.width * scale;
     const dh = img.height * scale;
-    const ox = (W - dw) / 2;
-    const oy = (H - dh) / 2;
+    const ox = dw > W ? (W - dw) * fx : (W - dw) / 2;
+    const oy = dh > H ? (H - dh) * fy : (H - dh) / 2;
     ctx.drawImage(img, ox, oy, dw, dh);
 }
 
+function drawStrokedText(ctx, text, x, y, fillHex, strokeRgba = 'rgba(0,0,0,0.72)') {
+    const t = String(text || '');
+    if (!t) return;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = strokeRgba;
+    ctx.strokeText(t, x, y);
+    ctx.fillStyle = rgbFill(fillHex);
+    ctx.fillText(t, x, y);
+}
+
 /**
- * Genera un PNG de tarjeta de bienvenida (fondo + avatar circular + textos).
  * @param {object} opts
- * @param {string} opts.avatarUrl
- * @param {string} [opts.backgroundUrl]
- * @param {string|null} [opts.backgroundFilePath]
- * @param {string} opts.headline
- * @param {string} opts.displayName
- * @param {string} [opts.subtitle]
- * @param {string} [opts.accentHex] sin #
- * @param {string} [opts.titleHex]
- * @param {string} [opts.nameHex]
- * @param {string} [opts.subtitleHex]
- * @returns {Promise<Buffer>}
+ * @param {object} [opts.cardLayout] posiciones en px (espacio 920×520); se fusiona con valores por defecto.
  */
 async function renderWelcomeCardPng(opts = {}) {
     const canvas = createCanvas(W, H);
     const ctx = canvas.getContext('2d');
+    const layout = mergeCardLayout(opts.cardLayout);
 
     const accent = (opts.accentHex || '4ade80').replace('#', '');
     const titleColor = (opts.titleHex || 'ffffff').replace('#', '');
     const nameColor = (opts.nameHex || 'f8fafc').replace('#', '');
     const subColor = (opts.subtitleHex || 'e2e8f0').replace('#', '');
+    const overlayColor = (opts.overlayHex || 'ffffff').replace('#', '');
+    const fonts = resolveFonts(opts.fontKey);
+    const userHint = opts.plainUsername || 'usuario';
 
     ctx.save();
     roundRectPath(ctx, 0, 0, W, H, 24);
     ctx.clip();
 
-    await drawBackground(ctx, opts.backgroundUrl, opts.backgroundFilePath);
+    const bgImg = await loadBackgroundImage(opts.backgroundUrl, opts.backgroundFilePath);
+    if (!bgImg) {
+        drawBackgroundGradient(ctx);
+    } else {
+        drawBackgroundImage(ctx, bgImg, layout.bgFocalX, layout.bgFocalY);
+    }
 
     const vignette = ctx.createLinearGradient(0, H * 0.35, 0, H);
     vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.25)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.28)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, W, H);
 
     ctx.restore();
 
-    const cx = W / 2;
-    const cy = 168;
-    const radius = 78;
+    const cx = layout.avatarCx;
+    const cy = layout.avatarCy;
+    const radius = layout.avatarR;
+    const ring = Math.max(3, Math.round(radius * 0.07));
 
     let avatarImg = null;
     try {
@@ -121,7 +205,7 @@ async function renderWelcomeCardPng(opts = {}) {
 
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cx, cy, radius + 5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, radius + ring, 0, Math.PI * 2);
     ctx.fillStyle = rgbFill(accent);
     ctx.fill();
 
@@ -155,35 +239,44 @@ async function renderWelcomeCardPng(opts = {}) {
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    const headline = String(opts.headline || 'Bienvenido').slice(0, 80);
-    const displayName = String(opts.displayName || 'Usuario').slice(0, 64);
-    const subtitle = String(opts.subtitle || '').slice(0, 120);
+    const headline = canvasSafeLine(String(opts.headline || 'Bienvenido').slice(0, 80), userHint);
+    const displayName = canvasSafeLine(String(opts.displayName || 'Usuario').slice(0, 80), userHint);
+    const subtitle = canvasSafeLine(String(opts.subtitle || '').slice(0, 200), userHint);
+    const overlayRaw = canvasSafeLine(String(opts.overlayText || '').slice(0, 160), userHint);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
+    ctx.shadowColor = 'transparent';
 
-    ctx.shadowColor = 'rgba(0,0,0,0.55)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 3;
+    ctx.font = fonts.title;
+    drawStrokedText(ctx, headline, layout.titleX, layout.titleY, titleColor);
 
-    ctx.font = 'bold 46px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
-    ctx.fillStyle = rgbFill(titleColor);
-    ctx.fillText(headline, cx, 268);
-
-    ctx.font = '28px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
-    ctx.fillStyle = rgbFill(nameColor);
-    ctx.fillText(displayName, cx, 328);
+    ctx.font = fonts.name;
+    drawStrokedText(ctx, displayName, layout.nameX, layout.nameY, nameColor);
 
     if (subtitle.trim()) {
-        ctx.font = 'italic 22px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
-        ctx.fillStyle = rgbFill(subColor);
+        ctx.font = fonts.sub;
         const lines = wrapText(ctx, subtitle, W - 120);
-        let y = 378;
+        let y = layout.subtitleY;
         for (const line of lines.slice(0, 3)) {
-            ctx.fillText(line, cx, y);
+            drawStrokedText(ctx, line, layout.subtitleX, y, subColor);
             y += 28;
         }
+    }
+
+    if (overlayRaw.trim()) {
+        ctx.font = fonts.overlay;
+        const alignRight = layout.overlayX >= W / 2;
+        ctx.textAlign = alignRight ? 'right' : 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+        ctx.lineJoin = 'round';
+        ctx.strokeText(overlayRaw, layout.overlayX, layout.overlayY);
+        ctx.fillStyle = rgbFill(overlayColor);
+        ctx.fillText(overlayRaw, layout.overlayX, layout.overlayY);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
     }
 
     ctx.shadowColor = 'transparent';
@@ -192,7 +285,7 @@ async function renderWelcomeCardPng(opts = {}) {
 }
 
 function wrapText(ctx, text, maxWidth) {
-    const words = text.split(/\s+/);
+    const words = text.split(/\s+/).filter(Boolean);
     const lines = [];
     let line = '';
     for (const w of words) {
@@ -205,11 +298,14 @@ function wrapText(ctx, text, maxWidth) {
         }
     }
     if (line) lines.push(line);
-    return lines.length ? lines : [''];
+    return lines.length ? lines : (text.trim() ? [text] : []);
 }
 
 module.exports = {
     renderWelcomeCardPng,
+    mergeCardLayout,
+    DEFAULT_CARD_LAYOUT,
+    FONT_STACKS,
     WELCOME_CARD_WIDTH: W,
     WELCOME_CARD_HEIGHT: H
 };

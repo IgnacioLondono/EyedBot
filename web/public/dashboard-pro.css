@@ -8655,3 +8655,321 @@ mark.receipt-highlight {
     border-top-color: #ffffff;
     animation: fgSpin 0.7s linear infinite;
 }
+
+/* ==========================================================
+   Welcome card — editor a pantalla completa
+   ========================================================== */
+
+body.wc-studio-open {
+    overflow: hidden;
+}
+
+.wc-studio {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: none;
+    flex-direction: column;
+    background: radial-gradient(120% 80% at 50% 0%, #1e1640 0%, #0c0618 55%, #05030c 100%);
+    color: #ece8ff;
+}
+
+.wc-studio.is-open {
+    display: flex;
+}
+
+.wc-studio__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 4, 22, 0.85);
+    backdrop-filter: blur(12px);
+}
+
+.wc-studio__title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.wc-studio__subtitle {
+    margin: 0.15rem 0 0;
+    font-size: 0.78rem;
+    color: #a89cc8;
+    max-width: 42rem;
+}
+
+.wc-studio__titlewrap {
+    flex: 1;
+    min-width: 200px;
+}
+
+.wc-studio__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.wc-studio__btn {
+    border-radius: 10px;
+    padding: 0.45rem 0.9rem;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.wc-studio__btn--ghost {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #e8e4ff;
+}
+
+.wc-studio__btn--ghost:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.wc-studio__btn--primary {
+    background: linear-gradient(135deg, #7c4dff, #5b8cff);
+    color: #fff;
+    border: none;
+}
+
+.wc-studio__body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 260px;
+    gap: 0;
+    min-height: 0;
+}
+
+@media (max-width: 960px) {
+    .wc-studio__body {
+        grid-template-columns: 56px minmax(0, 1fr);
+    }
+    .wc-studio__sidebar {
+        display: none;
+    }
+}
+
+.wc-studio__toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.75rem 0.35rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(6, 3, 18, 0.6);
+}
+
+.wc-studio__tool {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #c9c0e8;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.wc-studio__tool:hover {
+    background: rgba(124, 77, 255, 0.2);
+    border-color: rgba(124, 77, 255, 0.45);
+    color: #fff;
+}
+
+.wc-studio__tool.is-active {
+    background: rgba(124, 77, 255, 0.35);
+    border-color: rgba(160, 130, 255, 0.6);
+    color: #fff;
+}
+
+.wc-studio__tool-letter {
+    font-weight: 800;
+    font-size: 1rem;
+}
+
+.wc-studio__canvas-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: auto;
+    min-height: 0;
+}
+
+.wc-studio__canvas-scaler {
+    transform-origin: top center;
+    transform: scale(min(1, calc((100vw - 340px) / 920)));
+}
+
+@media (max-width: 960px) {
+    .wc-studio__canvas-scaler {
+        transform: scale(min(1, calc((100vw - 100px) / 920)));
+    }
+}
+
+.wc-studio__stage {
+    position: relative;
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    touch-action: none;
+    user-select: none;
+}
+
+.wc-stage-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #38bdf8 0%, #a78bfa 50%, #34d399 100%);
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: 50% 50%;
+}
+
+.wc-stage-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent 35%, rgba(0, 0, 0, 0.28));
+}
+
+.wc-layer--avatar {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    cursor: grab;
+    touch-action: none;
+}
+
+.wc-layer--avatar:active {
+    cursor: grabbing;
+}
+
+.wc-avatar-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4ade80, #22d3ee);
+    z-index: 0;
+}
+
+.wc-avatar-img {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    object-fit: cover;
+    width: 86%;
+    height: 86%;
+    z-index: 1;
+}
+
+.wc-layer--text {
+    position: absolute;
+    transform: translate(-50%, 0);
+    z-index: 6;
+    max-width: 88%;
+    text-align: center;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75), 0 0 2px rgba(0, 0, 0, 0.9);
+    cursor: grab;
+    pointer-events: auto;
+    line-height: 1.25;
+}
+
+.wc-layer--text:active {
+    cursor: grabbing;
+}
+
+.wc-layer--title {
+    font-weight: 800;
+    font-size: 2rem;
+    color: #fff;
+}
+
+.wc-layer--name {
+    font-weight: 600;
+    font-size: 1.35rem;
+    color: #f1f5f9;
+}
+
+.wc-layer--subtitle {
+    font-style: italic;
+    font-size: 1.05rem;
+    color: #e2e8f0;
+    white-space: pre-wrap;
+}
+
+.wc-layer--overlay {
+    text-align: right;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #fff;
+    max-width: 70%;
+}
+
+.wc-studio__sidebar {
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 1rem;
+    overflow: auto;
+    background: rgba(8, 4, 20, 0.55);
+}
+
+.wc-studio__side-title {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9d8fc9;
+}
+
+.wc-studio__label {
+    display: block;
+    font-size: 0.82rem;
+    margin: 0.5rem 0 0.25rem;
+    color: #c4b8e8;
+}
+
+.wc-studio__range {
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.wc-studio__hint {
+    font-size: 0.8rem;
+    color: #9a8cba;
+    line-height: 1.45;
+    margin: 0.25rem 0 0;
+}
+
+.wc-studio-launch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.wc-studio-launch-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #7c4dff, #5b8cff);
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.1rem;
+    line-height: 1;
+}

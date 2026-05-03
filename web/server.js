@@ -12,7 +12,7 @@ const os = require('os');
 const multer = require('multer');
 const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
-const { renderWelcomeCardPng } = require('../src/utils/welcome-card');
+const { renderWelcomeCardPng, mergeCardLayout } = require('../src/utils/welcome-card');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
@@ -1127,7 +1127,12 @@ function buildDefaultGreetingConfig(mode, fallbackChannel = '') {
         cardAccentColor: '4ade80',
         cardTitleColor: 'ffffff',
         cardNameColor: 'f8fafc',
-        cardSubtitleColor: 'e2e8f0'
+        cardSubtitleColor: 'e2e8f0',
+        cardNameTemplate: '{username}',
+        cardOverlayText: '',
+        cardOverlayColor: 'ffffff',
+        cardFontKey: 'system',
+        cardLayout: mergeCardLayout(null)
     };
 }
 
@@ -1164,6 +1169,13 @@ function normalizeGreetingConfigInput(body = {}, mode, userId) {
         base.cardTitleColor = sanitizeHexColor6(body.cardTitleColor, 'ffffff');
         base.cardNameColor = sanitizeHexColor6(body.cardNameColor, 'f8fafc');
         base.cardSubtitleColor = sanitizeHexColor6(body.cardSubtitleColor, 'e2e8f0');
+        base.cardNameTemplate = String(body.cardNameTemplate != null ? body.cardNameTemplate : '{username}').trim().slice(0, 120) || '{username}';
+        base.cardOverlayText = String(body.cardOverlayText || '').slice(0, 200);
+        base.cardOverlayColor = sanitizeHexColor6(body.cardOverlayColor, 'ffffff');
+        base.cardFontKey = ['system', 'serif', 'mono', 'rounded', 'elegant'].includes(String(body.cardFontKey || '').toLowerCase())
+            ? String(body.cardFontKey).toLowerCase()
+            : 'system';
+        base.cardLayout = mergeCardLayout(body.cardLayout);
     }
 
     return base;
@@ -2911,8 +2923,13 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
                 backgroundUrl: localImagePath ? null : cfg.imageUrl,
                 backgroundFilePath: localImagePath,
                 headline: applyWelcomeTemplate(cfg.title || '¡Bienvenido!', member),
-                displayName: member.displayName || member.user.username,
+                displayName: applyWelcomeTemplate(cfg.cardNameTemplate || '{username}', member),
                 subtitle: applyWelcomeTemplate(cfg.message || '¡Hola {user}!', member),
+                overlayText: applyWelcomeTemplate(cfg.cardOverlayText || '', member),
+                overlayHex: cfg.cardOverlayColor || 'ffffff',
+                fontKey: cfg.cardFontKey || 'system',
+                plainUsername: member.user.username,
+                cardLayout: mergeCardLayout(cfg.cardLayout),
                 accentHex: cfg.cardAccentColor || '4ade80',
                 titleHex: cfg.cardTitleColor || 'ffffff',
                 nameHex: cfg.cardNameColor || 'f8fafc',
@@ -2971,7 +2988,8 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
         const avatarUrl = member
             ? member.user.displayAvatarURL({ extension: 'png', size: 256 })
             : sessionUserAvatarUrl(req.session.user);
-        const displayName = member ? (member.displayName || member.user.username) : (req.session.user?.username || 'Usuario');
+        const plainUser = member ? member.user.username : (req.session.user?.username || 'Usuario');
+        const nameTpl = String(body.cardNameTemplate != null ? body.cardNameTemplate : '{username}').trim() || '{username}';
 
         const localImagePath = resolveLocalUploadFile(body.imageUrl);
         const buffer = await renderWelcomeCardPng({
@@ -2979,8 +2997,15 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
             backgroundUrl: localImagePath ? null : String(body.imageUrl || ''),
             backgroundFilePath: localImagePath,
             headline: applyWelcomeTemplate(String(body.title || '¡Bienvenido!'), tplMember),
-            displayName,
+            displayName: applyWelcomeTemplate(nameTpl, tplMember),
             subtitle: applyWelcomeTemplate(String(body.message || ''), tplMember),
+            overlayText: applyWelcomeTemplate(String(body.cardOverlayText || ''), tplMember),
+            overlayHex: sanitizeHexColor6(body.cardOverlayColor, 'ffffff'),
+            fontKey: ['system', 'serif', 'mono', 'rounded', 'elegant'].includes(String(body.cardFontKey || '').toLowerCase())
+                ? String(body.cardFontKey).toLowerCase()
+                : 'system',
+            plainUsername: plainUser,
+            cardLayout: mergeCardLayout(body.cardLayout),
             accentHex: sanitizeHexColor6(body.cardAccentColor, '4ade80'),
             titleHex: sanitizeHexColor6(body.cardTitleColor, 'ffffff'),
             nameHex: sanitizeHexColor6(body.cardNameColor, 'f8fafc'),

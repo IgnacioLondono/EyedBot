@@ -8660,8 +8660,14 @@ function renderGreetingPanel(guildId, channels, mode) {
                 ${mode === 'welcome' ? `
                 <section class="greeting-card" aria-labelledby="greeting-section-welcome-style">
                     <div class="greeting-card__head">
-                        <h4 id="greeting-section-welcome-style" class="greeting-card__title">Estilo de bienvenida</h4>
-                        <p class="greeting-card__hint">La tarjeta es una imagen PNG que el bot envía al unirse alguien (como en dashboards tipo Koya). Usa la imagen principal como fondo.</p>
+                        <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:0.75rem;width:100%;">
+                            <h4 id="greeting-section-welcome-style" class="greeting-card__title" style="margin:0;">Estilo de bienvenida</h4>
+                            <button type="button" id="welcomeOpenStudioBtn" class="btn btn-secondary wc-studio-launch-btn" title="Editor visual a pantalla completa">
+                                <span class="wc-studio-launch-icon" aria-hidden="true">+</span>
+                                Editor visual
+                            </button>
+                        </div>
+                        <p class="greeting-card__hint">La tarjeta es un PNG que el bot envía al canal cuando alguien entra. El fondo es la misma imagen que configures en «Fondo / imagen principal» más abajo (URL o archivo).</p>
                     </div>
                     <div class="form-group">
                         <span class="greeting-var-strip__label" style="display:block;margin-bottom:0.5rem;">Formato</span>
@@ -8670,23 +8676,50 @@ function renderGreetingPanel(guildId, channels, mode) {
                             <label><input type="radio" name="welcomeStyle" value="card" ${cfg.welcomeStyle === 'card' ? 'checked' : ''}> Tarjeta con imagen (PNG)</label>
                         </div>
                     </div>
-                    <div id="welcomeCardColorFields" class="form-grid greeting-card__grid" style="display:${cfg.welcomeStyle === 'card' ? '' : 'none'}">
+                    <div id="welcomeCardColorFields" class="greeting-card__body-card-extra" style="display:${cfg.welcomeStyle === 'card' ? '' : 'none'}">
+                        <div class="form-grid greeting-card__grid">
                         <div class="form-group">
-                            <label for="welcomeCardAccent">Aro del avatar</label>
+                            <label for="welcomeCardFont">Fuente del texto</label>
+                            <select id="welcomeCardFont" class="form-control">
+                                <option value="system" ${(cfg.cardFontKey || 'system') === 'system' ? 'selected' : ''}>Sans (Arial)</option>
+                                <option value="serif" ${cfg.cardFontKey === 'serif' ? 'selected' : ''}>Serif (Georgia)</option>
+                                <option value="mono" ${cfg.cardFontKey === 'mono' ? 'selected' : ''}>Monoespacio (Consolas)</option>
+                                <option value="rounded" ${cfg.cardFontKey === 'rounded' ? 'selected' : ''}>Redondeada (Verdana)</option>
+                                <option value="elegant" ${cfg.cardFontKey === 'elegant' ? 'selected' : ''}>Elegante (Times)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeCardAccent">Color del aro del avatar</label>
                             <input type="color" id="welcomeCardAccent" class="form-control color-input" value="#${(cfg.cardAccentColor || '4ade80').replace('#', '')}">
                         </div>
                         <div class="form-group">
-                            <label for="welcomeCardTitle">Texto grande</label>
+                            <label for="welcomeCardTitle">Color del título grande</label>
                             <input type="color" id="welcomeCardTitle" class="form-control color-input" value="#${(cfg.cardTitleColor || 'ffffff').replace('#', '')}">
                         </div>
                         <div class="form-group">
-                            <label for="welcomeCardName">Nombre</label>
+                            <label for="welcomeCardName">Color de la línea central</label>
                             <input type="color" id="welcomeCardName" class="form-control color-input" value="#${(cfg.cardNameColor || 'f8fafc').replace('#', '')}">
                         </div>
                         <div class="form-group">
-                            <label for="welcomeCardSubtitle">Subtítulo</label>
+                            <label for="welcomeCardSubtitle">Color del subtítulo</label>
                             <input type="color" id="welcomeCardSubtitle" class="form-control color-input" value="#${(cfg.cardSubtitleColor || 'e2e8f0').replace('#', '')}">
                         </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeCardNameLine">Línea central (nombre o texto libre)</label>
+                            <input type="text" id="welcomeCardNameLine" class="form-control" value="${escapeHtmlForValue(cfg.cardNameTemplate != null ? cfg.cardNameTemplate : '{username}')}" placeholder="{username} o texto fijo">
+                            <small class="greeting-card__hint">Variables: {user}, {username}, {server}, {memberCount}. En la imagen las menciones se muestran como @nombre.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeCardOverlay">Texto extra sobre la imagen</label>
+                            <textarea id="welcomeCardOverlay" class="form-control" rows="2" placeholder="Ej.: ¡Gracias por unirte! o {server}">${escapeHtmlForValue(cfg.cardOverlayText || '')}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeCardOverlayColor">Color del texto extra</label>
+                            <input type="color" id="welcomeCardOverlayColor" class="form-control color-input" value="#${(cfg.cardOverlayColor || 'ffffff').replace('#', '')}">
+                            <small class="greeting-card__hint">Se dibuja abajo a la derecha sobre el fondo.</small>
+                        </div>
+                        <p class="greeting-card__hint"><a href="#" id="welcomeScrollToBg" style="color:var(--accent-color);">Ir a subir imagen de fondo ↓</a></p>
                     </div>
                 </section>
                 ` : ''}
@@ -8694,13 +8727,14 @@ function renderGreetingPanel(guildId, channels, mode) {
                 <section class="greeting-card" aria-labelledby="greeting-section-embed">
                     <div class="greeting-card__head">
                         <h4 id="greeting-section-embed" class="greeting-card__title">${mode === 'welcome' ? 'Texto del mensaje' : 'Texto del embed'}</h4>
+                        ${mode === 'welcome' ? '<p class="greeting-card__hint">Modo tarjeta: <strong>Título</strong> = línea grande arriba; <strong>Descripción</strong> = subtítulo bajo la línea central. La línea central se edita en «Estilo de bienvenida».</p>' : ''}
                     </div>
                     <div class="form-group">
-                        <label for="welcomeTitle">Título</label>
+                        <label for="welcomeTitle">${mode === 'welcome' ? 'Título (línea grande en tarjeta)' : 'Título'}</label>
                         <input type="text" id="welcomeTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || meta.defaultTitle)}">
                     </div>
                     <div class="form-group">
-                        <label for="welcomeMessage">Descripción</label>
+                        <label for="welcomeMessage">${mode === 'welcome' ? 'Descripción (subtítulo en tarjeta)' : 'Descripción'}</label>
                         <textarea id="welcomeMessage" class="form-control greeting-textarea-main" rows="5">${escapeHtmlForValue(cfg.message || meta.defaultMessage)}</textarea>
                     </div>
                     <div class="greeting-var-strip" role="group" aria-label="Insertar variables en la descripción">
@@ -8716,10 +8750,10 @@ function renderGreetingPanel(guildId, channels, mode) {
                     </div>
                 </section>
 
-                <section class="greeting-card greeting-card--media" aria-labelledby="greeting-section-thumb">
+                <section class="greeting-card greeting-card--media" id="welcomeBgImageSection" aria-labelledby="greeting-section-thumb">
                     <div class="greeting-card__head">
-                        <h4 id="greeting-section-thumb" class="greeting-card__title">Miniatura e imagen</h4>
-                        <p class="greeting-card__hint">La miniatura aparece arriba a la derecha; la imagen grande va debajo del texto.</p>
+                        <h4 id="greeting-section-thumb" class="greeting-card__title">Miniatura y fondo</h4>
+                        <p class="greeting-card__hint">${mode === 'welcome' ? 'En <strong>tarjeta PNG</strong>, la imagen principal cubre todo el fondo. En embed, la miniatura va arriba a la derecha y la imagen debajo del texto.' : 'La miniatura aparece arriba a la derecha; la imagen grande va debajo del texto.'}</p>
                     </div>
                     <div class="form-row greeting-thumb-row">
                         <div class="form-group">
@@ -8738,8 +8772,8 @@ function renderGreetingPanel(guildId, channels, mode) {
 
                     <div class="welcome-image-editor greeting-image-tools">
                         <div class="greeting-card__head greeting-card__head--nested">
-                            <h4 class="greeting-card__title greeting-card__title--sm">Imagen principal</h4>
-                            <p class="greeting-card__hint">Sube o enlaza una imagen; puedes recortar y escalar antes de subirla.</p>
+                            <h4 class="greeting-card__title greeting-card__title--sm">Fondo / imagen principal</h4>
+                            <p class="greeting-card__hint">Pega una URL o elige archivo; en modo tarjeta es el fondo completo. Puedes recortar y escalar antes de subir.</p>
                         </div>
                         <div class="form-group">
                             <label for="welcomeImageUrl">URL de imagen</label>
@@ -8840,7 +8874,11 @@ function renderGreetingPanel(guildId, channels, mode) {
         'welcomeCardAccent',
         'welcomeCardTitle',
         'welcomeCardName',
-        'welcomeCardSubtitle'
+        'welcomeCardSubtitle',
+        'welcomeCardFont',
+        'welcomeCardNameLine',
+        'welcomeCardOverlay',
+        'welcomeCardOverlayColor'
     ];
 
     previewListeners.forEach((id) => {
@@ -8910,6 +8948,17 @@ function renderGreetingPanel(guildId, channels, mode) {
     const testBtn = document.getElementById('testWelcomeBtn');
     if (saveBtn) saveBtn.addEventListener('click', () => saveWelcomeConfig(guildId));
     if (testBtn) testBtn.addEventListener('click', () => sendWelcomeTest(guildId));
+    const studioBtn = document.getElementById('welcomeOpenStudioBtn');
+    if (studioBtn && mode === 'welcome') {
+        studioBtn.addEventListener('click', () => {
+            saveCurrentGreetingDraft();
+            openWelcomeCardStudio(guildId);
+        });
+    }
+    container.querySelector('#welcomeScrollToBg')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('welcomeBgImageSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     updateWelcomePreviewPanel(guildId);
 }
 
@@ -8932,6 +8981,9 @@ async function loadWelcomePanel(guildId) {
         const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
         currentWelcomeConfig = await welcomeResponse.json();
         currentGoodbyeConfig = await goodbyeResponse.json();
+        if (typeof window.WelcomeCardStudio?.mergeCardLayout === 'function') {
+            currentWelcomeConfig.cardLayout = window.WelcomeCardStudio.mergeCardLayout(currentWelcomeConfig.cardLayout);
+        }
 
         if (welcomeImagePreviewUrl) URL.revokeObjectURL(welcomeImagePreviewUrl);
         welcomeImageFile = null;
@@ -9167,6 +9219,15 @@ function collectWelcomeConfigFromForm() {
         base.cardTitleColor = (document.getElementById('welcomeCardTitle')?.value || '#ffffff').replace('#', '');
         base.cardNameColor = (document.getElementById('welcomeCardName')?.value || '#f8fafc').replace('#', '');
         base.cardSubtitleColor = (document.getElementById('welcomeCardSubtitle')?.value || '#e2e8f0').replace('#', '');
+        base.cardFontKey = document.getElementById('welcomeCardFont')?.value || 'system';
+        base.cardNameTemplate = (document.getElementById('welcomeCardNameLine')?.value || '').trim() || '{username}';
+        base.cardOverlayText = document.getElementById('welcomeCardOverlay')?.value || '';
+        base.cardOverlayColor = (document.getElementById('welcomeCardOverlayColor')?.value || '#ffffff').replace('#', '');
+        base.cardLayout = typeof window !== 'undefined' && window.WelcomeCardStudio?.mergeCardLayout
+            ? window.WelcomeCardStudio.mergeCardLayout(currentWelcomeConfig?.cardLayout)
+            : (currentWelcomeConfig?.cardLayout && typeof currentWelcomeConfig.cardLayout === 'object'
+                ? currentWelcomeConfig.cardLayout
+                : {});
     }
     return base;
 }
@@ -11451,4 +11512,49 @@ async function applyChannelSetupGenerate(guildId) {
             btn.classList.remove('is-loading');
         }
     }
+}
+
+function getDashboardUserAvatarUrl() {
+    if (!currentUser?.id) return '';
+    if (currentUser.avatar) {
+        const ext = String(currentUser.avatar).startsWith('a_') ? 'gif' : 'png';
+        return `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.${ext}?size=256`;
+    }
+    const mod = Number((BigInt(currentUser.id) >> 22n) % 6n);
+    return `https://cdn.discordapp.com/embed/avatars/${mod}.png`;
+}
+
+function openWelcomeCardStudio(guildId) {
+    if (typeof window.WelcomeCardStudio?.open !== 'function') {
+        showToast('Recarga la página para cargar el editor visual.', 'warning');
+        return;
+    }
+    saveCurrentGreetingDraft();
+    currentWelcomeConfig = { ...(currentWelcomeConfig || {}) };
+    window.WelcomeCardStudio.open({
+        guildId,
+        getWelcomeConfig: () => currentWelcomeConfig,
+        applyCardLayout: (L) => {
+            currentWelcomeConfig = { ...currentWelcomeConfig, cardLayout: { ...L } };
+        },
+        getBgUrl: () => welcomeImagePreviewUrl || document.getElementById('welcomeImageUrl')?.value || '',
+        getAvatarUrl: () => getDashboardUserAvatarUrl(),
+        getPreviewLines: () => {
+            const cfg = collectWelcomeConfigFromForm();
+            const guild = currentServerGuilds.find((g) => String(g.id) === String(guildId));
+            const sample = {
+                userMention: `@${currentUser?.username || 'Usuario'}`,
+                username: currentUser?.username || 'Usuario',
+                server: guild?.name || 'Tu servidor',
+                memberCount: guild?.botGuild?.memberCount || 100
+            };
+            return {
+                title: applyWelcomePreviewTemplate(cfg.title || '¡Bienvenido!', sample),
+                name: applyWelcomePreviewTemplate((cfg.cardNameTemplate || '{username}'), sample),
+                sub: applyWelcomePreviewTemplate(cfg.message || '', sample),
+                overlay: applyWelcomePreviewTemplate(cfg.cardOverlayText || '', sample)
+            };
+        },
+        onClose: () => updateWelcomePreviewPanel(guildId)
+    });
 }
