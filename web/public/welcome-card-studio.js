@@ -58,12 +58,430 @@
     let layout = { ...DEFAULT_LAYOUT };
     let activeTool = 'select';
     let selectedLayer = null;
+    let canvasUserZoomPct = 100;
+
+    function applyCanvasUserZoom() {
+        if (rootEl) rootEl.style.setProperty('--wc-user-zoom', String(canvasUserZoomPct / 100));
+    }
+
+    function hideContextMenu() {
+        const menu = rootEl?.querySelector('#wcContextMenu');
+        if (!menu) return;
+        menu.hidden = true;
+        menu.innerHTML = '';
+    }
 
     function studioKeyHandler(ev) {
         if (ev.key !== 'Escape') return;
         if (!rootEl?.classList.contains('is-open')) return;
+        const menu = rootEl.querySelector('#wcContextMenu');
+        if (menu && !menu.hidden) {
+            hideContextMenu();
+            return;
+        }
         setSelectedLayer(null);
         clearGuides();
+    }
+
+    const LAYER_LABELS = {
+        avatar: 'Avatar',
+        title: 'Título',
+        name: 'Nombre / línea central',
+        subtitle: 'Subtítulo',
+        overlay: 'Texto extra (esquina)'
+    };
+
+    function setActiveTool(tool) {
+        activeTool = tool || 'select';
+        rootEl?.querySelectorAll('.wc-studio__tool').forEach((b) => {
+            b.classList.toggle('is-active', b.dataset.tool === activeTool);
+        });
+        renderSidebar();
+    }
+
+    function resetLayerToDefault(key) {
+        const d = DEFAULT_LAYOUT;
+        if (key === 'avatar') {
+            layout.avatarCx = d.avatarCx;
+            layout.avatarCy = d.avatarCy;
+            layout.avatarR = d.avatarR;
+        } else if (key === 'title') {
+            layout.titleX = d.titleX;
+            layout.titleY = d.titleY;
+        } else if (key === 'name') {
+            layout.nameX = d.nameX;
+            layout.nameY = d.nameY;
+        } else if (key === 'subtitle') {
+            layout.subtitleX = d.subtitleX;
+            layout.subtitleY = d.subtitleY;
+        } else if (key === 'overlay') {
+            layout.overlayX = d.overlayX;
+            layout.overlayY = d.overlayY;
+        }
+        syncDomFromLayout();
+    }
+
+    function centerLayerX(key) {
+        const cx = W / 2;
+        if (key === 'title') layout.titleX = cx;
+        else if (key === 'name') layout.nameX = cx;
+        else if (key === 'subtitle') layout.subtitleX = cx;
+        else if (key === 'overlay') layout.overlayX = cx;
+        else if (key === 'avatar') layout.avatarCx = cx;
+        syncDomFromLayout();
+    }
+
+    function centerLayerY(key) {
+        if (key === 'title') layout.titleY = Math.round(H * 0.36);
+        else if (key === 'name') layout.nameY = Math.round(H * 0.48);
+        else if (key === 'subtitle') layout.subtitleY = Math.round(H * 0.6);
+        else if (key === 'avatar') layout.avatarCy = Math.round(H * 0.32);
+        else if (key === 'overlay') layout.overlayY = H - 36;
+        syncDomFromLayout();
+    }
+
+    function nudgeLayer(key, dx, dy) {
+        if (key === 'avatar') {
+            layout.avatarCx = clamp(layout.avatarCx + dx, layout.avatarR + 8, W - layout.avatarR - 8);
+            layout.avatarCy = clamp(layout.avatarCy + dy, layout.avatarR + 8, H - layout.avatarR - 8);
+        } else if (key === 'title') {
+            layout.titleX = clamp(layout.titleX + dx, 40, W - 40);
+            layout.titleY = clamp(layout.titleY + dy, 16, H - 100);
+        } else if (key === 'name') {
+            layout.nameX = clamp(layout.nameX + dx, 40, W - 40);
+            layout.nameY = clamp(layout.nameY + dy, 16, H - 80);
+        } else if (key === 'subtitle') {
+            layout.subtitleX = clamp(layout.subtitleX + dx, 40, W - 40);
+            layout.subtitleY = clamp(layout.subtitleY + dy, 16, H - 36);
+        } else if (key === 'overlay') {
+            layout.overlayX = clamp(layout.overlayX + dx, 48, W - 4);
+            layout.overlayY = clamp(layout.overlayY + dy, 18, H - 4);
+        }
+        syncDomFromLayout();
+    }
+
+    function distributeTextsVertically() {
+        const cx = W / 2;
+        layout.titleX = cx;
+        layout.nameX = cx;
+        layout.subtitleX = cx;
+        layout.titleY = 218;
+        layout.nameY = 292;
+        layout.subtitleY = 366;
+        syncDomFromLayout();
+        toast('Textos distribuidos en vertical', 'success');
+    }
+
+    function mirrorLayoutHorizontal() {
+        layout.titleX = W - layout.titleX;
+        layout.nameX = W - layout.nameX;
+        layout.subtitleX = W - layout.subtitleX;
+        layout.avatarCx = W - layout.avatarCx;
+        layout.overlayX = W - layout.overlayX;
+        syncDomFromLayout();
+        toast('Diseño reflejado en horizontal', 'success');
+    }
+
+    function setBgFocal(fx, fy) {
+        layout.bgFocalX = clamp(Number(fx) || 0.5, 0, 1);
+        layout.bgFocalY = clamp(Number(fy) || 0.5, 0, 1);
+        syncDomFromLayout();
+        renderSidebar();
+    }
+
+    function flashCenterGuides() {
+        renderGuides([W / 2], [H / 2]);
+        window.setTimeout(() => {
+            if (rootEl?.classList.contains('is-open')) clearGuides();
+        }, 1400);
+    }
+
+    async function copyLayoutJson() {
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(layout, null, 2));
+            toast('Posiciones copiadas al portapapeles (JSON)', 'success');
+        } catch {
+            toast('No se pudo copiar (permiso del navegador)', 'error');
+        }
+    }
+
+    async function pasteLayoutJson() {
+        try {
+            const raw = await navigator.clipboard.readText();
+            const parsed = JSON.parse(raw);
+            layout = mergeCardLayout(parsed);
+            syncDomFromLayout();
+            renderSidebar();
+            toast('Posiciones pegadas desde JSON', 'success');
+        } catch {
+            toast('Portapapeles vacío o JSON inválido', 'error');
+        }
+    }
+
+    function buildContextMenuHtml(layerKey) {
+        const layerLabel = layerKey ? LAYER_LABELS[layerKey] || layerKey : null;
+        const layerBlock =
+            layerKey && layerLabel
+                ? `
+            <div class="wc-ctx__heading">Capa: ${layerLabel}</div>
+            <button type="button" class="wc-ctx__item" data-action="layer-select" data-layer="${layerKey}">Seleccionar esta capa</button>
+            <button type="button" class="wc-ctx__item" data-action="layer-center-x" data-layer="${layerKey}">Centrar en horizontal (X)</button>
+            <button type="button" class="wc-ctx__item" data-action="layer-center-y" data-layer="${layerKey}">Centrar en vertical (Y sugerido)</button>
+            <button type="button" class="wc-ctx__item" data-action="layer-reset" data-layer="${layerKey}">Restaurar posición por defecto de la capa</button>
+            <div class="wc-ctx__subhead">Mover la capa (px)</div>
+            <div class="wc-ctx__grid4">
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="-10">↑</button>
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="-10" data-dy="0">←</button>
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="10" data-dy="0">→</button>
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="10">↓</button>
+            </div>
+            <div class="wc-ctx__grid4">
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="-1">▴</button>
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="-1" data-dy="0">◂</button>
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="1" data-dy="0">▸</button>
+                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="1">▾</button>
+            </div>
+            <div class="wc-ctx__sep"></div>`
+                : `
+            <div class="wc-ctx__hint">Clic derecho sobre una capa para opciones de esa capa.</div>
+            <div class="wc-ctx__sep"></div>`;
+
+        return `
+            <div class="wc-ctx__heading">Herramientas</div>
+            <button type="button" class="wc-ctx__item" data-action="tool-select">Seleccionar y mover capas</button>
+            <button type="button" class="wc-ctx__item" data-action="tool-avatar">Solo avatar (radio y arrastre)</button>
+            <button type="button" class="wc-ctx__item" data-action="tool-bg">Encuadre del fondo</button>
+            <div class="wc-ctx__sep"></div>
+            ${layerBlock}
+            <div class="wc-ctx__heading">Alineación global</div>
+            <button type="button" class="wc-ctx__item" data-action="align-texts-x">Centrar textos en horizontal</button>
+            <button type="button" class="wc-ctx__item" data-action="stack-texts">Apilar título · nombre · subtítulo</button>
+            <button type="button" class="wc-ctx__item" data-action="distribute-texts-y">Distribuir textos en vertical (3 bandas)</button>
+            <button type="button" class="wc-ctx__item" data-action="center-avatar">Centrar avatar en el lienzo</button>
+            <button type="button" class="wc-ctx__item" data-action="mirror-h">Reflejar todo en horizontal (espejo)</button>
+            <div class="wc-ctx__sep"></div>
+            <div class="wc-ctx__heading">Avatar — tamaño rápido</div>
+            <div class="wc-ctx__row">
+                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="56">S</button>
+                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="72">M</button>
+                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="88">L</button>
+                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="104">XL</button>
+            </div>
+            <div class="wc-ctx__sep"></div>
+            <div class="wc-ctx__heading">Fondo — punto de encuadre</div>
+            <button type="button" class="wc-ctx__item" data-action="bg-focal" data-fx="0.5" data-fy="0.5">Centro</button>
+            <div class="wc-ctx__row2">
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0" data-fy="0">↖</button>
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0.5" data-fy="0">↑</button>
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="1" data-fy="0">↗</button>
+            </div>
+            <div class="wc-ctx__row2">
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0" data-fy="0.5">←</button>
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="1" data-fy="0.5">→</button>
+            </div>
+            <div class="wc-ctx__row2">
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0" data-fy="1">↙</button>
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0.5" data-fy="1">↓</button>
+                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="1" data-fy="1">↘</button>
+            </div>
+            <div class="wc-ctx__sep"></div>
+            <div class="wc-ctx__heading">Zoom del lienzo</div>
+            <div class="wc-ctx__row">
+                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="70">70%</button>
+                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="85">85%</button>
+                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="100">100%</button>
+                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="115">115%</button>
+                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="130">130%</button>
+            </div>
+            <div class="wc-ctx__sep"></div>
+            <div class="wc-ctx__heading">Portapapeles</div>
+            <button type="button" class="wc-ctx__item" data-action="copy-layout">Copiar posiciones (JSON)</button>
+            <button type="button" class="wc-ctx__item" data-action="paste-layout">Pegar posiciones (JSON)</button>
+            <div class="wc-ctx__sep"></div>
+            <div class="wc-ctx__heading">Guías y vista</div>
+            <button type="button" class="wc-ctx__item" data-action="flash-guides">Mostrar cruz en centro (1,4 s)</button>
+            <button type="button" class="wc-ctx__item" data-action="clear-selection">Quitar selección de capa (Esc)</button>
+            <div class="wc-ctx__sep"></div>
+            <div class="wc-ctx__heading">Archivo y editor</div>
+            <button type="button" class="wc-ctx__item" data-action="upload-bg">Subir imagen de fondo…</button>
+            <button type="button" class="wc-ctx__item wc-ctx__item--warn" data-action="reset-all">Restablecer todo el diseño</button>
+            <button type="button" class="wc-ctx__item wc-ctx__item--accent" data-action="save-design">Guardar diseño y volver</button>
+            <button type="button" class="wc-ctx__item" data-action="close-studio">Cerrar sin guardar cambios del lienzo</button>
+            <p class="wc-ctx__foot">Clic fuera o Esc cierra este menú.</p>
+        `;
+    }
+
+    function positionContextMenu(menu, clientX, clientY) {
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        menu.hidden = false;
+        const w = menu.offsetWidth;
+        const h = menu.offsetHeight;
+        let x = clientX + 2;
+        let y = clientY + 2;
+        const maxX = window.innerWidth - w - 8;
+        const maxY = window.innerHeight - h - 8;
+        if (x > maxX) x = Math.max(8, maxX);
+        if (y > maxY) y = Math.max(8, maxY);
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+    }
+
+    function showContextMenu(clientX, clientY, layerKey) {
+        const menu = rootEl?.querySelector('#wcContextMenu');
+        if (!menu) return;
+        menu.innerHTML = buildContextMenuHtml(layerKey);
+        positionContextMenu(menu, clientX, clientY);
+        menu.focus({ preventScroll: true });
+    }
+
+    function runContextAction(btn) {
+        const action = btn.dataset.action;
+        const layer = btn.dataset.layer;
+
+        switch (action) {
+            case 'tool-select':
+                setActiveTool('select');
+                break;
+            case 'tool-avatar':
+                setActiveTool('avatar');
+                break;
+            case 'tool-bg':
+                setActiveTool('bg');
+                break;
+            case 'layer-select':
+                if (layer) setSelectedLayer(layer);
+                break;
+            case 'layer-center-x':
+                if (layer) centerLayerX(layer);
+                break;
+            case 'layer-center-y':
+                if (layer) centerLayerY(layer);
+                break;
+            case 'layer-reset':
+                if (layer) {
+                    resetLayerToDefault(layer);
+                    toast('Capa restaurada', 'success');
+                }
+                break;
+            case 'nudge':
+                if (layer) {
+                    nudgeLayer(layer, Number(btn.dataset.dx) || 0, Number(btn.dataset.dy) || 0);
+                }
+                break;
+            case 'align-texts-x':
+                centerTextsX();
+                break;
+            case 'stack-texts':
+                stackTitleNameSubtitle();
+                break;
+            case 'distribute-texts-y':
+                distributeTextsVertically();
+                break;
+            case 'center-avatar':
+                centerAvatarOnCanvas();
+                break;
+            case 'mirror-h':
+                mirrorLayoutHorizontal();
+                break;
+            case 'avatar-r': {
+                const r = Number(btn.dataset.r);
+                if (Number.isFinite(r)) {
+                    layout.avatarR = clamp(r, 36, 150);
+                    syncDomFromLayout();
+                    renderSidebar();
+                    toast(`Radio del avatar: ${Math.round(layout.avatarR)} px`, 'success');
+                }
+                break;
+            }
+            case 'bg-focal':
+                setBgFocal(btn.dataset.fx, btn.dataset.fy);
+                toast('Encuadre del fondo actualizado', 'success');
+                break;
+            case 'zoom': {
+                const z = Number(btn.dataset.z);
+                if (Number.isFinite(z)) {
+                    canvasUserZoomPct = clamp(z, 55, 130);
+                    applyCanvasUserZoom();
+                    renderSidebar();
+                }
+                break;
+            }
+            case 'copy-layout':
+                copyLayoutJson();
+                break;
+            case 'paste-layout':
+                pasteLayoutJson();
+                break;
+            case 'flash-guides':
+                flashCenterGuides();
+                break;
+            case 'clear-selection':
+                setSelectedLayer(null);
+                clearGuides();
+                break;
+            case 'upload-bg':
+                rootEl?.querySelector('#wcStudioBgFile')?.click();
+                break;
+            case 'reset-all':
+                layout = { ...DEFAULT_LAYOUT };
+                canvasUserZoomPct = 100;
+                applyCanvasUserZoom();
+                syncDomFromLayout();
+                clearGuides();
+                renderSidebar();
+                toast('Diseño restablecido', 'success');
+                break;
+            case 'save-design':
+                saveAndClose();
+                break;
+            case 'close-studio':
+                close();
+                break;
+            default:
+                break;
+        }
+    }
+
+    function onStudioContextMenu(ev) {
+        if (!rootEl?.classList.contains('is-open')) return;
+        if (ev.target.closest('#wcStudioSidebar')) return;
+        if (ev.target.closest('#wcContextMenu')) return;
+        ev.preventDefault();
+        const layerEl = ev.target.closest('[data-drag]');
+        const layerKey = layerEl?.dataset?.drag && LAYER_LABELS[layerEl.dataset.drag] ? layerEl.dataset.drag : null;
+        showContextMenu(ev.clientX, ev.clientY, layerKey);
+    }
+
+    function onDocumentClickCloseContext(ev) {
+        if (!rootEl?.classList.contains('is-open')) return;
+        const menu = rootEl.querySelector('#wcContextMenu');
+        if (!menu || menu.hidden) return;
+        if (menu.contains(ev.target)) return;
+        hideContextMenu();
+    }
+
+    function onContextMenuClick(ev) {
+        const menu = rootEl?.querySelector('#wcContextMenu');
+        if (!menu || menu.hidden) return;
+        const btn = ev.target.closest('button[data-action]');
+        if (!btn || !menu.contains(btn)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        runContextAction(btn);
+        hideContextMenu();
+    }
+
+    function bindContextMenuShell() {
+        if (rootEl.dataset.ctxMenuBound) return;
+        rootEl.dataset.ctxMenuBound = '1';
+        rootEl.addEventListener('contextmenu', onStudioContextMenu);
+        rootEl.addEventListener('click', onContextMenuClick);
+        rootEl.addEventListener('pointerdown', (ev) => {
+            if (ev.target.closest('#wcContextMenu')) ev.stopPropagation();
+        }, true);
+        document.addEventListener('click', onDocumentClickCloseContext, true);
+        window.addEventListener('resize', hideContextMenu);
     }
 
     function ensureRoot() {
@@ -101,14 +519,10 @@
                     <button type="button" class="wc-studio__tool" data-tool="bg" title="Encuadre del fondo">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                     </button>
-                    <div class="wc-studio__toolbar-divider" role="separator"></div>
-                    <button type="button" class="wc-studio__tool" data-tool="title" title="Título"><span class="wc-studio__tool-letter">T</span></button>
-                    <button type="button" class="wc-studio__tool" data-tool="name" title="Línea central"><span class="wc-studio__tool-letter">N</span></button>
-                    <button type="button" class="wc-studio__tool" data-tool="subtitle" title="Subtítulo"><span class="wc-studio__tool-letter">S</span></button>
-                    <button type="button" class="wc-studio__tool" data-tool="overlay" title="Texto extra"><span class="wc-studio__tool-letter">+</span></button>
                 </aside>
                 <div class="wc-studio__canvas-wrap">
-                    <div class="wc-studio__canvas-scaler">
+                    <div class="wc-studio__zoom-outer" id="wcStudioZoomOuter">
+                        <div class="wc-studio__canvas-scaler">
                         <div class="wc-studio__stage" id="wcStudioStage" style="width:${W}px;height:${H}px;">
                             <div class="wc-stage-bg" id="wcStageBg"></div>
                             <div class="wc-stage-vignette" aria-hidden="true"></div>
@@ -122,6 +536,7 @@
                             <div class="wc-layer wc-layer--text wc-layer--overlay" id="wcLayerOverlay" data-drag="overlay" tabindex="0"></div>
                             <svg class="wc-studio-guides" id="wcStudioGuides" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false"></svg>
                         </div>
+                        </div>
                     </div>
                 </div>
                 <aside class="wc-studio__sidebar" id="wcStudioSidebar">
@@ -129,10 +544,13 @@
                     <div id="wcStudioSideContent" class="wc-studio__side-content"></div>
                 </aside>
             </div>
+            <div id="wcContextMenu" class="wc-ctx" role="menu" aria-label="Menú contextual del editor" hidden tabindex="-1"></div>
         `;
         document.body.appendChild(rootEl);
+        applyCanvasUserZoom();
         document.addEventListener('keydown', studioKeyHandler);
         bindChrome();
+        bindContextMenuShell();
         return rootEl;
     }
 
@@ -223,6 +641,8 @@
         rootEl.querySelector('#wcStudioSave')?.addEventListener('click', saveAndClose);
         rootEl.querySelector('#wcStudioReset')?.addEventListener('click', () => {
             layout = { ...DEFAULT_LAYOUT };
+            canvasUserZoomPct = 100;
+            applyCanvasUserZoom();
             syncDomFromLayout();
             clearGuides();
             renderSidebar();
@@ -318,12 +738,9 @@
 
     function bindLayerDrag(el, key) {
         el.addEventListener('pointerdown', (ev) => {
+            if (ev.pointerType === 'mouse' && ev.button !== 0) return;
             if (activeTool === 'bg') return;
-            if (key === 'avatar' && activeTool !== 'avatar' && activeTool !== 'select') return;
-            if (key === 'title' && activeTool !== 'title' && activeTool !== 'select') return;
-            if (key === 'name' && activeTool !== 'name' && activeTool !== 'select') return;
-            if (key === 'subtitle' && activeTool !== 'subtitle' && activeTool !== 'select') return;
-            if (key === 'overlay' && activeTool !== 'overlay' && activeTool !== 'select') return;
+            if (activeTool === 'avatar' && key !== 'avatar') return;
 
             ev.preventDefault();
             ev.stopPropagation();
@@ -485,16 +902,74 @@
         }
     }
 
+    function sidebarEditBlock() {
+        return `
+            <div class="wc-studio__edit-block">
+                <h4 class="wc-studio__edit-heading">Edición rápida</h4>
+                <div class="wc-studio__btn-stack">
+                    <button type="button" class="wc-studio__side-btn" id="wcAlignTextsX">Centrar textos (horizontal)</button>
+                    <button type="button" class="wc-studio__side-btn" id="wcStackTexts">Apilar título · nombre · subtítulo</button>
+                    <button type="button" class="wc-studio__side-btn" id="wcAlignAvatar">Centrar avatar en el lienzo</button>
+                </div>
+                <label class="wc-studio__label" for="wcCanvasZoom">Zoom del lienzo (${canvasUserZoomPct}%)</label>
+                <input type="range" id="wcCanvasZoom" min="55" max="130" value="${canvasUserZoomPct}" class="wc-studio__range">
+            </div>
+        `;
+    }
+
+    function centerTextsX() {
+        const cx = W / 2;
+        layout.titleX = cx;
+        layout.nameX = cx;
+        layout.subtitleX = cx;
+        syncDomFromLayout();
+        toast('Textos centrados en X', 'success');
+    }
+
+    function stackTitleNameSubtitle() {
+        const cx = W / 2;
+        layout.titleX = cx;
+        layout.nameX = cx;
+        layout.subtitleX = cx;
+        layout.titleY = 232;
+        layout.nameY = 296;
+        layout.subtitleY = 352;
+        syncDomFromLayout();
+        toast('Bloque de textos reapilado', 'success');
+    }
+
+    function centerAvatarOnCanvas() {
+        layout.avatarCx = W / 2;
+        layout.avatarCy = Math.round(H * 0.32);
+        syncDomFromLayout();
+        toast('Avatar centrado', 'success');
+    }
+
+    function bindSidebarCommonActions(box) {
+        box.querySelector('#wcAlignTextsX')?.addEventListener('click', centerTextsX);
+        box.querySelector('#wcStackTexts')?.addEventListener('click', stackTitleNameSubtitle);
+        box.querySelector('#wcAlignAvatar')?.addEventListener('click', centerAvatarOnCanvas);
+        const z = box.querySelector('#wcCanvasZoom');
+        const zLabel = box.querySelector('label[for="wcCanvasZoom"]');
+        z?.addEventListener('input', (e) => {
+            canvasUserZoomPct = Number(e.target.value) || 100;
+            applyCanvasUserZoom();
+            if (zLabel) zLabel.textContent = `Zoom del lienzo (${canvasUserZoomPct}%)`;
+        });
+    }
+
     function renderSidebar() {
         const box = rootEl.querySelector('#wcStudioSideContent');
         if (!box) return;
 
         if (activeTool === 'avatar') {
             box.innerHTML = `
+                ${sidebarEditBlock()}
                 <label class="wc-studio__label">Radio del avatar (${Math.round(layout.avatarR)} px)</label>
                 <input type="range" id="wcAvatarRadius" min="48" max="130" value="${Math.round(layout.avatarR)}" class="wc-studio__range">
-                <p class="wc-studio__hint">Al mover, las <strong>líneas magenta</strong> marcan centro del lienzo o alineación con otros textos.</p>
+                <p class="wc-studio__hint">Con esta herramienta solo se arrastra el <strong>avatar</strong>. Guías <strong>magenta</strong> al alinear.</p>
             `;
+            bindSidebarCommonActions(box);
             box.querySelector('#wcAvatarRadius')?.addEventListener('input', (e) => {
                 layout.avatarR = Number(e.target.value) || 78;
                 syncDomFromLayout();
@@ -504,12 +979,14 @@
 
         if (activeTool === 'bg') {
             box.innerHTML = `
+                ${sidebarEditBlock()}
                 <p class="wc-studio__hint">Arrastra el <strong>fondo</strong> (zona sin capas) o usa los sliders.</p>
                 <label class="wc-studio__label">Encuadre horizontal</label>
                 <input type="range" id="wcBgFx" min="0" max="100" value="${Math.round(layout.bgFocalX * 100)}" class="wc-studio__range">
                 <label class="wc-studio__label">Encuadre vertical</label>
                 <input type="range" id="wcBgFy" min="0" max="100" value="${Math.round(layout.bgFocalY * 100)}" class="wc-studio__range">
             `;
+            bindSidebarCommonActions(box);
             box.querySelector('#wcBgFx')?.addEventListener('input', (e) => {
                 layout.bgFocalX = (Number(e.target.value) || 0) / 100;
                 syncDomFromLayout();
@@ -522,8 +999,10 @@
         }
 
         box.innerHTML = `
-            <p class="wc-studio__hint">Herramienta <strong>${activeTool}</strong>. Guías <strong>magenta</strong> al centrar o alinear con otra capa. <strong>Esc</strong> quita la selección.</p>
+            ${sidebarEditBlock()}
+            <p class="wc-studio__hint">Arrastra cualquier capa (título, nombre, subtítulo, texto extra, avatar). Guías <strong>magenta</strong> al centrar. <strong>Esc</strong> quita la selección.</p>
         `;
+        bindSidebarCommonActions(box);
     }
 
     function open(opts) {
@@ -538,6 +1017,10 @@
             img.src = av || 'https://cdn.discordapp.com/embed/avatars/0.png';
         }
         clearGuides();
+        canvasUserZoomPct = 100;
+        applyCanvasUserZoom();
+        activeTool = 'select';
+        rootEl.querySelectorAll('.wc-studio__tool').forEach((b) => b.classList.toggle('is-active', b.dataset.tool === 'select'));
         syncDomFromLayout();
         renderSidebar();
         setSelectedLayer(null);
@@ -559,6 +1042,7 @@
 
     function close() {
         if (!rootEl) return;
+        hideContextMenu();
         clearGuides();
         setSelectedLayer(null);
         rootEl.classList.remove('is-open');

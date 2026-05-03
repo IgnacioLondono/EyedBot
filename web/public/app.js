@@ -8845,7 +8845,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                     </div>
                     ${mode === 'welcome' ? `
                     <div id="welcomeCardPreviewWrap" style="display:none;text-align:center;">
-                        <img id="welcomeCardPreviewImg" alt="Vista previa de tarjeta" width="460" height="260" loading="lazy" style="max-width:100%;height:auto;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.45);">
+                        <img id="welcomeCardPreviewImg" alt="Vista previa de tarjeta" width="460" height="260" decoding="async" style="max-width:100%;height:auto;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.45);">
                     </div>
                     ` : ''}
                 </div>
@@ -9027,14 +9027,35 @@ async function fetchWelcomeCardPreview(guildId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        if (!res.ok) return;
+        const ct = String(res.headers.get('content-type') || '').toLowerCase();
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || `No se pudo generar la vista previa (${res.status})`, 'error');
+            return;
+        }
+        if (!ct.includes('image/png')) {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || 'La vista previa no devolvió una imagen PNG válida', 'error');
+            return;
+        }
         const blob = await res.blob();
-        if (!blob || blob.size < 32) return;
+        if (!blob || blob.size < 64) {
+            showToast('La vista previa de la tarjeta está vacía o corrupta', 'error');
+            return;
+        }
+        const sig = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+        const isPng = sig[0] === 0x89 && sig[1] === 0x50 && sig[2] === 0x4e && sig[3] === 0x47;
+        if (!isPng) {
+            showToast('La respuesta no es un PNG (¿sesión caducada o error del servidor?)', 'error');
+            return;
+        }
         if (welcomeCardPreviewObjectUrl) URL.revokeObjectURL(welcomeCardPreviewObjectUrl);
         welcomeCardPreviewObjectUrl = URL.createObjectURL(blob);
+        img.onerror = () => showToast('No se pudo mostrar la imagen de vista previa', 'error');
         img.src = welcomeCardPreviewObjectUrl;
     } catch (error) {
         console.error('Error cargando vista previa de tarjeta:', error);
+        showToast('Error de red al cargar la vista previa de la tarjeta', 'error');
     }
 }
 

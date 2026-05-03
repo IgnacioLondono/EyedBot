@@ -2992,13 +2992,18 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
         const nameTpl = String(body.cardNameTemplate != null ? body.cardNameTemplate : '{username}').trim() || '{username}';
 
         const localImagePath = resolveLocalUploadFile(body.imageUrl);
+        const titleRaw = String(body.title != null ? body.title : '').trim();
+        const messageRaw = String(body.message != null ? body.message : '').trim();
+        const subtitleTpl =
+            messageRaw || '¡Hola {user}! Bienvenido a **{server}**. Eres el miembro #{memberCount}.';
+
         const buffer = await renderWelcomeCardPng({
             avatarUrl,
             backgroundUrl: localImagePath ? null : String(body.imageUrl || ''),
             backgroundFilePath: localImagePath,
-            headline: applyWelcomeTemplate(String(body.title || '¡Bienvenido!'), tplMember),
+            headline: applyWelcomeTemplate(titleRaw || '¡Bienvenido!', tplMember),
             displayName: applyWelcomeTemplate(nameTpl, tplMember),
-            subtitle: applyWelcomeTemplate(String(body.message || ''), tplMember),
+            subtitle: applyWelcomeTemplate(subtitleTpl, tplMember),
             overlayText: applyWelcomeTemplate(String(body.cardOverlayText || ''), tplMember),
             overlayHex: sanitizeHexColor6(body.cardOverlayColor, 'ffffff'),
             fontKey: ['system', 'serif', 'mono', 'rounded', 'elegant'].includes(String(body.cardFontKey || '').toLowerCase())
