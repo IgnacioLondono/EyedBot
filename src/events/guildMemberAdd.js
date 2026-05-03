@@ -27,11 +27,15 @@ function enqueueWelcomeSend(queueKey, task) {
 }
 
 function applyTemplate(text, member) {
+    const mention = `${member}`;
+    const uname = member.user.username;
+    const srv = member.guild.name;
+    const mc = String(member.guild.memberCount);
     return String(text || '')
-        .replace(/\{user\}/gi, `${member}`)
-        .replace(/\{username\}/gi, member.user.username)
-        .replace(/\{server\}/gi, member.guild.name)
-        .replace(/\{memberCount\}/gi, String(member.guild.memberCount));
+        .replace(/\{user\}|\{mention\}/gi, mention)
+        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
+        .replace(/\{server\}|\{guild\}/gi, srv)
+        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
 }
 
 function resolveLocalUploadFile(rawUrl = '') {

@@ -8,6 +8,17 @@
     const W = 920;
     const H = 520;
     const SNAP = 14;
+    const DRAG_THRESHOLD = 8;
+
+    const LAYER_TO_RAW = {
+        title: 'title',
+        name: 'cardNameTemplate',
+        subtitle: 'message',
+        overlay: 'cardOverlayText'
+    };
+
+    let editingTextLayer = null;
+    let textPreviewDebounceTimer = null;
 
     const DEFAULT_LAYOUT = {
         bgFocalX: 0.5,
@@ -64,7 +75,15 @@
         if (rootEl) rootEl.style.setProperty('--wc-user-zoom', String(canvasUserZoomPct / 100));
     }
 
+    function hideTextFormatMenu() {
+        const m = rootEl?.querySelector('#wcTextFormatMenu');
+        if (!m) return;
+        m.hidden = true;
+        m.innerHTML = '';
+    }
+
     function hideContextMenu() {
+        hideTextFormatMenu();
         const menu = rootEl?.querySelector('#wcContextMenu');
         if (!menu) return;
         menu.hidden = true;
@@ -74,9 +93,18 @@
     function studioKeyHandler(ev) {
         if (ev.key !== 'Escape') return;
         if (!rootEl?.classList.contains('is-open')) return;
+        const tfm = rootEl.querySelector('#wcTextFormatMenu');
+        if (tfm && !tfm.hidden) {
+            hideTextFormatMenu();
+            return;
+        }
         const menu = rootEl.querySelector('#wcContextMenu');
         if (menu && !menu.hidden) {
             hideContextMenu();
+            return;
+        }
+        if (editingTextLayer) {
+            commitActiveTextEditIfAny();
             return;
         }
         setSelectedLayer(null);
@@ -90,6 +118,231 @@
         subtitle: 'Subtítulo',
         overlay: 'Texto extra (esquina)'
     };
+
+    const WC_SWATCH_COLORS = ['ffffff', 'f8fafc', 'fca5a5', 'fdba74', 'fde047', '4ade80', '22d3ee', '60a5fa', 'a78bfa', 'f472b6', 'e2e8f0', '334155'];
+
+    function parseMarkupSegs(input) {
+        const s = String(input ?? '');
+        const segments = [];
+        let color = null;
+        let buf = '';
+        const flush = () => {
+            if (!buf) return;
+            segments.push({ text: buf, color });
+            buf = '';
+        };
+        const re = /\[\[#([0-9a-fA-F]{6})\]\]|\[\[\/\]\]/gi;
+        let last = 0;
+        let m;
+        while ((m = re.exec(s)) !== null) {
+            buf += s.slice(last, m.index);
+            if (m[0].toLowerCase().startsWith('[[#')) {
+                flush();
+                color = m[1].toLowerCase();
+            } else {
+                flush();
+                color = null;
+            }
+            last = m.index + m[0].length;
+        }
+        buf += s.slice(last);
+        flush();
+        return segments.length ? segments : [{ text: s, color: null }];
+    }
+
+    function stripColorMarkup(input) {
+        return String(input || '')
+            .replace(/\[\[#([0-9a-fA-F]{6})\]\]/gi, '')
+            .replace(/\[\[\/\]\]/g, '');
+    }
+
+    function escHtml(t) {
+        return String(t)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function markupToHtml(src) {
+        return parseMarkupSegs(src)
+            .map((seg) => {
+                const inner = escHtml(seg.text || '').replace(/\n/g, '<br>');
+                if (seg.color && /^[0-9a-f]{6}$/i.test(seg.color)) {
+                    const h = seg.color.toLowerCase();
+                    return `<span class="wc-rich" data-wc-c="${h}" style="color:#${h}">${inner}</span>`;
+                }
+                return inner;
+            })
+            .join('');
+    }
+
+    function htmlToMarkup(root) {
+        function walk(node) {
+            if (node.nodeType === 3) return String(node.textContent || '').replace(/\u00a0/g, ' ');
+            if (node.nodeType !== 1) return '';
+            const el = node;
+            if (el.tagName === 'BR') return '\n';
+            if (el.classList && el.classList.contains('wc-rich')) {
+                const hex = String(el.getAttribute('data-wc-c') || '').toLowerCase();
+                let inner = '';
+                for (const c of el.childNodes) inner += walk(c);
+                if (/^[0-9a-f]{6}$/.test(hex) && inner) return `[[#${hex}]]${inner}[[/]]`;
+                return inner;
+            }
+            let out = '';
+            for (const c of el.childNodes) out += walk(c);
+            return out;
+        }
+        let res = '';
+        for (const c of root.childNodes) res += walk(c);
+        return res;
+    }
+
+    function getEditingTextLayerEl() {
+        return editingTextLayer ? rootEl?.querySelector(`[data-drag="${editingTextLayer}"]`) : null;
+    }
+
+    function wrapSelectionWithColor(hex) {
+        const h = String(hex || '').replace('#', '').toLowerCase();
+        if (!/^[0-9a-f]{6}$/.test(h)) return;
+        const layer = getEditingTextLayerEl();
+        if (!layer) return;
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !layer.contains(sel.anchorNode) || !layer.contains(sel.focusNode)) {
+            toast('Selecciona un fragmento de texto primero', 'warning');
+            return;
+        }
+        layer.focus();
+        const range = sel.getRangeAt(0);
+        const span = document.createElement('span');
+        span.className = 'wc-rich';
+        span.setAttribute('data-wc-c', h);
+        span.style.color = `#${h}`;
+        try {
+            range.surroundContents(span);
+        } catch {
+            const frag = range.extractContents();
+            span.appendChild(frag);
+            range.insertNode(span);
+        }
+        sel.removeAllRanges();
+        const nr = document.createRange();
+        nr.selectNodeContents(span);
+        nr.collapse(false);
+        sel.addRange(nr);
+        layer.dispatchEvent(new Event('input', { bubbles: true }));
+        toast('Color aplicado al fragmento', 'success');
+    }
+
+    function unwrapSelectionColor() {
+        const layer = getEditingTextLayerEl();
+        if (!layer) return;
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        let node = sel.anchorNode;
+        if (node.nodeType === 3) node = node.parentElement;
+        const span = node && node.closest && node.closest('span.wc-rich');
+        if (!span || !layer.contains(span)) {
+            toast('Coloca el cursor dentro de un color aplicado', 'warning');
+            return;
+        }
+        const parent = span.parentNode;
+        if (!parent) return;
+        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+        parent.removeChild(span);
+        layer.dispatchEvent(new Event('input', { bubbles: true }));
+        toast('Color quitado del fragmento', 'success');
+    }
+
+    function insertVarAtCaret(token) {
+        const layer = getEditingTextLayerEl();
+        if (!layer) return;
+        layer.focus();
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const r = sel.getRangeAt(0);
+        r.deleteContents();
+        const tn = document.createTextNode(token);
+        r.insertNode(tn);
+        r.setStartAfter(tn);
+        r.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        layer.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function buildTextFormatMenuHtml(hasSelection) {
+        const sw = WC_SWATCH_COLORS.map(
+            (c) =>
+                `<button type="button" class="wc-txtfmt__sw" data-tfmt="color" data-hex="${c}" title="#${c}" style="--sw:#${c}"></button>`
+        ).join('');
+        const colorBlock = hasSelection
+            ? `
+            <div class="wc-txtfmt__heading">Color del fragmento</div>
+            <div class="wc-txtfmt__swatches">${sw}</div>
+            <label class="wc-txtfmt__colorpick"><span>Otro color</span><input type="color" id="wcTxtFmtColorPick" value="#ffffff"></label>
+            <button type="button" class="wc-txtfmt__btn" data-tfmt="remove-color">Quitar color del fragmento</button>
+            <div class="wc-txtfmt__sep"></div>`
+            : '<p class="wc-txtfmt__hint">Selecciona texto para aplicar color.</p><div class="wc-txtfmt__sep"></div>';
+        return `
+            ${colorBlock}
+            <div class="wc-txtfmt__heading">Insertar variable</div>
+            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{user}">{user} — mención</button>
+            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{username}">{username}</button>
+            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{server}">{server}</button>
+            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{memberCount}">{memberCount}</button>
+            <p class="wc-txtfmt__foot">Los colores se guardan como [[#RRGGBB]]texto[[/]]. En subtítulo multilínea la PNG usa un solo color.</p>
+        `;
+    }
+
+    function positionTextFormatMenu(menu, clientX, clientY) {
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        menu.hidden = false;
+        const w = menu.offsetWidth;
+        const h = menu.offsetHeight;
+        let x = clientX + 2;
+        let y = clientY + 2;
+        const maxX = window.innerWidth - w - 8;
+        const maxY = window.innerHeight - h - 8;
+        if (x > maxX) x = Math.max(8, maxX);
+        if (y > maxY) y = Math.max(8, maxY);
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+    }
+
+    function showTextFormatMenu(clientX, clientY, hasSelection) {
+        hideContextMenu();
+        const menu = rootEl?.querySelector('#wcTextFormatMenu');
+        if (!menu) return;
+        menu.innerHTML = buildTextFormatMenuHtml(hasSelection);
+        positionTextFormatMenu(menu, clientX, clientY);
+        menu.focus({ preventScroll: true });
+        const pick = menu.querySelector('#wcTxtFmtColorPick');
+        pick?.addEventListener('input', () => {
+            const v = String(pick.value || '').replace('#', '').toLowerCase();
+            if (/^[0-9a-f]{6}$/.test(v)) wrapSelectionWithColor(v);
+            hideTextFormatMenu();
+        });
+    }
+
+    function runTextFormatAction(btn) {
+        const kind = btn.dataset.tfmt;
+        if (kind === 'color') wrapSelectionWithColor(btn.dataset.hex || '');
+        else if (kind === 'remove-color') unwrapSelectionColor();
+        else if (kind === 'var') insertVarAtCaret(btn.dataset.token || '');
+        hideTextFormatMenu();
+    }
+
+    function onTextFormatMenuClick(ev) {
+        const menu = rootEl?.querySelector('#wcTextFormatMenu');
+        if (!menu || menu.hidden) return;
+        const btn = ev.target.closest('button[data-tfmt]');
+        if (!btn || !menu.contains(btn)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        runTextFormatAction(btn);
+    }
 
     function setActiveTool(tool) {
         activeTool = tool || 'select';
@@ -328,6 +581,7 @@
     }
 
     function showContextMenu(clientX, clientY, layerKey) {
+        hideTextFormatMenu();
         const menu = rootEl?.querySelector('#wcContextMenu');
         if (!menu) return;
         menu.innerHTML = buildContextMenuHtml(layerKey);
@@ -447,6 +701,19 @@
         if (!rootEl?.classList.contains('is-open')) return;
         if (ev.target.closest('#wcStudioSidebar')) return;
         if (ev.target.closest('#wcContextMenu')) return;
+        if (ev.target.closest('#wcTextFormatMenu')) return;
+        const editLayer = ev.target.closest('.wc-layer--editing');
+        if (editLayer && (ev.target === editLayer || editLayer.contains(ev.target))) {
+            ev.preventDefault();
+            const sel = window.getSelection();
+            const hasSel =
+                sel &&
+                !sel.isCollapsed &&
+                editLayer.contains(sel.anchorNode) &&
+                editLayer.contains(sel.focusNode);
+            showTextFormatMenu(ev.clientX, ev.clientY, Boolean(hasSel));
+            return;
+        }
         ev.preventDefault();
         const layerEl = ev.target.closest('[data-drag]');
         const layerKey = layerEl?.dataset?.drag && LAYER_LABELS[layerEl.dataset.drag] ? layerEl.dataset.drag : null;
@@ -456,9 +723,13 @@
     function onDocumentClickCloseContext(ev) {
         if (!rootEl?.classList.contains('is-open')) return;
         const menu = rootEl.querySelector('#wcContextMenu');
-        if (!menu || menu.hidden) return;
-        if (menu.contains(ev.target)) return;
-        hideContextMenu();
+        const tfm = rootEl.querySelector('#wcTextFormatMenu');
+        if (tfm && !tfm.hidden) {
+            if (!tfm.contains(ev.target)) hideTextFormatMenu();
+        }
+        if (menu && !menu.hidden) {
+            if (!menu.contains(ev.target)) hideContextMenu();
+        }
     }
 
     function onContextMenuClick(ev) {
@@ -477,8 +748,9 @@
         rootEl.dataset.ctxMenuBound = '1';
         rootEl.addEventListener('contextmenu', onStudioContextMenu);
         rootEl.addEventListener('click', onContextMenuClick);
+        rootEl.addEventListener('click', onTextFormatMenuClick);
         rootEl.addEventListener('pointerdown', (ev) => {
-            if (ev.target.closest('#wcContextMenu')) ev.stopPropagation();
+            if (ev.target.closest('#wcContextMenu') || ev.target.closest('#wcTextFormatMenu')) ev.stopPropagation();
         }, true);
         document.addEventListener('click', onDocumentClickCloseContext, true);
         window.addEventListener('resize', hideContextMenu);
@@ -495,7 +767,7 @@
                 <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioClose" aria-label="Cerrar editor">← Volver</button>
                 <div class="wc-studio__titlewrap">
                     <h2 class="wc-studio__title">Editor de tarjeta</h2>
-                    <p class="wc-studio__subtitle">920×520 px · Guías magenta al centrar · Suelta para fijar.</p>
+                    <p class="wc-studio__subtitle">920×520 · Doble clic para editar · Clic derecho con selección: color del fragmento · Variables {user} {username} {server} {memberCount}</p>
                 </div>
                 <div class="wc-studio__actions wc-studio__actions--grow">
                     <input type="file" id="wcStudioBgFile" accept="image/*" class="wc-studio__file-input" aria-hidden="true" tabindex="-1">
@@ -545,6 +817,7 @@
                 </aside>
             </div>
             <div id="wcContextMenu" class="wc-ctx" role="menu" aria-label="Menú contextual del editor" hidden tabindex="-1"></div>
+            <div id="wcTextFormatMenu" class="wc-txtfmt" role="menu" aria-label="Formato de texto" hidden tabindex="-1"></div>
         `;
         document.body.appendChild(rootEl);
         applyCanvasUserZoom();
@@ -739,6 +1012,7 @@
     function bindLayerDrag(el, key) {
         el.addEventListener('pointerdown', (ev) => {
             if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+            if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') return;
             if (activeTool === 'bg') return;
             if (activeTool === 'avatar' && key !== 'avatar') return;
 
@@ -752,8 +1026,13 @@
                 y: ev.clientY,
                 layout: { ...layout }
             };
+            let moved = false;
 
             const onMove = (e) => {
+                if (!moved) {
+                    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < DRAG_THRESHOLD) return;
+                    moved = true;
+                }
                 const dx = (e.clientX - start.x) * sc;
                 const dy = (e.clientY - start.y) * sc;
                 const verticalGuides = [];
@@ -821,7 +1100,7 @@
             const onUp = () => {
                 window.removeEventListener('pointermove', onMove);
                 window.removeEventListener('pointerup', onUp);
-                clearGuides();
+                if (moved) clearGuides();
             };
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
@@ -893,13 +1172,110 @@
         const name = rootEl.querySelector('#wcLayerName');
         const sub = rootEl.querySelector('#wcLayerSubtitle');
         const ov = rootEl.querySelector('#wcLayerOverlay');
-        if (title) title.textContent = lines.title || '';
-        if (name) name.textContent = lines.name || '';
-        if (sub) sub.textContent = lines.sub || '';
+        if (title) title.innerHTML = markupToHtml(String(lines.title || ''));
+        if (name) name.innerHTML = markupToHtml(String(lines.name || ''));
+        if (sub) sub.innerHTML = markupToHtml(String(lines.sub || ''));
         if (ov) {
-            ov.textContent = lines.overlay || '';
-            ov.style.display = lines.overlay ? '' : 'none';
+            const ovLine = String(lines.overlay || '');
+            const hasOverlay = stripColorMarkup(ovLine).replace(/\s+/g, ' ').trim().length > 0;
+            if (hasOverlay) {
+                ov.innerHTML = markupToHtml(ovLine);
+                ov.classList.remove('wc-layer--overlay-empty');
+                ov.style.display = '';
+            } else {
+                ov.innerHTML = '';
+                ov.classList.add('wc-layer--overlay-empty');
+                ov.style.display = 'block';
+            }
         }
+    }
+
+    function onTextLayerInput() {
+        if (!optsRef?.onCardTextsUpdated || !optsRef.getRawCardTexts || !editingTextLayer) return;
+        window.clearTimeout(textPreviewDebounceTimer);
+        textPreviewDebounceTimer = window.setTimeout(() => {
+            textPreviewDebounceTimer = null;
+            const rawField = LAYER_TO_RAW[editingTextLayer];
+            const el = rootEl?.querySelector(`[data-drag="${editingTextLayer}"]`);
+            if (!rawField || !el) return;
+            const raw = { ...optsRef.getRawCardTexts() };
+            raw[rawField] = htmlToMarkup(el).replace(/\r\n/g, '\n');
+            optsRef.onCardTextsUpdated(raw, optsRef.guildId);
+        }, 420);
+    }
+
+    function finishTextLayerEdit(el, layerKey) {
+        if (!el || !layerKey || !LAYER_TO_RAW[layerKey] || !optsRef?.getRawCardTexts) return;
+        if (el.contentEditable !== 'true') return;
+        const rawField = LAYER_TO_RAW[layerKey];
+        let val = htmlToMarkup(el).replace(/\r\n/g, '\n');
+        if (layerKey === 'overlay') val = val.trim();
+        const raw = { ...optsRef.getRawCardTexts() };
+        raw[rawField] = val;
+        el.contentEditable = 'false';
+        el.classList.remove('wc-layer--editing');
+        editingTextLayer = null;
+        window.clearTimeout(textPreviewDebounceTimer);
+        textPreviewDebounceTimer = null;
+        optsRef.onCardTextsUpdated?.(raw, optsRef.guildId);
+        if (typeof optsRef.getPreviewLines === 'function') applyTexts(optsRef.getPreviewLines());
+    }
+
+    function commitActiveTextEditIfAny() {
+        if (!editingTextLayer || !rootEl) return;
+        const key = editingTextLayer;
+        const el = rootEl.querySelector(`[data-drag="${key}"]`);
+        if (!el || el.contentEditable !== 'true') return;
+        el.removeEventListener('input', onTextLayerInput);
+        finishTextLayerEdit(el, key);
+    }
+
+    function beginTextLayerEdit(layerKey) {
+        if (layerKey === 'avatar' || !LAYER_TO_RAW[layerKey] || !optsRef?.getRawCardTexts) return;
+        commitActiveTextEditIfAny();
+        const el = rootEl.querySelector(`[data-drag="${layerKey}"]`);
+        if (!el) return;
+        const rawField = LAYER_TO_RAW[layerKey];
+        const raw = optsRef.getRawCardTexts();
+        el.contentEditable = 'true';
+        el.classList.add('wc-layer--editing');
+        el.classList.remove('wc-layer--overlay-empty');
+        el.innerHTML = markupToHtml(raw[rawField] != null ? String(raw[rawField]) : '');
+        editingTextLayer = layerKey;
+        el.focus();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        el.addEventListener('input', onTextLayerInput);
+        el.addEventListener(
+            'blur',
+            (ev) => {
+                const t = ev.target;
+                t.removeEventListener('input', onTextLayerInput);
+                window.clearTimeout(textPreviewDebounceTimer);
+                textPreviewDebounceTimer = null;
+                finishTextLayerEdit(t, t.dataset.drag || layerKey);
+            },
+            { once: true }
+        );
+    }
+
+    function bindTextLayerEditing() {
+        ['title', 'name', 'subtitle', 'overlay'].forEach((key) => {
+            const el = rootEl.querySelector(`[data-drag="${key}"]`);
+            if (!el || el.dataset.wcTextDblBound) return;
+            el.dataset.wcTextDblBound = '1';
+            el.addEventListener('dblclick', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (activeTool === 'bg' || activeTool === 'avatar') return;
+                beginTextLayerEdit(key);
+            });
+        });
     }
 
     function sidebarEditBlock() {
@@ -1000,7 +1376,7 @@
 
         box.innerHTML = `
             ${sidebarEditBlock()}
-            <p class="wc-studio__hint">Arrastra cualquier capa (título, nombre, subtítulo, texto extra, avatar). Guías <strong>magenta</strong> al centrar. <strong>Esc</strong> quita la selección.</p>
+            <p class="wc-studio__hint">Arrastra capas o <strong>doble clic</strong> en un texto para editar ({user}, etc.). Guías <strong>magenta</strong> al centrar. <strong>Esc</strong> termina edición o quita la selección.</p>
         `;
         bindSidebarCommonActions(box);
     }
@@ -1033,6 +1409,7 @@
                 const el = rootEl.querySelector(`[data-drag="${k}"]`);
                 if (el) bindLayerDrag(el, k);
             });
+            bindTextLayerEditing();
         }
 
         rootEl.classList.add('is-open');
@@ -1042,6 +1419,7 @@
 
     function close() {
         if (!rootEl) return;
+        commitActiveTextEditIfAny();
         hideContextMenu();
         clearGuides();
         setSelectedLayer(null);
@@ -1052,6 +1430,7 @@
     }
 
     function saveAndClose() {
+        commitActiveTextEditIfAny();
         clearGuides();
         if (optsRef?.applyCardLayout) {
             optsRef.applyCardLayout({ ...layout });

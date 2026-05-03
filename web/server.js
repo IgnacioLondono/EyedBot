@@ -1067,11 +1067,15 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
 });
 
 function applyWelcomeTemplate(text, member) {
+    const mention = `<@${member.id}>`;
+    const uname = member.user.username;
+    const srv = member.guild.name;
+    const mc = String(member.guild.memberCount);
     return String(text || '')
-        .replace(/\{user\}/gi, `<@${member.id}>`)
-        .replace(/\{username\}/gi, member.user.username)
-        .replace(/\{server\}/gi, member.guild.name)
-        .replace(/\{memberCount\}/gi, String(member.guild.memberCount));
+        .replace(/\{user\}|\{mention\}/gi, mention)
+        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
+        .replace(/\{server\}|\{guild\}/gi, srv)
+        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
 }
 
 function sessionUserAvatarUrl(user) {
