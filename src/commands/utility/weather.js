@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -47,8 +48,9 @@ module.exports = {
                     { name: 'Humedad', value: `${current.humidity || 'N/A'}%`, inline: true },
                     { name: 'Condición', value: current.weatherDesc?.[0]?.value || 'Desconocido', inline: false },
                     { name: 'Viento', value: `${current.windspeedKmph || 'N/A'} km/h`, inline: true }
-                )
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                );
+
+            setInteractionFooter(embed, interaction.user.tag);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {

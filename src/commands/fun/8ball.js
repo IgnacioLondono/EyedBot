@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 const responses = [
     'Sí, definitivamente',
@@ -43,8 +44,9 @@ module.exports = {
             .addFields(
                 { name: 'Pregunta', value: question, inline: false },
                 { name: 'Respuesta', value: answer, inline: false }
-            )
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+            );
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed] });
     }

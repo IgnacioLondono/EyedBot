@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -30,8 +31,9 @@ module.exports = {
                 .addFields(
                     { name: 'Original', value: text, inline: false },
                     { name: 'Traducido', value: translated, inline: false }
-                )
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                );
+
+            setInteractionFooter(embed, interaction.user.tag);
 
             return interaction.reply({ embeds: [embed] });
         } catch (error) {

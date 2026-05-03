@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,6 +19,7 @@ module.exports = {
         
         try {
             let url;
+            let caption = null;
             if (config.tenorApiKey) {
                 const response = await axios.get(`https://g.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${config.tenorApiKey}&limit=10`, {
                     timeout: 10000
@@ -25,6 +27,7 @@ module.exports = {
                 if (response.data.results && response.data.results.length > 0) {
                     const randomResult = response.data.results[Math.floor(Math.random() * response.data.results.length)];
                     url = randomResult.media[0].gif.url;
+                    caption = randomResult.title || randomResult.content_description || null;
                 }
             } else {
                 // Fallback a Giphy si no hay Tenor API
@@ -35,6 +38,7 @@ module.exports = {
                     if (response.data.data && response.data.data.length > 0) {
                         const randomGif = response.data.data[Math.floor(Math.random() * response.data.data.length)];
                         url = randomGif.images.original.url;
+                        caption = randomGif.title || null;
                     }
                 } catch (giphyError) {
                     // Si Giphy falla, usar una API alternativa
@@ -54,8 +58,9 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
                 .setTitle(`GIF: ${query}`)
-                .setImage(url)
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                .setImage(url);
+
+            setInteractionFooter(embed, interaction.user.tag, caption, '🎬 Origen:');
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,8 +20,9 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle('🎲 Lanzamiento de Dado')
-            .setDescription(`Resultado: **${result}** de ${sides}`)
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+            .setDescription(`Resultado: **${result}** de ${sides}`);
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed] });
     }

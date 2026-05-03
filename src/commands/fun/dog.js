@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,8 +18,9 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
                 .setTitle('🐕 Perro Aleatorio')
-                .setImage(dogUrl)
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                .setImage(dogUrl);
+
+            setInteractionFooter(embed, interaction.user.tag);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {

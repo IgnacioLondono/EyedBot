@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,8 +19,9 @@ module.exports = {
             .addFields(
                 { name: 'Latencia del Bot', value: `${timeDiff}ms`, inline: true },
                 { name: 'Latencia de la API', value: apiPingText, inline: true }
-            )
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+            );
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.editReply({ embeds: [embed] });
     }

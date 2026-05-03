@@ -12,6 +12,7 @@ const os = require('os');
 const multer = require('multer');
 const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
+const { renderWelcomeCardPng } = require('../src/utils/welcome-card');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
@@ -1073,6 +1074,24 @@ function applyWelcomeTemplate(text, member) {
         .replace(/\{memberCount\}/gi, String(member.guild.memberCount));
 }
 
+function sessionUserAvatarUrl(user) {
+    if (!user?.id) return 'https://cdn.discordapp.com/embed/avatars/0.png';
+    if (user.avatar) {
+        const ext = String(user.avatar).startsWith('a_') ? 'gif' : 'png';
+        return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${ext}?size=256`;
+    }
+    const mod = Number((BigInt(user.id) >> 22n) % 6n);
+    return `https://cdn.discordapp.com/embed/avatars/${mod}.png`;
+}
+
+function previewWelcomeMemberStub(guild, sessionUser) {
+    return {
+        id: String(sessionUser?.id || '0'),
+        user: { username: sessionUser?.username || 'Usuario' },
+        guild: { name: guild?.name || 'Servidor', memberCount: guild?.memberCount ?? 1 }
+    };
+}
+
 function buildDefaultGreetingConfig(mode, fallbackChannel = '') {
     if (mode === 'goodbye') {
         return {
@@ -1103,8 +1122,18 @@ function buildDefaultGreetingConfig(mode, fallbackChannel = '') {
         thumbnailMode: 'avatar',
         thumbnailUrl: '',
         dmEnabled: false,
-        dmMessage: 'Bienvenido a {server}, {username}.'
+        dmMessage: 'Bienvenido a {server}, {username}.',
+        welcomeStyle: 'embed',
+        cardAccentColor: '4ade80',
+        cardTitleColor: 'ffffff',
+        cardNameColor: 'f8fafc',
+        cardSubtitleColor: 'e2e8f0'
     };
+}
+
+function sanitizeHexColor6(val, fallback) {
+    const h = String(val || '').replace('#', '').trim().slice(0, 6);
+    return /^[0-9a-fA-F]{6}$/.test(h) ? h.toLowerCase() : fallback;
 }
 
 function normalizeGreetingConfigInput(body = {}, mode, userId) {
@@ -1112,7 +1141,7 @@ function normalizeGreetingConfigInput(body = {}, mode, userId) {
         ? { title: 'Hasta pronto', message: '{username} ha salido de **{server}**.' }
         : { title: '¡Bienvenido!', message: '¡Hola {user}! Bienvenido a **{server}**.' };
 
-    return {
+    const base = {
         enabled: body.enabled !== false,
         channelId: String(body.channelId || ''),
         mentionUser: body.mentionUser === true,
@@ -1128,6 +1157,16 @@ function normalizeGreetingConfigInput(body = {}, mode, userId) {
         updatedAt: new Date().toISOString(),
         updatedBy: userId || 'unknown'
     };
+
+    if (mode === 'welcome') {
+        base.welcomeStyle = String(body.welcomeStyle || 'embed') === 'card' ? 'card' : 'embed';
+        base.cardAccentColor = sanitizeHexColor6(body.cardAccentColor, '4ade80');
+        base.cardTitleColor = sanitizeHexColor6(body.cardTitleColor, 'ffffff');
+        base.cardNameColor = sanitizeHexColor6(body.cardNameColor, 'f8fafc');
+        base.cardSubtitleColor = sanitizeHexColor6(body.cardSubtitleColor, 'e2e8f0');
+    }
+
+    return base;
 }
 
 function normalizeVerifyEmojiInput(rawEmoji = '✅') {
@@ -2863,6 +2902,27 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         const member = guild.members.cache.get(req.session.user?.id) || await guild.members.fetch(req.session.user?.id).catch(() => null);
         if (!member) return res.status(404).json({ error: 'No pude obtener tu usuario en este servidor' });
 
+        const content = cfg?.mentionUser ? `<@${member.id}>` : undefined;
+
+        if (cfg?.welcomeStyle === 'card') {
+            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
+            const buffer = await renderWelcomeCardPng({
+                avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                backgroundUrl: localImagePath ? null : cfg.imageUrl,
+                backgroundFilePath: localImagePath,
+                headline: applyWelcomeTemplate(cfg.title || '¡Bienvenido!', member),
+                displayName: member.displayName || member.user.username,
+                subtitle: applyWelcomeTemplate(cfg.message || '¡Hola {user}!', member),
+                accentHex: cfg.cardAccentColor || '4ade80',
+                titleHex: cfg.cardTitleColor || 'ffffff',
+                nameHex: cfg.cardNameColor || 'f8fafc',
+                subtitleHex: cfg.cardSubtitleColor || 'e2e8f0'
+            });
+            const file = new AttachmentBuilder(buffer, { name: 'bienvenida-preview.png' });
+            await channel.send({ content, files: [file] });
+            return res.json({ success: true, message: 'Prueba de bienvenida enviada' });
+        }
+
         const { EmbedBuilder } = require('discord.js');
         const embed = new EmbedBuilder()
             .setColor(cfg?.color || '7c4dff')
@@ -2884,12 +2944,55 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
 
-        await channel.send({ embeds: [embed], files });
+        await channel.send({ content, embeds: [embed], files });
 
         res.json({ success: true, message: 'Prueba de bienvenida enviada' });
     } catch (error) {
         console.error('Error enviando welcome test:', error);
         res.status(500).json({ error: 'Error al enviar prueba de bienvenida' });
+    }
+});
+
+app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const body = req.body || {};
+        const member = guild.members.cache.get(req.session.user?.id) || await guild.members.fetch(req.session.user?.id).catch(() => null);
+        const stub = previewWelcomeMemberStub(guild, req.session.user);
+
+        const tplMember = member || stub;
+        const avatarUrl = member
+            ? member.user.displayAvatarURL({ extension: 'png', size: 256 })
+            : sessionUserAvatarUrl(req.session.user);
+        const displayName = member ? (member.displayName || member.user.username) : (req.session.user?.username || 'Usuario');
+
+        const localImagePath = resolveLocalUploadFile(body.imageUrl);
+        const buffer = await renderWelcomeCardPng({
+            avatarUrl,
+            backgroundUrl: localImagePath ? null : String(body.imageUrl || ''),
+            backgroundFilePath: localImagePath,
+            headline: applyWelcomeTemplate(String(body.title || '¡Bienvenido!'), tplMember),
+            displayName,
+            subtitle: applyWelcomeTemplate(String(body.message || ''), tplMember),
+            accentHex: sanitizeHexColor6(body.cardAccentColor, '4ade80'),
+            titleHex: sanitizeHexColor6(body.cardTitleColor, 'ffffff'),
+            nameHex: sanitizeHexColor6(body.cardNameColor, 'f8fafc'),
+            subtitleHex: sanitizeHexColor6(body.cardSubtitleColor, 'e2e8f0')
+        });
+
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'no-store');
+        return res.send(buffer);
+    } catch (error) {
+        console.error('Error generando vista previa de tarjeta de bienvenida:', error);
+        res.status(500).json({ error: 'Error al generar la vista previa' });
     }
 });
 
