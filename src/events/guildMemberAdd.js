@@ -1,6 +1,6 @@
 const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
-const { renderWelcomeCardPng } = require('../utils/welcome-card');
+const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
 const { AttachmentBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -85,8 +85,16 @@ module.exports = {
                         backgroundUrl: localImagePath ? null : welcomeConfig.imageUrl,
                         backgroundFilePath: localImagePath,
                         headline: applyTemplate(welcomeConfig.title || '¡Bienvenido!', member),
-                        displayName: member.displayName || member.user.username,
+                        displayName: applyTemplate(
+                            welcomeConfig.cardNameTemplate || '{username}',
+                            member
+                        ),
                         subtitle: applyTemplate(welcomeConfig.message || '¡Hola {user}!', member),
+                        overlayText: applyTemplate(welcomeConfig.cardOverlayText || '', member),
+                        overlayHex: welcomeConfig.cardOverlayColor || 'ffffff',
+                        fontKey: welcomeConfig.cardFontKey || 'system',
+                        plainUsername: member.user.username,
+                        cardLayout: mergeCardLayout(welcomeConfig.cardLayout),
                         accentHex: welcomeConfig.cardAccentColor || '4ade80',
                         titleHex: welcomeConfig.cardTitleColor || 'ffffff',
                         nameHex: welcomeConfig.cardNameColor || 'f8fafc',
