@@ -9195,6 +9195,38 @@ async function uploadWelcomeEditedImage(guildId) {
     }
 }
 
+async function processAndUploadWelcomeStudioBackground(guildId, file) {
+    if (typeof resizeImageFile !== 'function') {
+        throw new Error('Procesador de imagen no disponible');
+    }
+    const resized = await resizeImageFile(file, 100, 1920, { x: 0, y: 0, w: 100, h: 100 });
+    const extension = (resized.name.split('.').pop() || 'jpg').toLowerCase();
+    const uploadName = `welcome_studio_${Date.now()}.${extension}`;
+    const formData = new FormData();
+    formData.append('imageFile', resized, uploadName);
+
+    const response = await fetchWithCredentials(`/api/guild/${guildId}/welcome-image`, {
+        method: 'POST',
+        body: formData
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.url) {
+        throw new Error(data.error || 'No se pudo subir la imagen');
+    }
+
+    const imageUrlInput = document.getElementById('welcomeImageUrl');
+    if (imageUrlInput) imageUrlInput.value = data.url;
+    if (welcomeImagePreviewUrl) URL.revokeObjectURL(welcomeImagePreviewUrl);
+    welcomeImageFile = null;
+    welcomeImagePreviewUrl = '';
+    const welcomeFileInput = document.getElementById('welcomeImageFile');
+    if (welcomeFileInput) welcomeFileInput.value = '';
+    const status = document.getElementById('welcomeImageUploadStatus');
+    if (status) status.textContent = 'Imagen aplicada desde el editor';
+
+    return data.url;
+}
+
 function collectWelcomeConfigFromForm() {
     const meta = getGreetingPanelMeta(currentGreetingMode);
     const mentionEl = document.getElementById('welcomeMentionUser');
@@ -11539,6 +11571,8 @@ function openWelcomeCardStudio(guildId) {
         },
         getBgUrl: () => welcomeImagePreviewUrl || document.getElementById('welcomeImageUrl')?.value || '',
         getAvatarUrl: () => getDashboardUserAvatarUrl(),
+        processAndUploadBackground: (file) => processAndUploadWelcomeStudioBackground(guildId, file),
+        onBackgroundUploaded: () => updateWelcomePreviewPanel(guildId),
         getPreviewLines: () => {
             const cfg = collectWelcomeConfigFromForm();
             const guild = currentServerGuilds.find((g) => String(g.id) === String(guildId));
