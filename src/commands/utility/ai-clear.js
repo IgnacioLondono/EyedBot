@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
 const conversationManager = require('../../utils/ai-conversation');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,8 +18,9 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle('✅ Historial Limpiado')
-            .setDescription('El historial de conversación con la IA ha sido eliminado.')
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+            .setDescription('El historial de conversación con la IA ha sido eliminado.');
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed], flags: 64 });
     }

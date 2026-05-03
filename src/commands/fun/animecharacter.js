@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 const DEFAULT_GIPHY_KEY = process.env.GIPHY_API_KEY || 'dc6zaTOxFJmzC';
 
@@ -244,12 +245,11 @@ module.exports = {
                 .setDescription(`**${interaction.user}**, te toco este personaje ultra random:`)
                 .addFields(
                     { name: 'Personaje', value: `**${characterName}**`, inline: true },
-                    { name: 'Anime', value: animeName, inline: true },
                     { name: 'Tipo', value: typeLabel(type), inline: true },
                     { name: 'Rol detectado', value: result.role || 'Unknown', inline: true },
                     { name: 'Resumen', value: trait, inline: false }
-                )
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                );
+            setInteractionFooter(embed, interaction.user.tag, animeName);
 
             if (profileUrl) embed.setURL(profileUrl);
             if (gifUrl) {

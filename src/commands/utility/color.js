@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -32,8 +33,9 @@ module.exports = {
                 { name: 'HEX', value: `#${hex.toUpperCase()}`, inline: true },
                 { name: 'Decimal', value: color.toString(), inline: true }
             )
-            .setImage(`https://api.color.pizza/v1/${hex}`)
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+            .setImage(`https://api.color.pizza/v1/${hex}`);
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed] });
     }

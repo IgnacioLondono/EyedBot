@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -37,8 +38,9 @@ module.exports = {
                     { name: '👍', value: definition.thumbs_up.toString(), inline: true },
                     { name: '👎', value: definition.thumbs_down.toString(), inline: true }
                 )
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` })
                 .setURL(definition.permalink);
+
+            setInteractionFooter(embed, interaction.user.tag);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {

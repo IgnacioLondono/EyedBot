@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,8 +23,9 @@ module.exports = {
                 { name: 'Creado', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true },
                 { name: 'Boost', value: `Nivel ${guild.premiumTier} (${guild.premiumSubscriptionCount} boosts)`, inline: true }
             )
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` })
             .setTimestamp();
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed] });
     }

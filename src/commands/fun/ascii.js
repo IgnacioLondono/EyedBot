@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -62,13 +63,14 @@ module.exports = {
             }
         }
 
-        return interaction.reply({
-            embeds: [new EmbedBuilder()
-                .setColor(config.embedColor)
-                .setTitle('ASCII Art')
-                .setDescription(`\`\`\`\n${ascii}\`\`\``)
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` })]
-        });
+        const embed = new EmbedBuilder()
+            .setColor(config.embedColor)
+            .setTitle('ASCII Art')
+            .setDescription(`\`\`\`\n${ascii}\`\`\``);
+
+        setInteractionFooter(embed, interaction.user.tag);
+
+        return interaction.reply({ embeds: [embed] });
     }
 };
 

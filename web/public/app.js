@@ -14,6 +14,8 @@ let currentServerGuildId = '';
 let currentServerGuilds = [];
 let welcomeImageFile = null;
 let welcomeImagePreviewUrl = '';
+let welcomeCardPreviewTimer = null;
+let welcomeCardPreviewObjectUrl = '';
 let currentGreetingMode = 'welcome';
 const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
@@ -8570,7 +8572,7 @@ function getGreetingPanelMeta(mode) {
     return {
         key: 'welcome',
         panelTitle: 'Sistema de Bienvenidas',
-        subtitle: 'Configura mensaje, imagen y comportamiento para este servidor. Usa variables: <code>{user}</code>, <code>{username}</code>, <code>{server}</code>, <code>{memberCount}</code>.',
+        subtitle: 'Elige embed clásico o <strong>tarjeta PNG</strong> (fondo + avatar + textos). Variables: <code>{user}</code>, <code>{username}</code>, <code>{server}</code>, <code>{memberCount}</code>.',
         channelLabel: 'Canal de bienvenida',
         toggleLabel: 'Activar bienvenidas',
         saveButton: 'Guardar Bienvenida',
@@ -8649,12 +8651,49 @@ function renderGreetingPanel(guildId, channels, mode) {
                         <div class="form-group checkbox-group greeting-toggle">
                             <label><input type="checkbox" id="welcomeDmEnabled" ${cfg.dmEnabled ? 'checked' : ''}> <span>Enviar DM al usuario</span></label>
                         </div>
+                        <div class="form-group checkbox-group greeting-toggle">
+                            <label><input type="checkbox" id="welcomeMentionUser" ${cfg.mentionUser ? 'checked' : ''}> <span>Mencionar al usuario en el canal</span></label>
+                        </div>
                     </div>
                 </section>
 
+                ${mode === 'welcome' ? `
+                <section class="greeting-card" aria-labelledby="greeting-section-welcome-style">
+                    <div class="greeting-card__head">
+                        <h4 id="greeting-section-welcome-style" class="greeting-card__title">Estilo de bienvenida</h4>
+                        <p class="greeting-card__hint">La tarjeta es una imagen PNG que el bot envía al unirse alguien (como en dashboards tipo Koya). Usa la imagen principal como fondo.</p>
+                    </div>
+                    <div class="form-group">
+                        <span class="greeting-var-strip__label" style="display:block;margin-bottom:0.5rem;">Formato</span>
+                        <div class="greeting-style-options" style="display:flex;flex-direction:column;gap:0.5rem;">
+                            <label><input type="radio" name="welcomeStyle" value="embed" ${(cfg.welcomeStyle || 'embed') !== 'card' ? 'checked' : ''}> Embed clásico de Discord</label>
+                            <label><input type="radio" name="welcomeStyle" value="card" ${cfg.welcomeStyle === 'card' ? 'checked' : ''}> Tarjeta con imagen (PNG)</label>
+                        </div>
+                    </div>
+                    <div id="welcomeCardColorFields" class="form-grid greeting-card__grid" style="display:${cfg.welcomeStyle === 'card' ? '' : 'none'}">
+                        <div class="form-group">
+                            <label for="welcomeCardAccent">Aro del avatar</label>
+                            <input type="color" id="welcomeCardAccent" class="form-control color-input" value="#${(cfg.cardAccentColor || '4ade80').replace('#', '')}">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeCardTitle">Texto grande</label>
+                            <input type="color" id="welcomeCardTitle" class="form-control color-input" value="#${(cfg.cardTitleColor || 'ffffff').replace('#', '')}">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeCardName">Nombre</label>
+                            <input type="color" id="welcomeCardName" class="form-control color-input" value="#${(cfg.cardNameColor || 'f8fafc').replace('#', '')}">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcomeCardSubtitle">Subtítulo</label>
+                            <input type="color" id="welcomeCardSubtitle" class="form-control color-input" value="#${(cfg.cardSubtitleColor || 'e2e8f0').replace('#', '')}">
+                        </div>
+                    </div>
+                </section>
+                ` : ''}
+
                 <section class="greeting-card" aria-labelledby="greeting-section-embed">
                     <div class="greeting-card__head">
-                        <h4 id="greeting-section-embed" class="greeting-card__title">Texto del embed</h4>
+                        <h4 id="greeting-section-embed" class="greeting-card__title">${mode === 'welcome' ? 'Texto del mensaje' : 'Texto del embed'}</h4>
                     </div>
                     <div class="form-group">
                         <label for="welcomeTitle">Título</label>
@@ -8758,12 +8797,23 @@ function renderGreetingPanel(guildId, channels, mode) {
             </div>
 
             <aside class="welcome-preview-panel">
-                <div class="welcome-preview-panel__top">
+                <div class="welcome-preview-panel__top" id="welcomePreviewHeadingEmbed">
                     <h4 class="welcome-preview-heading">Vista previa del embed</h4>
                     <p class="welcome-preview-panel__sub">Se actualiza al cambiar título, descripción, color o imágenes.</p>
                 </div>
-                <div class="welcome-preview-stage" aria-label="Simulación aproximada del mensaje en Discord">
-                    <div id="welcomePreviewCard" class="embed-preview"></div>
+                <div class="welcome-preview-panel__top" id="welcomePreviewHeadingCard" style="display:none;">
+                    <h4 class="welcome-preview-heading">Vista previa de la tarjeta</h4>
+                    <p class="welcome-preview-panel__sub">PNG que enviará el bot al unirse un miembro (mismas variables en título y descripción).</p>
+                </div>
+                <div class="welcome-preview-stage" aria-label="Vista previa de bienvenida o despedida">
+                    <div id="welcomeEmbedPreviewWrap">
+                        <div id="welcomePreviewCard" class="embed-preview"></div>
+                    </div>
+                    ${mode === 'welcome' ? `
+                    <div id="welcomeCardPreviewWrap" style="display:none;text-align:center;">
+                        <img id="welcomeCardPreviewImg" alt="Vista previa de tarjeta" width="460" height="260" loading="lazy" style="max-width:100%;height:auto;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.45);">
+                    </div>
+                    ` : ''}
                 </div>
             </aside>
         </div>
@@ -8774,6 +8824,7 @@ function renderGreetingPanel(guildId, channels, mode) {
         'welcomeColor',
         'welcomeEnabled',
         'welcomeDmEnabled',
+        'welcomeMentionUser',
         'welcomeTitle',
         'welcomeMessage',
         'welcomeFooter',
@@ -8785,7 +8836,11 @@ function renderGreetingPanel(guildId, channels, mode) {
         'welcomeImageCropX',
         'welcomeImageCropY',
         'welcomeImageCropW',
-        'welcomeImageCropH'
+        'welcomeImageCropH',
+        'welcomeCardAccent',
+        'welcomeCardTitle',
+        'welcomeCardName',
+        'welcomeCardSubtitle'
     ];
 
     previewListeners.forEach((id) => {
@@ -8804,8 +8859,12 @@ function renderGreetingPanel(guildId, channels, mode) {
                 if (thumbUrlInput) thumbUrlInput.disabled = String(el.value || 'avatar') !== 'url';
             }
 
-            renderWelcomeEmbedPreview(guildId);
+            updateWelcomePreviewPanel(guildId);
         });
+    });
+
+    container.querySelectorAll('input[name="welcomeStyle"]').forEach((radio) => {
+        radio.addEventListener('change', () => updateWelcomePreviewPanel(guildId));
     });
 
     container.querySelector('.greeting-var-strip')?.addEventListener('click', (e) => {
@@ -8820,7 +8879,7 @@ function renderGreetingPanel(guildId, channels, mode) {
         ta.focus();
         const caret = start + ins.length;
         ta.setSelectionRange(caret, caret);
-        renderWelcomeEmbedPreview(guildId);
+        updateWelcomePreviewPanel(guildId);
     });
 
     container.querySelectorAll('[data-greeting-tab]').forEach((tabBtn) => {
@@ -8851,7 +8910,7 @@ function renderGreetingPanel(guildId, channels, mode) {
     const testBtn = document.getElementById('testWelcomeBtn');
     if (saveBtn) saveBtn.addEventListener('click', () => saveWelcomeConfig(guildId));
     if (testBtn) testBtn.addEventListener('click', () => sendWelcomeTest(guildId));
-    renderWelcomeEmbedPreview(guildId);
+    updateWelcomePreviewPanel(guildId);
 }
 
 async function loadWelcomePanel(guildId) {
@@ -8877,6 +8936,10 @@ async function loadWelcomePanel(guildId) {
         if (welcomeImagePreviewUrl) URL.revokeObjectURL(welcomeImagePreviewUrl);
         welcomeImageFile = null;
         welcomeImagePreviewUrl = '';
+        if (welcomeCardPreviewObjectUrl) URL.revokeObjectURL(welcomeCardPreviewObjectUrl);
+        welcomeCardPreviewObjectUrl = '';
+        clearTimeout(welcomeCardPreviewTimer);
+        welcomeCardPreviewTimer = null;
 
         if (!['welcome', 'goodbye'].includes(currentGreetingMode)) currentGreetingMode = 'welcome';
         renderGreetingPanel(guildId, channels, currentGreetingMode);
@@ -8892,6 +8955,70 @@ function applyWelcomePreviewTemplate(text, sample) {
         .replace(/\{username\}/gi, sample.username)
         .replace(/\{server\}/gi, sample.server)
         .replace(/\{memberCount\}/gi, String(sample.memberCount));
+}
+
+function scheduleWelcomeCardPreview(guildId) {
+    clearTimeout(welcomeCardPreviewTimer);
+    welcomeCardPreviewTimer = setTimeout(() => {
+        fetchWelcomeCardPreview(guildId);
+    }, 420);
+}
+
+async function fetchWelcomeCardPreview(guildId) {
+    const img = document.getElementById('welcomeCardPreviewImg');
+    if (!img || currentGreetingMode !== 'welcome') return;
+    const payload = collectWelcomeConfigFromForm();
+    if (payload.welcomeStyle !== 'card') return;
+    try {
+        const res = await fetchWithCredentials(`/api/guild/${guildId}/welcome-card-preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (!blob || blob.size < 32) return;
+        if (welcomeCardPreviewObjectUrl) URL.revokeObjectURL(welcomeCardPreviewObjectUrl);
+        welcomeCardPreviewObjectUrl = URL.createObjectURL(blob);
+        img.src = welcomeCardPreviewObjectUrl;
+    } catch (error) {
+        console.error('Error cargando vista previa de tarjeta:', error);
+    }
+}
+
+function updateWelcomePreviewPanel(guildId) {
+    const headingEmbed = document.getElementById('welcomePreviewHeadingEmbed');
+    const headingCard = document.getElementById('welcomePreviewHeadingCard');
+    const embedWrap = document.getElementById('welcomeEmbedPreviewWrap');
+    const cardWrap = document.getElementById('welcomeCardPreviewWrap');
+    const mode = currentGreetingMode;
+    const style = mode === 'welcome' ? (document.querySelector('input[name="welcomeStyle"]:checked')?.value || 'embed') : 'embed';
+
+    if (headingEmbed && headingCard) {
+        if (mode === 'welcome' && style === 'card') {
+            headingEmbed.style.display = 'none';
+            headingCard.style.display = '';
+        } else {
+            headingEmbed.style.display = '';
+            headingCard.style.display = 'none';
+        }
+    } else if (headingEmbed) {
+        headingEmbed.style.display = '';
+    }
+
+    const cardColors = document.getElementById('welcomeCardColorFields');
+    if (cardColors) cardColors.style.display = mode === 'welcome' && style === 'card' ? '' : 'none';
+
+    if (mode === 'goodbye' || style === 'embed' || !cardWrap) {
+        if (embedWrap) embedWrap.style.display = '';
+        if (cardWrap) cardWrap.style.display = 'none';
+        renderWelcomeEmbedPreview(guildId);
+        return;
+    }
+
+    if (embedWrap) embedWrap.style.display = 'none';
+    cardWrap.style.display = '';
+    scheduleWelcomeCardPreview(guildId);
 }
 
 function renderWelcomeEmbedPreview(guildId) {
@@ -8945,7 +9072,7 @@ function handleWelcomeImageSelection(event) {
             welcomeImagePreviewUrl = '';
         }
         if (status) status.textContent = '';
-        renderWelcomeEmbedPreview(currentServerGuildId);
+        updateWelcomePreviewPanel(currentServerGuildId);
         return;
     }
 
@@ -8959,7 +9086,7 @@ function handleWelcomeImageSelection(event) {
     if (welcomeImagePreviewUrl) URL.revokeObjectURL(welcomeImagePreviewUrl);
     welcomeImagePreviewUrl = URL.createObjectURL(file);
     if (status) status.textContent = `Archivo listo: ${file.name}`;
-    renderWelcomeEmbedPreview(currentServerGuildId);
+    updateWelcomePreviewPanel(currentServerGuildId);
 }
 
 function getWelcomeImageCropSettings() {
@@ -9007,7 +9134,7 @@ async function uploadWelcomeEditedImage(guildId) {
         if (imageUrlInput) imageUrlInput.value = data.url;
         if (status) status.textContent = 'Imagen subida y aplicada';
         showToast(getGreetingPanelMeta(currentGreetingMode).uploadSuccess, 'success');
-        renderWelcomeEmbedPreview(guildId);
+        updateWelcomePreviewPanel(guildId);
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
         showToast('Error subiendo la imagen', 'error');
@@ -9018,10 +9145,11 @@ async function uploadWelcomeEditedImage(guildId) {
 
 function collectWelcomeConfigFromForm() {
     const meta = getGreetingPanelMeta(currentGreetingMode);
-    return {
+    const mentionEl = document.getElementById('welcomeMentionUser');
+    const base = {
         enabled: document.getElementById('welcomeEnabled')?.checked ?? true,
         channelId: document.getElementById('welcomeChannelSelect')?.value || '',
-        mentionUser: false,
+        mentionUser: mentionEl ? mentionEl.checked : false,
         title: document.getElementById('welcomeTitle')?.value || meta.defaultTitle,
         message: document.getElementById('welcomeMessage')?.value || meta.defaultMessage,
         color: (document.getElementById('welcomeColor')?.value || `#${meta.defaultColor}`).replace('#', ''),
@@ -9032,6 +9160,15 @@ function collectWelcomeConfigFromForm() {
         dmEnabled: document.getElementById('welcomeDmEnabled')?.checked ?? false,
         dmMessage: document.getElementById('welcomeDmMessage')?.value || ''
     };
+    if (currentGreetingMode === 'welcome') {
+        const styleRadio = document.querySelector('input[name="welcomeStyle"]:checked');
+        base.welcomeStyle = styleRadio?.value === 'card' ? 'card' : 'embed';
+        base.cardAccentColor = (document.getElementById('welcomeCardAccent')?.value || '#4ade80').replace('#', '');
+        base.cardTitleColor = (document.getElementById('welcomeCardTitle')?.value || '#ffffff').replace('#', '');
+        base.cardNameColor = (document.getElementById('welcomeCardName')?.value || '#f8fafc').replace('#', '');
+        base.cardSubtitleColor = (document.getElementById('welcomeCardSubtitle')?.value || '#e2e8f0').replace('#', '');
+    }
+    return base;
 }
 
 async function saveWelcomeConfig(guildId, showSuccessToast = true) {

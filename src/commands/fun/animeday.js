@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 const GENRES = [
     { name: 'Accion', value: 'accion', id: 1 },
@@ -176,8 +177,9 @@ module.exports = {
                     { name: '📊 Puntuacion', value: `${anime?.score || 'N/A'}`, inline: true },
                     { name: '📡 Estado', value: anime?.status || 'No definido', inline: true },
                     { name: '🏢 Estudio', value: studios, inline: false }
-                )
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                );
+
+            setInteractionFooter(embed, interaction.user.tag, title);
 
             if (anime?.url) embed.setURL(anime.url);
             if (image) embed.setImage(image);

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,8 +18,9 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle('⭐ Calificación')
-            .setDescription(`Califico **${thing}** con un **${rating}/10**`)
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+            .setDescription(`Califico **${thing}** con un **${rating}/10**`);
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed] });
     }

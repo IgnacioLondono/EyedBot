@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
 const config = require('../../config');
+const { fetchInteractionGif, setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -15,17 +15,22 @@ module.exports = {
         await interaction.deferReply();
 
         const user = interaction.options.getUser('usuario');
-        
+
         try {
-            const response = await axios.get('https://api.waifu.pics/sfw/wink');
-            const gifUrl = response.data.url;
+            const media = await fetchInteractionGif('wink');
+            if (!media?.url) {
+                return interaction.editReply({
+                    embeds: [new EmbedBuilder().setColor('#FF0000').setTitle('❌ Error').setDescription('No se pudo obtener el GIF.')]
+                });
+            }
 
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
                 .setTitle('😉 Guiño')
                 .setDescription(user ? `${interaction.user} le guiñó a ${user}` : `${interaction.user} guiñó`)
-                .setImage(gifUrl)
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                .setImage(media.url);
+
+            setInteractionFooter(embed, interaction.user.tag, media.source);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {
@@ -35,16 +40,3 @@ module.exports = {
         }
     }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
 const os = require('os');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -28,8 +29,9 @@ module.exports = {
                 { name: 'Discord.js', value: require('discord.js').version, inline: true },
                 { name: 'Plataforma', value: os.platform(), inline: true }
             )
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` })
             .setTimestamp();
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed] });
     }

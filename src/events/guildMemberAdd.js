@@ -1,5 +1,7 @@
 const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
+const { renderWelcomeCardPng } = require('../utils/welcome-card');
+const { AttachmentBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -72,6 +74,49 @@ module.exports = {
         const queueKey = `${member.guild.id}:${channel.id}`;
 
         if (welcomeConfig) {
+            const content = welcomeConfig.mentionUser ? `${member}` : undefined;
+
+            if (welcomeConfig.welcomeStyle === 'card') {
+                let buffer;
+                try {
+                    const localImagePath = resolveLocalUploadFile(welcomeConfig.imageUrl);
+                    buffer = await renderWelcomeCardPng({
+                        avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                        backgroundUrl: localImagePath ? null : welcomeConfig.imageUrl,
+                        backgroundFilePath: localImagePath,
+                        headline: applyTemplate(welcomeConfig.title || '¡Bienvenido!', member),
+                        displayName: member.displayName || member.user.username,
+                        subtitle: applyTemplate(welcomeConfig.message || '¡Hola {user}!', member),
+                        accentHex: welcomeConfig.cardAccentColor || '4ade80',
+                        titleHex: welcomeConfig.cardTitleColor || 'ffffff',
+                        nameHex: welcomeConfig.cardNameColor || 'f8fafc',
+                        subtitleHex: welcomeConfig.cardSubtitleColor || 'e2e8f0'
+                    });
+                } catch {
+                    buffer = null;
+                }
+
+                if (buffer) {
+                    const file = new AttachmentBuilder(buffer, { name: 'bienvenida.png' });
+                    await enqueueWelcomeSend(queueKey, () =>
+                        channel.send({ content, files: [file] })
+                    ).catch(() => null);
+                } else {
+                    const { EmbedBuilder } = require('discord.js');
+                    const embed = new EmbedBuilder()
+                        .setColor((welcomeConfig.color || '7c4dff').replace('#', ''))
+                        .setTitle(applyTemplate(welcomeConfig.title || '¡Bienvenido!', member))
+                        .setDescription(applyTemplate(welcomeConfig.message || '¡Hola {user}!', member));
+                    if (welcomeConfig.footer) embed.setFooter({ text: applyTemplate(welcomeConfig.footer, member) });
+                    await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed] })).catch(() => null);
+                }
+
+                if (welcomeConfig.dmEnabled && welcomeConfig.dmMessage) {
+                    await member.send({ content: applyTemplate(welcomeConfig.dmMessage, member) }).catch(() => null);
+                }
+                return;
+            }
+
             const { EmbedBuilder } = require('discord.js');
             const embed = new EmbedBuilder()
                 .setColor((welcomeConfig.color || '7c4dff').replace('#', ''))
@@ -97,7 +142,7 @@ module.exports = {
                 embed.setThumbnail(welcomeConfig.thumbnailUrl);
             }
 
-            await enqueueWelcomeSend(queueKey, () => channel.send({ embeds: [embed], files })).catch(() => null);
+            await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files })).catch(() => null);
 
             if (welcomeConfig.dmEnabled && welcomeConfig.dmMessage) {
                 await member.send({ content: applyTemplate(welcomeConfig.dmMessage, member) }).catch(() => null);

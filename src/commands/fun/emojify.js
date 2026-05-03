@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 const emojiMap = {
     'a': '🇦', 'b': '🇧', 'c': '🇨', 'd': '🇩', 'e': '🇪', 'f': '🇫',
@@ -41,8 +42,9 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle('✨ Texto Emojificado')
-            .setDescription(emojified)
-            .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+            .setDescription(emojified);
+
+        setInteractionFooter(embed, interaction.user.tag);
 
         return interaction.reply({ embeds: [embed] });
     }

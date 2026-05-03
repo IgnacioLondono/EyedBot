@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
 const config = require('../../config');
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -32,8 +33,9 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
                 .setTitle('Invitar Bot')
-                .setDescription(`[Haz clic aqui para invitar el bot](${inviteUrl})`)
-                .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
+                .setDescription(`[Haz clic aqui para invitar el bot](${inviteUrl})`);
+
+            setInteractionFooter(embed, interaction.user.tag);
 
             return interaction.reply({ embeds: [embed] });
         }

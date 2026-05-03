@@ -15,7 +15,8 @@ const ACTIONS = {
     kiss: { title: '💋 Beso', verb: 'besó', tenorQuery: 'anime kiss' },
     pat: { title: '👋 Caricia', verb: 'acarició', tenorQuery: 'anime pat' },
     slap: { title: '👋 Golpe', verb: 'golpeó', tenorQuery: 'anime slap' },
-    punch: { title: '👊 Puñetazo', verb: 'golpeó', tenorQuery: 'anime punch' }
+    punch: { title: '👊 Puñetazo', verb: 'golpeó', tenorQuery: 'anime punch' },
+    wink: { title: '😉 Guiño', verb: 'guiñó', tenorQuery: 'anime wink' }
 };
 
 function getActionMeta(action) {
@@ -79,21 +80,16 @@ async function incrementMentionCount(action, guildId, userId) {
     return { total, actionCount };
 }
 
-function truncateEmbedFieldValue(text, maxLen = 1024) {
-    const s = String(text).trim();
-    if (!s) return '';
-    if (s.length <= maxLen) return s;
-    return `${s.slice(0, maxLen - 3)}...`;
-}
+const FOOTER_TEXT_MAX = 2048;
 
-function addAnimeSourceField(embed, source) {
-    const v = source && String(source).trim();
-    if (!v) return;
-    embed.addFields({
-        name: '🎬 Anime',
-        value: truncateEmbedFieldValue(v),
-        inline: false
-    });
+function setInteractionFooter(embed, requesterTag, source = null, sourceLabel = '🎬 Anime:') {
+    const base = `Solicitado por ${requesterTag}`;
+    const v = source != null ? String(source).trim() : '';
+    let text = v ? `${base}\n${sourceLabel} ${v}` : base;
+    if (text.length > FOOTER_TEXT_MAX) {
+        text = `${text.slice(0, FOOTER_TEXT_MAX - 3)}...`;
+    }
+    embed.setFooter({ text });
 }
 
 async function fetchFromWaifuPics(action) {
@@ -198,10 +194,7 @@ async function handleReturnInteraction(interaction) {
     const embed = new EmbedBuilder()
         .setColor(config.embedColor)
         .setTitle(`${meta.title} (Devolución)`)
-        .setDescription(`<@${interaction.user.id}> ${meta.verb} a <@${parsed.authorId}>`)
-        .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
-
-    addAnimeSourceField(embed, media?.source);
+        .setDescription(`<@${interaction.user.id}> ${meta.verb} a <@${parsed.authorId}>`);
 
     if (Number.isFinite(counts?.total) && Number.isFinite(counts?.actionCount)) {
         embed.addFields({
@@ -212,6 +205,7 @@ async function handleReturnInteraction(interaction) {
     }
 
     if (media?.url) embed.setImage(media.url);
+    setInteractionFooter(embed, interaction.user.tag, media?.source);
 
     const disabledRows = (interaction.message.components || []).map((row) => {
         const clone = ActionRowBuilder.from(row);
@@ -227,7 +221,7 @@ async function handleReturnInteraction(interaction) {
 module.exports = {
     getActionMeta,
     fetchInteractionGif,
-    addAnimeSourceField,
+    setInteractionFooter,
     incrementMentionCount,
     createReturnComponents,
     handleReturnInteraction
