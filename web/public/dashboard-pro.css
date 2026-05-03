@@ -8713,6 +8713,48 @@ body.wc-studio-open {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    align-items: center;
+}
+
+.wc-studio__actions--grow {
+    flex: 1;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.wc-studio__file-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.wc-studio__btn--accent {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(124, 77, 255, 0.25);
+    border-color: rgba(186, 147, 255, 0.45);
+    color: #ede9fe;
+}
+
+.wc-studio__btn--accent:hover {
+    background: rgba(124, 77, 255, 0.38);
+}
+
+.wc-studio__btn.is-loading {
+    opacity: 0.75;
+    pointer-events: none;
+}
+
+.wc-studio__upload-status {
+    font-size: 0.78rem;
+    color: #a89cc8;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .wc-studio__btn {
@@ -8765,6 +8807,13 @@ body.wc-studio-open {
     padding: 0.75rem 0.35rem;
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(6, 3, 18, 0.6);
+}
+
+.wc-studio__toolbar-divider {
+    width: 28px;
+    height: 1px;
+    margin: 0.2rem 0;
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .wc-studio__tool {
@@ -8827,9 +8876,41 @@ body.wc-studio-open {
     user-select: none;
 }
 
+.wc-studio-guides {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 18;
+}
+
+.wc-guide-line {
+    stroke: #e879f9;
+    stroke-width: 1.5;
+    opacity: 0.95;
+    vector-effect: non-scaling-stroke;
+}
+
+.wc-guide-line--v {
+    stroke-dasharray: 6 4;
+}
+
+.wc-guide-line--h {
+    stroke-dasharray: 6 4;
+}
+
+.wc-guide-crosshair {
+    fill: none;
+    stroke: #f0abfc;
+    stroke-width: 2;
+    opacity: 0.9;
+}
+
 .wc-stage-bg {
     position: absolute;
     inset: 0;
+    z-index: 0;
     background: linear-gradient(135deg, #38bdf8 0%, #a78bfa 50%, #34d399 100%);
     background-size: cover;
     background-repeat: no-repeat;
@@ -8839,6 +8920,7 @@ body.wc-studio-open {
 .wc-stage-vignette {
     position: absolute;
     inset: 0;
+    z-index: 1;
     pointer-events: none;
     background: linear-gradient(to bottom, transparent 35%, rgba(0, 0, 0, 0.28));
 }
@@ -8846,7 +8928,7 @@ body.wc-studio-open {
 .wc-layer--avatar {
     position: absolute;
     transform: translate(-50%, -50%);
-    z-index: 5;
+    z-index: 6;
     cursor: grab;
     touch-action: none;
 }
@@ -8880,7 +8962,7 @@ body.wc-studio-open {
 .wc-layer--text {
     position: absolute;
     transform: translate(-50%, 0);
-    z-index: 6;
+    z-index: 7;
     max-width: 88%;
     text-align: center;
     text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75), 0 0 2px rgba(0, 0, 0, 0.9);
@@ -8918,6 +9000,12 @@ body.wc-studio-open {
     font-size: 0.95rem;
     color: #fff;
     max-width: 70%;
+}
+
+.wc-layer--selected {
+    box-shadow: 0 0 0 2px #e879f9, 0 0 28px rgba(232, 121, 249, 0.4);
+    border-radius: 8px;
+    z-index: 10 !important;
 }
 
 .wc-studio__sidebar {
