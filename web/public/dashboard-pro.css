@@ -4378,7 +4378,7 @@ mark.receipt-highlight {
     position: relative;
 }
 /* Chip pequeno "MODULO" antes del titulo, solo en los panes cubiertos */
-#serverPaneWelcome       .moderation-container > .welcome-panel-title::after { content: "BIENVENIDA"; }
+#serverPaneWelcome       .moderation-container > .welcome-panel-title::after { content: "SALUDOS"; }
 #serverPaneVerify        .moderation-container > .welcome-panel-title::after { content: "VERIFICACION"; }
 #serverPaneTickets       .moderation-container > .welcome-panel-title::after { content: "TICKETS"; }
 #serverPaneLevels        .moderation-container > .welcome-panel-title::after { content: "NIVELES"; }
@@ -4401,6 +4401,288 @@ mark.receipt-highlight {
     border-radius: 999px;
     display: inline-block;
     line-height: 1;
+}
+
+/* --- Bienvenida / Despedida — estructura y componentes (#serverPaneWelcome) -- */
+#serverPaneWelcome .greeting-page {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.1rem;
+}
+#serverPaneWelcome .greeting-page > .welcome-panel-title {
+    margin-bottom: 0.35rem !important;
+}
+#serverPaneWelcome .greeting-hero {
+    margin-bottom: 0.5rem;
+    padding: 1.05rem 1.2rem 1.15rem;
+    border-radius: 20px;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.16));
+    background:
+        linear-gradient(145deg,
+            color-mix(in srgb, var(--pane-accent) 10%, rgba(14, 8, 34, 0.72)) 0%,
+            rgba(8, 4, 22, 0.78) 48%,
+            rgba(6, 3, 18, 0.85) 100%);
+    box-shadow:
+        0 16px 42px rgba(4, 2, 16, 0.42),
+        inset 0 1px 0 color-mix(in srgb, var(--pane-accent) 12%, rgba(255, 255, 255, 0.06));
+}
+#serverPaneWelcome .greeting-hero__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: flex-start;
+}
+#serverPaneWelcome .greeting-hero__subtitle {
+    margin: 0.9rem 0 0 !important;
+    padding: 0 !important;
+    color: #c4b8e8 !important;
+    font-size: 0.93rem !important;
+    line-height: 1.58 !important;
+    max-width: 54rem;
+}
+#serverPaneWelcome .greeting-hero__subtitle code {
+    background: rgba(12, 6, 30, 0.65);
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(190, 155, 255, 0.22));
+    border-radius: 6px;
+    padding: 0.08rem 0.42rem;
+    color: color-mix(in srgb, var(--pane-accent) 72%, #ffffff);
+    font-size: 0.86em;
+}
+#serverPaneWelcome .greeting-tabs {
+    width: 100%;
+    max-width: 440px;
+    padding: 0.32rem !important;
+    gap: 0.28rem !important;
+}
+#serverPaneWelcome .greeting-tab-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.62rem 0.85rem !important;
+    font-size: 0.86rem !important;
+    font-weight: 700 !important;
+    border-radius: 12px !important;
+    border: 1px solid transparent !important;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+#serverPaneWelcome .greeting-tab-btn__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+#serverPaneWelcome .greeting-tab-btn.active .greeting-tab-btn__dot {
+    background: var(--pane-accent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--pane-accent) 65%, transparent);
+}
+#serverPaneWelcome .greeting-tab-btn__label {
+    letter-spacing: 0.02em;
+}
+#serverPaneWelcome .welcome-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 400px) !important;
+    gap: 1.75rem !important;
+    margin-top: 0.4rem !important;
+    align-items: start;
+}
+#serverPaneWelcome .welcome-editor.greeting-editor {
+    gap: 1.2rem !important;
+    padding: 1.35rem 1.4rem !important;
+}
+#serverPaneWelcome .welcome-preview-panel {
+    padding: 1.35rem 1.25rem !important;
+}
+#serverPaneWelcome .welcome-preview-panel__top {
+    margin-bottom: 0.65rem;
+}
+#serverPaneWelcome .greeting-card__head:has(.greeting-card__title-row) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+}
+#serverPaneWelcome .greeting-card__title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    width: 100%;
+}
+#serverPaneWelcome .greeting-card__title-row .greeting-card__title {
+    margin: 0 !important;
+}
+#serverPaneWelcome .greeting-style-field__label {
+    display: block;
+    margin-bottom: 0.35rem !important;
+}
+#serverPaneWelcome .greeting-style-segment {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(208px, 1fr));
+    gap: 0.7rem;
+    margin-top: 0.15rem;
+}
+#serverPaneWelcome .greeting-style-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    margin: 0;
+    padding: 0.85rem 0.95rem;
+    border-radius: 14px;
+    cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 20%, rgba(190, 155, 255, 0.14));
+    background: rgba(6, 3, 18, 0.48);
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+#serverPaneWelcome .greeting-style-option:hover {
+    border-color: color-mix(in srgb, var(--pane-accent) 42%, rgba(190, 155, 255, 0.28));
+    background: rgba(8, 4, 24, 0.62);
+}
+#serverPaneWelcome .greeting-style-option input {
+    margin: 0.2rem 0 0;
+    flex-shrink: 0;
+    accent-color: var(--pane-accent);
+    width: 16px;
+    height: 16px;
+}
+#serverPaneWelcome .greeting-style-option:has(input:checked) {
+    border-color: color-mix(in srgb, var(--pane-accent) 55%, rgba(190, 155, 255, 0.35));
+    background: color-mix(in srgb, var(--pane-accent) 12%, rgba(8, 4, 22, 0.82));
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pane-accent) 25%, transparent),
+        0 12px 28px rgba(4, 2, 16, 0.35);
+}
+#serverPaneWelcome .greeting-style-option__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+#serverPaneWelcome .greeting-style-option__title {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #f4eeff !important;
+    letter-spacing: 0.01em;
+}
+#serverPaneWelcome .greeting-style-option__desc {
+    font-size: 0.76rem;
+    line-height: 1.4;
+    color: #9a8cba !important;
+}
+#serverPaneWelcome #welcomeCardColorFields.greeting-card__body-card-extra {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid color-mix(in srgb, var(--pane-accent) 16%, rgba(190, 155, 255, 0.12));
+}
+#serverPaneWelcome .greeting-toggle-row {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.65rem !important;
+    margin-top: 0.4rem !important;
+}
+#serverPaneWelcome .greeting-toggle-card {
+    padding: 0.48rem 0.6rem;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(190, 155, 255, 0.12));
+    background: rgba(6, 3, 18, 0.42);
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+#serverPaneWelcome .greeting-toggle-card:hover {
+    border-color: color-mix(in srgb, var(--pane-accent) 32%, rgba(190, 155, 255, 0.2));
+    background: rgba(8, 4, 22, 0.55);
+}
+#serverPaneWelcome .greeting-toggle-card .greeting-toggle {
+    margin-bottom: 0 !important;
+}
+#serverPaneWelcome .greeting-toggle-card .checkbox-group label {
+    align-items: flex-start !important;
+    line-height: 1.35 !important;
+}
+#serverPaneWelcome .greeting-var-strip {
+    flex-wrap: wrap !important;
+    gap: 0.45rem !important;
+    padding: 0.65rem 0.75rem !important;
+}
+#serverPaneWelcome .greeting-anchor-down {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--pane-accent) 70%, #ffffff) !important;
+    text-decoration: none !important;
+}
+#serverPaneWelcome .greeting-anchor-down::after {
+    content: "↓";
+    font-size: 0.95em;
+    opacity: 0.85;
+}
+#serverPaneWelcome .greeting-anchor-down:hover {
+    color: #ffffff !important;
+    text-shadow: 0 0 14px color-mix(in srgb, var(--pane-accent) 45%, transparent);
+}
+#serverPaneWelcome .greeting-card--media {
+    border-style: solid !important;
+    border-width: 1px !important;
+    border-color: color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.18)) !important;
+}
+#serverPaneWelcome .greeting-actions-bar {
+    margin-top: 0.35rem !important;
+    padding: 1.05rem 1.2rem !important;
+    border-radius: 18px !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 26%, rgba(190, 155, 255, 0.2)) !important;
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--pane-accent) 8%, rgba(12, 6, 30, 0.75)) 0%,
+            rgba(6, 3, 18, 0.88) 100%) !important;
+    box-shadow:
+        0 14px 36px rgba(4, 2, 14, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 8;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+#serverPaneWelcome .greeting-actions-bar__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+#serverPaneWelcome .greeting-actions-bar__hint {
+    margin: 0;
+    flex: 1;
+    min-width: min(100%, 220px);
+    max-width: 36rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #9a8cba !important;
+}
+#serverPaneWelcome .greeting-actions-bar__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    align-items: center;
+}
+#serverPaneWelcome .greeting-thumb-row {
+    gap: 1rem !important;
+}
+#serverPaneWelcome .greeting-crop-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem 1rem !important;
+}
+@media (max-width: 640px) {
+    #serverPaneWelcome .greeting-crop-grid {
+        grid-template-columns: 1fr !important;
+    }
 }
 
 /* --- Layout editor + preview --------------------------------------- */
@@ -4533,6 +4815,149 @@ mark.receipt-highlight {
     text-transform: uppercase;
     letter-spacing: 0.12em;
     margin-bottom: 0.7rem !important;
+}
+
+/* Editor: vista previa visual del recorte */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-visual-panel {
+    margin-top: 1rem !important;
+    padding: 1rem !important;
+    border-radius: 14px !important;
+    background: rgba(4, 2, 14, 0.45) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.15)) !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-visual-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-visual-title {
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.14em !important;
+    color: color-mix(in srgb, var(--pane-accent) 58%, #ffffff) !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-preset-btn {
+    appearance: none;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 35%, rgba(190, 155, 255, 0.25));
+    background: rgba(10, 6, 28, 0.75);
+    color: #e8e0ff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.15s ease;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-preset-btn:hover {
+    border-color: var(--pane-accent);
+    background: color-mix(in srgb, var(--pane-accent) 18%, rgba(10, 6, 28, 0.9));
+    transform: translateY(-1px);
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-canvas {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
+    border-radius: 12px;
+    box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.45),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    background: #111214;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-visual-hint {
+    margin: 0.55rem 0 0 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.45 !important;
+    color: #9a8cba !important;
+    text-align: center;
+}
+
+/* Vista previa embed: colores tipo Discord (legibles sobre cualquier tema del dashboard) */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-stage .embed-preview {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-height: min(72vh, 520px);
+    overflow: auto;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-discord-embed-preview {
+    background: #313338 !important;
+    color: #dbdee1 !important;
+    border-radius: 4px 8px 8px 4px !important;
+    overflow: hidden;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-discord-embed-preview .discord-embed-title {
+    color: #f2f3f5 !important;
+    margin-top: 0 !important;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-discord-embed-preview .discord-embed-description {
+    color: #b5bac1 !important;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-discord-embed-preview .discord-embed-footer {
+    color: #949ba4 !important;
+    clear: both;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-discord-embed-preview .discord-embed-thumbnail {
+    float: right;
+    max-width: 80px;
+    width: 80px;
+    height: auto;
+    border-radius: 4px;
+    margin: 0 0 0.75rem 1rem;
+    display: block;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-discord-embed-preview .discord-embed-textblock {
+    min-width: 0;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-discord-embed-preview .welcome-discord-embed-image {
+    clear: both;
+    display: block;
+    max-width: 100%;
+    border-radius: 8px;
+    margin-top: 0.75rem;
+}
+
+/* Vista previa tarjeta PNG */
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-card-preview-wrap {
+    position: relative;
+    padding: 0.5rem 0 0.25rem;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-card-preview-status {
+    font-size: 0.82rem;
+    color: #b7a7d6;
+    margin-bottom: 0.5rem;
+    min-height: 1.25em;
+    transition: opacity 0.2s ease;
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-card-preview-status.is-busy {
+    color: color-mix(in srgb, var(--pane-accent) 65%, #ffffff);
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-card-preview-wrap.is-loading .welcome-card-preview-img {
+    opacity: 0.35;
+    filter: blur(0.5px);
+}
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-card-preview-img {
+    max-width: min(100%, 480px);
+    width: 100%;
+    height: auto;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    vertical-align: top;
+    transition: opacity 0.25s ease;
 }
 
 /* --- Pestanas de saludo (Bienvenida/Despedida) --------------------- */
@@ -4857,6 +5282,11 @@ mark.receipt-highlight {
     }
     .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel {
         position: static;
+    }
+    #serverPaneWelcome .greeting-actions-bar {
+        position: static;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 }
 

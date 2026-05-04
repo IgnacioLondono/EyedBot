@@ -195,9 +195,11 @@ function truncatePlainSegments(segments, maxLen) {
     let n = 0;
     const out = [];
     for (const seg of segments) {
-        let t = String(seg.text || '');
         if (n >= maxLen) break;
+        let t = String(seg.text || '');
         if (n + t.length > maxLen) t = t.slice(0, maxLen - n);
+        t = String(t);
+        if (!t) continue;
         out.push({ text: t, color: seg.color });
         n += t.length;
         if (n >= maxLen) break;
@@ -205,14 +207,23 @@ function truncatePlainSegments(segments, maxLen) {
     return out.length ? out : [{ text: '', color: null }];
 }
 
-function drawRichStrokedLineTopCentered(ctx, segments, xCenter, y, defaultHex, userHint) {
+function drawRichStrokedLineTopCentered(ctx, segments, xCenter, y, defaultHex, userHint, maxFlatLen = 200) {
     const parts = segments
         .map((seg) => ({
             text: canvasSafeLine(String(seg.text || ''), userHint),
             color: seg.color
         }))
         .filter((p) => p.text.length);
-    if (!parts.length) return;
+    if (!parts.length) {
+        const flat = canvasSafeLine(
+            segments.map((s) => String(s.text || '')).join(''),
+            userHint
+        ).trim();
+        if (flat) {
+            drawStrokedText(ctx, flat.slice(0, maxFlatLen), xCenter, y, defaultHex);
+        }
+        return;
+    }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     let total = 0;
@@ -221,6 +232,11 @@ function drawRichStrokedLineTopCentered(ctx, segments, xCenter, y, defaultHex, u
         total += w;
         return w;
     });
+    if (!Number.isFinite(total) || total <= 0) {
+        const flat = parts.map((p) => p.text).join('');
+        drawStrokedText(ctx, flat.slice(0, maxFlatLen), xCenter, y, defaultHex);
+        return;
+    }
     let left = xCenter - total / 2;
     for (let i = 0; i < parts.length; i++) {
         const cx = left + widths[i] / 2;
@@ -229,14 +245,30 @@ function drawRichStrokedLineTopCentered(ctx, segments, xCenter, y, defaultHex, u
     }
 }
 
-function drawRichStrokedLineOverlay(ctx, segments, anchorX, anchorY, defaultHex, alignRight, userHint) {
+function drawRichStrokedLineOverlay(ctx, segments, anchorX, anchorY, defaultHex, alignRight, userHint, maxFlatLen = 200) {
     const parts = segments
         .map((seg) => ({
             text: canvasSafeLine(String(seg.text || ''), userHint),
             color: seg.color
         }))
         .filter((p) => p.text.length);
-    if (!parts.length) return;
+    if (!parts.length) {
+        const flat = canvasSafeLine(
+            segments.map((s) => String(s.text || '')).join(''),
+            userHint
+        ).trim();
+        if (flat) {
+            ctx.textAlign = alignRight ? 'right' : 'left';
+            ctx.textBaseline = 'bottom';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+            ctx.lineJoin = 'round';
+            ctx.strokeText(flat.slice(0, maxFlatLen), anchorX, anchorY);
+            ctx.fillStyle = rgbFill(defaultHex);
+            ctx.fillText(flat.slice(0, maxFlatLen), anchorX, anchorY);
+        }
+        return;
+    }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.lineWidth = 4;
@@ -248,6 +280,14 @@ function drawRichStrokedLineOverlay(ctx, segments, anchorX, anchorY, defaultHex,
         total += w;
         return w;
     });
+    if (!Number.isFinite(total) || total <= 0) {
+        const flat = parts.map((p) => p.text).join('');
+        ctx.textAlign = alignRight ? 'right' : 'left';
+        ctx.strokeText(flat.slice(0, maxFlatLen), anchorX, anchorY);
+        ctx.fillStyle = rgbFill(defaultHex);
+        ctx.fillText(flat.slice(0, maxFlatLen), anchorX, anchorY);
+        return;
+    }
     let left = alignRight ? anchorX - total : anchorX;
     for (let i = 0; i < parts.length; i++) {
         const cx = left + widths[i] / 2;
@@ -288,7 +328,7 @@ async function renderWelcomeCardPng(opts = {}) {
 
     const vignette = ctx.createLinearGradient(0, H * 0.35, 0, H);
     vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.28)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.4)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, W, H);
 
@@ -342,6 +382,8 @@ async function renderWelcomeCardPng(opts = {}) {
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
 
+    ctx.beginPath();
+
     const headlineSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.headline || 'Bienvenido')), 80);
     const displayNameSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.displayName || 'Usuario')), 80);
     const subtitlePlain = canvasSafeLine(stripColorMarkup(String(opts.subtitle || '').slice(0, 200)), userHint);
@@ -352,10 +394,10 @@ async function renderWelcomeCardPng(opts = {}) {
     ctx.shadowColor = 'transparent';
 
     ctx.font = fonts.title;
-    drawRichStrokedLineTopCentered(ctx, headlineSegs, layout.titleX, layout.titleY, titleColor, userHint);
+    drawRichStrokedLineTopCentered(ctx, headlineSegs, layout.titleX, layout.titleY, titleColor, userHint, 80);
 
     ctx.font = fonts.name;
-    drawRichStrokedLineTopCentered(ctx, displayNameSegs, layout.nameX, layout.nameY, nameColor, userHint);
+    drawRichStrokedLineTopCentered(ctx, displayNameSegs, layout.nameX, layout.nameY, nameColor, userHint, 80);
 
     if (subtitlePlain.trim()) {
         ctx.font = fonts.sub;
@@ -371,7 +413,7 @@ async function renderWelcomeCardPng(opts = {}) {
     if (hasOverlayDraw) {
         ctx.font = fonts.overlay;
         const alignRight = layout.overlayX >= W / 2;
-        drawRichStrokedLineOverlay(ctx, overlaySegs, layout.overlayX, layout.overlayY, overlayColor, alignRight, userHint);
+        drawRichStrokedLineOverlay(ctx, overlaySegs, layout.overlayX, layout.overlayY, overlayColor, alignRight, userHint, 160);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
     }

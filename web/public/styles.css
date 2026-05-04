@@ -2742,6 +2742,102 @@ body {
     margin-bottom: 0.25rem;
 }
 
+.greeting-page {
+    margin: 0;
+}
+
+.greeting-hero {
+    margin-bottom: 0.75rem;
+}
+
+.greeting-hero__subtitle {
+    margin: 0.65rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.greeting-tab-btn {
+    text-align: inherit;
+}
+
+.greeting-card__title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    width: 100%;
+}
+
+.greeting-style-field__label {
+    display: block;
+}
+
+.greeting-style-segment {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.greeting-style-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.greeting-style-option__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.greeting-style-option__title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.88rem;
+}
+
+.greeting-style-option__desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+.greeting-toggle-card {
+    margin: 0;
+}
+
+.greeting-actions-bar__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+}
+
+.greeting-actions-bar__hint {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.greeting-actions-bar__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+@media (min-width: 540px) {
+    .greeting-actions-bar__inner {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+}
+
 .greeting-intro .welcome-panel-subtitle {
     margin-top: 0.65rem;
     margin-bottom: 0;
