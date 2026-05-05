@@ -935,6 +935,7 @@ function setThemeCssVariables(theme = themeSettings) {
     const rgbTextPrimary = hexToRgb(textPrimaryAuto);
     const rgbBorder = hexToRgb(normalized.borderColor);
     const rgbBgPrimary = hexToRgb(normalized.bgPrimary);
+    const rgbBgSecondary = hexToRgb(normalized.bgSecondary);
     const rgbBgCard = hexToRgb(normalized.bgCard);
 
     root.style.setProperty('--color-bg1', mixHexColors(normalized.bgPrimary, normalized.accentPrimary, 0.28));
@@ -943,6 +944,7 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--accent-secondary-rgb', `${rgbAccentSecondary.r}, ${rgbAccentSecondary.g}, ${rgbAccentSecondary.b}`);
     root.style.setProperty('--border-rgb', `${rgbBorder.r}, ${rgbBorder.g}, ${rgbBorder.b}`);
     root.style.setProperty('--bg-primary-rgb', `${rgbBgPrimary.r}, ${rgbBgPrimary.g}, ${rgbBgPrimary.b}`);
+    root.style.setProperty('--bg-secondary-rgb', `${rgbBgSecondary.r}, ${rgbBgSecondary.g}, ${rgbBgSecondary.b}`);
     root.style.setProperty('--bg-card-rgb', `${rgbBgCard.r}, ${rgbBgCard.g}, ${rgbBgCard.b}`);
     root.style.setProperty('--color1', `${rgbAccentPrimary.r}, ${rgbAccentPrimary.g}, ${rgbAccentPrimary.b}`);
     root.style.setProperty('--color2', `${rgbAccentSecondary.r}, ${rgbAccentSecondary.g}, ${rgbAccentSecondary.b}`);
