@@ -1434,6 +1434,125 @@ label { color: var(--text-secondary); font-weight: 500; }
     opacity: 1;
 }
 
+/* =====================================================================
+   Acerca de (layout tipo cards RB3, sin copiar paleta de referencia)
+   ===================================================================== */
+.about-rb3-shell {
+    max-width: 1240px !important;
+    margin: 0 auto !important;
+    padding: 0.9rem 1rem 1.4rem !important;
+}
+
+.about-rb3-head {
+    margin-bottom: 1rem;
+}
+
+.about-rb3-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.32rem 0.68rem;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
+    background: rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.42);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-bottom: 0.55rem;
+}
+
+.about-rb3-head h2 {
+    margin: 0 0 0.4rem;
+    font-size: clamp(2rem, 3.6vw, 2.8rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+}
+
+.about-rb3-subtitle {
+    margin: 0;
+    color: var(--text-secondary);
+    max-width: 70ch;
+}
+
+.about-rb3-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.about-rb3-card {
+    position: relative;
+    min-height: 220px;
+    border-radius: 16px;
+    padding: 1.15rem 1.05rem 1rem;
+    background:
+        linear-gradient(
+            180deg,
+            rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.52),
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.44)
+        ) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
+    box-shadow: 0 16px 40px rgba(2, 1, 8, 0.32);
+    transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.about-rb3-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.42);
+    box-shadow: 0 20px 44px rgba(2, 1, 8, 0.42);
+}
+
+.about-rb3-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.9rem;
+    color: var(--text-primary);
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.18));
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.3);
+}
+
+.about-rb3-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.about-rb3-card h3 {
+    margin: 0 0 0.48rem;
+    font-size: 1.34rem;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
+.about-rb3-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.62;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 1024px) {
+    .about-rb3-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .about-rb3-shell {
+        padding: 0.75rem 0.8rem 1.1rem !important;
+    }
+
+    .about-rb3-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 920px) {
     .about-pro-tabs {
         gap: 0.5rem;
