@@ -27,12 +27,13 @@ function enqueueWelcomeSend(queueKey, task) {
 }
 
 function applyTemplate(text, member) {
-    const mention = `${member}`;
+    const displayName = member?.displayName || member?.user?.username || 'Usuario';
+    const mentionText = String(displayName).startsWith('@') ? String(displayName) : `@${displayName}`;
     const uname = member.user.username;
     const srv = member.guild.name;
     const mc = String(member.guild.memberCount);
     return String(text || '')
-        .replace(/\{user\}|\{mention\}/gi, mention)
+        .replace(/\{user\}|\{mention\}/gi, mentionText)
         .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
         .replace(/\{server\}|\{guild\}/gi, srv)
         .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
@@ -78,9 +79,12 @@ module.exports = {
         const queueKey = `${member.guild.id}:${channel.id}`;
 
         if (welcomeConfig) {
-            const content = welcomeConfig.mentionUser ? `${member}` : undefined;
+            const content = welcomeConfig.mentionUser ? `<@${member.id}>` : undefined;
+            const allowedMentions = welcomeConfig.mentionUser ? { parse: ['users'] } : undefined;
+            // Deshabilitar el modo tarjeta (PNG con "fondo/imagen de fondo").
+            const welcomeStyle = welcomeConfig.welcomeStyle === 'card' ? 'embed' : welcomeConfig.welcomeStyle;
 
-            if (welcomeConfig.welcomeStyle === 'card') {
+            if (welcomeStyle === 'card') {
                 let buffer;
                 try {
                     const localImagePath = resolveLocalUploadFile(welcomeConfig.imageUrl);
@@ -111,7 +115,7 @@ module.exports = {
                 if (buffer) {
                     const file = new AttachmentBuilder(buffer, { name: 'bienvenida.png' });
                     await enqueueWelcomeSend(queueKey, () =>
-                        channel.send({ content, files: [file] })
+                        channel.send({ content, files: [file], allowedMentions })
                     ).catch(() => null);
                 } else {
                     const { EmbedBuilder } = require('discord.js');
@@ -120,7 +124,7 @@ module.exports = {
                         .setTitle(applyTemplate(welcomeConfig.title || '¡Bienvenido!', member))
                         .setDescription(applyTemplate(welcomeConfig.message || '¡Hola {user}!', member));
                     if (welcomeConfig.footer) embed.setFooter({ text: applyTemplate(welcomeConfig.footer, member) });
-                    await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed] })).catch(() => null);
+                    await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], allowedMentions })).catch(() => null);
                 }
 
                 if (welcomeConfig.dmEnabled && welcomeConfig.dmMessage) {
@@ -154,7 +158,7 @@ module.exports = {
                 embed.setThumbnail(welcomeConfig.thumbnailUrl);
             }
 
-            await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files })).catch(() => null);
+            await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files, allowedMentions })).catch(() => null);
 
             if (welcomeConfig.dmEnabled && welcomeConfig.dmMessage) {
                 await member.send({ content: applyTemplate(welcomeConfig.dmMessage, member) }).catch(() => null);
@@ -165,7 +169,7 @@ module.exports = {
 
         const embed = Embeds.info(
             '¡Bienvenido!',
-            `¡Hola ${member}! Bienvenido a **${member.guild.name}**\n\n` +
+            `¡Hola @${member.displayName || member.user.username}! Bienvenido a **${member.guild.name}**\n\n` +
             `Eres el miembro #${member.guild.memberCount}`
         );
         embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));

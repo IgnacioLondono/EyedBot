@@ -8680,12 +8680,12 @@ function renderGreetingPanel(guildId, channels, mode) {
                     <div class="greeting-card__head">
                         <div class="greeting-card__title-row">
                             <h4 id="greeting-section-welcome-style" class="greeting-card__title">Estilo de bienvenida</h4>
-                            <button type="button" id="welcomeOpenStudioBtn" class="btn btn-secondary wc-studio-launch-btn" title="Editor visual a pantalla completa">
+                            <button type="button" id="welcomeOpenStudioBtn" class="btn btn-secondary wc-studio-launch-btn" style="display:none;" title="Editor visual a pantalla completa">
                                 <span class="wc-studio-launch-icon" aria-hidden="true">+</span>
                                 Editor visual
                             </button>
                         </div>
-                        <p class="greeting-card__hint">La tarjeta es un PNG que el bot envía al canal cuando alguien entra. El fondo es la misma imagen que configures en «Fondo / imagen principal» más abajo (URL o archivo).</p>
+                        <p class="greeting-card__hint">La bienvenida se envía como un embed clásico (sin tarjeta PNG).</p>
                     </div>
                     <div class="form-group greeting-style-field">
                         <span class="greeting-var-strip__label greeting-style-field__label">Formato del mensaje</span>
@@ -8697,7 +8697,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                                     <span class="greeting-style-option__desc">Mensaje con borde de color, como en Discord</span>
                                 </span>
                             </label>
-                            <label class="greeting-style-option">
+                            <label class="greeting-style-option" style="display:none;">
                                 <input type="radio" name="welcomeStyle" value="card" ${cfg.welcomeStyle === 'card' ? 'checked' : ''}>
                                 <span class="greeting-style-option__body">
                                     <span class="greeting-style-option__title">Tarjeta PNG</span>
@@ -8706,7 +8706,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                             </label>
                         </div>
                     </div>
-                    <div id="welcomeCardColorFields" class="greeting-card__body-card-extra" style="display:${cfg.welcomeStyle === 'card' ? '' : 'none'}">
+                    <div id="welcomeCardColorFields" class="greeting-card__body-card-extra" style="display:none">
                         <div class="form-grid greeting-card__grid">
                         <div class="form-group">
                             <label for="welcomeCardFont">Fuente del texto</label>
@@ -9015,8 +9015,7 @@ function renderGreetingPanel(guildId, channels, mode) {
     const studioBtn = document.getElementById('welcomeOpenStudioBtn');
     if (studioBtn && mode === 'welcome') {
         studioBtn.addEventListener('click', () => {
-            saveCurrentGreetingDraft();
-            openWelcomeCardStudio(guildId);
+            showToast('Editor visual deshabilitado (Tarjeta PNG no disponible).', 'warning');
         });
     }
     container.querySelector('#welcomeScrollToBg')?.addEventListener('click', (e) => {
@@ -9159,7 +9158,7 @@ function updateWelcomePreviewPanel(guildId) {
     const embedWrap = document.getElementById('welcomeEmbedPreviewWrap');
     const cardWrap = document.getElementById('welcomeCardPreviewWrap');
     const mode = currentGreetingMode;
-    const style = mode === 'welcome' ? (document.querySelector('input[name="welcomeStyle"]:checked')?.value || 'embed') : 'embed';
+    const style = 'embed';
 
     if (headingEmbed && headingCard) {
         if (mode === 'welcome' && style === 'card') {
@@ -9485,8 +9484,7 @@ function collectWelcomeConfigFromForm() {
         dmMessage: document.getElementById('welcomeDmMessage')?.value || ''
     };
     if (currentGreetingMode === 'welcome') {
-        const styleRadio = document.querySelector('input[name="welcomeStyle"]:checked');
-        base.welcomeStyle = styleRadio?.value === 'card' ? 'card' : 'embed';
+        base.welcomeStyle = 'embed';
         base.cardAccentColor = (document.getElementById('welcomeCardAccent')?.value || '#4ade80').replace('#', '');
         base.cardTitleColor = (document.getElementById('welcomeCardTitle')?.value || '#ffffff').replace('#', '');
         base.cardNameColor = (document.getElementById('welcomeCardName')?.value || '#f8fafc').replace('#', '');
