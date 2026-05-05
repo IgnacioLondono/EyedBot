@@ -10377,6 +10377,81 @@ body.wc-studio-open {
 }
 
 /* =====================================================================
+   Split layout solicitado: izquierda barra completa, derecha pantalla completa
+   Sin espacios entre panel lateral y contenido.
+   ===================================================================== */
+#serverSection.section > .container {
+    padding: 0 !important;
+}
+
+#serverSection .section-header {
+    margin: 0 !important;
+    padding: 0.65rem 0.85rem 0.55rem !important;
+}
+
+#serverSection .title-accent {
+    margin-top: 0.45rem !important;
+}
+
+#serverSection .server-shell {
+    gap: 0 !important;
+    border-top: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
+}
+
+#serverSection .server-side-menu {
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-right: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16) !important;
+    margin: 0 !important;
+}
+
+#serverSection .server-content-area {
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0.55rem 0.7rem 0.8rem !important;
+}
+
+#serverSection .server-pane-surface {
+    padding: 0 !important;
+}
+
+#serverSection .server-pane-head {
+    margin: 0 0 0.55rem !important;
+    padding: 0.35rem 0 0.5rem !important;
+}
+
+@media (max-width: 1024px) {
+    #serverSection.section > .container {
+        padding: 0.4rem !important;
+    }
+
+    #serverSection .server-shell {
+        gap: 0.45rem !important;
+        border-top: none !important;
+    }
+
+    #serverSection .server-side-menu {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
+        border-radius: 12px !important;
+    }
+
+    #serverSection .server-content-area {
+        border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
+        border-radius: 12px !important;
+    }
+}
+
+/* =====================================================================
    Fondo translúcido unificado adaptable al tema activo
    ===================================================================== */
 :root {
@@ -10722,4 +10797,85 @@ body,
 /* Quita la barra interna del panel derecho; usa scroll de página */
 .server-content-area {
     overflow: visible !important;
+}
+
+/* =====================================================================
+   Fix solicitado: quitar capa negra general + restaurar scrollbars
+   ===================================================================== */
+body {
+    background:
+        radial-gradient(1200px 620px at 82% -14%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.14), transparent 58%),
+        radial-gradient(1100px 560px at 8% 10%, rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.1), transparent 56%),
+        linear-gradient(180deg, rgba(var(--bg-primary-rgb, 10, 12, 26), 0.62), rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.58)) !important;
+}
+
+/* Vuelve a usar scroll interno en la vista de servidor */
+#serverSection.section {
+    height: calc(100vh - 76px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#serverSection.section > .container {
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+.server-shell {
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+.server-side-menu {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-gutter: stable !important;
+}
+
+.server-content-area {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-gutter: stable !important;
+}
+
+/* Scrollbars visibles en sidebar y pantalla principal */
+.server-side-menu::-webkit-scrollbar,
+.server-content-area::-webkit-scrollbar {
+    width: 9px !important;
+}
+
+.server-side-menu::-webkit-scrollbar-track,
+.server-content-area::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.server-side-menu::-webkit-scrollbar-thumb,
+.server-content-area::-webkit-scrollbar-thumb {
+    border-radius: 999px !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.52) !important;
+}
+
+.server-side-menu::-webkit-scrollbar-thumb:hover,
+.server-content-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.72) !important;
+}
+
+@media (max-width: 1024px) {
+    #serverSection.section {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #serverSection.section > .container,
+    .server-shell,
+    .server-side-menu,
+    .server-content-area {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
 }
