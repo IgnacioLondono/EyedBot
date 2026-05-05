@@ -10340,7 +10340,7 @@ body.wc-studio-open {
     max-width: none !important;
     height: 100% !important;
     margin: 0 !important;
-    padding: 0.5rem 0.75rem 0.75rem !important;
+    padding: 0 !important;
 }
 
 .server-shell {
@@ -10397,18 +10397,9 @@ body.wc-studio-open {
     padding: 0 !important;
 }
 
-#serverSection .section-header {
-    margin: 0 !important;
-    padding: 0.65rem 0.85rem 0.55rem !important;
-}
-
-#serverSection .title-accent {
-    margin-top: 0.45rem !important;
-}
-
 #serverSection .server-shell {
     gap: 0 !important;
-    border-top: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
+    border-top: none !important;
 }
 
 #serverSection .server-side-menu {
@@ -10442,7 +10433,7 @@ body.wc-studio-open {
 
 @media (max-width: 1024px) {
     #serverSection.section > .container {
-        padding: 0.4rem !important;
+        padding: 0 !important;
     }
 
     #serverSection .server-shell {
@@ -10539,7 +10530,7 @@ body {
     max-width: none !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 0.55rem 0 0.65rem !important;
+    padding: 0 !important;
 }
 
 .server-shell {
@@ -10621,7 +10612,7 @@ body {
 @media (max-width: 1400px) {
     #serverSection.section > .container {
         max-width: none !important;
-        padding: 0.5rem 0 0.6rem !important;
+        padding: 0 !important;
     }
 
     .server-shell {
