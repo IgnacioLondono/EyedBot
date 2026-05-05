@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260422-mobile1">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-no-server-heading">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-about-rb3-layout">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -152,191 +152,86 @@
         </section>
 
         <section id="controlCenterSection" class="section">
-            <div class="container dashboard-shell about-shell">
-                <section class="about-block about-hero about-hero-pro reveal-on-scroll" data-reveal="up">
-                    <div class="about-hero-main">
-                        <div class="hero-eyebrow">
-                            <span class="hero-eyebrow-dot"></span>
-                            Plataforma EyedBot
-                        </div>
-                        <h2>Un centro operativo profesional para administrar, automatizar y escalar tu comunidad en Discord</h2>
-                        <p>
-                            EyedBot integra moderacion, engagement, automatizaciones y herramientas visuales en una experiencia de gestion moderna.
-                            Esta plataforma fue pensada para equipos de staff que necesitan velocidad en la operacion diaria, consistencia en las reglas
-                            y una interfaz clara para tomar decisiones con mas contexto.
-                        </p>
-                    </div>
-                    <aside class="about-hero-side">
-                        <article class="about-side-card">
-                            <h4>Principio de diseño</h4>
-                            <p>Menos friccion para el staff, mas claridad para los miembros y controles seguros para crecer sin perder orden.</p>
-                        </article>
-                        <article class="about-side-card">
-                            <h4>Enfoque de producto</h4>
-                            <p>Funciones modulares, panel unificado y mejoras continuas orientadas a rendimiento comunitario.</p>
-                        </article>
-                    </aside>
-                    <div class="about-kpis">
-                        <article class="about-kpi-card">
-                            <span class="about-kpi-label">Presencia actual</span>
-                            <strong id="aboutTotalServers" class="about-kpi-value">--</strong>
-                            <span class="about-kpi-caption">servidores con EyedBot</span>
-                        </article>
-                        <article class="about-kpi-card">
-                            <span class="about-kpi-label">Arquitectura funcional</span>
-                            <strong class="about-kpi-value">Comunidad + Seguridad + Automatizacion</strong>
-                            <span class="about-kpi-caption">operacion centralizada en un flujo</span>
-                        </article>
-                        <article class="about-kpi-card">
-                            <span class="about-kpi-label">Comandos disponibles</span>
-                            <strong id="aboutTotalCommands" class="about-kpi-value">--</strong>
-                            <span class="about-kpi-caption">atajos listos para produccion</span>
-                        </article>
-                    </div>
-                </section>
+            <div class="container dashboard-shell about-rb3-shell">
+                <header class="about-rb3-head reveal-on-scroll" data-reveal="up">
+                    <p class="about-rb3-kicker">Acerca de EyedBot</p>
+                    <h2>Caracteristicas</h2>
+                    <p class="about-rb3-subtitle">Una vista clara de las capacidades clave para administrar y escalar tu comunidad en Discord.</p>
+                </header>
 
-                <section class="about-block about-tabs-wrap reveal-on-scroll" data-reveal="up">
-                    <header class="about-band-head">
-                        <h3>Acerca de la plataforma</h3>
-                        <p>Navega por pilares clave de EyedBot con una estructura de tabs profesional.</p>
-                    </header>
-
-                    <div class="about-pro-tabs" role="tablist" aria-label="Secciones de Acerca de">
-                        <button class="about-pro-tab active" type="button" role="tab" aria-selected="true" data-about-tab="vision">Vision</button>
-                        <button class="about-pro-tab" type="button" role="tab" aria-selected="false" data-about-tab="capacidades">Capacidades</button>
-                        <button class="about-pro-tab" type="button" role="tab" aria-selected="false" data-about-tab="flujo">Flujo operativo</button>
-                        <button class="about-pro-tab" type="button" role="tab" aria-selected="false" data-about-tab="roadmap">Roadmap</button>
-                    </div>
-
-                    <div class="about-pro-panels">
-                        <article class="about-pro-panel active" data-about-panel="vision">
-                            <div class="about-info-grid">
-                                <article class="about-info-card">
-                                    <h3>Que es EyedBot</h3>
-                                    <p>Una plataforma de gestion para Discord que unifica herramientas de moderacion, comunicacion, automatizacion y dinamicas de comunidad en un panel consistente.</p>
-                                </article>
-                                <article class="about-info-card">
-                                    <h3>Mision del producto</h3>
-                                    <p>Reducir carga operativa del staff, mantener estandares de convivencia y elevar la experiencia del miembro con flujos claros y accionables.</p>
-                                </article>
-                                <article class="about-info-card">
-                                    <h3>Propuesta de valor</h3>
-                                    <p>Resolver tareas criticas del dia a dia sin fragmentar herramientas, permitiendo escalar comunidades con mejor control y menor friccion.</p>
-                                </article>
-                            </div>
-                        </article>
-
-                        <article class="about-pro-panel" data-about-panel="capacidades">
-                            <div class="about-pillars">
-                                <article class="about-pillar-card">
-                                    <h4>Moderacion inteligente</h4>
-                                    <p>Controles de seguridad, acciones de respuesta rapida y capas de proteccion para escenarios de riesgo.</p>
-                                </article>
-                                <article class="about-pillar-card">
-                                    <h4>Automatizacion de operaciones</h4>
-                                    <p>Disena procesos repetitivos para mejorar tiempos de respuesta y mantener consistencia en reglas internas.</p>
-                                </article>
-                                <article class="about-pillar-card">
-                                    <h4>Experiencia de miembro</h4>
-                                    <p>Estructuras de onboarding, engagement y comunicacion visual para aumentar participacion y retencion.</p>
-                                </article>
-                                <article class="about-pillar-card">
-                                    <h4>Control desde dashboard</h4>
-                                    <p>Gestion centralizada de modulos, configuraciones y monitoreo en una interfaz clara para equipos de staff.</p>
-                                </article>
-                            </div>
-                        </article>
-
-                        <article class="about-pro-panel" data-about-panel="flujo">
-                            <div class="about-story about-story-pro">
-                                <article class="about-story-block">
-                                    <h3>1. Activacion y estructura</h3>
-                                    <p>Configura las bases del servidor, define canales clave y activa modulos necesarios para operar con estabilidad.</p>
-                                </article>
-                                <article class="about-story-block">
-                                    <h3>2. Automatizacion de tareas</h3>
-                                    <p>Reduce intervencion manual en procesos repetitivos para que el staff enfoque energia en casos de alto impacto.</p>
-                                </article>
-                                <article class="about-story-block">
-                                    <h3>3. Supervisar y ajustar</h3>
-                                    <p>Evalua resultados, ajusta reglas y refina mensajes para mantener una experiencia consistente para toda la comunidad.</p>
-                                </article>
-                                <article class="about-story-block">
-                                    <h3>4. Escalar con confianza</h3>
-                                    <p>Incrementa capacidad operativa del servidor con controles robustos y una base preparada para crecer.</p>
-                                </article>
-                            </div>
-                        </article>
-
-                        <article class="about-pro-panel" data-about-panel="roadmap">
-                            <div class="about-timeline">
-                                <article class="about-timeline-item">
-                                    <span class="about-timeline-dot"></span>
-                                    <div>
-                                        <h4>Fase 1 · Estandarizacion</h4>
-                                        <p>Consolidacion de modulos base y mejoras de usabilidad para operaciones diarias de staff.</p>
-                                    </div>
-                                </article>
-                                <article class="about-timeline-item">
-                                    <span class="about-timeline-dot"></span>
-                                    <div>
-                                        <h4>Fase 2 · Inteligencia operativa</h4>
-                                        <p>Mas analitica, reglas avanzadas y componentes de automatizacion para equipos en crecimiento.</p>
-                                    </div>
-                                </article>
-                                <article class="about-timeline-item">
-                                    <span class="about-timeline-dot"></span>
-                                    <div>
-                                        <h4>Fase 3 · Escala premium</h4>
-                                        <p>Funciones orientadas a alto volumen, segmentacion y experiencias de administracion de nivel profesional.</p>
-                                    </div>
-                                </article>
-                            </div>
-                        </article>
-                    </div>
-                </section>
-
-                <section class="about-block about-carousel-wrap reveal-on-scroll" data-reveal="zoom">
-                    <header class="about-carousel-head">
-                        <h3>Lo que puedes hacer con EyedBot</h3>
-                        <p>Explora capacidades clave en un carrusel con interacciones suaves y enfoque visual profesional.</p>
-                    </header>
-                    <div class="about-carousel">
-                        <button type="button" class="about-carousel-arrow" id="aboutCarouselPrev" aria-label="Anterior">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M15 18l-6-6 6-6"></path>
+                <section class="about-rb3-grid reveal-on-scroll" data-reveal="zoom" aria-label="Caracteristicas principales de EyedBot">
+                    <article class="about-rb3-card">
+                        <span class="about-rb3-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2l8 4v6c0 5-3.8 9.4-8 10-4.2-.6-8-5-8-10V6l8-4z"></path>
+                                <path d="M9 12l2 2 4-4"></path>
                             </svg>
-                        </button>
-                        <div id="aboutCarouselViewport" class="about-carousel-viewport" tabindex="0" aria-label="Tarjetas destacadas de EyedBot">
-                            <div class="about-carousel-track">
-                                <article class="about-carousel-card">
-                                    <h4>Operacion mas eficiente</h4>
-                                    <p>Convierte tareas manuales en flujos repetibles para mantener tiempos de respuesta consistentes.</p>
-                                </article>
-                                <article class="about-carousel-card">
-                                    <h4>Seguridad adaptable</h4>
-                                    <p>Ajusta controles de moderacion y proteccion segun el contexto de cada servidor.</p>
-                                </article>
-                                <article class="about-carousel-card">
-                                    <h4>Comunicacion de alto impacto</h4>
-                                    <p>Diseña mensajes mas claros y atractivos para mejorar alcance, comprension y participacion.</p>
-                                </article>
-                                <article class="about-carousel-card">
-                                    <h4>Experiencia de miembro consistente</h4>
-                                    <p>Desde onboarding hasta dinamicas de retencion, EyedBot mantiene continuidad en la experiencia.</p>
-                                </article>
-                                <article class="about-carousel-card">
-                                    <h4>Escalabilidad continua</h4>
-                                    <p>Una base operativa preparada para evolucionar con tu comunidad sin perder estabilidad.</p>
-                                </article>
-                            </div>
-                        </div>
-                        <button type="button" class="about-carousel-arrow" id="aboutCarouselNext" aria-label="Siguiente">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path d="M9 18l6-6-6-6"></path>
+                        </span>
+                        <h3>Antiraid</h3>
+                        <p>Capas de proteccion para detectar comportamientos sospechosos y mantener estabilidad en momentos de alto riesgo.</p>
+                    </article>
+
+                    <article class="about-rb3-card">
+                        <span class="about-rb3-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 7h-9"></path>
+                                <path d="M14 17H5"></path>
+                                <circle cx="17" cy="17" r="3"></circle>
+                                <circle cx="7" cy="7" r="3"></circle>
                             </svg>
-                        </button>
-                    </div>
+                        </span>
+                        <h3>Seguridad opcional</h3>
+                        <p>Modulos activables segun tu comunidad para reforzar controles sin sobrecargar la operacion diaria del staff.</p>
+                    </article>
+
+                    <article class="about-rb3-card">
+                        <span class="about-rb3-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <line x1="19" y1="8" x2="19" y2="14"></line>
+                                <line x1="22" y1="11" x2="16" y2="11"></line>
+                            </svg>
+                        </span>
+                        <h3>Deteccion de usuarios maliciosos</h3>
+                        <p>Listas de bloqueo y reglas de ingreso para filtrar cuentas conflictivas antes de que afecten a tu servidor.</p>
+                    </article>
+
+                    <article class="about-rb3-card">
+                        <span class="about-rb3-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="17 8 21 12 17 16"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </span>
+                        <h3>Copias de seguridad</h3>
+                        <p>Respalda configuraciones clave para recuperar estructura, parametros y flujo operativo cuando lo necesites.</p>
+                    </article>
+
+                    <article class="about-rb3-card">
+                        <span class="about-rb3-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="8.5" cy="7" r="4"></circle>
+                                <polyline points="17 11 19 13 23 9"></polyline>
+                            </svg>
+                        </span>
+                        <h3>Whitelist de usuarios</h3>
+                        <p>Define personas de confianza y reduce falsos positivos en sistemas de proteccion y automatizacion.</p>
+                    </article>
+
+                    <article class="about-rb3-card">
+                        <span class="about-rb3-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="3" y1="3" x2="3" y2="21"></line>
+                                <line x1="3" y1="21" x2="21" y2="21"></line>
+                                <path d="M7 14l4-4 3 3 5-6"></path>
+                            </svg>
+                        </span>
+                        <h3>Dashboard</h3>
+                        <p>Panel central para gestionar modulos, revisar estado operativo y ajustar decisiones desde una sola interfaz.</p>
+                    </article>
                 </section>
             </div>
         </section>
