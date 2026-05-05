@@ -225,6 +225,14 @@ body::before {
 .dropdown-item { border-radius: 12px; transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease; }
 .dropdown-item:hover { background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14)) !important; transform: translateX(2px); }
 
+/* Iconos del menú usuario: 16px hace ilegible el engranaje detallado; unifica tamaño con buena lectura */
+#dropdownMenu .dropdown-item svg {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    flex-shrink: 0 !important;
+}
+
 /* ---------- Main content / secciones ---------- */
 .main-content {
     padding: 1.35rem 1.25rem 2rem;
