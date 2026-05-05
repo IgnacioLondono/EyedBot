@@ -7,8 +7,8 @@
 
 :root {
     /* Paleta multicolor para el dashboard (se combina con la del tema activo) */
-    --pro-violet: #8b5cf6;
-    --pro-violet-600: #7c3aed;
+    --pro-violet: var(--iris-500, #8b5cf6);
+    --pro-violet-600: var(--iris-500, #7c3aed);
     --pro-indigo: #6366f1;
     --pro-pink: #ec4899;
     --pro-rose: #f43f5e;
@@ -20,9 +20,9 @@
     --pro-orange: #fb923c;
 
     /* Shadows base */
-    --pro-shadow-sm: 0 2px 6px rgba(4, 2, 12, 0.35);
-    --pro-shadow-md: 0 10px 30px rgba(4, 2, 12, 0.45);
-    --pro-shadow-lg: 0 22px 60px rgba(4, 2, 12, 0.55);
+    --pro-shadow-sm: 0 2px 6px rgba(var(--bg-primary-rgb, 4, 2, 12), 0.35);
+    --pro-shadow-md: 0 10px 30px rgba(var(--bg-primary-rgb, 4, 2, 12), 0.45);
+    --pro-shadow-lg: 0 22px 60px rgba(var(--bg-primary-rgb, 4, 2, 12), 0.55);
     --pro-shadow-glow: 0 10px 40px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
 
     /* Radius */
@@ -34,7 +34,11 @@
     --pro-grad-primary: linear-gradient(135deg, var(--iris-500, #7c4dff) 0%, var(--fuchsia, #ff78d1) 100%);
     --pro-grad-cool: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
     --pro-grad-warm: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
-    --pro-grad-night: linear-gradient(180deg, rgba(10, 6, 22, 0.92), rgba(18, 10, 36, 0.82));
+    --pro-grad-night: linear-gradient(
+        180deg,
+        rgba(var(--bg-primary-rgb, 10, 6, 22), 0.92),
+        rgba(var(--bg-secondary-rgb, 18, 10, 36), 0.82)
+    );
 }
 
 /* ---------- Fondo base: mesh + grid sutil ---------- */
@@ -76,11 +80,11 @@ body::before {
 
 /* ---------- Navbar profesional ---------- */
 .navbar {
-    background: linear-gradient(180deg, rgba(12, 7, 24, 0.85), rgba(12, 7, 24, 0.65));
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 12, 7, 24), 0.85), rgba(var(--bg-primary-rgb, 12, 7, 24), 0.65));
     backdrop-filter: blur(22px) saturate(180%);
     -webkit-backdrop-filter: blur(22px) saturate(180%);
     border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
-    box-shadow: 0 10px 30px rgba(2, 1, 8, 0.45);
+    box-shadow: 0 10px 30px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.45);
 }
 .navbar::after {
     content: "";
@@ -243,11 +247,11 @@ body::before {
     gap: 0.6rem !important;
 }
 .user-menu:hover { background: rgba(255, 255, 255, 0.06) !important; border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45) !important; }
-.user-menu .user-avatar { width: 30px; height: 30px; border: 2px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55); box-shadow: 0 0 0 2px rgba(10, 6, 22, 0.9); }
+.user-menu .user-avatar { width: 30px; height: 30px; border: 2px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55); box-shadow: 0 0 0 2px rgba(var(--bg-primary-rgb, 10, 6, 22), 0.9); }
 .user-menu #userName { font-weight: 600; font-size: 0.9rem; color: var(--text-primary); }
 
 .dropdown-menu {
-    background: rgba(14, 9, 26, 0.96) !important;
+    background: rgba(var(--bg-primary-rgb, 14, 9, 26), 0.96) !important;
     backdrop-filter: blur(22px) saturate(180%);
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18) !important;
     border-radius: var(--pro-radius-md) !important;
@@ -324,7 +328,7 @@ body::before {
 
 .guild-card {
     position: relative;
-    background: linear-gradient(180deg, rgba(30, 18, 54, 0.78), rgba(18, 11, 34, 0.78)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 30, 18, 54), 0.78), rgba(var(--bg-primary-rgb, 18, 11, 34), 0.78)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16) !important;
     border-radius: var(--pro-radius-md) !important;
     padding: 1.25rem !important;
@@ -355,7 +359,7 @@ body::before {
 .guild-card:hover {
     transform: translateY(-4px);
     border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.6) !important;
-    box-shadow: 0 22px 48px rgba(2, 1, 8, 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2);
+    box-shadow: 0 22px 48px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2);
 }
 .guild-card:hover::before { opacity: 1; }
 
@@ -379,7 +383,7 @@ body::before {
 
 .stat-card {
     position: relative;
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.82), rgba(14, 8, 28, 0.82)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.82), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.82)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16) !important;
     border-radius: var(--pro-radius-md) !important;
     padding: 1.35rem 1.35rem 1.2rem !important;
@@ -389,7 +393,7 @@ body::before {
 }
 .stat-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 18px 42px rgba(2, 1, 8, 0.55);
+    box-shadow: 0 18px 42px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.55);
 }
 .stat-card::before {
     content: "";
@@ -412,7 +416,7 @@ body::before {
 
 /* 6 colores rotando para cada stat */
 .stats-grid .stat-card:nth-child(6n+1)::before { background: linear-gradient(90deg, var(--pro-violet), var(--pro-pink)); }
-.stats-grid .stat-card:nth-child(6n+1) .stat-icon { background: linear-gradient(135deg, rgba(139, 92, 246, 0.35), rgba(236, 72, 153, 0.28)) !important; box-shadow: 0 10px 24px rgba(139, 92, 246, 0.35); }
+.stats-grid .stat-card:nth-child(6n+1) .stat-icon { background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 139, 92, 246), 0.35), rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.28)) !important; box-shadow: 0 10px 24px rgba(var(--accent-primary-rgb, 139, 92, 246), 0.35); }
 
 .stats-grid .stat-card:nth-child(6n+2)::before { background: linear-gradient(90deg, var(--pro-cyan), var(--pro-indigo)); }
 .stats-grid .stat-card:nth-child(6n+2) .stat-icon { background: linear-gradient(135deg, rgba(34, 211, 238, 0.32), rgba(99, 102, 241, 0.28)) !important; box-shadow: 0 10px 24px rgba(34, 211, 238, 0.35); }
@@ -424,7 +428,7 @@ body::before {
 .stats-grid .stat-card:nth-child(6n+4) .stat-icon { background: linear-gradient(135deg, rgba(245, 158, 11, 0.32), rgba(244, 63, 94, 0.28)) !important; box-shadow: 0 10px 24px rgba(245, 158, 11, 0.35); }
 
 .stats-grid .stat-card:nth-child(6n+5)::before { background: linear-gradient(90deg, var(--pro-pink), var(--pro-violet)); }
-.stats-grid .stat-card:nth-child(6n+5) .stat-icon { background: linear-gradient(135deg, rgba(236, 72, 153, 0.32), rgba(139, 92, 246, 0.28)) !important; box-shadow: 0 10px 24px rgba(236, 72, 153, 0.35); }
+.stats-grid .stat-card:nth-child(6n+5) .stat-icon { background: linear-gradient(135deg, rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.32), rgba(var(--accent-primary-rgb, 139, 92, 246), 0.28)) !important; box-shadow: 0 10px 24px rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.35); }
 
 .stats-grid .stat-card:nth-child(6n)::before   { background: linear-gradient(90deg, var(--pro-sky), var(--pro-emerald)); }
 .stats-grid .stat-card:nth-child(6n) .stat-icon { background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(16, 185, 129, 0.28)) !important; box-shadow: 0 10px 24px rgba(56, 189, 248, 0.35); }
@@ -432,7 +436,7 @@ body::before {
 /* System info grid (estadísticas) — tarjetas consistentes */
 #systemInfo { gap: 1.25rem !important; }
 #systemInfo > * {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.72), rgba(14, 8, 28, 0.72)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.72), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.72)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
     border-radius: var(--pro-radius-md) !important;
     padding: 1.25rem !important;
@@ -447,7 +451,7 @@ body::before {
 }
 .command-card {
     position: relative;
-    background: linear-gradient(180deg, rgba(30, 18, 54, 0.7), rgba(18, 11, 34, 0.7)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 30, 18, 54), 0.7), rgba(var(--bg-primary-rgb, 18, 11, 34), 0.7)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
     border-radius: var(--pro-radius-md) !important;
     padding: 1.1rem 1.15rem !important;
@@ -457,7 +461,7 @@ body::before {
 .command-card:hover {
     transform: translateY(-3px);
     border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55) !important;
-    box-shadow: 0 18px 40px rgba(2, 1, 8, 0.5);
+    box-shadow: 0 18px 40px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.5);
 }
 .command-card::before {
     content: "";
@@ -626,13 +630,13 @@ label { color: var(--text-secondary); font-weight: 500; }
     background: transparent;
 }
 .embed-preview {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.7), rgba(14, 8, 28, 0.7)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.7), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.7)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
     border-radius: var(--pro-radius-md) !important;
     box-shadow: var(--pro-shadow-sm);
 }
 .fields-section {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.55), rgba(14, 8, 28, 0.55));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.55), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.55));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
     border-radius: var(--pro-radius-md);
     padding: 1rem;
@@ -647,8 +651,8 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .server-side-menu {
     background:
-        radial-gradient(120% 120% at 8% -12%, rgba(124, 77, 255, 0.2), transparent 48%),
-        linear-gradient(180deg, rgba(16, 10, 34, 0.95), rgba(9, 5, 22, 0.97)) !important;
+        radial-gradient(120% 120% at 8% -12%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2), transparent 48%),
+        linear-gradient(180deg, rgba(var(--bg-primary-rgb, 16, 10, 34), 0.95), rgba(var(--bg-primary-rgb, 9, 5, 22), 0.97)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
     border-radius: 22px !important;
     padding: 0.95rem !important;
@@ -683,7 +687,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     height: 42px;
     border-radius: 13px;
     border: 1px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55);
-    box-shadow: 0 8px 18px rgba(124, 77, 255, 0.32);
+    box-shadow: 0 8px 18px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.32);
 }
 
 .side-menu-group-title {
@@ -738,7 +742,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .side-menu-btn.active {
     background:
-        linear-gradient(135deg, rgba(71, 165, 255, 0.2), rgba(124, 77, 255, 0.2)),
+        linear-gradient(135deg, rgba(71, 165, 255, 0.2), rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2)),
         linear-gradient(180deg, rgba(34, 86, 140, 0.38), rgba(20, 56, 94, 0.34)) !important;
     border-color: rgba(87, 190, 255, 0.45) !important;
     box-shadow:
@@ -767,7 +771,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 /* Pane surface */
 .server-content-area {
-    background: linear-gradient(180deg, rgba(18, 11, 34, 0.78), rgba(10, 6, 22, 0.78)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 18, 11, 34), 0.78), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.78)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
     border-radius: var(--pro-radius-lg) !important;
     padding: 1.5rem !important;
@@ -861,7 +865,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     height: 56px;
     border-radius: 14px;
     padding: 2px;
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.75), rgba(255, 120, 209, 0.72));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.75), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.72));
     flex-shrink: 0;
 }
 
@@ -933,8 +937,8 @@ label { color: var(--text-secondary); font-weight: 500; }
     color: #ffd58b;
 }
 .modx-action-btn.is-kick .modx-action-icon {
-    background: linear-gradient(135deg, rgba(255, 120, 209, 0.22), rgba(236, 72, 153, 0.24));
-    border-color: rgba(236, 72, 153, 0.35);
+    background: linear-gradient(135deg, rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.22), rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.24));
+    border-color: rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.35);
     color: #f9a8d4;
 }
 .modx-action-btn.is-ban .modx-action-icon {
@@ -988,7 +992,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.25), rgba(255, 120, 209, 0.23));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.25), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.23));
     color: #fff;
 }
 .modx-empty-icon svg { width: 24px; height: 24px; }
@@ -1064,7 +1068,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 /* ---------- Settings layout ---------- */
 .settings-layout { gap: 1.5rem !important; }
 .settings-sidebar {
-    background: linear-gradient(180deg, rgba(18, 11, 34, 0.88), rgba(10, 6, 22, 0.88)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 18, 11, 34), 0.88), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.88)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16) !important;
     border-radius: var(--pro-radius-lg) !important;
     padding: 0.75rem !important;
@@ -1091,7 +1095,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .settings-overview-card {
-    background: linear-gradient(180deg, rgba(18, 11, 34, 0.82), rgba(10, 6, 22, 0.82));
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 18, 11, 34), 0.82), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.82));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: var(--pro-radius-lg);
     padding: 1.5rem 1.75rem;
@@ -1110,7 +1114,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 /* Theme lab panel */
 .theme-lab {
-    background: linear-gradient(180deg, rgba(18, 11, 34, 0.85), rgba(10, 6, 22, 0.85));
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 18, 11, 34), 0.85), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.85));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: var(--pro-radius-lg);
     padding: 1.5rem 1.75rem;
@@ -1186,7 +1190,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 1rem; margin-top: 1.5rem;
 }
 .about-kpi-card {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.65), rgba(14, 8, 28, 0.65));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.65), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.65));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
     border-radius: var(--pro-radius-md);
     padding: 1.1rem 1.2rem;
@@ -1209,7 +1213,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 1rem;
 }
 .about-info-card {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.6), rgba(14, 8, 28, 0.6));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.6), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.6));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
     border-radius: var(--pro-radius-md);
     padding: 1.1rem 1.2rem;
@@ -1233,7 +1237,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .about-carousel-arrow:hover { background: var(--pro-grad-primary); border-color: transparent; color: #fff; box-shadow: 0 10px 24px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4); }
 .about-carousel-card {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.72), rgba(14, 8, 28, 0.72));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.72), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.72));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: var(--pro-radius-md);
     padding: 1.25rem 1.35rem;
@@ -1247,7 +1251,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 1rem;
 }
 .about-story-block {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.6), rgba(14, 8, 28, 0.6));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.6), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.6));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
     border-radius: var(--pro-radius-md);
     padding: 1.1rem 1.2rem;
@@ -1285,7 +1289,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     margin-top: 1.15rem;
 }
 .about-side-card {
-    background: linear-gradient(180deg, rgba(30, 18, 54, 0.62), rgba(14, 8, 28, 0.58));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 30, 18, 54), 0.62), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.58));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: 16px;
     padding: 0.9rem 1rem;
@@ -1307,7 +1311,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 .about-tabs-wrap {
     overflow: visible;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
-    background: linear-gradient(180deg, rgba(20, 12, 38, 0.82), rgba(10, 6, 22, 0.78));
+    background: linear-gradient(180deg, rgba(20, 12, 38, 0.82), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.78));
     box-shadow: 0 18px 48px rgba(5, 2, 11, 0.42);
 }
 .about-band-head h3 { color: #f7f3ff; }
@@ -1372,7 +1376,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .about-pro-panels::-webkit-scrollbar-thumb,
 .section#controlCenterSection > .container::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(176, 130, 255, 0.9), rgba(255, 120, 209, 0.82));
+    background: linear-gradient(180deg, rgba(176, 130, 255, 0.9), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.82));
     border-radius: 999px;
 }
 
@@ -1393,7 +1397,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 0.95rem;
 }
 .about-pillar-card {
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.65), rgba(14, 8, 28, 0.62));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.65), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.62));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: var(--pro-radius-md);
     padding: 1rem 1.1rem;
@@ -1429,7 +1433,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     grid-template-columns: auto 1fr;
     align-items: start;
     gap: 0.8rem;
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.64), rgba(14, 8, 28, 0.6));
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.64), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.6));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: 14px;
     padding: 0.9rem 1rem;
@@ -1534,14 +1538,14 @@ label { color: var(--text-secondary); font-weight: 500; }
             rgba(var(--bg-primary-rgb, 10, 12, 26), 0.44)
         ) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
-    box-shadow: 0 16px 40px rgba(2, 1, 8, 0.32);
+    box-shadow: 0 16px 40px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.32);
     transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
 .about-rb3-card:hover {
     transform: translateY(-3px);
     border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.42);
-    box-shadow: 0 20px 44px rgba(2, 1, 8, 0.42);
+    box-shadow: 0 20px 44px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.42);
 }
 
 .about-rb3-icon {
@@ -1631,10 +1635,10 @@ label { color: var(--text-secondary); font-weight: 500; }
     border-radius: 16px !important;
     color: var(--text-primary) !important;
     background:
-        linear-gradient(135deg, rgba(30, 18, 54, 0.96), rgba(14, 8, 28, 0.96)) !important;
+        linear-gradient(135deg, rgba(var(--bg-card-rgb, 30, 18, 54), 0.96), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.96)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22) !important;
     box-shadow:
-        0 24px 60px rgba(2, 1, 8, 0.55),
+        0 24px 60px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.55),
         0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12),
         inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
     backdrop-filter: blur(18px) saturate(180%);
@@ -1742,9 +1746,9 @@ label { color: var(--text-secondary); font-weight: 500; }
     to   { opacity: 0; transform: translateY(12px) scale(0.97); }
 }
 @keyframes proToastPulse {
-    0%   { transform: translateY(0) scale(1); box-shadow: 0 24px 60px rgba(2, 1, 8, 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
-    40%  { transform: translateY(-3px) scale(1.02); box-shadow: 0 26px 70px rgba(2, 1, 8, 0.6), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
-    100% { transform: translateY(0) scale(1); box-shadow: 0 24px 60px rgba(2, 1, 8, 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+    0%   { transform: translateY(0) scale(1); box-shadow: 0 24px 60px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+    40%  { transform: translateY(-3px) scale(1.02); box-shadow: 0 26px 70px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.6), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+    100% { transform: translateY(0) scale(1); box-shadow: 0 24px 60px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
 }
 
 .toast.pro-toast.pro-toast-enter { animation: proToastIn 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
@@ -1753,7 +1757,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 /* Fallback: si algun toast viejo aparece sin la clase pro-toast, evitamos acumulacion visual */
 .toast-container .toast:not(.pro-toast) {
-    background: linear-gradient(180deg, rgba(20, 12, 38, 0.95), rgba(14, 8, 28, 0.95)) !important;
+    background: linear-gradient(180deg, rgba(20, 12, 38, 0.95), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.95)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22) !important;
     border-radius: 14px !important;
     color: var(--text-primary) !important;
@@ -1763,7 +1767,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 /* ---------- Server switcher modal ---------- */
 .server-switcher-modal { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .server-switcher-dialog {
-    background: linear-gradient(180deg, rgba(18, 11, 34, 0.96), rgba(10, 6, 22, 0.96)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 18, 11, 34), 0.96), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.96)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
     border-radius: var(--pro-radius-lg) !important;
     box-shadow: var(--pro-shadow-lg), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18) !important;
@@ -1779,7 +1783,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 /* ---------- Owner analytics ---------- */
 .owner-analytics-panel {
-    background: linear-gradient(180deg, rgba(18, 11, 34, 0.82), rgba(10, 6, 22, 0.82));
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 18, 11, 34), 0.82), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.82));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: var(--pro-radius-lg);
     padding: 1.5rem 1.75rem;
@@ -1816,7 +1820,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 /* ---------- Logs container ---------- */
 .logs-container {
-    background: linear-gradient(180deg, rgba(10, 6, 22, 0.9), rgba(6, 3, 14, 0.92)) !important;
+    background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 10, 6, 22), 0.9), rgba(6, 3, 14, 0.92)) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18) !important;
     border-radius: var(--pro-radius-md) !important;
     padding: 1rem 1.1rem !important;
@@ -1888,7 +1892,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     justify-content: center;
     gap: 0.45rem;
     background: rgba(12, 6, 30, 0.78) !important;
-    border: 1px solid rgba(190, 155, 255, 0.35) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.35) !important;
     color: #f4eeff !important;
     border-radius: 12px !important;
     padding: 0.55rem 1rem !important;
@@ -1896,8 +1900,8 @@ label { color: var(--text-secondary); font-weight: 500; }
     font-size: 0.85rem !important;
 }
 #serverPaneTicketsManage .ticket-manage-actions .btn.btn-ghost:hover {
-    background: rgba(124, 77, 255, 0.2) !important;
-    border-color: rgba(190, 155, 255, 0.55) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.55) !important;
     color: #ffffff !important;
     transform: translateY(-1px);
 }
@@ -1913,8 +1917,8 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 0.4rem;
     padding: 0.35rem 0.7rem;
     border-radius: 999px;
-    border: 1px solid rgba(154, 109, 255, 0.25);
-    background: rgba(154, 109, 255, 0.08);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.25);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.08);
     color: var(--text-secondary, #cbb7f6);
     font-size: 0.78rem;
     font-weight: 600;
@@ -1940,7 +1944,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 .ticket-manage-loading .loading-spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(154, 109, 255, 0.2);
+    border: 3px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
     border-top-color: var(--pro-violet, #8b5cf6);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -1959,8 +1963,8 @@ label { color: var(--text-secondary); font-weight: 500; }
     position: relative;
     padding: 1.1rem 1.2rem;
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.88), rgba(12, 7, 24, 0.92));
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.88), rgba(var(--bg-primary-rgb, 12, 7, 24), 0.92));
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     overflow: hidden;
     transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
@@ -1969,21 +1973,21 @@ label { color: var(--text-secondary); font-weight: 500; }
     content: "";
     position: absolute;
     inset: 0;
-    background: var(--tm-accent, linear-gradient(135deg, rgba(124, 77, 255, 0.28), transparent 60%));
+    background: var(--tm-accent, linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.28), transparent 60%));
     opacity: 0.5;
     pointer-events: none;
 }
 .tm-stat-card:hover {
     transform: translateY(-3px);
-    border-color: rgba(190, 155, 255, 0.38);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(190, 155, 255, 0.12);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.38);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(var(--border-rgb, 190, 155, 255), 0.12);
 }
 
 .tm-stat-card.is-active    { --tm-accent: linear-gradient(135deg, rgba(34, 211, 238, 0.28), transparent 60%); }
 .tm-stat-card.is-pending   { --tm-accent: linear-gradient(135deg, rgba(245, 158, 11, 0.28), transparent 60%); }
 .tm-stat-card.is-closed    { --tm-accent: linear-gradient(135deg, rgba(16, 185, 129, 0.28), transparent 60%); }
-.tm-stat-card.is-total     { --tm-accent: linear-gradient(135deg, rgba(124, 77, 255, 0.3), rgba(255, 120, 209, 0.22) 60%); }
-.tm-stat-card.is-claimed   { --tm-accent: linear-gradient(135deg, rgba(236, 72, 153, 0.28), transparent 60%); }
+.tm-stat-card.is-total     { --tm-accent: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.22) 60%); }
+.tm-stat-card.is-claimed   { --tm-accent: linear-gradient(135deg, rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.28), transparent 60%); }
 .tm-stat-card.is-unclaimed { --tm-accent: linear-gradient(135deg, rgba(239, 68, 68, 0.26), transparent 60%); }
 
 .tm-stat-card > * { position: relative; z-index: 1; }
@@ -2039,8 +2043,8 @@ label { color: var(--text-secondary); font-weight: 500; }
 .tm-trend-card {
     padding: 1.1rem 1.2rem;
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.92), rgba(12, 7, 24, 0.96));
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.92), rgba(var(--bg-primary-rgb, 12, 7, 24), 0.96));
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
 .tm-trend-head {
@@ -2081,7 +2085,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     align-items: end;
     height: 140px;
     padding-bottom: 0.25rem;
-    border-bottom: 1px dashed rgba(190, 155, 255, 0.16);
+    border-bottom: 1px dashed rgba(var(--border-rgb, 190, 155, 255), 0.16);
 }
 .tm-trend-day {
     display: flex;
@@ -2104,7 +2108,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     min-height: 2px;
     border-radius: 6px 6px 2px 2px;
     background: linear-gradient(180deg, #7c4dff, #4b2c9e);
-    box-shadow: 0 4px 12px rgba(124, 77, 255, 0.25);
+    box-shadow: 0 4px 12px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.25);
     transition: opacity 0.2s ease, filter 0.2s ease;
 }
 .tm-trend-bar.bar-open   { background: linear-gradient(180deg, #f59e0b, #b45309); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25); }
@@ -2123,7 +2127,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 0.4rem;
     padding: 0.35rem;
     background: rgba(20, 12, 38, 0.72);
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     border-radius: 16px;
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
@@ -2145,9 +2149,9 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .tm-tab-btn:hover { color: var(--text-primary, #f4eeff); }
 .tm-tab-btn.active {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.6), rgba(255, 120, 209, 0.5));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.6), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.5));
     color: #fff;
-    box-shadow: 0 8px 20px rgba(124, 77, 255, 0.35);
+    box-shadow: 0 8px 20px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
 }
 .tm-tab-count {
     display: inline-flex;
@@ -2175,7 +2179,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     color: var(--text-muted, #a48fd0);
     border-radius: 16px;
     background: rgba(20, 12, 38, 0.72);
-    border: 1px dashed rgba(154, 109, 255, 0.2);
+    border: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
 }
 .tm-list-empty-icon {
     display: inline-flex;
@@ -2184,7 +2188,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     width: 52px;
     height: 52px;
     border-radius: 16px;
-    background: rgba(154, 109, 255, 0.1);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.1);
     color: var(--pro-violet, #8b5cf6);
     margin-bottom: 0.6rem;
 }
@@ -2197,14 +2201,14 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 1rem;
     padding: 1rem 1.1rem;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.9), rgba(12, 7, 24, 0.94));
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.9), rgba(var(--bg-primary-rgb, 12, 7, 24), 0.94));
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
     transition: transform 0.2s ease, border-color 0.2s ease;
 }
 .tm-ticket-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 155, 255, 0.32);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.32);
 }
 
 .tm-ticket-avatar {
@@ -2290,7 +2294,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 .tm-btn-claim {
     background: linear-gradient(135deg, #7c4dff, #ff78d1);
     color: #fff;
-    box-shadow: 0 10px 22px rgba(124, 77, 255, 0.35);
+    box-shadow: 0 10px 22px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
 }
 .tm-btn-unclaim {
     background: rgba(245, 158, 11, 0.12);
@@ -2300,7 +2304,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 .tm-btn-ghost {
     background: rgba(255, 255, 255, 0.04);
     color: var(--text-secondary, #cbb7f6);
-    border-color: rgba(190, 155, 255, 0.22);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.22);
 }
 
 /* ---------- Badges ---------- */
@@ -2319,7 +2323,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 .tm-badge.cat       { background: rgba(99, 102, 241, 0.15); color: #a8b1ff; border-color: rgba(99, 102, 241, 0.35); }
 .tm-badge.pending   { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border-color: rgba(245, 158, 11, 0.35); }
 .tm-badge.active    { background: rgba(34, 211, 238, 0.12); color: #67e8f9; border-color: rgba(34, 211, 238, 0.35); }
-.tm-badge.claimed   { background: rgba(236, 72, 153, 0.14); color: #f9a8d4; border-color: rgba(236, 72, 153, 0.35); }
+.tm-badge.claimed   { background: rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.14); color: #f9a8d4; border-color: rgba(var(--accent-secondary-rgb, 236, 72, 153), 0.35); }
 .tm-badge.closed    { background: rgba(16, 185, 129, 0.14); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.35); }
 .tm-badge svg { width: 11px; height: 11px; }
 
@@ -2329,8 +2333,8 @@ label { color: var(--text-secondary); font-weight: 500; }
     margin-top: 0.7rem;
     padding: 0.8rem 0.9rem;
     border-radius: 12px;
-    background: rgba(12, 7, 24, 0.55);
-    border: 1px solid rgba(190, 155, 255, 0.12);
+    background: rgba(var(--bg-primary-rgb, 12, 7, 24), 0.55);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
     display: none;
     grid-column: 1 / -1;
     color: var(--text-secondary, #cbb7f6);
@@ -2380,7 +2384,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 .receipt-modal-backdrop {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 50% 20%, rgba(124, 77, 255, 0.22), rgba(6, 2, 18, 0.82) 60%);
+    background: radial-gradient(circle at 50% 20%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22), rgba(6, 2, 18, 0.82) 60%);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     cursor: pointer;
@@ -2392,11 +2396,11 @@ label { color: var(--text-secondary); font-weight: 500; }
     display: flex;
     flex-direction: column;
     background: linear-gradient(180deg, rgba(32, 18, 68, 0.96), rgba(18, 10, 40, 0.96));
-    border: 1px solid rgba(190, 155, 255, 0.25);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.25);
     border-radius: 22px;
     box-shadow:
         0 30px 80px rgba(7, 3, 22, 0.65),
-        0 0 0 1px rgba(124, 77, 255, 0.2) inset;
+        0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2) inset;
     overflow: hidden;
     animation: receiptSlide 0.22s cubic-bezier(.2,.9,.3,1.2);
 }
@@ -2410,8 +2414,8 @@ label { color: var(--text-secondary); font-weight: 500; }
     align-items: center;
     gap: 0.9rem;
     padding: 1rem 1.4rem;
-    background: linear-gradient(90deg, rgba(124, 77, 255, 0.22), rgba(43, 144, 217, 0.2));
-    border-bottom: 1px solid rgba(190, 155, 255, 0.18);
+    background: linear-gradient(90deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22), rgba(43, 144, 217, 0.2));
+    border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
 }
 .receipt-modal-kicker {
     display: inline-flex;
@@ -2425,7 +2429,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    border: 1px solid rgba(190, 155, 255, 0.22);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
 }
 .receipt-modal-kicker svg { width: 14px; height: 14px; }
 .receipt-modal-head h3 {
@@ -2444,7 +2448,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     align-items: center;
     justify-content: center;
     border-radius: 10px;
-    border: 1px solid rgba(190, 155, 255, 0.22);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
     background: rgba(12, 6, 30, 0.6);
     color: #f4eeff;
     cursor: pointer;
@@ -2464,7 +2468,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     justify-content: space-between;
     padding: 0.75rem 1.2rem;
     background: rgba(10, 5, 25, 0.55);
-    border-bottom: 1px solid rgba(190, 155, 255, 0.12);
+    border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
     flex-wrap: wrap;
 }
 .receipt-modal-tabs {
@@ -2473,7 +2477,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     border-radius: 12px;
     padding: 4px;
     gap: 4px;
-    border: 1px solid rgba(190, 155, 255, 0.12);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
 }
 .receipt-tab-btn {
     padding: 0.45rem 0.9rem;
@@ -2490,7 +2494,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 .receipt-tab-btn.is-active {
     background: linear-gradient(135deg, #7c4dff, #2b90d9);
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(124, 77, 255, 0.35);
+    box-shadow: 0 4px 12px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
 }
 .receipt-modal-toolbar-actions {
     display: inline-flex;
@@ -2503,7 +2507,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     padding: 0.45rem 0.8rem;
     border-radius: 10px;
     background: rgba(7, 3, 20, 0.6);
-    border: 1px solid rgba(190, 155, 255, 0.2);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
     color: #f4eeff;
     font-size: 0.85rem;
     outline: none;
@@ -2511,8 +2515,8 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .receipt-search::placeholder { color: #8a75b8; }
 .receipt-search:focus {
-    border-color: rgba(124, 77, 255, 0.6);
-    box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.18);
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.6);
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18);
 }
 .receipt-modal .btn.btn-sm {
     padding: 0.45rem 0.8rem;
@@ -2525,7 +2529,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     flex: 1 1 auto;
     overflow: hidden;
     position: relative;
-    background: linear-gradient(180deg, rgba(14, 8, 34, 0.6), rgba(9, 5, 22, 0.85));
+    background: linear-gradient(180deg, rgba(14, 8, 34, 0.6), rgba(var(--bg-primary-rgb, 9, 5, 22), 0.85));
 }
 .receipt-pane {
     position: absolute;
@@ -2534,12 +2538,12 @@ label { color: var(--text-secondary); font-weight: 500; }
     overflow-y: auto;
     display: none;
     scrollbar-width: thin;
-    scrollbar-color: rgba(124, 77, 255, 0.45) transparent;
+    scrollbar-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45) transparent;
 }
 .receipt-pane.is-active { display: block; }
 .receipt-pane::-webkit-scrollbar { width: 10px; }
 .receipt-pane::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(124, 77, 255, 0.55), rgba(43, 144, 217, 0.45));
+    background: linear-gradient(180deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55), rgba(43, 144, 217, 0.45));
     border-radius: 10px;
 }
 .receipt-pane::-webkit-scrollbar-track { background: transparent; }
@@ -2562,7 +2566,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .receipt-card {
     background: linear-gradient(180deg, rgba(26, 14, 55, 0.85), rgba(18, 10, 40, 0.9));
-    border: 1px solid rgba(190, 155, 255, 0.18);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
     border-radius: 14px;
     padding: 1rem 1.1rem;
 }
@@ -2598,7 +2602,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     font-size: 1rem;
     overflow: hidden;
     flex-shrink: 0;
-    border: 2px solid rgba(190, 155, 255, 0.25);
+    border: 2px solid rgba(var(--border-rgb, 190, 155, 255), 0.25);
 }
 .receipt-user-avatar img {
     width: 100%;
@@ -2643,7 +2647,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 0.5rem;
     flex-wrap: wrap;
     padding-bottom: 0.5rem;
-    border-bottom: 1px dashed rgba(190, 155, 255, 0.15);
+    border-bottom: 1px dashed rgba(var(--border-rgb, 190, 155, 255), 0.15);
     color: #a48fd0;
     font-size: 0.82rem;
 }
@@ -2655,7 +2659,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     border-radius: 12px;
     transition: background 0.15s ease;
 }
-.receipt-msg:hover { background: rgba(124, 77, 255, 0.08); }
+.receipt-msg:hover { background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.08); }
 .receipt-msg.is-bot { background: rgba(43, 144, 217, 0.06); }
 .receipt-msg-avatar {
     width: 40px;
@@ -2731,14 +2735,14 @@ label { color: var(--text-secondary); font-weight: 500; }
     padding: 0.3rem 0.55rem;
     border-radius: 8px;
     background: rgba(12, 6, 30, 0.7);
-    border: 1px solid rgba(190, 155, 255, 0.2);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
     color: #b89aff;
     text-decoration: none;
     font-size: 0.78rem;
     transition: all 0.15s ease;
 }
 .receipt-msg-attach a:hover {
-    background: rgba(124, 77, 255, 0.18);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18);
     color: #ffffff;
 }
 .receipt-msg-attach a svg { width: 12px; height: 12px; }
@@ -2768,7 +2772,7 @@ mark.receipt-highlight {
     gap: 0.65rem;
     padding: 0.7rem 0.8rem;
     background: rgba(18, 10, 40, 0.8);
-    border: 1px solid rgba(190, 155, 255, 0.15);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.15);
     border-radius: 12px;
 }
 .receipt-participant .receipt-user-avatar { width: 38px; height: 38px; font-size: 0.85rem; }
@@ -2777,13 +2781,13 @@ mark.receipt-highlight {
 
 /* ---- Botón ver comprobante en historial ---- */
 .tm-btn-receipt {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.3), rgba(43, 144, 217, 0.3));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3), rgba(43, 144, 217, 0.3));
     color: #ffffff;
-    border: 1px solid rgba(190, 155, 255, 0.3);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.3);
 }
 .tm-btn-receipt:hover {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.5), rgba(43, 144, 217, 0.5));
-    border-color: rgba(190, 155, 255, 0.5);
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.5), rgba(43, 144, 217, 0.5));
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.5);
     transform: translateY(-1px);
 }
 
@@ -3032,7 +3036,7 @@ mark.receipt-highlight {
 }
 .overview-hero-chip:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 155, 255, 0.4) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.4) !important;
 }
 .overview-hero-chip-icon {
     width: 36px;
@@ -3041,9 +3045,9 @@ mark.receipt-highlight {
     align-items: center;
     justify-content: center;
     border-radius: 10px;
-    background: rgba(124, 77, 255, 0.15);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.15);
     color: #d7c4ff;
-    border: 1px solid rgba(190, 155, 255, 0.2);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
     flex-shrink: 0;
 }
 .overview-hero-chip-icon svg { width: 18px; height: 18px; }
@@ -3080,7 +3084,7 @@ mark.receipt-highlight {
     justify-content: space-between;
     gap: 0.5rem;
     padding-bottom: 0.4rem;
-    border-bottom: 1px dashed rgba(190, 155, 255, 0.16);
+    border-bottom: 1px dashed rgba(var(--border-rgb, 190, 155, 255), 0.16);
 }
 .overview-section-title {
     display: flex !important;
@@ -3099,7 +3103,7 @@ mark.receipt-highlight {
     height: 22px !important;
     border-radius: 4px !important;
     background: linear-gradient(180deg, #7c4dff, #2b90d9) !important;
-    box-shadow: 0 0 10px rgba(124, 77, 255, 0.55);
+    box-shadow: 0 0 10px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55);
 }
 .overview-section-dot--blue { background: linear-gradient(180deg, #58acff, #3167e8) !important; }
 .overview-section-dot--teal { background: linear-gradient(180deg, #76ffe8, #3ab6ce) !important; box-shadow: 0 0 10px rgba(58, 182, 206, 0.6); }
@@ -3165,9 +3169,9 @@ mark.receipt-highlight {
     border-radius: 18px !important;
     padding: 1.1rem 1.2rem !important;
     background:
-        radial-gradient(circle at top right, rgba(124, 77, 255, 0.1), transparent 55%),
+        radial-gradient(circle at top right, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.1), transparent 55%),
         linear-gradient(180deg, rgba(30, 17, 68, 0.78), rgba(18, 10, 42, 0.92)) !important;
-    border: 1px solid rgba(190, 155, 255, 0.18) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18) !important;
     transition: transform 0.2s cubic-bezier(.2,.9,.3,1.2), box-shadow 0.2s ease, border-color 0.2s ease !important;
     overflow: hidden;
 }
@@ -3185,16 +3189,16 @@ mark.receipt-highlight {
 }
 .summary-card--interactive:hover {
     transform: translateY(-3px);
-    border-color: rgba(190, 155, 255, 0.42) !important;
-    box-shadow: 0 14px 40px rgba(7, 3, 22, 0.55), 0 0 0 1px rgba(124, 77, 255, 0.18) inset;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.42) !important;
+    box-shadow: 0 14px 40px rgba(7, 3, 22, 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18) inset;
 }
 .summary-card--interactive:hover::before {
     width: 5px;
     opacity: 1;
-    box-shadow: 0 0 16px rgba(124, 77, 255, 0.6);
+    box-shadow: 0 0 16px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.6);
 }
 .summary-card--interactive:focus-visible {
-    outline: 2px solid rgba(124, 77, 255, 0.7);
+    outline: 2px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.7);
     outline-offset: 2px;
 }
 
@@ -3208,7 +3212,7 @@ mark.receipt-highlight {
 
 .summary-card.tone-blue:hover    { box-shadow: 0 14px 40px rgba(49, 103, 232, 0.25), 0 0 0 1px rgba(88, 172, 255, 0.2) inset; }
 .summary-card.tone-teal:hover    { box-shadow: 0 14px 40px rgba(58, 182, 206, 0.25), 0 0 0 1px rgba(118, 255, 232, 0.2) inset; }
-.summary-card.tone-violet:hover  { box-shadow: 0 14px 40px rgba(124, 77, 255, 0.28), 0 0 0 1px rgba(191, 148, 255, 0.22) inset; }
+.summary-card.tone-violet:hover  { box-shadow: 0 14px 40px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.28), 0 0 0 1px rgba(191, 148, 255, 0.22) inset; }
 .summary-card.tone-gold:hover    { box-shadow: 0 14px 40px rgba(255, 138, 70, 0.22), 0 0 0 1px rgba(255, 201, 118, 0.2) inset; }
 .summary-card.tone-pink:hover    { box-shadow: 0 14px 40px rgba(198, 99, 255, 0.22), 0 0 0 1px rgba(255, 131, 203, 0.2) inset; }
 .summary-card.tone-orange:hover  { box-shadow: 0 14px 40px rgba(255, 116, 79, 0.22), 0 0 0 1px rgba(255, 170, 111, 0.2) inset; }
@@ -3246,8 +3250,8 @@ mark.receipt-highlight {
     width: 32px !important;
     height: 32px !important;
     border-radius: 10px !important;
-    border: 1px solid rgba(190, 155, 255, 0.25) !important;
-    background: rgba(124, 77, 255, 0.14) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.25) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.14) !important;
     color: #e9deff !important;
     box-shadow: 0 4px 10px rgba(7, 3, 22, 0.3);
 }
@@ -3298,7 +3302,7 @@ mark.receipt-highlight {
     padding: 0.4rem 0.65rem !important;
     border-radius: 10px !important;
     background: rgba(7, 3, 20, 0.6) !important;
-    border: 1px solid rgba(190, 155, 255, 0.18) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18) !important;
     font-size: 0.8rem;
 }
 .summary-highlight-label {
@@ -3309,7 +3313,7 @@ mark.receipt-highlight {
     letter-spacing: 0.1em;
     padding: 0.08rem 0.35rem;
     border-radius: 6px;
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.3), rgba(43, 144, 217, 0.3));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3), rgba(43, 144, 217, 0.3));
     color: #ffffff;
 }
 .summary-highlight-value {
@@ -3342,7 +3346,7 @@ mark.receipt-highlight {
     padding: 0.7rem 0.5rem !important;
     border-radius: 12px !important;
     background: rgba(7, 3, 20, 0.55) !important;
-    border: 1px solid rgba(190, 155, 255, 0.16) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16) !important;
 }
 .summary-flow-item--joins { border-color: rgba(76, 203, 129, 0.3) !important; }
 .summary-flow-item--joins .summary-flow-value { color: #7de2a8 !important; }
@@ -3362,7 +3366,7 @@ mark.receipt-highlight {
 .summary-flow-divider {
     width: 1px;
     height: 44px;
-    background: linear-gradient(180deg, transparent, rgba(190, 155, 255, 0.3), transparent);
+    background: linear-gradient(180deg, transparent, rgba(var(--border-rgb, 190, 155, 255), 0.3), transparent);
 }
 .summary-flow-balance {
     margin-top: 0.55rem !important;
@@ -3397,7 +3401,7 @@ mark.receipt-highlight {
     padding: 0.55rem 0.7rem !important;
     border-radius: 10px !important;
     background: rgba(7, 3, 20, 0.5) !important;
-    border: 1px solid rgba(190, 155, 255, 0.14);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
 }
 .summary-peak-dot {
     width: 10px;
@@ -3431,7 +3435,7 @@ mark.receipt-highlight {
     padding: 0.55rem 0.7rem !important;
     border-radius: 10px !important;
     background: rgba(7, 3, 20, 0.5) !important;
-    border: 1px solid rgba(190, 155, 255, 0.14);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
 }
 .summary-detail-row > div span {
     color: #a48fd0 !important;
@@ -3459,12 +3463,12 @@ mark.receipt-highlight {
     padding: 0.6rem 0.75rem !important;
     border-radius: 12px !important;
     background: rgba(7, 3, 20, 0.5) !important;
-    border: 1px solid rgba(190, 155, 255, 0.12) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12) !important;
     transition: all 0.15s ease;
 }
 .summary-top-user-item:hover {
-    background: rgba(124, 77, 255, 0.1) !important;
-    border-color: rgba(190, 155, 255, 0.3) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.1) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.3) !important;
     transform: translateX(3px);
 }
 .summary-top-user-rank {
@@ -3475,8 +3479,8 @@ mark.receipt-highlight {
     align-items: center !important;
     justify-content: center !important;
     border-radius: 50% !important;
-    background: rgba(124, 77, 255, 0.16) !important;
-    border: 1px solid rgba(190, 155, 255, 0.22);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.16) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
     color: #d7c4ff !important;
     font-size: 0.78rem !important;
     font-weight: 800 !important;
@@ -3504,7 +3508,7 @@ mark.receipt-highlight {
     width: 42px !important;
     height: 42px !important;
     border-radius: 50% !important;
-    border: 2px solid rgba(190, 155, 255, 0.35) !important;
+    border: 2px solid rgba(var(--border-rgb, 190, 155, 255), 0.35) !important;
 }
 .summary-top-user-name {
     color: #f4eeff !important;
@@ -3524,7 +3528,7 @@ mark.receipt-highlight {
     text-align: center;
     color: #8a75b8;
     font-size: 0.85rem;
-    border: 1px dashed rgba(190, 155, 255, 0.2);
+    border: 1px dashed rgba(var(--border-rgb, 190, 155, 255), 0.2);
     border-radius: 12px;
     background: rgba(7, 3, 20, 0.35);
 }
@@ -3534,8 +3538,8 @@ mark.receipt-highlight {
     align-self: flex-start;
     margin-top: 0.5rem !important;
     padding: 0.4rem 0.9rem !important;
-    background: rgba(124, 77, 255, 0.14) !important;
-    border: 1px solid rgba(190, 155, 255, 0.3) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.14) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.3) !important;
     border-radius: 10px !important;
     color: #d7c4ff !important;
     font-size: 0.8rem !important;
@@ -3544,9 +3548,9 @@ mark.receipt-highlight {
     transition: all 0.15s ease;
 }
 .summary-link-btn:hover {
-    background: rgba(124, 77, 255, 0.26) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.26) !important;
     color: #ffffff !important;
-    border-color: rgba(190, 155, 255, 0.5) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.5) !important;
 }
 
 /* Chart head & wrap */
@@ -3569,7 +3573,7 @@ mark.receipt-highlight {
     padding: 0.4rem 0.7rem !important;
     border-radius: 10px !important;
     background: rgba(7, 3, 20, 0.7) !important;
-    border: 1px solid rgba(190, 155, 255, 0.25) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.25) !important;
     color: #f4eeff !important;
     font-size: 0.8rem !important;
     cursor: pointer;
@@ -3578,7 +3582,7 @@ mark.receipt-highlight {
     position: relative;
     min-height: 260px;
     background: rgba(7, 3, 20, 0.4);
-    border: 1px solid rgba(190, 155, 255, 0.1);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.1);
     border-radius: 14px;
     padding: 0.8rem;
 }
@@ -3613,7 +3617,7 @@ mark.receipt-highlight {
     gap: 0.45rem;
     padding: 0.5rem 0.95rem !important;
     background: rgba(7, 3, 20, 0.6) !important;
-    border: 1px solid rgba(190, 155, 255, 0.25) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.25) !important;
     border-radius: 10px !important;
     color: #d7c4ff !important;
     font-size: 0.85rem !important;
@@ -3623,8 +3627,8 @@ mark.receipt-highlight {
     width: fit-content;
 }
 .server-insight-back:hover {
-    background: rgba(124, 77, 255, 0.18) !important;
-    border-color: rgba(190, 155, 255, 0.5) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.5) !important;
     color: #ffffff !important;
     transform: translateX(-2px);
 }
@@ -3634,9 +3638,9 @@ mark.receipt-highlight {
     padding: 1.3rem 1.5rem !important;
     border-radius: 18px !important;
     background:
-        radial-gradient(circle at 90% 0%, rgba(124, 77, 255, 0.2), transparent 60%),
+        radial-gradient(circle at 90% 0%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2), transparent 60%),
         linear-gradient(180deg, rgba(30, 17, 68, 0.85), rgba(18, 10, 42, 0.95)) !important;
-    border: 1px solid rgba(190, 155, 255, 0.2) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
     box-shadow: 0 10px 30px rgba(7, 3, 22, 0.45);
 }
 .server-insight-kicker {
@@ -3644,8 +3648,8 @@ mark.receipt-highlight {
     align-items: center;
     padding: 0.18rem 0.6rem;
     border-radius: 999px;
-    background: rgba(124, 77, 255, 0.22);
-    border: 1px solid rgba(190, 155, 255, 0.35);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.35);
     color: #d7c4ff;
     font-size: 0.66rem;
     font-weight: 800;
@@ -3718,7 +3722,7 @@ mark.receipt-highlight {
 .server-insight-grid > article:hover,
 .server-insight-grid > div:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 155, 255, 0.4) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.4) !important;
     box-shadow: 0 10px 24px rgba(7, 3, 22, 0.45);
 }
 
@@ -3790,11 +3794,11 @@ mark.receipt-highlight {
     overflow-y: auto;
     padding-right: 0.35rem;
     scrollbar-width: thin;
-    scrollbar-color: rgba(124, 77, 255, 0.45) transparent;
+    scrollbar-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45) transparent;
 }
 .server-detail-list--scroll::-webkit-scrollbar { width: 8px; }
 .server-detail-list--scroll::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(124, 77, 255, 0.55), rgba(43, 144, 217, 0.45));
+    background: linear-gradient(180deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55), rgba(43, 144, 217, 0.45));
     border-radius: 8px;
 }
 .server-detail-list-item,
@@ -3804,7 +3808,7 @@ mark.receipt-highlight {
     padding: 0.7rem 0.9rem !important;
     border-radius: 12px !important;
     background: rgba(7, 3, 20, 0.55) !important;
-    border: 1px solid rgba(190, 155, 255, 0.14) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
     transition: all 0.15s ease;
     text-align: left !important;
 }
@@ -3816,8 +3820,8 @@ mark.receipt-highlight {
 }
 .server-detail-list-item:hover,
 .server-detail-list-item--button:hover {
-    background: rgba(124, 77, 255, 0.1) !important;
-    border-color: rgba(190, 155, 255, 0.35) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.1) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.35) !important;
     transform: translateX(3px);
 }
 .server-detail-list-title {
@@ -3886,7 +3890,7 @@ mark.receipt-highlight {
 .ticket-chat-backdrop {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 50% 20%, rgba(124, 77, 255, 0.22), rgba(6, 2, 18, 0.85) 60%);
+    background: radial-gradient(circle at 50% 20%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22), rgba(6, 2, 18, 0.85) 60%);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     cursor: pointer;
@@ -3899,11 +3903,11 @@ mark.receipt-highlight {
     display: flex;
     flex-direction: column;
     background: linear-gradient(180deg, rgba(32, 18, 68, 0.97), rgba(18, 10, 40, 0.98));
-    border: 1px solid rgba(190, 155, 255, 0.25);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.25);
     border-radius: 22px;
     box-shadow:
         0 30px 80px rgba(7, 3, 22, 0.65),
-        0 0 0 1px rgba(124, 77, 255, 0.2) inset;
+        0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2) inset;
     overflow: hidden;
     animation: tchatSlide 0.22s cubic-bezier(.2,.9,.3,1.2);
 }
@@ -3919,8 +3923,8 @@ mark.receipt-highlight {
     justify-content: space-between;
     gap: 1rem;
     padding: 0.9rem 1.2rem;
-    background: linear-gradient(90deg, rgba(124, 77, 255, 0.2), rgba(43, 144, 217, 0.18));
-    border-bottom: 1px solid rgba(190, 155, 255, 0.18);
+    background: linear-gradient(90deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2), rgba(43, 144, 217, 0.18));
+    border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
     flex-shrink: 0;
 }
 .ticket-chat-head-info {
@@ -3942,8 +3946,8 @@ mark.receipt-highlight {
     font-weight: 800;
     overflow: hidden;
     flex-shrink: 0;
-    border: 2px solid rgba(190, 155, 255, 0.35);
-    box-shadow: 0 4px 14px rgba(124, 77, 255, 0.4);
+    border: 2px solid rgba(var(--border-rgb, 190, 155, 255), 0.35);
+    box-shadow: 0 4px 14px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4);
 }
 .ticket-chat-avatar img {
     width: 100%;
@@ -4022,7 +4026,7 @@ mark.receipt-highlight {
     align-items: center;
     justify-content: center;
     border-radius: 10px;
-    border: 1px solid rgba(190, 155, 255, 0.22);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
     background: rgba(12, 6, 30, 0.6);
     color: #f4eeff;
     cursor: pointer;
@@ -4042,17 +4046,17 @@ mark.receipt-highlight {
     overflow-y: auto;
     padding: 1rem 1.2rem;
     background:
-        radial-gradient(circle at 50% -10%, rgba(124, 77, 255, 0.08), transparent 60%),
-        linear-gradient(180deg, rgba(14, 8, 34, 0.7), rgba(9, 5, 22, 0.9));
+        radial-gradient(circle at 50% -10%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.08), transparent 60%),
+        linear-gradient(180deg, rgba(14, 8, 34, 0.7), rgba(var(--bg-primary-rgb, 9, 5, 22), 0.9));
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     scrollbar-width: thin;
-    scrollbar-color: rgba(124, 77, 255, 0.45) transparent;
+    scrollbar-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45) transparent;
 }
 .ticket-chat-body::-webkit-scrollbar { width: 8px; }
 .ticket-chat-body::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(124, 77, 255, 0.55), rgba(43, 144, 217, 0.45));
+    background: linear-gradient(180deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55), rgba(43, 144, 217, 0.45));
     border-radius: 8px;
 }
 .ticket-chat-body::-webkit-scrollbar-track { background: transparent; }
@@ -4083,7 +4087,7 @@ mark.receipt-highlight {
     content: "";
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(190, 155, 255, 0.22), transparent);
+    background: linear-gradient(90deg, transparent, rgba(var(--border-rgb, 190, 155, 255), 0.22), transparent);
 }
 .ticket-chat-day-separator span {
     color: #a48fd0;
@@ -4094,7 +4098,7 @@ mark.receipt-highlight {
     padding: 0.2rem 0.6rem;
     border-radius: 999px;
     background: rgba(7, 3, 20, 0.6);
-    border: 1px solid rgba(190, 155, 255, 0.15);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.15);
 }
 
 .tchat-msg {
@@ -4110,11 +4114,11 @@ mark.receipt-highlight {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
 }
-.tchat-msg:hover { background: rgba(124, 77, 255, 0.06); }
+.tchat-msg:hover { background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.06); }
 .tchat-msg.is-bot { background: rgba(43, 144, 217, 0.06); }
 .tchat-msg.is-from-web {
-    background: rgba(124, 77, 255, 0.09);
-    border: 1px solid rgba(124, 77, 255, 0.18);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.09);
+    border: 1px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18);
 }
 .tchat-msg.is-owner { background: rgba(76, 203, 129, 0.05); }
 
@@ -4131,7 +4135,7 @@ mark.receipt-highlight {
     font-size: 0.95rem;
     overflow: hidden;
     flex-shrink: 0;
-    border: 2px solid rgba(190, 155, 255, 0.25);
+    border: 2px solid rgba(var(--border-rgb, 190, 155, 255), 0.25);
 }
 .tchat-avatar img {
     width: 100%;
@@ -4169,7 +4173,7 @@ mark.receipt-highlight {
 }
 .tchat-web-tag {
     background: linear-gradient(135deg, #7c4dff, #c663ff);
-    box-shadow: 0 0 10px rgba(124, 77, 255, 0.4);
+    box-shadow: 0 0 10px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4);
 }
 .tchat-time {
     color: #8a75b8;
@@ -4198,7 +4202,7 @@ mark.receipt-highlight {
     text-decoration-color: #ffffff;
 }
 .tchat-mention {
-    background: rgba(124, 77, 255, 0.22);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22);
     color: #d7c4ff;
     padding: 0.05rem 0.32rem;
     border-radius: 5px;
@@ -4211,7 +4215,7 @@ mark.receipt-highlight {
     padding: 0.08rem 0.35rem;
     border-radius: 5px;
     font-size: 0.86em;
-    border: 1px solid rgba(190, 155, 255, 0.12);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
 }
 
 .tchat-attachments {
@@ -4227,16 +4231,16 @@ mark.receipt-highlight {
     padding: 0.3rem 0.55rem;
     border-radius: 8px;
     background: rgba(12, 6, 30, 0.7);
-    border: 1px solid rgba(190, 155, 255, 0.18);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
     color: #b89aff;
     text-decoration: none;
     font-size: 0.76rem;
     transition: all 0.15s ease;
 }
 .tchat-attach:hover {
-    background: rgba(124, 77, 255, 0.18);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18);
     color: #ffffff;
-    border-color: rgba(190, 155, 255, 0.4);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.4);
 }
 .tchat-attach svg { width: 12px; height: 12px; }
 
@@ -4246,7 +4250,7 @@ mark.receipt-highlight {
     margin-top: 0.4rem;
     border-radius: 10px;
     overflow: hidden;
-    border: 1px solid rgba(190, 155, 255, 0.15);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.15);
 }
 .tchat-attach-image img {
     display: block;
@@ -4286,8 +4290,8 @@ mark.receipt-highlight {
     flex-shrink: 0;
 }
 .ticket-chat-status.is-info {
-    background: rgba(124, 77, 255, 0.14);
-    border-top-color: rgba(124, 77, 255, 0.35);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.14);
+    border-top-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
     color: #d7c4ff;
 }
 
@@ -4298,7 +4302,7 @@ mark.receipt-highlight {
     gap: 0.6rem;
     padding: 0.75rem 1rem 0.9rem;
     background: rgba(10, 5, 25, 0.78);
-    border-top: 1px solid rgba(190, 155, 255, 0.18);
+    border-top: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
     flex-shrink: 0;
 }
 .ticket-chat-input-wrap {
@@ -4307,14 +4311,14 @@ mark.receipt-highlight {
     display: flex;
     flex-direction: column;
     background: rgba(7, 3, 20, 0.75);
-    border: 1px solid rgba(190, 155, 255, 0.22);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
     border-radius: 14px;
     padding: 0.55rem 0.9rem 0.35rem;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .ticket-chat-input-wrap:focus-within {
-    border-color: rgba(124, 77, 255, 0.55);
-    box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.18);
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55);
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18);
 }
 .ticket-chat-input {
     width: 100%;
@@ -4355,12 +4359,12 @@ mark.receipt-highlight {
     font-size: 0.88rem;
     cursor: pointer;
     transition: all 0.15s ease;
-    box-shadow: 0 6px 18px rgba(124, 77, 255, 0.35);
+    box-shadow: 0 6px 18px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
     flex-shrink: 0;
 }
 .ticket-chat-send:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 10px 24px rgba(124, 77, 255, 0.5);
+    box-shadow: 0 10px 24px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.5);
 }
 .ticket-chat-send:disabled {
     opacity: 0.5;
@@ -4592,7 +4596,7 @@ mark.receipt-highlight {
     margin-bottom: 0.5rem;
     padding: 1.05rem 1.2rem 1.15rem;
     border-radius: 20px;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.16));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(var(--border-rgb, 190, 155, 255), 0.16));
     background:
         linear-gradient(145deg,
             color-mix(in srgb, var(--pane-accent) 10%, rgba(14, 8, 34, 0.72)) 0%,
@@ -4619,7 +4623,7 @@ mark.receipt-highlight {
 }
 #serverPaneWelcome .greeting-hero__subtitle code {
     background: rgba(12, 6, 30, 0.65);
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(190, 155, 255, 0.22));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(var(--border-rgb, 190, 155, 255), 0.22));
     border-radius: 6px;
     padding: 0.08rem 0.42rem;
     color: color-mix(in srgb, var(--pane-accent) 72%, #ffffff);
@@ -4711,12 +4715,12 @@ mark.receipt-highlight {
     padding: 0.85rem 0.95rem;
     border-radius: 14px;
     cursor: pointer;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 20%, rgba(190, 155, 255, 0.14));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 20%, rgba(var(--border-rgb, 190, 155, 255), 0.14));
     background: rgba(6, 3, 18, 0.48);
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 #serverPaneWelcome .greeting-style-option:hover {
-    border-color: color-mix(in srgb, var(--pane-accent) 42%, rgba(190, 155, 255, 0.28));
+    border-color: color-mix(in srgb, var(--pane-accent) 42%, rgba(var(--border-rgb, 190, 155, 255), 0.28));
     background: rgba(8, 4, 24, 0.62);
 }
 #serverPaneWelcome .greeting-style-option input {
@@ -4727,7 +4731,7 @@ mark.receipt-highlight {
     height: 16px;
 }
 #serverPaneWelcome .greeting-style-option:has(input:checked) {
-    border-color: color-mix(in srgb, var(--pane-accent) 55%, rgba(190, 155, 255, 0.35));
+    border-color: color-mix(in srgb, var(--pane-accent) 55%, rgba(var(--border-rgb, 190, 155, 255), 0.35));
     background: color-mix(in srgb, var(--pane-accent) 12%, rgba(8, 4, 22, 0.82));
     box-shadow:
         0 0 0 1px color-mix(in srgb, var(--pane-accent) 25%, transparent),
@@ -4753,7 +4757,7 @@ mark.receipt-highlight {
 #serverPaneWelcome #welcomeCardColorFields.greeting-card__body-card-extra {
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid color-mix(in srgb, var(--pane-accent) 16%, rgba(190, 155, 255, 0.12));
+    border-top: 1px solid color-mix(in srgb, var(--pane-accent) 16%, rgba(var(--border-rgb, 190, 155, 255), 0.12));
 }
 #serverPaneWelcome .greeting-toggle-row {
     display: grid !important;
@@ -4764,12 +4768,12 @@ mark.receipt-highlight {
 #serverPaneWelcome .greeting-toggle-card {
     padding: 0.48rem 0.6rem;
     border-radius: 12px;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(190, 155, 255, 0.12));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(var(--border-rgb, 190, 155, 255), 0.12));
     background: rgba(6, 3, 18, 0.42);
     transition: border-color 0.18s ease, background 0.18s ease;
 }
 #serverPaneWelcome .greeting-toggle-card:hover {
-    border-color: color-mix(in srgb, var(--pane-accent) 32%, rgba(190, 155, 255, 0.2));
+    border-color: color-mix(in srgb, var(--pane-accent) 32%, rgba(var(--border-rgb, 190, 155, 255), 0.2));
     background: rgba(8, 4, 22, 0.55);
 }
 #serverPaneWelcome .greeting-toggle-card .greeting-toggle {
@@ -4804,13 +4808,13 @@ mark.receipt-highlight {
 #serverPaneWelcome .greeting-card--media {
     border-style: solid !important;
     border-width: 1px !important;
-    border-color: color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.18)) !important;
+    border-color: color-mix(in srgb, var(--pane-accent) 22%, rgba(var(--border-rgb, 190, 155, 255), 0.18)) !important;
 }
 #serverPaneWelcome .greeting-actions-bar {
     margin-top: 0.35rem !important;
     padding: 1.05rem 1.2rem !important;
     border-radius: 18px !important;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 26%, rgba(190, 155, 255, 0.2)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 26%, rgba(var(--border-rgb, 190, 155, 255), 0.2)) !important;
     background:
         linear-gradient(180deg,
             color-mix(in srgb, var(--pane-accent) 8%, rgba(12, 6, 30, 0.75)) 0%,
@@ -4872,7 +4876,7 @@ mark.receipt-highlight {
     position: relative;
     background:
         linear-gradient(180deg, rgba(24, 14, 54, 0.85), rgba(14, 7, 32, 0.92)) !important;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(190, 155, 255, 0.16)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(var(--border-rgb, 190, 155, 255), 0.16)) !important;
     border-radius: 18px !important;
     padding: 1.3rem !important;
     box-shadow:
@@ -4882,7 +4886,7 @@ mark.receipt-highlight {
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-editor:hover,
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-preview-panel:hover {
-    border-color: color-mix(in srgb, var(--pane-accent) 38%, rgba(190, 155, 255, 0.25));
+    border-color: color-mix(in srgb, var(--pane-accent) 38%, rgba(var(--border-rgb, 190, 155, 255), 0.25));
     box-shadow:
         0 26px 54px rgba(6, 2, 20, 0.55),
         0 0 0 1px color-mix(in srgb, var(--pane-accent) 18%, transparent) inset;
@@ -4913,7 +4917,7 @@ mark.receipt-highlight {
     font-weight: 800 !important;
     padding: 0.3rem 0.7rem;
     background: color-mix(in srgb, var(--pane-accent) 12%, rgba(7, 3, 20, 0.5));
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(190, 155, 255, 0.2));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(var(--border-rgb, 190, 155, 255), 0.2));
     border-radius: 999px;
     margin-bottom: 0.55rem !important;
 }
@@ -4981,7 +4985,7 @@ mark.receipt-highlight {
     padding: 1rem !important;
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--pane-accent) 6%, rgba(12, 6, 30, 0.5)), rgba(12, 6, 30, 0.7)) !important;
-    border: 1px dashed color-mix(in srgb, var(--pane-accent) 35%, rgba(190, 155, 255, 0.2)) !important;
+    border: 1px dashed color-mix(in srgb, var(--pane-accent) 35%, rgba(var(--border-rgb, 190, 155, 255), 0.2)) !important;
     border-radius: 14px !important;
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-image-editor h4 {
@@ -4998,7 +5002,7 @@ mark.receipt-highlight {
     padding: 1rem !important;
     border-radius: 14px !important;
     background: rgba(4, 2, 14, 0.45) !important;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.15)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(var(--border-rgb, 190, 155, 255), 0.15)) !important;
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-visual-head {
     display: flex;
@@ -5022,7 +5026,7 @@ mark.receipt-highlight {
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .welcome-crop-preset-btn {
     appearance: none;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 35%, rgba(190, 155, 255, 0.25));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 35%, rgba(var(--border-rgb, 190, 155, 255), 0.25));
     background: rgba(10, 6, 28, 0.75);
     color: #e8e0ff;
     font-size: 0.72rem;
@@ -5139,7 +5143,7 @@ mark.receipt-highlight {
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .greeting-tabs {
     padding: 0.35rem !important;
     background: rgba(7, 3, 20, 0.5) !important;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.15)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(var(--border-rgb, 190, 155, 255), 0.15)) !important;
     border-radius: 14px !important;
     margin-bottom: 1rem !important;
 }
@@ -5192,7 +5196,7 @@ mark.receipt-highlight {
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control {
     background: rgba(10, 5, 24, 0.78) !important;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 16%, rgba(190, 155, 255, 0.18)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 16%, rgba(var(--border-rgb, 190, 155, 255), 0.18)) !important;
     color: #f4eeff !important;
     border-radius: 12px !important;
     padding: 0.72rem 0.95rem !important;
@@ -5203,7 +5207,7 @@ mark.receipt-highlight {
     color: #7a689c !important;
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control:hover {
-    border-color: color-mix(in srgb, var(--pane-accent) 32%, rgba(190, 155, 255, 0.25)) !important;
+    border-color: color-mix(in srgb, var(--pane-accent) 32%, rgba(var(--border-rgb, 190, 155, 255), 0.25)) !important;
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control:focus,
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .form-control:focus-visible {
@@ -5258,7 +5262,7 @@ mark.receipt-highlight {
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-ghost,
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage) .btn-secondary {
     background: rgba(12, 6, 30, 0.6) !important;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(190, 155, 255, 0.25)) !important;
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 22%, rgba(var(--border-rgb, 190, 155, 255), 0.25)) !important;
     color: #f4eeff !important;
     border-radius: 12px !important;
     padding: 0.65rem 1.1rem !important;
@@ -5346,7 +5350,7 @@ mark.receipt-highlight {
 #serverPaneModeration .member-item {
     background:
         linear-gradient(180deg, rgba(24, 14, 54, 0.7), rgba(14, 7, 32, 0.85)) !important;
-    border: 1px solid rgba(190, 155, 255, 0.15) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.15) !important;
     border-radius: 14px !important;
     padding: 0.9rem 1rem !important;
     transition: all 0.18s ease !important;
@@ -5363,7 +5367,7 @@ mark.receipt-highlight {
     transition: opacity 0.18s ease;
 }
 #serverPaneModeration .member-item:hover {
-    border-color: color-mix(in srgb, var(--pane-accent) 40%, rgba(190, 155, 255, 0.3)) !important;
+    border-color: color-mix(in srgb, var(--pane-accent) 40%, rgba(var(--border-rgb, 190, 155, 255), 0.3)) !important;
     transform: translateX(4px) !important;
     box-shadow: 0 10px 26px rgba(6, 2, 20, 0.45), 0 0 0 1px color-mix(in srgb, var(--pane-accent) 18%, transparent) !important;
 }
@@ -5418,14 +5422,14 @@ mark.receipt-highlight {
     box-shadow: 0 6px 18px rgba(239, 68, 68, 0.35) !important;
 }
 #serverPaneModeration .btn-timeout {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.08)) !important;
-    border: 1px solid rgba(139, 92, 246, 0.4) !important;
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 139, 92, 246), 0.2), rgba(var(--accent-primary-rgb, 139, 92, 246), 0.08)) !important;
+    border: 1px solid rgba(var(--accent-primary-rgb, 139, 92, 246), 0.4) !important;
     color: #c4b0ff !important;
 }
 #serverPaneModeration .btn-timeout:hover {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.35), rgba(139, 92, 246, 0.2)) !important;
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 139, 92, 246), 0.35), rgba(var(--accent-primary-rgb, 139, 92, 246), 0.2)) !important;
     border-color: #8b5cf6 !important;
-    box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35) !important;
+    box-shadow: 0 6px 18px rgba(var(--accent-primary-rgb, 139, 92, 246), 0.35) !important;
 }
 
 /* --- Scrollbars personalizados dentro de los panes ----------------- */
@@ -5532,7 +5536,7 @@ mark.receipt-highlight {
 .fg-section {
     position: relative;
     padding: 1.3rem !important;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(190, 155, 255, 0.16));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(var(--border-rgb, 190, 155, 255), 0.16));
     border-radius: 18px;
     background: linear-gradient(180deg, rgba(24, 14, 54, 0.85), rgba(14, 7, 32, 0.92));
     box-shadow: 0 18px 38px rgba(6, 2, 20, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -5723,7 +5727,7 @@ mark.receipt-highlight {
     padding: 0.65rem 1rem;
     border-radius: 12px;
     background: rgba(12, 6, 30, 0.6);
-    border: 1px solid rgba(190, 155, 255, 0.2);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
     color: #b7a7d6;
     cursor: pointer;
     font-weight: 700;
@@ -5742,7 +5746,7 @@ mark.receipt-highlight {
     flex-shrink: 0;
 }
 .fg-source-chip:hover {
-    border-color: rgba(190, 155, 255, 0.4);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.4);
     color: #f4eeff;
     transform: translateY(-1px);
 }
@@ -5770,7 +5774,7 @@ mark.receipt-highlight {
     height: 42px;
     padding: 2px;
     border-radius: 10px;
-    border: 1px solid rgba(190, 155, 255, 0.3);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.3);
     background: rgba(12, 6, 30, 0.6);
     cursor: pointer;
 }
@@ -5837,7 +5841,7 @@ mark.receipt-highlight {
 .fg-preview {
     position: relative;
     padding: 1.3rem;
-    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(190, 155, 255, 0.16));
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 18%, rgba(var(--border-rgb, 190, 155, 255), 0.16));
     border-radius: 18px;
     background: linear-gradient(180deg, rgba(24, 14, 54, 0.85), rgba(14, 7, 32, 0.92));
     box-shadow: 0 18px 38px rgba(6, 2, 20, 0.4);
@@ -5912,7 +5916,7 @@ mark.receipt-highlight {
     display: flex;
     flex-direction: column;
     background: linear-gradient(180deg, rgba(14, 7, 32, 0.9), rgba(9, 4, 22, 0.95));
-    border: 1px solid rgba(190, 155, 255, 0.18);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
     border-radius: 14px;
     overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -5924,7 +5928,7 @@ mark.receipt-highlight {
 }
 .fg-card:hover {
     transform: translateY(-4px);
-    border-color: rgba(190, 155, 255, 0.35);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.35);
     box-shadow: 0 20px 40px rgba(6, 2, 20, 0.5);
 }
 .fg-card--epic:hover {
@@ -6091,7 +6095,7 @@ mark.receipt-highlight {
     padding: 0.3rem 0.55rem;
     border-radius: 8px;
     background: rgba(12, 6, 30, 0.6);
-    border: 1px solid rgba(190, 155, 255, 0.18);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
     color: #b7a7d6;
     font-size: 0.72rem;
     font-weight: 600;
@@ -6121,8 +6125,8 @@ mark.receipt-highlight {
 .fg-tag {
     padding: 0.18rem 0.5rem;
     border-radius: 6px;
-    background: rgba(124, 77, 255, 0.12);
-    border: 1px solid rgba(124, 77, 255, 0.25);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12);
+    border: 1px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.25);
     color: #c4b0ff;
     font-size: 0.68rem;
     font-weight: 600;
@@ -6553,8 +6557,8 @@ mark.receipt-highlight {
     gap: 0.35rem;
     padding: 0.35rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.55);
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.55);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
@@ -6579,14 +6583,14 @@ mark.receipt-highlight {
 }
 
 .levels-tab:hover {
-    background: rgba(154, 109, 255, 0.1);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.1);
     color: var(--text-primary);
 }
 
 .levels-tab.is-active {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.35), rgba(255, 120, 209, 0.2));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.2));
     color: var(--white);
-    box-shadow: 0 4px 14px rgba(124, 77, 255, 0.3);
+    box-shadow: 0 4px 14px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3);
 }
 
 .levels-tab-panel {
@@ -6610,7 +6614,7 @@ mark.receipt-highlight {
     padding: 1.25rem 1.4rem;
     border-radius: 16px;
     background: rgba(21, 12, 38, 0.7);
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
 }
 
 .levels-section-head {
@@ -6645,15 +6649,15 @@ mark.receipt-highlight {
     gap: 0.8rem;
     padding: 0.9rem 1rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.6);
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.6);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     cursor: pointer;
     transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .levels-toggle:hover {
-    border-color: rgba(190, 155, 255, 0.38);
-    background: rgba(30, 18, 54, 0.75);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.38);
+    background: rgba(var(--bg-card-rgb, 30, 18, 54), 0.75);
 }
 
 .levels-toggle input {
@@ -6667,8 +6671,8 @@ mark.receipt-highlight {
     width: 42px;
     height: 24px;
     border-radius: 999px;
-    background: rgba(154, 109, 255, 0.18);
-    border: 1px solid rgba(154, 109, 255, 0.3);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.3);
     transition: background 0.2s ease, border-color 0.2s ease;
     flex-shrink: 0;
 }
@@ -6688,7 +6692,7 @@ mark.receipt-highlight {
 
 .levels-toggle input:checked + .levels-toggle-switch {
     background: linear-gradient(135deg, var(--iris-500), var(--fuchsia));
-    border-color: rgba(255, 120, 209, 0.5);
+    border-color: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.5);
 }
 
 .levels-toggle input:checked + .levels-toggle-switch::after {
@@ -6750,13 +6754,13 @@ mark.receipt-highlight {
     gap: 0;
     border-radius: 10px;
     overflow: hidden;
-    border: 1px solid rgba(154, 109, 255, 0.25);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.25);
     background: rgba(20, 11, 42, 0.55);
     transition: border-color 0.18s ease;
 }
 
 .levels-input-with-suffix:focus-within {
-    border-color: rgba(190, 155, 255, 0.6);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.6);
 }
 
 .levels-input-with-suffix input {
@@ -6772,8 +6776,8 @@ mark.receipt-highlight {
     padding: 0 0.85rem;
     font-size: 0.8rem;
     color: var(--text-muted);
-    background: rgba(154, 109, 255, 0.08);
-    border-left: 1px solid rgba(154, 109, 255, 0.2);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.08);
+    border-left: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
     white-space: nowrap;
 }
 
@@ -6783,7 +6787,7 @@ mark.receipt-highlight {
     background: linear-gradient(180deg, rgba(20, 11, 42, 0.6), rgba(15, 8, 34, 0.9));
     border-radius: 12px;
     padding: 0.75rem;
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     max-height: min(45vh, 480px);
     overflow-y: auto;
     overflow-x: hidden;
@@ -6791,7 +6795,7 @@ mark.receipt-highlight {
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+    scrollbar-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.45) rgba(20, 11, 42, 0.35);
 }
 
 .levels-curve-wrap::-webkit-scrollbar {
@@ -6804,7 +6808,7 @@ mark.receipt-highlight {
 }
 
 .levels-curve-wrap::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    background: linear-gradient(180deg, rgba(var(--accent-primary-rgb, 154, 109, 255), 0.6), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.45));
     border-radius: 999px;
     border: 2px solid rgba(20, 11, 42, 0.45);
 }
@@ -6819,7 +6823,7 @@ mark.receipt-highlight {
     padding-right: 0.1rem;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+    scrollbar-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.45) rgba(20, 11, 42, 0.35);
     border-radius: 12px;
 }
 
@@ -6833,7 +6837,7 @@ mark.receipt-highlight {
 }
 
 #levelsTierLadderWrap::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    background: linear-gradient(180deg, rgba(var(--accent-primary-rgb, 154, 109, 255), 0.6), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.45));
     border-radius: 999px;
     border: 2px solid rgba(20, 11, 42, 0.45);
 }
@@ -6845,7 +6849,7 @@ mark.receipt-highlight {
 }
 
 .levels-curve-grid {
-    stroke: rgba(154, 109, 255, 0.12);
+    stroke: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.12);
     stroke-dasharray: 3 4;
     stroke-width: 1;
 }
@@ -6866,8 +6870,8 @@ mark.receipt-highlight {
 .levels-milestone-card {
     padding: 0.9rem 1rem;
     border-radius: 12px;
-    background: rgba(26, 16, 48, 0.7);
-    border: 1px solid rgba(154, 109, 255, 0.2);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.7);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -6876,7 +6880,7 @@ mark.receipt-highlight {
 
 .levels-milestone-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 155, 255, 0.45);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.45);
 }
 
 .levels-milestone-level {
@@ -6911,8 +6915,8 @@ mark.receipt-highlight {
     gap: 0.25rem;
     padding: 0.2rem 0.5rem;
     border-radius: 999px;
-    background: rgba(154, 109, 255, 0.1);
-    border: 1px solid rgba(154, 109, 255, 0.2);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.1);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
 }
 
 /* ---- Rewards ---- */
@@ -6929,13 +6933,13 @@ mark.receipt-highlight {
     align-items: center;
     padding: 0.9rem 1rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.75);
-    border: 1px solid rgba(154, 109, 255, 0.2);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.75);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
     transition: border-color 0.18s ease, transform 0.18s ease, opacity 0.2s ease;
 }
 
 .level-reward-card:hover {
-    border-color: rgba(190, 155, 255, 0.4);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.4);
 }
 
 .level-reward-card.is-entering {
@@ -7031,15 +7035,15 @@ mark.receipt-highlight {
     gap: 0.9rem;
     padding: 1.2rem 1.3rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.5);
-    border: 1px dashed rgba(154, 109, 255, 0.3);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.5);
+    border: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.3);
 }
 
 .levels-empty-icon {
     width: 50px;
     height: 50px;
     border-radius: 12px;
-    background: rgba(154, 109, 255, 0.15);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.15);
     color: var(--iris-300);
     display: inline-flex;
     align-items: center;
@@ -7086,8 +7090,8 @@ mark.receipt-highlight {
     align-items: center;
     padding: 1rem 0.8rem 1.2rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.75);
-    border: 1px solid rgba(154, 109, 255, 0.25);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.75);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.25);
     text-align: center;
     gap: 0.35rem;
     position: relative;
@@ -7107,7 +7111,7 @@ mark.receipt-highlight {
     order: 2;
     padding-top: 1.4rem;
     padding-bottom: 1.5rem;
-    background: linear-gradient(160deg, rgba(255, 205, 100, 0.12), rgba(26, 16, 48, 0.85));
+    background: linear-gradient(160deg, rgba(255, 205, 100, 0.12), rgba(var(--bg-card-rgb, 26, 16, 48), 0.85));
     border-color: rgba(255, 205, 100, 0.45);
     box-shadow: 0 10px 30px rgba(255, 205, 100, 0.15);
     transform: translateY(-6px);
@@ -7115,13 +7119,13 @@ mark.receipt-highlight {
 
 .levels-podium-slot--second {
     order: 1;
-    background: linear-gradient(160deg, rgba(200, 210, 225, 0.1), rgba(26, 16, 48, 0.85));
+    background: linear-gradient(160deg, rgba(200, 210, 225, 0.1), rgba(var(--bg-card-rgb, 26, 16, 48), 0.85));
     border-color: rgba(200, 210, 225, 0.4);
 }
 
 .levels-podium-slot--third {
     order: 3;
-    background: linear-gradient(160deg, rgba(205, 127, 50, 0.12), rgba(26, 16, 48, 0.85));
+    background: linear-gradient(160deg, rgba(205, 127, 50, 0.12), rgba(var(--bg-card-rgb, 26, 16, 48), 0.85));
     border-color: rgba(205, 127, 50, 0.4);
 }
 
@@ -7196,8 +7200,8 @@ mark.receipt-highlight {
     font-size: 0.85rem;
     text-align: center;
     border-radius: 12px;
-    background: rgba(26, 16, 48, 0.4);
-    border: 1px dashed rgba(154, 109, 255, 0.2);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.4);
+    border: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
 }
 
 .levels-rank-row {
@@ -7206,14 +7210,14 @@ mark.receipt-highlight {
     gap: 0.85rem;
     padding: 0.75rem 0.95rem;
     border-radius: 12px;
-    background: rgba(26, 16, 48, 0.55);
-    border: 1px solid rgba(154, 109, 255, 0.15);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.55);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.15);
     transition: transform 0.18s ease, border-color 0.18s ease;
 }
 
 .levels-rank-row:hover {
     transform: translateX(2px);
-    border-color: rgba(190, 155, 255, 0.35);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.35);
 }
 
 .levels-rank-number {
@@ -7271,8 +7275,8 @@ mark.receipt-highlight {
     font-weight: 700;
     padding: 0.2rem 0.5rem;
     border-radius: 999px;
-    background: rgba(154, 109, 255, 0.18);
-    border: 1px solid rgba(154, 109, 255, 0.3);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.3);
     color: var(--iris-300);
     flex-shrink: 0;
     letter-spacing: 0.04em;
@@ -7281,7 +7285,7 @@ mark.receipt-highlight {
 .levels-rank-progress {
     width: 100%;
     height: 5px;
-    background: rgba(154, 109, 255, 0.14);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.14);
     border-radius: 999px;
     overflow: hidden;
 }
@@ -7411,8 +7415,8 @@ mark.receipt-highlight {
     text-align: left;
     padding: 0.95rem 1rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.75);
-    border: 1px solid rgba(154, 109, 255, 0.22);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.75);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.22);
     cursor: pointer;
     color: var(--text-primary);
     display: flex;
@@ -7423,14 +7427,14 @@ mark.receipt-highlight {
 
 .levels-preset:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 155, 255, 0.45);
-    background: rgba(30, 18, 54, 0.85);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.45);
+    background: rgba(var(--bg-card-rgb, 30, 18, 54), 0.85);
 }
 
 .levels-preset.is-active {
-    border-color: rgba(255, 120, 209, 0.55);
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.18), rgba(255, 120, 209, 0.14));
-    box-shadow: 0 6px 20px rgba(124, 77, 255, 0.25);
+    border-color: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.55);
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14));
+    box-shadow: 0 6px 20px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.25);
 }
 
 .levels-preset-head {
@@ -7451,7 +7455,7 @@ mark.receipt-highlight {
     height: 8px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--iris-400), var(--fuchsia));
-    box-shadow: 0 0 10px rgba(255, 120, 209, 0.6);
+    box-shadow: 0 0 10px rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.6);
 }
 
 .levels-preset-values {
@@ -7470,7 +7474,7 @@ mark.receipt-highlight {
 /* ---- Tier badge (chip) ---- */
 .levels-tier-badge {
     --tier-color: #9a6dff;
-    --tier-accent: rgba(154, 109, 255, 0.5);
+    --tier-accent: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.5);
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
@@ -7487,7 +7491,7 @@ mark.receipt-highlight {
 
 @supports not (background: color-mix(in srgb, red, blue)) {
     .levels-tier-badge {
-        background: rgba(154, 109, 255, 0.14);
+        background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.14);
     }
 }
 
@@ -7518,7 +7522,7 @@ mark.receipt-highlight {
 
 .levels-tier-card {
     --tier-color: #9a6dff;
-    --tier-accent: rgba(154, 109, 255, 0.5);
+    --tier-accent: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.5);
     display: grid;
     grid-template-columns: auto 1fr auto;
     gap: 0.9rem;
@@ -7526,7 +7530,7 @@ mark.receipt-highlight {
     padding: 0.85rem 1rem;
     border-radius: 14px;
     background: linear-gradient(135deg,
-        color-mix(in srgb, var(--tier-color) 12%, rgba(26, 16, 48, 0.85)),
+        color-mix(in srgb, var(--tier-color) 12%, rgba(var(--bg-card-rgb, 26, 16, 48), 0.85)),
         rgba(20, 11, 42, 0.9)
     );
     border: 1px solid var(--tier-accent);
@@ -7538,7 +7542,7 @@ mark.receipt-highlight {
 
 @supports not (background: color-mix(in srgb, red, blue)) {
     .levels-tier-card {
-        background: rgba(26, 16, 48, 0.85);
+        background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.85);
     }
 }
 
@@ -7573,7 +7577,7 @@ mark.receipt-highlight {
 
 @supports not (background: color-mix(in srgb, red, blue)) {
     .levels-tier-card-icon {
-        background: rgba(154, 109, 255, 0.15);
+        background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.15);
     }
 }
 
@@ -7808,9 +7812,9 @@ mark.receipt-highlight {
     border-radius: 999px;
     font-size: 0.78rem;
     font-weight: 700;
-    background: rgba(154, 109, 255, 0.15);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.15);
     color: var(--iris-300);
-    border: 1px solid rgba(154, 109, 255, 0.32);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.32);
 }
 
 .dpx-status-chip.is-on {
@@ -7845,8 +7849,8 @@ mark.receipt-highlight {
     overflow: hidden;
     padding: 1.05rem 1.15rem;
     border-radius: 16px;
-    background: rgba(26, 16, 48, 0.65);
-    border: 1px solid rgba(154, 109, 255, 0.22);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.65);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.22);
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -7865,7 +7869,7 @@ mark.receipt-highlight {
 
 .dpx-stat-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 155, 255, 0.4);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.4);
 }
 
 .dpx-stat-label {
@@ -7898,9 +7902,9 @@ mark.receipt-highlight {
     border-radius: 999px;
     font-size: 0.74rem;
     font-weight: 700;
-    background: rgba(154, 109, 255, 0.18);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     color: var(--iris-300);
-    border: 1px solid rgba(154, 109, 255, 0.35);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.35);
 }
 
 .dpx-stat-pill.is-on {
@@ -7921,8 +7925,8 @@ mark.receipt-highlight {
     gap: 0.35rem;
     padding: 0.35rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.55);
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.55);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
@@ -7988,14 +7992,14 @@ mark.receipt-highlight {
 }
 
 .dpx-tab:hover {
-    background: rgba(154, 109, 255, 0.1);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.1);
     color: var(--text-primary);
 }
 
 .dpx-tab.is-active {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.35), rgba(255, 120, 209, 0.2));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.2));
     color: var(--white);
-    box-shadow: 0 4px 14px rgba(124, 77, 255, 0.3);
+    box-shadow: 0 4px 14px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3);
 }
 
 .dpx-tab-panel {
@@ -8019,7 +8023,7 @@ mark.receipt-highlight {
     padding: 1.25rem 1.4rem;
     border-radius: 16px;
     background: rgba(21, 12, 38, 0.7);
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
 }
 
 .dpx-section-head {
@@ -8060,15 +8064,15 @@ mark.receipt-highlight {
     gap: 0.8rem;
     padding: 0.85rem 1rem;
     border-radius: 14px;
-    background: rgba(26, 16, 48, 0.6);
-    border: 1px solid rgba(154, 109, 255, 0.18);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.6);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
     cursor: pointer;
     transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .dpx-toggle:hover {
-    border-color: rgba(190, 155, 255, 0.38);
-    background: rgba(30, 18, 54, 0.75);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.38);
+    background: rgba(var(--bg-card-rgb, 30, 18, 54), 0.75);
 }
 
 .dpx-toggle input {
@@ -8082,8 +8086,8 @@ mark.receipt-highlight {
     width: 42px;
     height: 24px;
     border-radius: 999px;
-    background: rgba(154, 109, 255, 0.18);
-    border: 1px solid rgba(154, 109, 255, 0.3);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.3);
     transition: background 0.2s ease, border-color 0.2s ease;
     flex-shrink: 0;
 }
@@ -8103,7 +8107,7 @@ mark.receipt-highlight {
 
 .dpx-toggle input:checked + .dpx-toggle-switch {
     background: linear-gradient(135deg, var(--iris-500), var(--fuchsia));
-    border-color: rgba(255, 120, 209, 0.5);
+    border-color: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.5);
 }
 
 .dpx-toggle input:checked + .dpx-toggle-switch::after {
@@ -8178,7 +8182,7 @@ mark.receipt-highlight {
     gap: 0.55rem;
     margin-top: 1.1rem;
     padding-top: 0.95rem;
-    border-top: 1px dashed rgba(154, 109, 255, 0.2);
+    border-top: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
     justify-content: flex-end;
 }
 
@@ -8203,23 +8207,23 @@ mark.receipt-highlight {
     border-radius: 999px;
     font-size: 0.8rem;
     font-weight: 600;
-    background: rgba(26, 16, 48, 0.6);
-    border: 1px solid rgba(154, 109, 255, 0.22);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.6);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.22);
     color: var(--text-secondary);
     cursor: pointer;
     transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
 .dpx-chip:hover {
-    border-color: rgba(190, 155, 255, 0.4);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.4);
     color: var(--text-primary);
     transform: translateY(-1px);
 }
 
 .dpx-chip.is-on {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.3), rgba(255, 120, 209, 0.18));
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.18));
     color: var(--white);
-    border-color: rgba(190, 155, 255, 0.55);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.55);
 }
 
 /* Item card list (used by sources, rewards, etc.) */
@@ -8228,7 +8232,7 @@ mark.receipt-highlight {
     border-radius: 14px;
     padding: 1rem 1.1rem;
     background: rgba(20, 11, 42, 0.55);
-    border: 1px solid rgba(154, 109, 255, 0.2);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
     display: flex;
     flex-direction: column;
     gap: 0.7rem;
@@ -8236,7 +8240,7 @@ mark.receipt-highlight {
 }
 
 .dpx-item-card:hover {
-    border-color: rgba(190, 155, 255, 0.45);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.45);
 }
 
 .dpx-item-head {
@@ -8282,7 +8286,7 @@ mark.receipt-highlight {
     border-radius: 14px;
     text-align: center;
     background: rgba(20, 11, 42, 0.45);
-    border: 1px dashed rgba(154, 109, 255, 0.3);
+    border: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.3);
 }
 
 .dpx-empty-card h5 {
@@ -8308,8 +8312,8 @@ mark.receipt-highlight {
 .dpx-preview-card {
     padding: 1.1rem 1.2rem;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(26, 16, 48, 0.85), rgba(20, 11, 42, 0.95));
-    border: 1px solid rgba(154, 109, 255, 0.22);
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.85), rgba(20, 11, 42, 0.95));
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.22);
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
@@ -8333,7 +8337,7 @@ mark.receipt-highlight {
     gap: 0.5rem;
     font-size: 0.85rem;
     padding: 0.45rem 0;
-    border-bottom: 1px dashed rgba(154, 109, 255, 0.16);
+    border-bottom: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.16);
     color: var(--text-secondary);
 }
 
@@ -8354,7 +8358,7 @@ mark.receipt-highlight {
 /* Removable item button */
 .dpx-icon-btn {
     background: transparent;
-    border: 1px solid rgba(154, 109, 255, 0.25);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.25);
     color: var(--text-secondary);
     border-radius: 10px;
     padding: 0.35rem 0.65rem;
@@ -8377,8 +8381,8 @@ mark.receipt-highlight {
 .dpx-tip {
     border-radius: 14px;
     padding: 0.85rem 1rem;
-    background: rgba(124, 77, 255, 0.12);
-    border: 1px solid rgba(154, 109, 255, 0.28);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.28);
     color: var(--text-secondary);
     font-size: 0.85rem;
     line-height: 1.5;
@@ -8392,7 +8396,7 @@ mark.receipt-highlight {
     padding: 0.05rem 0.35rem;
     border-radius: 6px;
     background: rgba(20, 11, 42, 0.6);
-    border: 1px solid rgba(154, 109, 255, 0.2);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
     font-size: 0.8em;
 }
 
@@ -8419,9 +8423,9 @@ mark.receipt-highlight {
     gap: 0.4rem;
     padding: 0.3rem 0.65rem;
     border-radius: 999px;
-    background: rgba(154, 109, 255, 0.15);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.15);
     color: var(--lavender);
-    border: 1px solid rgba(154, 109, 255, 0.28);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.28);
     font-size: 0.75rem;
     font-weight: 600;
 }
@@ -8544,8 +8548,8 @@ mark.receipt-highlight {
 
 @supports not (background: color-mix(in srgb, red, blue)) {
     .levels-tier-role.is-set {
-        background: rgba(154, 109, 255, 0.14);
-        border-color: rgba(154, 109, 255, 0.4);
+        background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.14);
+        border-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.4);
     }
 }
 
@@ -8685,7 +8689,7 @@ mark.receipt-highlight {
     padding: 1rem;
     border-radius: 22px;
     background: linear-gradient(180deg, rgba(20, 11, 42, 0.9), rgba(14, 7, 30, 0.95));
-    border: 1px solid rgba(190, 155, 255, 0.42);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.42);
     box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
     display: flex;
     flex-direction: column;
@@ -8797,7 +8801,7 @@ mark.receipt-highlight {
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+    scrollbar-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.45) rgba(20, 11, 42, 0.35);
     padding-right: 0.15rem;
     display: flex;
     flex-direction: column;
@@ -8814,7 +8818,7 @@ mark.receipt-highlight {
 }
 
 .embed-builder-main::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    background: linear-gradient(180deg, rgba(var(--accent-primary-rgb, 154, 109, 255), 0.6), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.45));
     border-radius: 999px;
     border: 2px solid rgba(20, 11, 42, 0.45);
 }
@@ -8839,7 +8843,7 @@ mark.receipt-highlight {
     flex-direction: column;
     overflow: hidden;
     padding: 0.9rem 1rem 1rem;
-    border: 1px solid rgba(190, 155, 255, 0.28);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.28);
 }
 
 .embed-preview-hint {
@@ -8860,7 +8864,7 @@ mark.receipt-highlight {
     min-width: 0;
     max-height: none;
     border-radius: 14px;
-    border: 1px solid rgba(190, 155, 255, 0.34);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.34);
     background: rgba(10, 5, 20, 0.55);
     padding: 1rem;
     color: var(--text-secondary);
@@ -8873,20 +8877,20 @@ mark.receipt-highlight {
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: rgba(154, 109, 255, 0.45) rgba(20, 11, 42, 0.35);
+    scrollbar-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.45) rgba(20, 11, 42, 0.35);
 }
 
 .embed-panel .dpx-stat-card,
 .embed-panel .dpx-section,
 .embed-panel .dpx-tabs {
-    border-color: rgba(190, 155, 255, 0.34) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.34) !important;
 }
 
 .embed-panel .dpx-field .form-control,
 .embed-panel select.form-control,
 .embed-panel textarea.form-control {
     min-height: 38px;
-    border-color: rgba(190, 155, 255, 0.34);
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.34);
 }
 
 .embed-panel textarea.form-control {
@@ -8903,7 +8907,7 @@ mark.receipt-highlight {
 }
 
 .embed-preview-card .embed-preview::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(154, 109, 255, 0.6), rgba(255, 120, 209, 0.45));
+    background: linear-gradient(180deg, rgba(var(--accent-primary-rgb, 154, 109, 255), 0.6), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.45));
     border-radius: 999px;
     border: 2px solid rgba(20, 11, 42, 0.45);
 }
@@ -8930,7 +8934,7 @@ mark.receipt-highlight {
 .embed-preview-card .embed-placeholder svg {
     width: 34px;
     height: 34px;
-    color: rgba(154, 109, 255, 0.55);
+    color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.55);
 }
 
 .embed-preview-card .embed-placeholder p {
@@ -8961,7 +8965,7 @@ mark.receipt-highlight {
     margin-left: 0.45rem;
     padding: 0.1rem 0.5rem;
     border-radius: 999px;
-    background: rgba(154, 109, 255, 0.14);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.14);
     color: var(--lavender);
     font-size: 0.7rem;
     font-weight: 700;
@@ -8997,8 +9001,8 @@ mark.receipt-highlight {
     color: var(--text-muted);
     padding: 0.3rem 0.6rem;
     border-radius: 999px;
-    background: rgba(154, 109, 255, 0.12);
-    border: 1px solid rgba(154, 109, 255, 0.24);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.12);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.24);
 }
 
 .embed-fields-list:empty::before {
@@ -9006,8 +9010,8 @@ mark.receipt-highlight {
     display: block;
     padding: 1rem 1.1rem;
     border-radius: 12px;
-    background: rgba(154, 109, 255, 0.06);
-    border: 1px dashed rgba(154, 109, 255, 0.22);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.06);
+    border: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.22);
     color: var(--text-muted);
     font-size: 0.82rem;
     text-align: center;
@@ -9016,13 +9020,13 @@ mark.receipt-highlight {
 .embed-templates-actions .dpx-actions .btn { justify-content: center; }
 
 #resetEmbedBtn {
-    border-color: rgba(255, 120, 209, 0.45);
-    background: rgba(255, 120, 209, 0.08);
+    border-color: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.45);
+    background: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.08);
 }
 
 #resetEmbedBtn:hover {
-    border-color: rgba(255, 120, 209, 0.8);
-    background: rgba(255, 120, 209, 0.14);
+    border-color: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.8);
+    background: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14);
 }
 
 /* Color picker ajustado al nuevo sistema */
@@ -9185,7 +9189,7 @@ mark.receipt-highlight {
     padding: 0.45rem 0.55rem;
     border-radius: 10px;
     background: rgba(10, 5, 24, 0.55);
-    border: 1px solid rgba(190, 155, 255, 0.12);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
 }
 
 .chs-pill {
@@ -9232,7 +9236,7 @@ mark.receipt-highlight {
     padding: 2.5rem 1rem;
     color: #b7a7d6;
     border-radius: 16px;
-    border: 1px dashed rgba(190, 155, 255, 0.25);
+    border: 1px dashed rgba(var(--border-rgb, 190, 155, 255), 0.25);
     background: rgba(12, 6, 30, 0.35);
 }
 
@@ -9340,13 +9344,13 @@ body.wc-studio-open {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    background: rgba(124, 77, 255, 0.25);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.25);
     border-color: rgba(186, 147, 255, 0.45);
     color: #ede9fe;
 }
 
 .wc-studio__btn--accent:hover {
-    background: rgba(124, 77, 255, 0.38);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.38);
 }
 
 .wc-studio__btn.is-loading {
@@ -9437,13 +9441,13 @@ body.wc-studio-open {
 }
 
 .wc-studio__tool:hover {
-    background: rgba(124, 77, 255, 0.2);
-    border-color: rgba(124, 77, 255, 0.45);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2);
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45);
     color: #fff;
 }
 
 .wc-studio__tool.is-active {
-    background: rgba(124, 77, 255, 0.35);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
     border-color: rgba(160, 130, 255, 0.6);
     color: #fff;
 }
@@ -9476,7 +9480,7 @@ body.wc-studio-open {
 
 .wc-studio__side-btn {
     appearance: none;
-    border: 1px solid rgba(124, 77, 255, 0.45);
+    border: 1px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45);
     background: rgba(30, 22, 48, 0.85);
     color: #ede9fe;
     border-radius: 10px;
@@ -9488,7 +9492,7 @@ body.wc-studio-open {
 }
 
 .wc-studio__side-btn:hover {
-    background: rgba(124, 77, 255, 0.22);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22);
     border-color: rgba(196, 181, 253, 0.55);
 }
 
@@ -9809,12 +9813,12 @@ body.wc-studio-open {
 
 .wc-ctx__item:hover,
 .wc-ctx__item:focus-visible {
-    background: rgba(124, 77, 255, 0.28);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.28);
     outline: none;
 }
 
 .wc-ctx__item--accent {
-    background: rgba(124, 77, 255, 0.35);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
     font-weight: 600;
 }
 
@@ -9847,7 +9851,7 @@ body.wc-studio-open {
     min-width: 2.35rem;
     padding: 0.32rem 0.45rem;
     border-radius: 10px;
-    border: 1px solid rgba(124, 77, 255, 0.4);
+    border: 1px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4);
     background: rgba(20, 14, 40, 0.9);
     color: #e8e0ff;
     font: inherit;
@@ -9858,7 +9862,7 @@ body.wc-studio-open {
 }
 
 .wc-ctx__pill:hover {
-    background: rgba(124, 77, 255, 0.3);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3);
     border-color: rgba(196, 181, 253, 0.55);
 }
 
@@ -9882,7 +9886,7 @@ body.wc-studio-open {
 }
 
 .wc-ctx__mini:hover {
-    background: rgba(124, 77, 255, 0.35);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
 }
 
 .wc-ctx__foot {
@@ -10930,7 +10934,7 @@ body,
    ===================================================================== */
 .navbar {
     border-bottom: none !important;
-    box-shadow: 0 6px 18px rgba(2, 1, 8, 0.28) !important;
+    box-shadow: 0 6px 18px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.28) !important;
 }
 
 .navbar::after {
@@ -11074,7 +11078,7 @@ body {
         ) !important;
     backdrop-filter: blur(14px) saturate(165%) !important;
     -webkit-backdrop-filter: blur(14px) saturate(165%) !important;
-    box-shadow: 0 16px 40px rgba(2, 1, 8, 0.32) !important;
+    box-shadow: 0 16px 40px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.32) !important;
 }
 
 #serverSection .server-side-menu {
