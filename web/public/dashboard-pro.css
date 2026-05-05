@@ -10617,3 +10617,109 @@ body {
     background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22) !important;
     border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.42) !important;
 }
+
+/* =====================================================================
+   Fix continuidad visual: el fondo principal sostiene todas las pantallas
+   ===================================================================== */
+body,
+.main-content {
+    background-attachment: fixed !important;
+}
+
+.main-content,
+.section,
+.section > .container,
+#dashboard.section > .container,
+#serverSection.section > .container,
+#controlCenterSection.section > .container,
+#profileSettingsSection.section > .container,
+#embedSection.section > .container,
+#statsSection.section > .container,
+#logsSection.section > .container,
+#commandsSection.section > .container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Quitar "cortes" por radios y separación entre wrappers globales */
+.section > .container,
+#serverSection.section > .container {
+    border-radius: 0 !important;
+}
+
+/* Mantener paneles internos con glass suave, pero sin bloque opaco */
+.server-side-menu,
+.server-content-area,
+.server-pane-surface,
+.moderation-container,
+.server-info-container,
+.embed-panel,
+.settings-layout,
+.about-block,
+.stats-shell,
+.logs-shell,
+.commands-shell,
+.ticket-manage-container {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.24),
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.2)
+        ),
+        linear-gradient(
+            180deg,
+            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.035),
+            rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.022)
+        ) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
+}
+
+/* =====================================================================
+   Seamless final: sin cortes entre navbar, vistas y panel servidor
+   ===================================================================== */
+.navbar {
+    border-bottom: none !important;
+    box-shadow: 0 6px 18px rgba(2, 1, 8, 0.28) !important;
+}
+
+.navbar::after {
+    display: none !important;
+}
+
+.main-content {
+    padding-top: 0.8rem !important;
+}
+
+.section {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#serverSection.section {
+    height: auto !important;
+    min-height: calc(100vh - 76px) !important;
+    overflow: visible !important;
+}
+
+#serverSection.section > .container {
+    height: auto !important;
+    min-height: calc(100vh - 76px) !important;
+}
+
+.server-shell,
+.server-pane,
+.server-pane.active,
+.server-pane-surface,
+.server-content-area {
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+/* Quita la barra interna del panel derecho; usa scroll de página */
+.server-content-area {
+    overflow: visible !important;
+}
