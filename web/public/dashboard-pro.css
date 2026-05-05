@@ -10312,3 +10312,133 @@ body.wc-studio-open {
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container::after {
     display: none !important;
 }
+
+/* =====================================================================
+   Full-space fix: usar todo el lienzo sin recortes
+   ===================================================================== */
+#serverSection.section {
+    height: calc(100vh - 76px) !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+
+#serverSection.section > .container {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0.5rem 0.75rem 0.75rem !important;
+}
+
+.server-shell {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+.server-side-menu {
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+}
+
+.server-content-area {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+}
+
+.server-pane.active,
+.server-pane-surface,
+.moderation-container,
+.server-info-container {
+    min-height: 0 !important;
+}
+
+@media (max-width: 1024px) {
+    #serverSection.section {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #serverSection.section > .container {
+        height: auto !important;
+    }
+
+    .server-shell {
+        height: auto !important;
+    }
+
+    .server-side-menu,
+    .server-content-area {
+        height: auto !important;
+        overflow: visible !important;
+    }
+}
+
+/* =====================================================================
+   Fondo translúcido unificado adaptable al tema activo
+   ===================================================================== */
+:root {
+    --glass-bg-soft: linear-gradient(
+        180deg,
+        rgba(var(--accent-primary-rgb, 124, 77, 255), 0.07),
+        rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.04)
+    );
+    --glass-bg-panel: linear-gradient(
+        180deg,
+        rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.58),
+        rgba(var(--bg-primary-rgb, 10, 12, 26), 0.52)
+    );
+    --glass-border: rgba(var(--border-rgb, 190, 155, 255), 0.24);
+}
+
+body {
+    background:
+        radial-gradient(1200px 580px at 85% -12%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.16), transparent 58%),
+        radial-gradient(1000px 520px at 0% 8%, rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.12), transparent 55%),
+        linear-gradient(180deg, rgba(var(--bg-primary-rgb, 10, 12, 26), 0.94), rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.9)) !important;
+}
+
+.navbar,
+.main-content,
+.section,
+.section > .container,
+.server-shell,
+.server-content-area,
+.server-side-menu,
+.server-pane-surface,
+.moderation-container,
+.server-info-container,
+.embed-panel,
+.settings-layout,
+.about-block,
+.stats-shell,
+.logs-shell,
+.commands-shell,
+.ticket-manage-container {
+    background: var(--glass-bg-panel), var(--glass-bg-soft) !important;
+    border-color: var(--glass-border) !important;
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+.section > .container {
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+}
+
+.card,
+.modx-member-card,
+.modx-action-card,
+.greeting-card,
+.welcome-editor,
+.welcome-preview-panel,
+.ticket-manage-card,
+.chs-card,
+.dpx-section,
+.embed-preview,
+.fields-section {
+    background: var(--glass-bg-panel) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.22) !important;
+}
