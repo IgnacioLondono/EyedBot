@@ -1895,7 +1895,7 @@ function setupEventListeners() {
         saveState();
     });
     document.getElementById('channelSelect').addEventListener('change', saveState);
-    document.getElementById('previewBtn').addEventListener('click', updateEmbedPreview);
+    document.getElementById('previewBtn')?.addEventListener('click', updateEmbedPreview);
     document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
     document.getElementById('sendOwnerAttachmentBtn')?.addEventListener('click', sendOwnerAttachmentToChannel);
@@ -2860,48 +2860,12 @@ function initEmbedPanel() {
 }
 
 function updateEmbedStats() {
-    const guildSelect = document.getElementById('guildSelect');
-    const channelSelect = document.getElementById('channelSelect');
-    const templateSelect = document.getElementById('templateSelect');
     const fieldsContainer = document.getElementById('fieldsContainer');
-
-    const guildVal = document.getElementById('embedStatGuild');
-    const guildHint = document.getElementById('embedStatGuildHint');
-    const channelVal = document.getElementById('embedStatChannel');
-    const channelHint = document.getElementById('embedStatChannelHint');
-    const fieldsVal = document.getElementById('embedStatFields');
-    const templatesVal = document.getElementById('embedStatTemplates');
-
-    if (guildSelect && guildVal && guildHint) {
-        const opt = guildSelect.options[guildSelect.selectedIndex];
-        const name = guildSelect.value ? (opt?.textContent || '—') : '—';
-        guildVal.textContent = name.length > 28 ? `${name.slice(0, 28)}…` : name;
-        guildHint.textContent = guildSelect.value ? 'Servidor seleccionado' : 'Selecciona el servidor destino';
-    }
-
-    if (channelSelect && channelVal && channelHint) {
-        if (channelSelect.disabled || !channelSelect.value) {
-            channelVal.textContent = '—';
-            channelHint.textContent = channelSelect.disabled ? 'Primero elige servidor' : 'Selecciona un canal';
-        } else {
-            const opt = channelSelect.options[channelSelect.selectedIndex];
-            const name = opt?.textContent || '—';
-            channelVal.textContent = name.length > 28 ? `${name.slice(0, 28)}…` : name;
-            channelHint.textContent = 'Canal listo para enviar';
-        }
-    }
-
-    if (fieldsContainer && fieldsVal) {
+    if (fieldsContainer) {
         const count = fieldsContainer.querySelectorAll('.field-row, .field-entry, [data-embed-field]').length
             || fieldsContainer.children.length;
-        fieldsVal.innerHTML = `${count}<span class="dpx-stat-pill">/ 25</span>`;
         const fieldsUsage = document.getElementById('embedFieldsUsage');
-        if (fieldsUsage) fieldsUsage.textContent = `${count} / 25 campos usados`;
-    }
-
-    if (templateSelect && templatesVal) {
-        const realOptions = Array.from(templateSelect.options).filter((o) => o.value);
-        templatesVal.textContent = String(realOptions.length);
+        if (fieldsUsage) fieldsUsage.textContent = `${count} / 25 campos`;
     }
 }
 
@@ -3665,6 +3629,26 @@ function dpxRenderToggle({ id, checked = false, title = '', description = '', da
                 <span>${escapeHtml(description)}</span>
             </span>
         </label>
+    `;
+}
+
+function levelsRenderMainTabs(activeKey = 'config') {
+    const tabs = [
+        { key: 'config', label: 'Configuración', icon: 'gear' },
+        { key: 'curve', label: 'Progresión', icon: 'bolt' },
+        { key: 'rewards', label: 'Recompensas', icon: 'sparkles' },
+        { key: 'leaderboard', label: 'Leaderboard', icon: 'users' }
+    ];
+    const active = tabs.some((t) => t.key === activeKey) ? activeKey : tabs[0].key;
+    return `
+        <nav class="dpx-tabs levels-main-tabs" role="tablist">
+            ${tabs.map((tab) => `
+                <button type="button" class="dpx-tab ${tab.key === active ? 'is-active' : ''}" data-levels-tab="${escapeHtml(tab.key)}" role="tab">
+                    ${dpxIcon(tab.icon, 'dpx-tab-icon')}
+                    <span>${escapeHtml(tab.label)}</span>
+                </button>
+            `).join('')}
+        </nav>
     `;
 }
 
@@ -6170,8 +6154,9 @@ function renderTierLadder(difficulty, options = {}) {
 function renderLevelMilestones(difficulty, config) {
     const milestones = [5, 10, 25, 50].map((lvl) => {
         const info = levelingEstimateTimeToLevel(lvl, difficulty, config);
+        const tier = tierForLevel(lvl);
         return `
-            <div class="levels-milestone-card">
+            <div class="levels-milestone-card" style="--tier-color:${tier.color};--tier-accent:${tier.accent};">
                 <div class="levels-milestone-level">Nv ${lvl}</div>
                 <div class="levels-milestone-xp">${levelingFormatNumber(info.totalXp)} XP</div>
                 <div class="levels-milestone-estimates">
@@ -6198,9 +6183,10 @@ function renderLevelsStatsHeader(config, leaderboard, roles = []) {
     const tiersAssigned = Object.keys(roleMap).length;
     const stats = tierStatsFromLeaderboard(leaderboard);
     const avgLevelLabel = stats.avgLevel ? `Nv ${stats.avgLevel.toFixed(1)}` : 'Nv —';
+    const topTierResolved = topUser ? tierForLevel(topUser.level) : null;
 
     return `
-        <div class="levels-stats-grid">
+        <div class="levels-stats-grid dpx-stats-grid">
             <div class="levels-stat-card ${enabled ? 'is-active' : 'is-inactive'}">
                 <div class="levels-stat-label">Estado</div>
                 <div class="levels-stat-value">
@@ -6226,21 +6212,18 @@ function renderLevelsStatsHeader(config, leaderboard, roles = []) {
                 <div class="levels-stat-value">${levelingFormatNumber(totalUsers)}</div>
                 <div class="levels-stat-hint">${stats.avgLevel ? `Nivel promedio ${avgLevelLabel}` : 'Miembros con XP acumulado'}</div>
             </div>
-            <div class="levels-stat-card levels-stat-card--top">
+            <div class="levels-stat-card levels-stat-card--top${topTierResolved ? ' has-tier-accent' : ''}"${topTierResolved ? ` style="--tier-color:${topTierResolved.color};--tier-accent:${topTierResolved.accent};"` : ''}>
                 <div class="levels-stat-label">Top actual</div>
-                ${topUser ? (() => {
-                    const topTier = tierForLevel(topUser.level);
-                    return `
-                    <div class="levels-top-user" style="--tier-color:${topTier.color};">
+                ${topUser ? `
+                    <div class="levels-top-user" style="--tier-color:${topTierResolved.color};">
                         ${topUser.avatar ? `<img src="${topUser.avatar}" alt="avatar">` : `<div class="levels-top-user-placeholder">${(topUser.tag || 'U').charAt(0).toUpperCase()}</div>`}
                         <div>
                             <div class="levels-top-user-name">${escapeHtml(topUser.tag || topUser.username || 'Usuario')}</div>
                             <div class="levels-top-user-meta">Nv ${topUser.level} · ${levelingFormatNumber(topUser.xp)} XP</div>
-                            ${renderTierBadge(topTier, 'sm')}
+                            ${renderTierBadge(topTierResolved, 'sm')}
                         </div>
                     </div>
-                    `;
-                })() : `<div class="levels-stat-hint">Aún sin ranking</div>`}
+                    ` : `<div class="levels-stat-hint">Aún sin ranking</div>`}
             </div>
             <div class="levels-stat-card levels-stat-card--rewards">
                 <div class="levels-stat-label">Rangos con rol</div>
@@ -6369,34 +6352,32 @@ async function loadLevelsPanel(guildId) {
         const rewards = Array.isArray(config.roleRewards) ? config.roleRewards : [];
         const difficulty = levelingSanitizeDifficulty(config.difficulty || {});
 
-        container.innerHTML = `
-            <div class="levels-panel">
-                <div class="levels-panel-hero">
-                    <div class="levels-panel-hero-text">
-                        <div class="levels-panel-kicker">Sistema de progresión</div>
-                        <h3>Niveles y recompensas</h3>
-                        <p>Premia la actividad real de tu servidor con XP por mensajes y por tiempo en voz. Diseñado para que subir de nivel sea un logro, no una rutina.</p>
-                    </div>
-                    <div class="levels-panel-hero-actions">
-                        <button type="button" class="btn btn-secondary" id="levelsRefreshBtn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10"/><path d="M20.49 15a9 9 0 01-14.85 3.36L1 14"/></svg>
-                            Recargar
-                        </button>
-                        <button type="button" class="btn btn-primary" id="saveLevelingBtn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                            Guardar cambios
-                        </button>
-                    </div>
+        const levelsHeroHtml = dpxRenderHero({
+            kicker: 'Niveles',
+            title: 'Niveles y recompensas',
+            description: 'Premia la actividad real de tu servidor con XP por mensajes y por tiempo en voz. Diseñado para que subir de nivel sea un logro, no una rutina.',
+            actionsHtml: `
+                <span id="levelsHeroStatusChip" class="dpx-status-chip ${config.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${config.enabled ? 'Sistema activo' : 'Sistema inactivo'}</span>
+                <div class="levels-hero-buttons">
+                    <button type="button" class="btn btn-secondary" id="levelsRefreshBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10"/><path d="M20.49 15a9 9 0 01-14.85 3.36L1 14"/></svg>
+                        Recargar
+                    </button>
+                    <button type="button" class="btn btn-primary" id="saveLevelingBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Guardar cambios
+                    </button>
                 </div>
+            `
+        });
+
+        container.innerHTML = `
+            <div class="dpx-panel levels-panel">
+                ${levelsHeroHtml}
 
                 <div id="levelsStatsHeaderWrap">${renderLevelsStatsHeader(config, leaderboard, roles)}</div>
 
-                <div class="levels-tabs" role="tablist">
-                    <button type="button" class="levels-tab is-active" data-levels-tab="config" role="tab">Configuración</button>
-                    <button type="button" class="levels-tab" data-levels-tab="curve" role="tab">Progresión</button>
-                    <button type="button" class="levels-tab" data-levels-tab="rewards" role="tab">Recompensas</button>
-                    <button type="button" class="levels-tab" data-levels-tab="leaderboard" role="tab">Leaderboard</button>
-                </div>
+                ${levelsRenderMainTabs('config')}
 
                 <div class="levels-tab-panel is-active" data-levels-panel="config">
                     <input type="hidden" id="levelUpAnnounceChannelId" value="${escapeHtml(String(config.levelUpAnnounceChannelId || '').trim())}">
@@ -6673,7 +6654,7 @@ async function loadLevelsPanel(guildId) {
 }
 
 function bindLevelsTabs(container) {
-    const tabs = container.querySelectorAll('[data-levels-tab]');
+    const tabs = container.querySelectorAll('[data-levels-tab][role="tab"]');
     const panels = container.querySelectorAll('[data-levels-panel]');
 
     tabs.forEach((tab) => {
@@ -6722,6 +6703,14 @@ function refreshLevelsDerivedViews(container, initialConfig, context = {}) {
     if (milestonesWrap) milestonesWrap.innerHTML = renderLevelMilestones(difficulty, config);
     if (ladderWrap) ladderWrap.innerHTML = renderTierLadder(difficulty, { config, leaderboard, roles });
     if (statsWrap) statsWrap.innerHTML = renderLevelsStatsHeader(config, leaderboard, roles);
+
+    const heroChip = container.querySelector('#levelsHeroStatusChip');
+    if (heroChip) {
+        heroChip.classList.toggle('is-on', !!config.enabled);
+        heroChip.classList.toggle('is-off', !config.enabled);
+        heroChip.innerHTML = `<span class="dot"></span>${config.enabled ? 'Sistema activo' : 'Sistema inactivo'}`;
+    }
+
     if (presetsWrap) {
         presetsWrap.innerHTML = renderCurvePresets(difficulty);
         attachPresetHandlers(container, presetsWrap);
@@ -6748,7 +6737,8 @@ function bindLevelsCurveLive(container, initialConfig, context = {}) {
         container.querySelector('#levelingVoiceXp'),
         container.querySelector('#levelingEnabled'),
         container.querySelector('#levelingMessageEnabled'),
-        container.querySelector('#levelingVoiceEnabled')
+        container.querySelector('#levelingVoiceEnabled'),
+        container.querySelector('#levelingVoicePeers')
     ].filter(Boolean);
 
     otherInputs.forEach((input) => {

@@ -6342,83 +6342,22 @@ mark.receipt-highlight {
 /* ============================================================
    Sistema de niveles — panel rediseñado
    ============================================================ */
-.levels-panel {
-    display: flex;
+/* Panel de niveles: layout base en .dpx-panel; hero compartido con Tickets (.dpx-hero). */
+.levels-panel .dpx-hero-actions {
     flex-direction: column;
-    gap: 1.25rem;
-    color: var(--text-primary);
-}
-
-.levels-panel-hero {
-    display: flex;
     align-items: flex-end;
-    justify-content: space-between;
-    gap: 1.5rem;
-    padding: 1.5rem 1.75rem;
-    border-radius: 20px;
-    background:
-        radial-gradient(circle at top right, rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.22), transparent 60%),
-        radial-gradient(circle at bottom left, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.26), transparent 55%),
-        linear-gradient(135deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.93), rgba(var(--bg-primary-rgb, 10, 12, 26), 0.97));
-    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.32);
-    box-shadow: 0 18px 40px rgba(var(--bg-primary-rgb, 5, 2, 12), 0.5);
-    position: relative;
-    overflow: hidden;
+    gap: 0.65rem;
 }
 
-.levels-panel-hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, transparent 55%, rgba(255, 255, 255, 0.04) 70%, transparent 85%);
-    pointer-events: none;
-}
-
-.levels-panel-hero-text {
-    max-width: 60ch;
-    position: relative;
-    z-index: 1;
-}
-
-.levels-panel-kicker {
-    font-size: 0.72rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--iris-300);
-    font-weight: 700;
-    margin-bottom: 0.4rem;
-}
-
-.levels-panel-hero h3 {
-    font-size: 1.9rem;
-    margin: 0 0 0.45rem 0;
-    background: linear-gradient(135deg, var(--text-primary, #fff) 0%, var(--iris-300, #e6dcff) 58%, var(--fuchsia, #ff78d1) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-}
-
-.levels-panel-hero p {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-    line-height: 1.55;
-    margin: 0;
-}
-
-.levels-panel-hero-actions {
+.levels-hero-buttons {
     display: flex;
-    gap: 0.6rem;
     flex-wrap: wrap;
-    position: relative;
-    z-index: 1;
+    gap: 0.55rem;
+    justify-content: flex-end;
 }
 
-.levels-panel-hero-actions .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
+.levels-main-tabs {
+    width: 100%;
 }
 
 #saveLevelingBtn.is-loading {
@@ -6506,6 +6445,21 @@ mark.receipt-highlight {
     opacity: 0.92;
 }
 
+/* Tarjeta “Top actual”: franja y brillo acordes al rango del #1 */
+.levels-stat-card--top.has-tier-accent::before {
+    background: linear-gradient(180deg, var(--tier-color), transparent);
+    opacity: 0.9;
+}
+
+.levels-stat-card--top.has-tier-accent {
+    border-color: var(--tier-accent);
+    background-image: radial-gradient(ellipse 95% 75% at 92% -8%, var(--tier-color) 0%, transparent 52%);
+    background-color: rgba(var(--bg-card-rgb, 26, 16, 48), 0.72);
+    box-shadow:
+        0 4px 18px rgba(0, 0, 0, 0.24),
+        0 0 40px -14px var(--tier-color);
+}
+
 .levels-stat-sources {
     gap: 0.4rem;
 }
@@ -6569,48 +6523,7 @@ mark.receipt-highlight {
     color: var(--text-secondary);
 }
 
-/* ---- Tabs ---- */
-.levels-tabs {
-    display: flex;
-    gap: 0.35rem;
-    padding: 0.35rem;
-    border-radius: 14px;
-    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.55);
-    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-}
-
-.levels-tabs::-webkit-scrollbar {
-    height: 4px;
-}
-
-.levels-tab {
-    flex: 1 1 auto;
-    padding: 0.6rem 1rem;
-    border-radius: 10px;
-    background: transparent;
-    border: 0;
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.88rem;
-    cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease;
-    white-space: nowrap;
-}
-
-.levels-tab:hover {
-    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.1);
-    color: var(--text-primary);
-}
-
-.levels-tab.is-active {
-    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.2));
-    color: var(--white);
-    box-shadow: 0 4px 14px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.3);
-}
-
+/* ---- Tab panels (pestañas = .dpx-tab dentro de .levels-main-tabs) ---- */
 .levels-tab-panel {
     display: none;
     animation: levelsFadeIn 0.25s ease;
@@ -6631,8 +6544,8 @@ mark.receipt-highlight {
 .levels-section {
     padding: 1.25rem 1.4rem;
     border-radius: 16px;
-    background: rgba(21, 12, 38, 0.7);
-    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
+    background: rgba(var(--bg-card-rgb, 21, 12, 38), 0.72);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
 }
 
 .levels-section-head {
@@ -6888,17 +6801,20 @@ mark.receipt-highlight {
 .levels-milestone-card {
     padding: 0.9rem 1rem;
     border-radius: 12px;
-    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.7);
-    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.2);
+    background-color: rgba(var(--bg-card-rgb, 26, 16, 48), 0.72);
+    background-image: radial-gradient(ellipse 100% 90% at 96% -10%, var(--tier-color, transparent) 0%, transparent 52%);
+    border: 1px solid var(--tier-accent, rgba(var(--accent-primary-rgb, 154, 109, 255), 0.22));
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    transition: transform 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 28px -16px var(--tier-color, transparent);
 }
 
 .levels-milestone-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.45);
+    border-color: var(--tier-accent, rgba(var(--border-rgb, 190, 155, 255), 0.45));
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22), 0 0 36px -12px var(--tier-color, transparent);
 }
 
 .levels-milestone-level {
@@ -6906,7 +6822,7 @@ mark.receipt-highlight {
     text-transform: uppercase;
     letter-spacing: 0.12em;
     font-weight: 700;
-    color: var(--iris-300);
+    color: var(--tier-color, var(--iris-300));
 }
 
 .levels-milestone-xp {
@@ -7324,20 +7240,6 @@ mark.receipt-highlight {
 }
 
 /* ---- Mobile adaptations ---- */
-@media (max-width: 900px) {
-    .levels-panel-hero {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 1.25rem 1.25rem;
-    }
-    .levels-panel-hero h3 {
-        font-size: 1.55rem;
-    }
-    .levels-panel-hero-actions {
-        justify-content: flex-end;
-    }
-}
-
 @media (max-width: 720px) {
     .levels-stats-grid {
         grid-template-columns: 1fr 1fr;
@@ -7383,25 +7285,20 @@ mark.receipt-highlight {
     .levels-stat-card--diff {
         grid-column: auto;
     }
-    .levels-panel-hero {
-        padding: 1.1rem 1rem;
-    }
-    .levels-panel-hero h3 {
-        font-size: 1.35rem;
-    }
-    .levels-panel-hero-actions {
-        gap: 0.45rem;
-    }
-    .levels-panel-hero-actions .btn {
-        flex: 1;
-        justify-content: center;
-    }
     .levels-section {
         padding: 0.95rem 0.9rem;
     }
-    .levels-tab {
+    .levels-panel .dpx-tab {
         padding: 0.5rem 0.75rem;
         font-size: 0.82rem;
+    }
+    .levels-hero-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+    .levels-hero-buttons .btn {
+        width: 100%;
+        justify-content: center;
     }
     .level-reward-card {
         grid-template-columns: auto 1fr;
@@ -7502,14 +7399,17 @@ mark.receipt-highlight {
     font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--tier-color);
-    background: color-mix(in srgb, var(--tier-color) 15%, transparent);
+    background-color: rgba(255, 255, 255, 0.04);
+    background-image: radial-gradient(circle at 22% 35%, var(--tier-color) 0%, transparent 62%);
     border: 1px solid var(--tier-accent);
     white-space: nowrap;
 }
 
-@supports not (background: color-mix(in srgb, red, blue)) {
+@supports (background: color-mix(in srgb, red, blue)) {
     .levels-tier-badge {
-        background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.14);
+        background-image:
+            radial-gradient(circle at 22% 35%, color-mix(in srgb, var(--tier-color) 55%, transparent) 0%, transparent 62%);
+        background-color: color-mix(in srgb, var(--tier-color) 14%, transparent);
     }
 }
 
@@ -7547,20 +7447,28 @@ mark.receipt-highlight {
     align-items: center;
     padding: 0.85rem 1rem;
     border-radius: 14px;
-    background: linear-gradient(135deg,
-        color-mix(in srgb, var(--tier-color) 12%, rgba(var(--bg-card-rgb, 26, 16, 48), 0.85)),
-        rgba(var(--bg-card-rgb, 20, 11, 42), 0.9)
-    );
+    background-color: rgba(var(--bg-card-rgb, 26, 16, 48), 0.94);
+    background-image:
+        radial-gradient(ellipse 118% 100% at -12% -18%, var(--tier-color) 0%, transparent 54%),
+        linear-gradient(150deg, rgba(255, 255, 255, 0.04) 0%, transparent 42%);
     border: 1px solid var(--tier-accent);
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--tier-color) 18%, transparent);
+    box-shadow:
+        0 4px 18px rgba(0, 0, 0, 0.28),
+        0 0 32px -10px var(--tier-color);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
     overflow: hidden;
 }
 
-@supports not (background: color-mix(in srgb, red, blue)) {
+@supports (background: color-mix(in srgb, red, blue)) {
     .levels-tier-card {
-        background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.85);
+        background-image:
+            radial-gradient(
+                ellipse 118% 100% at -12% -18%,
+                color-mix(in srgb, var(--tier-color) 78%, transparent) 0%,
+                transparent 54%
+            ),
+            linear-gradient(150deg, rgba(255, 255, 255, 0.045) 0%, transparent 42%);
     }
 }
 
@@ -7571,13 +7479,16 @@ mark.receipt-highlight {
     left: 0;
     width: 3px;
     height: 100%;
+    z-index: 0;
     background: var(--tier-color);
-    box-shadow: 0 0 12px var(--tier-color);
+    box-shadow: 0 0 14px var(--tier-color);
 }
 
 .levels-tier-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 28px color-mix(in srgb, var(--tier-color) 32%, transparent);
+    box-shadow:
+        0 14px 36px rgba(0, 0, 0, 0.36),
+        0 0 48px -10px var(--tier-color);
 }
 
 .levels-tier-card-icon {
@@ -7588,14 +7499,17 @@ mark.receipt-highlight {
     align-items: center;
     justify-content: center;
     color: var(--tier-color);
-    background: color-mix(in srgb, var(--tier-color) 18%, transparent);
+    position: relative;
+    z-index: 1;
+    background-color: rgba(var(--bg-card-rgb, 26, 16, 48), 0.65);
+    background-image: radial-gradient(circle at 48% 40%, var(--tier-color) 0%, transparent 68%);
     border: 1px solid var(--tier-accent);
     flex-shrink: 0;
 }
 
-@supports not (background: color-mix(in srgb, red, blue)) {
+@supports (background: color-mix(in srgb, red, blue)) {
     .levels-tier-card-icon {
-        background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.15);
+        background-image: radial-gradient(circle at 48% 40%, color-mix(in srgb, var(--tier-color) 72%, transparent) 0%, transparent 68%);
     }
 }
 
@@ -7604,6 +7518,8 @@ mark.receipt-highlight {
     display: flex;
     flex-direction: column;
     gap: 0.12rem;
+    position: relative;
+    z-index: 1;
 }
 
 .levels-tier-card-name {
@@ -7633,6 +7549,8 @@ mark.receipt-highlight {
     text-align: right;
     gap: 0.1rem;
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
 
 .levels-tier-card-threshold-label {
@@ -7660,7 +7578,9 @@ mark.receipt-highlight {
 /* ---- Podium & rank tweaks for tier aware color accents ---- */
 .levels-podium-slot .levels-podium-avatar {
     border-color: var(--tier-color, rgba(255, 255, 255, 0.25));
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--tier-color, #9a6dff) 35%, transparent);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.3),
+        0 0 30px -6px var(--tier-color, #9a6dff);
 }
 
 .levels-podium-slot .levels-tier-badge {
@@ -7700,7 +7620,9 @@ mark.receipt-highlight {
 .levels-top-user img,
 .levels-top-user-placeholder {
     border: 2px solid var(--tier-color, transparent);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--tier-color, #9a6dff) 35%, transparent);
+    box-shadow:
+        0 0 24px -4px var(--tier-color, #9a6dff),
+        0 4px 12px rgba(0, 0, 0, 0.32);
 }
 
 .levels-stat-card--top .levels-tier-badge {
@@ -8040,8 +7962,8 @@ mark.receipt-highlight {
 .dpx-section {
     padding: 1.25rem 1.4rem;
     border-radius: 16px;
-    background: rgba(21, 12, 38, 0.7);
-    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
+    background: rgba(var(--bg-card-rgb, 21, 12, 38), 0.72);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
 }
 
 .dpx-section-head {
@@ -8539,7 +8461,9 @@ mark.receipt-highlight {
 }
 
 .levels-tier-card.has-role {
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--tier-color) 22%, transparent);
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.32),
+        0 0 44px -8px var(--tier-color);
 }
 
 .levels-tier-role {
@@ -8547,12 +8471,13 @@ mark.receipt-highlight {
     align-items: center;
     gap: 0.38rem;
     margin-top: 0.3rem;
-    padding: 0.28rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
     font-weight: 600;
     max-width: 100%;
-    line-height: 1.1;
+    line-height: 1.25;
+    flex-wrap: wrap;
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -8560,15 +8485,26 @@ mark.receipt-highlight {
 
 .levels-tier-role.is-set {
     color: var(--tier-role-color, var(--tier-color));
-    background: color-mix(in srgb, var(--tier-role-color, var(--tier-color)) 14%, transparent);
-    border-color: color-mix(in srgb, var(--tier-role-color, var(--tier-color)) 45%, transparent);
+    background-color: rgba(255, 255, 255, 0.035);
+    background-image: radial-gradient(ellipse 120% 150% at 8% 55%, var(--tier-role-color, var(--tier-color)) 0%, transparent 58%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-@supports not (background: color-mix(in srgb, red, blue)) {
+@supports (background: color-mix(in srgb, red, blue)) {
     .levels-tier-role.is-set {
-        background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.14);
-        border-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.4);
+        background-image:
+            radial-gradient(
+                ellipse 120% 150% at 8% 55%,
+                color-mix(in srgb, var(--tier-role-color, var(--tier-color)) 72%, transparent) 0%,
+                transparent 58%
+            );
+        border-color: color-mix(in srgb, var(--tier-role-color, var(--tier-color)) 45%, transparent);
     }
+}
+
+.levels-tier-card-body > .levels-tier-role {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .levels-tier-role.is-empty {
@@ -8586,10 +8522,10 @@ mark.receipt-highlight {
 }
 
 .levels-tier-role-name {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 140px;
+    white-space: normal;
+    overflow: visible;
+    word-break: break-word;
+    max-width: min(100%, 28ch);
 }
 
 .levels-tier-role-lvl {
@@ -8671,7 +8607,7 @@ mark.receipt-highlight {
 }
 
 @media (max-width: 640px) {
-    .levels-tier-role-name { max-width: 100px; }
+    .levels-tier-role-name { max-width: 100%; }
     .levels-tier-ladder-summary { gap: 0.35rem; }
 }
 
@@ -8722,36 +8658,22 @@ mark.receipt-highlight {
     overflow: hidden; /* mantiene visible el borde redondeado completo como en otros paneles */
 }
 
-/* Hero + stats no se comprimen a cero; el corte bajo el hero desaparece con scroll de container */
-.embed-panel .embed-hero,
-.embed-panel .embed-stats-grid {
+/* Hero no se comprime a cero */
+.embed-panel .embed-hero {
     flex-shrink: 0;
 }
 
-/* Celdas de stats: nombres de servidor / canal largos sin corte raro ni overflow horizontal */
-.embed-panel .embed-stats-grid {
-    min-width: 0;
-    width: 100%;
-    max-width: 100%;
+.embed-panel .embed-hero-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.55rem;
 }
 
-.embed-panel .embed-stats-grid .dpx-stat-card {
-    min-width: 0;
-    overflow: hidden;
-}
-
-.embed-panel .embed-stats-grid .dpx-stat-value,
-.embed-panel .embed-stats-grid .dpx-stat-hint {
-    min-width: 0;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-}
-
-.embed-panel .embed-stats-grid .dpx-stat-value {
-    line-height: 1.3;
+.embed-panel .embed-hero-buttons {
+    display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
+    gap: 0.5rem;
+    justify-content: flex-end;
 }
 
 /* Pestañas siempre encima del flujo, sin que la sección Destino las tape */
@@ -8767,21 +8689,15 @@ mark.receipt-highlight {
     flex-shrink: 0;
     position: relative;
     z-index: 1;
+    padding: 0.85rem 1rem;
 }
 
-.embed-panel .embed-destination .dpx-section-head {
-    margin-bottom: 0.9rem;
-}
-
-.embed-panel .embed-destination .dpx-section-head-text {
-    min-width: 0;
-    flex: 1 1 auto;
-}
-
-.embed-panel .embed-destination .dpx-section-head-text h4 {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
+.embed-panel .embed-destination-title {
+    margin: 0 0 0.65rem 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
 }
 
 .embed-hero h3 {
@@ -8791,8 +8707,6 @@ mark.receipt-highlight {
 }
 
 .embed-hero h3 svg { color: #6ec8ff; }
-
-.embed-stats-grid { margin: 0; }
 
 .embed-split {
     display: grid;
@@ -8898,7 +8812,6 @@ mark.receipt-highlight {
     scrollbar-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.45) rgba(var(--bg-card-rgb, 20, 11, 42), 0.35);
 }
 
-.embed-panel .dpx-stat-card,
 .embed-panel .dpx-section,
 .embed-panel .dpx-tabs {
     border-color: rgba(var(--border-rgb, 190, 155, 255), 0.34) !important;
@@ -9080,8 +8993,10 @@ mark.receipt-highlight {
     .embed-panel { padding: 1rem; border-radius: 18px; }
     .embed-crop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .embed-hero h3 { font-size: 1.1rem; }
-    .embed-hero .dpx-hero-actions { flex-wrap: wrap; }
-    .embed-hero .dpx-hero-actions .btn { flex: 1 1 100%; justify-content: center; }
+    .embed-hero .embed-hero-actions { align-items: stretch; width: 100%; }
+    .embed-hero .embed-hero-buttons { width: 100%; flex-direction: column; }
+    .embed-hero .embed-hero-buttons .btn { width: 100%; justify-content: center; }
+    .embed-hero .back-to-server-btn { width: 100%; justify-content: center; }
     .embed-builder-main,
     .embed-preview-aside {
         max-height: min(58vh, calc(100dvh - 8.5rem));
