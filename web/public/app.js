@@ -962,6 +962,46 @@ function setThemeCssVariables(theme = themeSettings) {
     }
 }
 
+/** Parpadeo CSS + pupila que sigue el cursor en el logo del navbar */
+function initBrandEyeAnimation() {
+    const svg = document.querySelector('.nav-brand .brand-icon');
+    const pupil = svg?.querySelector('.brand-eye-pupil');
+    if (!svg || !pupil) return;
+
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (reduceMotion) return;
+
+    const maxMove = 2.15;
+    let targetX = 0;
+    let targetY = 0;
+    let curX = 0;
+    let curY = 0;
+    let raf = 0;
+
+    const onMove = (e) => {
+        const rect = svg.getBoundingClientRect();
+        if (rect.width < 8 || rect.height < 8) return;
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        let nx = (e.clientX - cx) / (rect.width * 0.42);
+        let ny = (e.clientY - cy) / (rect.height * 0.42);
+        nx = Math.max(-1, Math.min(1, nx));
+        ny = Math.max(-1, Math.min(1, ny));
+        targetX = nx * maxMove;
+        targetY = ny * maxMove;
+    };
+
+    const tick = () => {
+        curX += (targetX - curX) * 0.22;
+        curY += (targetY - curY) * 0.22;
+        pupil.setAttribute('transform', `translate(${curX.toFixed(3)}, ${curY.toFixed(3)})`);
+        raf = requestAnimationFrame(tick);
+    };
+
+    document.addEventListener('mousemove', onMove, { passive: true });
+    raf = requestAnimationFrame(tick);
+}
+
 function initializeInteractiveGradient() {
     const interactive = document.getElementById('interactiveGradient');
     if (!(interactive instanceof HTMLElement)) return;
@@ -1307,6 +1347,7 @@ function restoreServerState(state) {
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
     initializeInteractiveGradient();
+    initBrandEyeAnimation();
 
     const isAuthenticated = await checkAuth();
     
