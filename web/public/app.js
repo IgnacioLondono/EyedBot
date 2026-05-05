@@ -5770,7 +5770,8 @@ function collectLevelingConfigFromForm() {
             baseXp: Math.max(50, Number.parseInt(document.getElementById('levelingBaseXp')?.value || '280', 10) || 280),
             exponent: Math.max(1.2, Number.parseFloat(document.getElementById('levelingExponent')?.value || '2.08') || 2.08)
         },
-        roleRewards: getLevelingRewardRows()
+        roleRewards: getLevelingRewardRows(),
+        levelUpAnnounceChannelId: document.getElementById('levelUpAnnounceChannelId')?.value || ''
     };
 }
 
@@ -6396,6 +6397,7 @@ async function loadLevelsPanel(guildId) {
                 </div>
 
                 <div class="levels-tab-panel is-active" data-levels-panel="config">
+                    <input type="hidden" id="levelUpAnnounceChannelId" value="${escapeHtml(String(config.levelUpAnnounceChannelId || '').trim())}">
                     <div class="levels-section">
                         <div class="levels-section-head">
                             <h4>Estado general</h4>

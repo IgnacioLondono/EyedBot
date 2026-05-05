@@ -48,6 +48,41 @@ function randInt(min, max) {
     return low + Math.floor(Math.random() * (high - low + 1));
 }
 
+async function sendLevelUpAnnouncements(member, oldLevel, newLevel, cfg) {
+    const channelId = String(cfg?.levelUpAnnounceChannelId || '').trim();
+    if (!channelId || !member?.guild?.id || newLevel <= oldLevel) return;
+
+    const guild = member.guild;
+    const channel =
+        guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
+    if (!channel || !channel.isTextBased?.()) return;
+
+    const me = guild.members.me;
+    if (!me?.permissionsIn(channel)?.has(PermissionsBitField.Flags.SendMessages)) return;
+
+    const mention = `<@${member.user.id}>`;
+
+    const start = Math.max(1, oldLevel + 1);
+    const end = Math.max(start, newLevel);
+    const span = end - start + 1;
+
+    try {
+        if (span <= 5) {
+            for (let lvl = start; lvl <= end; lvl += 1) {
+                await channel.send({
+                    content: `¡Felicidades ${mention}! Has alcanzado el nivel ${lvl}.`
+                });
+            }
+        } else {
+            await channel.send({
+                content: `¡Felicidades ${mention}! Has pasado del nivel ${oldLevel} al ${newLevel}.`
+            });
+        }
+    } catch (err) {
+        console.warn('[leveling] No se pudo enviar aviso de nivel:', err?.message || err);
+    }
+}
+
 async function applyRoleRewards(member, level, rewards) {
     if (!member || !member.guild) return;
 
@@ -107,6 +142,7 @@ async function awardXpToMember(member, amount, source = 'message') {
     if (newLevel > oldLevel) {
         const rewards = parseRoleRewards(cfg.roleRewards);
         await applyRoleRewards(member, newLevel, rewards);
+        await sendLevelUpAnnouncements(member, oldLevel, newLevel, cfg);
     }
 
     return nextState;
