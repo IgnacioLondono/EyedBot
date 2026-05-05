@@ -113,6 +113,37 @@ body::before {
 
 .nav-brand .brand-icon {
     filter: drop-shadow(0 0 10px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.55));
+    overflow: visible;
+}
+
+/* Logo ojo: parpadeo + pupila movida por JS */
+.nav-brand .brand-eye-lids {
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+    animation: brand-eye-blink 5.2s ease-in-out infinite;
+}
+
+@keyframes brand-eye-blink {
+    0%,
+    40%,
+    44%,
+    100% {
+        transform: scaleY(1);
+    }
+    42% {
+        transform: scaleY(0.11);
+    }
+}
+
+.nav-brand .brand-eye-pupil {
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-brand .brand-eye-lids {
+        animation: none;
+    }
 }
 
 /* Pestañas del navbar — pills elegantes */
@@ -10003,9 +10034,14 @@ body.wc-studio-open {
     pointer-events: none;
     z-index: -1;
     background:
-        radial-gradient(1200px 620px at 88% -12%, rgba(96, 165, 250, 0.18), transparent 56%),
-        radial-gradient(1000px 520px at 4% 8%, rgba(56, 189, 248, 0.1), transparent 55%),
-        linear-gradient(180deg, var(--sv2-bg-0) 0%, var(--sv2-bg-1) 46%, var(--sv2-bg-0) 100%);
+        radial-gradient(1200px 620px at 88% -12%, rgba(96, 165, 250, 0.16), transparent 56%),
+        radial-gradient(1000px 520px at 4% 8%, rgba(56, 189, 248, 0.09), transparent 55%),
+        linear-gradient(
+            180deg,
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.36) 0%,
+            rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.32) 50%,
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.36) 100%
+        );
 }
 
 .server-shell {
@@ -10457,7 +10493,7 @@ body.wc-studio-open {
    Full-space fix: usar todo el lienzo sin recortes
    ===================================================================== */
 #serverSection.section {
-    height: calc(100vh - 76px) !important;
+    height: calc(100vh - 70px) !important;
     overflow: hidden !important;
     padding: 0 !important;
 }
@@ -10909,13 +10945,13 @@ body,
 
 #serverSection.section {
     height: auto !important;
-    min-height: calc(100vh - 76px) !important;
+    min-height: calc(100vh - 70px) !important;
     overflow: visible !important;
 }
 
 #serverSection.section > .container {
     height: auto !important;
-    min-height: calc(100vh - 76px) !important;
+    min-height: calc(100vh - 70px) !important;
 }
 
 .server-shell,
@@ -10944,7 +10980,7 @@ body {
 
 /* Vuelve a usar scroll interno en la vista de servidor */
 #serverSection.section {
-    height: calc(100vh - 76px) !important;
+    height: calc(100vh - 70px) !important;
     min-height: 0 !important;
     overflow: hidden !important;
 }
@@ -11016,4 +11052,41 @@ body {
 /* Pantalla servidor: sin padding del main (evita marco alrededor del split) */
 .main-content:has(#serverSection.active) {
     padding: 0 !important;
+}
+
+/* Misma superficie glass que .about-rb3-card: barra lateral + panel derecho */
+#serverSection .server-side-menu,
+#serverSection .server-content-area {
+    background:
+        linear-gradient(
+            125deg,
+            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.08) 0%,
+            transparent 48%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.52),
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.44)
+        ) !important;
+    backdrop-filter: blur(14px) saturate(165%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(165%) !important;
+    box-shadow: 0 16px 40px rgba(2, 1, 8, 0.32) !important;
+}
+
+#serverSection .server-side-menu {
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
+}
+
+#serverSection .server-content-area {
+    border: none !important;
+}
+
+@media (max-width: 1024px) {
+    #serverSection .server-side-menu,
+    #serverSection .server-content-area {
+        border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
+    }
 }
