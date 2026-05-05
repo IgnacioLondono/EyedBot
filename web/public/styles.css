@@ -522,19 +522,22 @@ body {
 }
 
 .settings-content {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     min-height: 0;
-    height: 100%;
+    flex: 1;
 }
 
 .settings-pane {
     display: none;
     min-height: 0;
-    height: 100%;
+    flex: 1;
 }
 
 .settings-pane.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
 }
 
 .settings-overview-card {
@@ -771,7 +774,6 @@ body {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 1rem 0.2rem 1rem 1rem;
-    scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--accent-primary-rgb), 0.55) rgba(255, 255, 255, 0.03);
     height: 100%;
@@ -926,10 +928,13 @@ body {
 }
 
 .section#profileSettingsSection > .container {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-gutter: stable;
-    padding-right: 0.45rem;
+    padding-right: 0;
 }
 
 .section#profileSettingsSection .theme-lab-grid {
@@ -978,13 +983,29 @@ body {
 }
 
 @media (max-width: 720px) {
-    .theme-lab-header {
+    #profileSettingsSection .settings-pane-hero.dpx-hero {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #profileSettingsSection .settings-pane-hero-actions {
+        align-items: stretch;
+        width: 100%;
+    }
+
+    #profileSettingsSection .settings-pane-theme-buttons {
+        width: 100%;
         flex-direction: column;
     }
 
-    .theme-lab-actions {
+    #profileSettingsSection .settings-pane-theme-buttons .btn {
         width: 100%;
-        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    #profileSettingsSection .settings-pane-hero-actions .dpx-status-chip {
+        align-self: stretch;
+        justify-content: center;
     }
 
     .theme-form-grid {
@@ -1178,8 +1199,7 @@ body {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 0.35rem;
-    scrollbar-gutter: stable;
+    padding-right: 0;
 }
 
 .reveal-on-scroll {
@@ -2581,8 +2601,7 @@ body {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 0.35rem;
-    scrollbar-gutter: stable;
+    padding-right: 0;
 }
 
 .server-pane.active {
@@ -4386,7 +4405,6 @@ body {
     max-height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-gutter: stable;
 }
 
 .server-side-header {
@@ -4721,8 +4739,7 @@ body {
     max-height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 0.35rem;
-    scrollbar-gutter: stable;
+    padding-right: 0;
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--accent-primary-rgb), 0.55) rgba(255, 255, 255, 0.03);
 }
@@ -6231,7 +6248,7 @@ select:focus {
     }
 
     .section > .container {
-        padding-right: 0.1rem;
+        padding-right: 0;
     }
 
     .section-header--split {
@@ -6411,8 +6428,7 @@ select:focus {
     max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 0.5rem;
-    scrollbar-gutter: stable;
+    padding-right: 0;
 }
 
 #embedSection .embed-preview::-webkit-scrollbar {

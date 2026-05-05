@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
-    <link rel="stylesheet" href="styles.css?v=20260505-theme-global">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-embed-simplify">
+    <link rel="stylesheet" href="styles.css?v=20260505-scrollbar-gutter-fix">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-scrollbar-gutter-fix">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -269,39 +269,88 @@
 
                     <div class="settings-content">
                         <section id="settingsPaneAccount" class="settings-pane active">
-                            <article class="settings-overview-card">
-                                <h3>Cuenta</h3>
-                                <div class="settings-kv"><span>Usuario</span><strong id="settingsAccountName">-</strong></div>
-                                <div class="settings-kv"><span>ID</span><strong id="settingsAccountId">-</strong></div>
-                                <div class="settings-kv"><span>Avatar</span><strong id="settingsAccountAvatar">No disponible</strong></div>
-                            </article>
+                            <div class="settings-pane-shell dpx-panel">
+                                <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#6ec8ff;--dpx-hero-glow-1:rgba(110,200,255,0.22);--dpx-hero-glow-2:rgba(124,77,255,0.18);">
+                                    <div class="dpx-hero-text">
+                                        <div class="dpx-hero-kicker">Datos de sesión</div>
+                                        <h3>Cuenta conectada</h3>
+                                        <p>Información de tu usuario de Discord en esta sesión del panel. No editable desde aquí.</p>
+                                    </div>
+                                    <div class="dpx-hero-actions settings-pane-hero-actions">
+                                        <span class="dpx-status-chip is-on"><span class="dot"></span>Solo lectura</span>
+                                    </div>
+                                </header>
+                                <div class="settings-pane-body">
+                                    <div class="settings-kv-grid">
+                                        <div class="settings-kv-card">
+                                            <span class="settings-kv-card-label">Usuario</span>
+                                            <strong id="settingsAccountName">-</strong>
+                                        </div>
+                                        <div class="settings-kv-card">
+                                            <span class="settings-kv-card-label">ID</span>
+                                            <strong id="settingsAccountId">-</strong>
+                                        </div>
+                                        <div class="settings-kv-card settings-kv-card--wide">
+                                            <span class="settings-kv-card-label">Avatar</span>
+                                            <strong id="settingsAccountAvatar">No disponible</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </section>
 
                         <section id="settingsPaneWeb" class="settings-pane">
-                            <article class="settings-overview-card">
-                                <h3>Web</h3>
-                                <div class="settings-kv"><span>Host</span><strong id="settingsWebHost">-</strong></div>
-                                <div class="settings-kv"><span>Ruta</span><strong id="settingsWebPath">-</strong></div>
-                                <div class="settings-kv"><span>Navegador</span><strong id="settingsWebBrowser">-</strong></div>
-                                <div class="settings-kv"><span>Zona horaria</span><strong id="settingsWebTimezone">-</strong></div>
-                            </article>
+                            <div class="settings-pane-shell dpx-panel">
+                                <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#fbbf24;--dpx-hero-glow-1:rgba(251,191,36,0.2);--dpx-hero-glow-2:rgba(124,77,255,0.16);">
+                                    <div class="dpx-hero-text">
+                                        <div class="dpx-hero-kicker">Entorno del navegador</div>
+                                        <h3>Esta instalación web</h3>
+                                        <p>Datos del host y del cliente donde abriste el panel. Útiles para soporte o depuración.</p>
+                                    </div>
+                                    <div class="dpx-hero-actions settings-pane-hero-actions">
+                                        <span class="dpx-status-chip is-on"><span class="dot"></span>Solo lectura</span>
+                                    </div>
+                                </header>
+                                <div class="settings-pane-body">
+                                    <div class="settings-kv-grid">
+                                        <div class="settings-kv-card">
+                                            <span class="settings-kv-card-label">Host</span>
+                                            <strong id="settingsWebHost">-</strong>
+                                        </div>
+                                        <div class="settings-kv-card">
+                                            <span class="settings-kv-card-label">Ruta</span>
+                                            <strong id="settingsWebPath">-</strong>
+                                        </div>
+                                        <div class="settings-kv-card">
+                                            <span class="settings-kv-card-label">Navegador</span>
+                                            <strong id="settingsWebBrowser">-</strong>
+                                        </div>
+                                        <div class="settings-kv-card">
+                                            <span class="settings-kv-card-label">Zona horaria</span>
+                                            <strong id="settingsWebTimezone">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </section>
 
                         <section id="settingsPaneTheme" class="settings-pane">
-                            <div class="theme-lab" id="themeLab">
-                                <div class="theme-lab-header">
-                                    <div>
-                                        <div class="theme-lab-kicker">Personalización visual</div>
+                            <div class="theme-lab settings-pane-shell dpx-panel" id="themeLab">
+                                <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#6ee7b7;--dpx-hero-glow-1:rgba(110,231,183,0.24);--dpx-hero-glow-2:rgba(124,77,255,0.18);">
+                                    <div class="dpx-hero-text">
+                                        <div class="dpx-hero-kicker">Personalización visual</div>
                                         <h3>Diseña el panel a tu gusto</h3>
                                         <p>Elige un preset, ajusta colores y modifica la atmósfera del fondo. Los cambios se aplican al instante y quedan guardados en tu navegador.</p>
                                     </div>
-                                    <div class="theme-lab-actions">
-                                        <button type="button" id="themeSaveBtn" class="btn btn-primary">Guardar</button>
-                                        <button type="button" id="themeResetBtn" class="btn btn-secondary">Restablecer</button>
+                                    <div class="dpx-hero-actions settings-pane-hero-actions">
+                                        <div class="settings-pane-theme-buttons">
+                                            <button type="button" id="themeSaveBtn" class="btn btn-primary">Guardar</button>
+                                            <button type="button" id="themeResetBtn" class="btn btn-secondary">Restablecer</button>
+                                        </div>
                                     </div>
-                                </div>
+                                </header>
 
-                                <div class="theme-lab-grid">
+                                <div class="theme-lab-grid settings-pane-theme-grid">
                                     <div class="theme-preview-card">
                                         <div class="theme-preview-head">
                                             <span class="theme-preview-chip">Vista previa</span>
@@ -1476,6 +1525,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260505-embed-simplify"></script>
+    <script src="app.js?v=20260505-settings-redesign"></script>
 </body>
 </html>
