@@ -9833,3 +9833,462 @@ body.wc-studio-open {
     font-weight: inherit;
     font-style: inherit;
 }
+
+/* =====================================================================
+   Server Dashboard V2 - estilo unificado tipo "control center"
+   ===================================================================== */
+:root {
+    --sv2-bg-0: #080a15;
+    --sv2-bg-1: #0d1020;
+    --sv2-bg-2: #131830;
+    --sv2-panel: rgba(16, 20, 38, 0.86);
+    --sv2-panel-strong: rgba(18, 23, 44, 0.94);
+    --sv2-border: rgba(255, 200, 84, 0.18);
+    --sv2-border-strong: rgba(255, 200, 84, 0.34);
+    --sv2-text: #f6f8ff;
+    --sv2-text-dim: #aeb7d6;
+    --sv2-gold: #f4c15d;
+    --sv2-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
+}
+
+.section#serverSection {
+    position: relative;
+    isolation: isolate;
+}
+
+.section#serverSection::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+        radial-gradient(1200px 620px at 88% -12%, rgba(96, 165, 250, 0.18), transparent 56%),
+        radial-gradient(1000px 520px at 4% 8%, rgba(56, 189, 248, 0.1), transparent 55%),
+        linear-gradient(180deg, var(--sv2-bg-0) 0%, var(--sv2-bg-1) 46%, var(--sv2-bg-0) 100%);
+}
+
+.server-shell {
+    gap: 1.15rem !important;
+}
+
+.server-side-menu {
+    background:
+        radial-gradient(130% 120% at 8% -12%, rgba(96, 165, 250, 0.2), transparent 48%),
+        linear-gradient(180deg, #0a0d1c 0%, #090c18 100%) !important;
+    border: 1px solid var(--sv2-border) !important;
+    border-radius: 18px !important;
+    box-shadow: var(--sv2-shadow);
+}
+
+.server-side-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.75rem;
+}
+
+.server-side-guild-name {
+    color: var(--sv2-text) !important;
+}
+
+.side-menu-group-title {
+    color: #cad4ff !important;
+    letter-spacing: 0.08em !important;
+}
+
+.side-menu-btn {
+    border-radius: 10px !important;
+    background: linear-gradient(180deg, rgba(22, 27, 50, 0.86), rgba(15, 19, 38, 0.92)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.side-menu-btn:hover {
+    border-color: rgba(96, 165, 250, 0.38) !important;
+    box-shadow: 0 10px 26px rgba(3, 8, 22, 0.48);
+}
+
+.side-menu-btn.active {
+    background: linear-gradient(180deg, rgba(35, 46, 84, 0.94), rgba(26, 35, 66, 0.96)) !important;
+    border-color: rgba(96, 165, 250, 0.56) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.13),
+        0 10px 26px rgba(3, 12, 32, 0.55);
+}
+
+.side-menu-btn.active .side-menu-btn-inner,
+.side-menu-btn.active .side-menu-icon {
+    color: #dff3ff !important;
+}
+
+.server-content-area {
+    background:
+        linear-gradient(180deg, rgba(14, 18, 34, 0.9), rgba(9, 13, 26, 0.9)) !important;
+    border: 1px solid var(--sv2-border) !important;
+    border-radius: 18px !important;
+    box-shadow: var(--sv2-shadow);
+}
+
+.server-pane-surface {
+    background: transparent !important;
+}
+
+.server-pane-head {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    margin-bottom: 1.2rem !important;
+}
+
+.server-pane-kicker {
+    background: rgba(96, 165, 250, 0.14) !important;
+    border: 1px solid rgba(96, 165, 250, 0.32) !important;
+    color: #dbeafe !important;
+}
+
+.server-pane-head h3 {
+    color: var(--sv2-text) !important;
+}
+
+.server-pane-head p {
+    color: var(--sv2-text-dim) !important;
+}
+
+.server-info-container,
+.moderation-container,
+.ticket-manage-container,
+.receipt-modal-dialog,
+.ticket-chat-dialog {
+    color: var(--sv2-text);
+}
+
+/* tarjetas / bloques internos en todas las secciones */
+.server-pane .card,
+.server-pane .modx-member-card,
+.server-pane .modx-action-card,
+.server-pane .greeting-card,
+.server-pane .ticket-manage-card,
+.server-pane .verify-card,
+.server-pane .leveling-card,
+.server-pane .automation-card,
+.server-pane .voicecreator-card,
+.server-pane .security-card,
+.server-pane .notifications-card,
+.server-pane .freegames-card,
+.server-pane .commands-card,
+.server-pane .stats-card,
+.server-pane .embed-builder,
+.server-pane .embed-preview,
+.server-pane .fields-section,
+.server-pane .welcome-editor,
+.server-pane .welcome-preview-panel,
+.server-pane .welcome-image-editor,
+.server-pane .welcome-crop-visual-panel,
+.server-pane .chs-card,
+.server-pane .chs-step,
+.server-pane .chs-output {
+    background: linear-gradient(180deg, var(--sv2-panel-strong), var(--sv2-panel)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.34);
+}
+
+/* tablas y listas */
+.server-pane table,
+.server-pane .table,
+.server-pane .table-wrap {
+    background: rgba(11, 15, 30, 0.86) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--sv2-text) !important;
+}
+
+.server-pane th,
+.server-pane td {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* formularios */
+.server-pane .form-control,
+.server-pane input[type="text"],
+.server-pane input[type="number"],
+.server-pane input[type="url"],
+.server-pane input[type="search"],
+.server-pane input[type="password"],
+.server-pane textarea,
+.server-pane select {
+    background: rgba(9, 13, 26, 0.92) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    color: #edf2ff !important;
+    border-radius: 10px !important;
+}
+
+.server-pane .form-control::placeholder,
+.server-pane textarea::placeholder,
+.server-pane input::placeholder {
+    color: #8fa0c7 !important;
+}
+
+.server-pane .form-control:focus,
+.server-pane input:focus,
+.server-pane textarea:focus,
+.server-pane select:focus {
+    border-color: rgba(96, 165, 250, 0.56) !important;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2) !important;
+}
+
+/* botones */
+.server-pane .btn-primary,
+.server-pane button.btn-primary {
+    background: linear-gradient(135deg, #2d8cff 0%, #1464db 100%) !important;
+    border: 1px solid rgba(164, 212, 255, 0.4) !important;
+    color: #ffffff !important;
+}
+
+.server-pane .btn-primary:hover,
+.server-pane button.btn-primary:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 12px 26px rgba(20, 100, 219, 0.38);
+}
+
+.server-pane .btn-ghost,
+.server-pane .btn-secondary {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    color: #e9eeff !important;
+}
+
+.server-pane .btn-ghost:hover,
+.server-pane .btn-secondary:hover {
+    background: rgba(96, 165, 250, 0.14) !important;
+    border-color: rgba(96, 165, 250, 0.4) !important;
+}
+
+/* acentos dorados para métricas y badges */
+.server-pane .owner-pill,
+.server-pane .dpx-stat-pill,
+.server-pane .badge,
+.server-pane .plan-badge,
+.server-pane .premium-badge {
+    background: linear-gradient(135deg, rgba(244, 193, 93, 0.24), rgba(245, 158, 11, 0.24)) !important;
+    border-color: rgba(244, 193, 93, 0.45) !important;
+    color: #ffe7b3 !important;
+}
+
+/* estados vacíos / loading */
+.server-pane .loading,
+.server-pane .empty-state,
+.server-pane .modx-empty,
+.server-pane .commands-empty,
+.server-pane .chs-empty {
+    background: rgba(11, 15, 30, 0.75) !important;
+    border: 1px dashed rgba(255, 255, 255, 0.18) !important;
+    border-radius: 12px !important;
+    color: #c4cfea !important;
+}
+
+/* =====================================================================
+   Server Dashboard - STRUCTURE ONLY (sin re-skin)
+   Aplica solo layout/jerarquia/espaciado para parecerse al mockup.
+   ===================================================================== */
+
+.section#serverSection .container {
+    max-width: 1720px;
+}
+
+.server-shell {
+    display: grid !important;
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: 1rem !important;
+    align-items: stretch;
+}
+
+.server-side-menu {
+    min-height: calc(100vh - 170px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.server-side-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding-right: 0.2rem;
+}
+
+.server-content-area {
+    min-height: calc(100vh - 170px);
+    padding: 1rem !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.server-pane {
+    display: none;
+    min-height: 100%;
+}
+
+.server-pane.active {
+    display: block;
+}
+
+.server-pane-surface {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.server-pane-head {
+    margin-bottom: 1rem !important;
+    padding-bottom: 0.75rem !important;
+}
+
+.server-pane-head h3 {
+    font-size: 1.55rem !important;
+    line-height: 1.2;
+}
+
+.server-pane-head p {
+    font-size: 0.95rem;
+}
+
+.moderation-container,
+.server-info-container,
+.ticket-manage-container,
+#welcomeContainer,
+#verifyContainer,
+#ticketContainer,
+#levelsContainer,
+#voiceCreatorContainer,
+#automationContainer,
+#securityContainer,
+#notificationsContainer,
+#freeGamesContainer,
+#channelSetupContainer,
+#gachaContainer {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* Tarjetas: estructura homogénea */
+.server-pane .card,
+.server-pane .greeting-card,
+.server-pane .modx-member-card,
+.server-pane .modx-action-card,
+.server-pane .embed-preview,
+.server-pane .fields-section,
+.server-pane .welcome-editor,
+.server-pane .welcome-preview-panel,
+.server-pane .welcome-image-editor,
+.server-pane .welcome-crop-visual-panel,
+.server-pane .ticket-manage-card,
+.server-pane .chs-card,
+.server-pane .chs-step,
+.server-pane .chs-output {
+    border-radius: 12px !important;
+}
+
+/* Grids tipo dashboard */
+.modx-members-grid,
+.modx-action-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+    gap: 0.75rem !important;
+}
+
+/* Welcome/Goodbye en dos columnas como panel principal + preview */
+.welcome-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+    gap: 0.9rem !important;
+    align-items: start;
+}
+
+.welcome-editor,
+.welcome-preview-panel {
+    min-height: 100%;
+}
+
+/* Formularios más compactos para densidad tipo dashboard */
+.server-pane .form-group {
+    margin-bottom: 0.7rem !important;
+}
+
+.server-pane .form-control,
+.server-pane input,
+.server-pane select,
+.server-pane textarea {
+    min-height: 38px;
+}
+
+.server-pane textarea.form-control,
+.server-pane textarea {
+    min-height: 86px;
+}
+
+/* Botonera y tabs */
+.greeting-tabs,
+.ticket-manage-actions,
+.welcome-actions,
+.verify-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+/* Responsive estructura */
+@media (max-width: 1280px) {
+    .server-shell {
+        grid-template-columns: 250px minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .server-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .server-side-menu,
+    .server-content-area {
+        min-height: auto;
+    }
+
+    .welcome-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =====================================================================
+   Ajuste pedido: sin "bloque grande redondo" envolvente
+   Cada pantalla usa su propio contenido, sin mega-card contenedora.
+   ===================================================================== */
+.server-content-area {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+}
+
+.server-pane-surface {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .server-pane-surface::before {
+    display: none !important;
+}
+
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+}
+
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container::before,
+.server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container::after {
+    display: none !important;
+}

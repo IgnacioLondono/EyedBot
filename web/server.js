@@ -1067,12 +1067,14 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
 });
 
 function applyWelcomeTemplate(text, member) {
-    const mention = `<@${member.id}>`;
-    const uname = member.user.username;
+    // Mostrar siempre el nombre (sin mención por ID) para evitar que aparezcan números.
+    const uname = member.user?.username || 'Usuario';
+    const displayName = member.displayName || uname;
+    const mentionText = String(displayName).startsWith('@') ? String(displayName) : `@${displayName}`;
     const srv = member.guild.name;
     const mc = String(member.guild.memberCount);
     return String(text || '')
-        .replace(/\{user\}|\{mention\}/gi, mention)
+        .replace(/\{user\}|\{mention\}/gi, mentionText)
         .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
         .replace(/\{server\}|\{guild\}/gi, srv)
         .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
@@ -1168,7 +1170,8 @@ function normalizeGreetingConfigInput(body = {}, mode, userId) {
     };
 
     if (mode === 'welcome') {
-        base.welcomeStyle = String(body.welcomeStyle || 'embed') === 'card' ? 'card' : 'embed';
+        // Forzar modo embed: deshabilitamos "Tarjeta PNG" (fondo/imagen de fondo).
+        base.welcomeStyle = 'embed';
         base.cardAccentColor = sanitizeHexColor6(body.cardAccentColor, '4ade80');
         base.cardTitleColor = sanitizeHexColor6(body.cardTitleColor, 'ffffff');
         base.cardNameColor = sanitizeHexColor6(body.cardNameColor, 'f8fafc');
@@ -2814,6 +2817,7 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
         if (!config) return res.json(buildDefaultGreetingConfig('welcome', fallbackChannel));
 
         if (!config.channelId && fallbackChannel) config.channelId = fallbackChannel;
+        if (config.welcomeStyle === 'card') config.welcomeStyle = 'embed';
         res.json(config);
     } catch (error) {
         console.error('Error obteniendo welcome config:', error);
@@ -2911,6 +2915,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const cfg = await welcomeStore.getWelcomeConfig(guildId);
+        if (cfg && cfg.welcomeStyle === 'card') cfg.welcomeStyle = 'embed';
         const channelId = cfg?.channelId || await welcomeStore.getWelcomeChannelId(guildId);
         const channel = channelId ? guild.channels.cache.get(channelId) : null;
         if (!channel) return res.status(404).json({ error: 'Canal de bienvenida no encontrado' });
@@ -2919,6 +2924,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         if (!member) return res.status(404).json({ error: 'No pude obtener tu usuario en este servidor' });
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : undefined;
+        const allowedMentions = cfg?.mentionUser ? { parse: ['users'] } : undefined;
 
         if (cfg?.welcomeStyle === 'card') {
             const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
@@ -2940,7 +2946,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
                 subtitleHex: cfg.cardSubtitleColor || 'e2e8f0'
             });
             const file = new AttachmentBuilder(buffer, { name: 'bienvenida-preview.png' });
-            await channel.send({ content, files: [file] });
+            await channel.send({ content, files: [file], allowedMentions });
             return res.json({ success: true, message: 'Prueba de bienvenida enviada' });
         }
 
@@ -2965,7 +2971,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
 
-        await channel.send({ content, embeds: [embed], files });
+        await channel.send({ content, embeds: [embed], files, allowedMentions });
 
         res.json({ success: true, message: 'Prueba de bienvenida enviada' });
     } catch (error) {
@@ -2976,6 +2982,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
 
 app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, res) => {
     try {
+        return res.status(404).json({ error: 'Editor visual y "Tarjeta PNG" deshabilitados.' });
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
@@ -3110,7 +3117,8 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
         if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;
-        await channel.send({ content, embeds: [embed], files });
+        const allowedMentions = cfg?.mentionUser ? { parse: ['users'] } : undefined;
+        await channel.send({ content, embeds: [embed], files, allowedMentions });
 
         res.json({ success: true, message: 'Prueba de despedida enviada' });
     } catch (error) {
