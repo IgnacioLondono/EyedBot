@@ -10442,3 +10442,178 @@ body {
     background: var(--glass-bg-panel) !important;
     border-color: rgba(var(--border-rgb, 190, 155, 255), 0.22) !important;
 }
+
+/* =====================================================================
+   Densidad visual: más aire, más limpio (zoom 100%)
+   ===================================================================== */
+#serverSection.section > .container {
+    max-width: 1680px !important;
+    margin: 0 auto !important;
+    padding: 0.9rem 1.1rem 1rem !important;
+}
+
+.server-shell {
+    grid-template-columns: 250px minmax(0, 1fr) !important;
+    gap: 1.15rem !important;
+}
+
+.server-content-area {
+    padding: 1rem 1.05rem !important;
+}
+
+.server-pane-head {
+    margin-bottom: 1.15rem !important;
+    padding-bottom: 0.9rem !important;
+}
+
+.server-pane-head h3 {
+    font-size: 1.32rem !important;
+}
+
+.server-pane-head p {
+    font-size: 0.9rem !important;
+    max-width: 72ch !important;
+}
+
+.side-menu-btn-inner {
+    min-height: 40px !important;
+    padding: 0.55rem 0.72rem !important;
+}
+
+.side-menu-label {
+    font-size: 0.86rem !important;
+}
+
+.server-pane .form-group {
+    margin-bottom: 0.9rem !important;
+}
+
+.server-pane .form-control,
+.server-pane input,
+.server-pane select,
+.server-pane textarea {
+    min-height: 36px !important;
+    font-size: 0.9rem !important;
+}
+
+.server-pane textarea.form-control,
+.server-pane textarea {
+    min-height: 94px !important;
+}
+
+.modx-members-grid,
+.modx-action-grid {
+    gap: 0.95rem !important;
+}
+
+.welcome-layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr) !important;
+    gap: 1rem !important;
+}
+
+.server-pane .card,
+.server-pane .greeting-card,
+.server-pane .modx-member-card,
+.server-pane .modx-action-card,
+.server-pane .embed-preview,
+.server-pane .fields-section,
+.server-pane .welcome-editor,
+.server-pane .welcome-preview-panel,
+.server-pane .welcome-image-editor,
+.server-pane .welcome-crop-visual-panel,
+.server-pane .ticket-manage-card,
+.server-pane .chs-card,
+.server-pane .chs-step,
+.server-pane .chs-output {
+    padding: 0.95rem !important;
+}
+
+@media (max-width: 1400px) {
+    #serverSection.section > .container {
+        max-width: 100% !important;
+        padding: 0.75rem 0.85rem 0.9rem !important;
+    }
+
+    .server-shell {
+        grid-template-columns: 230px minmax(0, 1fr) !important;
+        gap: 0.9rem !important;
+    }
+}
+
+/* =====================================================================
+   Ajuste solicitado: todo más transparente, botones bien diferenciados
+   ===================================================================== */
+:root {
+    --glass-bg-panel: linear-gradient(
+        180deg,
+        rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.34),
+        rgba(var(--bg-primary-rgb, 10, 12, 26), 0.28)
+    );
+    --glass-bg-soft: linear-gradient(
+        180deg,
+        rgba(var(--accent-primary-rgb, 124, 77, 255), 0.045),
+        rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.03)
+    );
+    --glass-border: rgba(var(--border-rgb, 190, 155, 255), 0.2);
+}
+
+.navbar,
+.main-content,
+.section,
+.section > .container,
+.server-shell,
+.server-content-area,
+.server-side-menu,
+.server-pane-surface,
+.moderation-container,
+.server-info-container,
+.embed-panel,
+.settings-layout,
+.about-block,
+.stats-shell,
+.logs-shell,
+.commands-shell,
+.ticket-manage-container,
+.card,
+.modx-member-card,
+.modx-action-card,
+.greeting-card,
+.welcome-editor,
+.welcome-preview-panel,
+.ticket-manage-card,
+.chs-card,
+.dpx-section,
+.embed-preview,
+.fields-section {
+    background: var(--glass-bg-panel), var(--glass-bg-soft) !important;
+}
+
+/* Botones con más contraste para distinguir acciones */
+.btn-primary,
+.server-pane .btn-primary,
+.server-pane button.btn-primary {
+    background: linear-gradient(
+        135deg,
+        rgba(var(--accent-primary-rgb, 124, 77, 255), 0.95),
+        rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.9)
+    ) !important;
+    border: 1px solid rgba(255, 255, 255, 0.34) !important;
+    color: #fff !important;
+}
+
+.btn-secondary,
+.btn-ghost,
+.server-pane .btn-secondary,
+.server-pane .btn-ghost {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #eef2ff !important;
+}
+
+.btn-secondary:hover,
+.btn-ghost:hover,
+.server-pane .btn-secondary:hover,
+.server-pane .btn-ghost:hover {
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22) !important;
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.42) !important;
+}
