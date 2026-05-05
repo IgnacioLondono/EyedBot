@@ -2055,6 +2055,8 @@ function normalizeLevelingConfigInput(body = {}, current = null, userId = 'unkno
             .slice(0, 50)
         : (Array.isArray(base.roleRewards) ? base.roleRewards : []);
 
+    const levelUpAnnounceChannelId = String(body.levelUpAnnounceChannelId ?? base.levelUpAnnounceChannelId ?? '').trim();
+
     return {
         enabled: body.enabled === true,
         messageXpEnabled: body.messageXpEnabled !== false,
@@ -2066,6 +2068,7 @@ function normalizeLevelingConfigInput(body = {}, current = null, userId = 'unkno
         voiceRequirePeers: body.voiceRequirePeers !== false,
         difficulty: sanitizeDifficulty(body.difficulty || base.difficulty || {}),
         roleRewards,
+        levelUpAnnounceChannelId: /^\d{10,25}$/.test(levelUpAnnounceChannelId) ? levelUpAnnounceChannelId : '',
         updatedAt: new Date().toISOString(),
         updatedBy: userId
     };

@@ -77,6 +77,8 @@ function defaultConfig() {
             exponent: 2.08
         },
         roleRewards: [],
+        /** Canal de texto (ID) donde avisar subidas de nivel; mensaje plano, sin embed */
+        levelUpAnnounceChannelId: '',
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
     };
