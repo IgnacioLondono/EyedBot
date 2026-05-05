@@ -92,7 +92,14 @@ body::before {
     pointer-events: none;
 }
 
-.nav-container { max-width: 1600px; padding: 0 1.5rem; }
+/* Ancho completo: evita la columna centrada ~1600px de styles.css (bandas a los lados) */
+.nav-container {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 1.25rem !important;
+    box-sizing: border-box !important;
+}
 
 .nav-brand h1 {
     background: var(--pro-grad-primary);
@@ -219,7 +226,13 @@ body::before {
 .dropdown-item:hover { background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14)) !important; transform: translateX(2px); }
 
 /* ---------- Main content / secciones ---------- */
-.main-content { padding: 1.35rem 2rem 2rem; }
+.main-content {
+    padding: 1.35rem 1.25rem 2rem;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+}
 
 /* Encabezado con kicker + acento gradiente */
 .section-header { margin-bottom: 1.05rem; padding-bottom: 0.35rem; }
@@ -10520,11 +10533,13 @@ body {
 
 /* =====================================================================
    Densidad visual: más aire, más limpio (zoom 100%)
+   Ancho completo: sin tope 1680px ni centrado (evita bandas laterales).
    ===================================================================== */
 #serverSection.section > .container {
-    max-width: 1680px !important;
-    margin: 0 auto !important;
-    padding: 0.9rem 1.1rem 1rem !important;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.55rem 0 0.65rem !important;
 }
 
 .server-shell {
@@ -10605,8 +10620,8 @@ body {
 
 @media (max-width: 1400px) {
     #serverSection.section > .container {
-        max-width: 100% !important;
-        padding: 0.75rem 0.85rem 0.9rem !important;
+        max-width: none !important;
+        padding: 0.5rem 0 0.6rem !important;
     }
 
     .server-shell {
@@ -10878,4 +10893,9 @@ body {
         max-height: none !important;
         overflow: visible !important;
     }
+}
+
+/* Pantalla servidor: sin padding del main (evita marco alrededor del split) */
+.main-content:has(#serverSection.active) {
+    padding: 0 !important;
 }
