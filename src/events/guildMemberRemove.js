@@ -3,11 +3,15 @@ const path = require('path');
 const welcomeStore = require('../utils/welcome-config-store');
 
 function applyTemplate(text, member) {
+    const uid = member?.user?.id ?? member?.id;
+    const discordMention = uid ? `<@${uid}>` : '@usuario';
+    const uname = member.user?.username || 'Usuario';
     return String(text || '')
-        .replace(/\{user\}/gi, `${member.user?.tag || member.user?.username || 'Usuario'}`)
-        .replace(/\{username\}/gi, member.user?.username || 'Usuario')
-        .replace(/\{server\}/gi, member.guild?.name || 'Servidor')
-        .replace(/\{memberCount\}/gi, String(member.guild?.memberCount || 0));
+        .replace(/\{mention\}/gi, discordMention)
+        .replace(/\{user\}/gi, discordMention)
+        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
+        .replace(/\{server\}|\{guild\}/gi, member.guild?.name || 'Servidor')
+        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, String(member.guild?.memberCount || 0));
 }
 
 function resolveLocalUploadFile(rawUrl = '') {
