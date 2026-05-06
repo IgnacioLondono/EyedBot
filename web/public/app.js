@@ -9103,16 +9103,37 @@ async function loadWelcomePanel(guildId) {
     }
 }
 
-function applyWelcomePreviewTemplate(text, sample) {
-    const mention = sample.userMention;
-    const uname = sample.username;
-    const srv = sample.server;
-    const mc = String(sample.memberCount);
-    return String(text || '')
-        .replace(/\{user\}|\{mention\}/gi, mention)
-        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
-        .replace(/\{server\}|\{guild\}/gi, srv)
-        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
+function applyWelcomePreviewTemplate(text, sample, options = {}) {
+    const uname = sample.username || 'Usuario';
+    const srv = sample.server || '';
+    const mc = String(sample.memberCount || '');
+    const plainMention = `@${uname}`;
+    const htmlMentions = options.htmlMentions === true;
+
+    if (!htmlMentions) {
+        return String(text || '')
+            .replace(/\{user\}|\{mention\}/gi, plainMention)
+            .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
+            .replace(/\{server\}|\{guild\}/gi, srv)
+            .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
+    }
+
+    const T_M = '{{__EYED_USER_MENTION__}}';
+    const T_U = '{{__EYED_USERNAME__}}';
+    const T_S = '{{__EYED_SERVER__}}';
+    const T_MC = '{{__EYED_MC__}}';
+    let s = String(text || '')
+        .replace(/\{user\}|\{mention\}/gi, T_M)
+        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, T_U)
+        .replace(/\{server\}|\{guild\}/gi, T_S)
+        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, T_MC);
+    s = escapeHtml(s);
+    const mentionSafe = `<span class="discord-mention-preview">@${escapeHtml(uname)}</span>`;
+    return s
+        .split(T_M).join(mentionSafe)
+        .split(T_U).join(escapeHtml(uname))
+        .split(T_S).join(escapeHtml(srv))
+        .split(T_MC).join(escapeHtml(mc));
 }
 
 function scheduleWelcomeCardPreview(guildId) {
@@ -9231,7 +9252,6 @@ function renderWelcomeEmbedPreview(guildId) {
     const payload = collectWelcomeConfigFromForm();
 
     const sample = {
-        userMention: `@${currentUser?.username || 'NuevoUsuario'}`,
         username: currentUser?.username || 'NuevoUsuario',
         server: guild?.name || 'Tu Servidor',
         memberCount: guild?.botGuild?.memberCount || 123
@@ -9239,9 +9259,10 @@ function renderWelcomeEmbedPreview(guildId) {
 
     const colorHex = (payload.color || meta.defaultColor).replace('#', '');
     const color = `#${colorHex}`;
-    const title = applyWelcomePreviewTemplate(payload.title, sample);
-    const message = applyWelcomePreviewTemplate(payload.message, sample);
-    const footer = applyWelcomePreviewTemplate(payload.footer, sample);
+    const previewOpts = { htmlMentions: true };
+    const title = applyWelcomePreviewTemplate(payload.title, sample, previewOpts);
+    const message = applyWelcomePreviewTemplate(payload.message, sample, previewOpts);
+    const footer = applyWelcomePreviewTemplate(payload.footer, sample, previewOpts);
 
     const image = welcomeImagePreviewUrl || payload.imageUrl;
     const showThumb = payload.thumbnailMode === 'avatar' || (payload.thumbnailMode === 'url' && payload.thumbnailUrl);
@@ -9255,11 +9276,11 @@ function renderWelcomeEmbedPreview(guildId) {
         <div class="discord-embed welcome-discord-embed-preview" style="border-left-color:${color};">
             ${showThumb ? `<img src="${safeThumbSrc}" alt="" class="discord-embed-thumbnail" width="80" height="80" decoding="async" loading="lazy">` : ''}
             <div class="discord-embed-textblock">
-                ${title ? `<div class="discord-embed-title">${escapeHtml(title)}</div>` : ''}
-                ${message ? `<div class="discord-embed-description">${escapeHtml(message)}</div>` : ''}
+                ${title ? `<div class="discord-embed-title">${title}</div>` : ''}
+                ${message ? `<div class="discord-embed-description">${message}</div>` : ''}
             </div>
             ${image ? `<img src="${safeImageSrc}" alt="" class="discord-embed-image welcome-discord-embed-image" decoding="async" loading="lazy">` : ''}
-            ${(footer || payload.enabled === false) ? `<div class="discord-embed-footer">${escapeHtml(footer || '')}${payload.enabled === false ? ` - ${escapeHtml(meta.disabledText)}` : ''}</div>` : ''}
+            ${(footer || payload.enabled === false) ? `<div class="discord-embed-footer">${footer || ''}${payload.enabled === false ? ` - ${escapeHtml(meta.disabledText)}` : ''}</div>` : ''}
         </div>
     `;
 }

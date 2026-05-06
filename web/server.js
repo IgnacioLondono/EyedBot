@@ -1067,14 +1067,14 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
 });
 
 function applyWelcomeTemplate(text, member) {
-    // Mostrar siempre el nombre (sin mención por ID) para evitar que aparezcan números.
     const uname = member.user?.username || 'Usuario';
-    const displayName = member.displayName || uname;
-    const mentionText = String(displayName).startsWith('@') ? String(displayName) : `@${displayName}`;
+    const uid = member.id || member.user?.id;
+    const discordMention = uid && uid !== '0' ? `<@${uid}>` : `@${uname}`;
     const srv = member.guild.name;
     const mc = String(member.guild.memberCount);
     return String(text || '')
-        .replace(/\{user\}|\{mention\}/gi, mentionText)
+        .replace(/\{mention\}/gi, discordMention)
+        .replace(/\{user\}/gi, discordMention)
         .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
         .replace(/\{server\}|\{guild\}/gi, srv)
         .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
@@ -1091,9 +1091,11 @@ function sessionUserAvatarUrl(user) {
 }
 
 function previewWelcomeMemberStub(guild, sessionUser) {
+    const uname = sessionUser?.username || 'Usuario';
     return {
         id: String(sessionUser?.id || '0'),
-        user: { username: sessionUser?.username || 'Usuario' },
+        displayName: uname,
+        user: { id: sessionUser?.id, username: uname },
         guild: { name: guild?.name || 'Servidor', memberCount: guild?.memberCount ?? 1 }
     };
 }

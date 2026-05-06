@@ -27,13 +27,15 @@ function enqueueWelcomeSend(queueKey, task) {
 }
 
 function applyTemplate(text, member) {
-    const displayName = member?.displayName || member?.user?.username || 'Usuario';
-    const mentionText = String(displayName).startsWith('@') ? String(displayName) : `@${displayName}`;
+    const uid = member?.user?.id ?? member?.id;
+    // Discord solo pinta la mención en azul con <@id>, no con @texto.
+    const discordMention = uid ? `<@${uid}>` : '@usuario';
     const uname = member.user.username;
     const srv = member.guild.name;
     const mc = String(member.guild.memberCount);
     return String(text || '')
-        .replace(/\{user\}|\{mention\}/gi, mentionText)
+        .replace(/\{mention\}/gi, discordMention)
+        .replace(/\{user\}/gi, discordMention)
         .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
         .replace(/\{server\}|\{guild\}/gi, srv)
         .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
@@ -80,7 +82,10 @@ module.exports = {
 
         if (welcomeConfig) {
             const content = welcomeConfig.mentionUser ? `<@${member.id}>` : undefined;
-            const allowedMentions = welcomeConfig.mentionUser ? { parse: ['users'] } : undefined;
+            // Si «mencionar usuario» está off, evitar ping aunque el embed lleve <@id> (sigue viéndose azul).
+            const allowedMentions = welcomeConfig.mentionUser
+                ? { parse: ['users'] }
+                : { parse: [], users: [], roles: [], repliedUser: false };
             // Deshabilitar el modo tarjeta (PNG con "fondo/imagen de fondo").
             const welcomeStyle = welcomeConfig.welcomeStyle === 'card' ? 'embed' : welcomeConfig.welcomeStyle;
 
@@ -169,7 +174,7 @@ module.exports = {
 
         const embed = Embeds.info(
             '¡Bienvenido!',
-            `¡Hola @${member.displayName || member.user.username}! Bienvenido a **${member.guild.name}**\n\n` +
+            `¡Hola <@${member.user.id}>! Bienvenido a **${member.guild.name}**\n\n` +
             `Eres el miembro #${member.guild.memberCount}`
         );
         embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));

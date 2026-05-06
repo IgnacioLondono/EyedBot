@@ -1621,6 +1621,16 @@ body {
     line-height: 1.6;
 }
 
+/* Simula mención Discord en vista previa del panel (el cliente real usa <@id>) */
+.discord-mention-preview {
+    display: inline;
+    padding: 0 0.12em;
+    border-radius: 3px;
+    background: rgba(88, 101, 242, 0.42);
+    color: #dee0fc;
+    font-weight: 600;
+}
+
 .discord-embed-fields {
     margin-top: 1rem;
     display: flex;
