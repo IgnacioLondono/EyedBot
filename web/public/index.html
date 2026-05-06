@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
-    <link rel="stylesheet" href="styles.css?v=20260505-settings-theme-layout">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-settings-theme-flat-preview">
+    <link rel="stylesheet" href="styles.css?v=20260505-wallpaper-bg">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-wallpaper-bg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -13,6 +13,11 @@
 <body>
     <!-- Background Effects -->
     <div class="gradient-bg" aria-hidden="true">
+        <div class="user-wallpaper is-off" id="userWallpaperLayer" aria-hidden="true">
+            <div class="user-wallpaper__bloom"></div>
+            <div class="user-wallpaper__sharp"></div>
+            <div class="user-wallpaper__veil"></div>
+        </div>
         <svg xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <filter id="goo">
@@ -447,6 +452,40 @@
                                                     <small id="themeBorderStrengthValue">28%</small>
                                                 </div>
                                             </div>
+
+                                            <section class="settings-wallpaper-section" aria-labelledby="settingsWallpaperHeading">
+                                                <header class="dpx-section-head settings-theme-section-head">
+                                                    <div class="dpx-section-head-text">
+                                                        <h4 id="settingsWallpaperHeading">Fondo de pantalla</h4>
+                                                        <p>Imagen nítida con halo suave; el velo usa los colores del tema y la intensidad ambiental.</p>
+                                                    </div>
+                                                </header>
+                                                <div class="settings-wallpaper-grid">
+                                                    <label class="theme-toggle theme-toggle--wallpaper">
+                                                        <div class="theme-toggle-copy">
+                                                            <strong>Mostrar imagen de fondo</strong>
+                                                            <small>Si está desactivado, solo verás el degradado animado habitual.</small>
+                                                        </div>
+                                                        <input type="checkbox" id="themeWallpaperEnabled">
+                                                        <span class="theme-toggle-track" aria-hidden="true"></span>
+                                                    </label>
+                                                    <div class="settings-wallpaper-file-row">
+                                                        <input type="file" id="themeWallpaperFile" class="form-control" accept="image/jpeg,image/png,image/webp">
+                                                        <button type="button" id="themeWallpaperClearBtn" class="btn btn-secondary btn-sm">Quitar imagen</button>
+                                                    </div>
+                                                    <div class="form-group theme-slider-group">
+                                                        <label for="themeWallpaperBloom">Halo / bloom</label>
+                                                        <input type="range" id="themeWallpaperBloom" class="form-control" min="0" max="100" value="42" step="1">
+                                                        <small id="themeWallpaperBloomValue">42%</small>
+                                                    </div>
+                                                    <div class="form-group theme-slider-group">
+                                                        <label for="themeWallpaperVeil">Velo del tema (legibilidad)</label>
+                                                        <input type="range" id="themeWallpaperVeil" class="form-control" min="0" max="100" value="38" step="1">
+                                                        <small id="themeWallpaperVeilValue">38%</small>
+                                                    </div>
+                                                    <p class="settings-wallpaper-hint">PNG, JPG o WebP. Se optimiza en el navegador (máx. ~2200 px). Guarda con el botón superior si cambias otros colores.</p>
+                                                </div>
+                                            </section>
 
                                             <div class="theme-status-line">
                                                 <span class="theme-status-dot"></span>
@@ -1548,6 +1587,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260505-theme-presets-extra"></script>
+    <script src="app.js?v=20260505-wallpaper-bg"></script>
 </body>
 </html>

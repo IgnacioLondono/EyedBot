@@ -1256,6 +1256,36 @@ label { color: var(--text-secondary); font-weight: 500; }
     padding-right: 0.25rem;
 }
 
+#profileSettingsSection .settings-wallpaper-section {
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
+}
+
+#profileSettingsSection .settings-wallpaper-grid {
+    display: grid;
+    gap: 0.85rem;
+}
+
+#profileSettingsSection .settings-wallpaper-file-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    align-items: center;
+}
+
+#profileSettingsSection .settings-wallpaper-file-row .form-control {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+#profileSettingsSection .settings-wallpaper-hint {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
 @media (max-width: 1100px) {
     #profileSettingsSection .settings-theme-layout {
         grid-template-columns: 1fr;
