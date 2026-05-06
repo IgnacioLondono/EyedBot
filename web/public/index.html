@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
-    <link rel="stylesheet" href="styles.css?v=20260505-wallpaper-idb-video">
+    <link rel="stylesheet" href="styles.css?v=20260507-bg-bubbles-toggle">
     <link rel="stylesheet" href="dashboard-pro.css?v=20260505-wallpaper-bg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -453,6 +453,14 @@
                                                     <input type="range" id="themeBorderStrength" class="form-control" min="0" max="100" value="28" step="1">
                                                     <small id="themeBorderStrengthValue">28%</small>
                                                 </div>
+                                                <label class="theme-toggle theme-toggle--wallpaper">
+                                                    <div class="theme-toggle-copy">
+                                                        <strong>Burbujas en el fondo</strong>
+                                                        <small>Orbes de color animados con efecto “goo”. Desactívalos si prefieres solo el degradado base y tu imagen o vídeo.</small>
+                                                    </div>
+                                                    <input type="checkbox" id="themeBackgroundBubbles" checked>
+                                                    <span class="theme-toggle-track" aria-hidden="true"></span>
+                                                </label>
                                             </div>
 
                                             <section class="settings-wallpaper-section" aria-labelledby="settingsWallpaperHeading">
@@ -466,7 +474,7 @@
                                                     <label class="theme-toggle theme-toggle--wallpaper">
                                                         <div class="theme-toggle-copy">
                                                             <strong>Mostrar imagen de fondo</strong>
-                                                            <small>Si está desactivado, solo verás el degradado animado habitual.</small>
+                                                            <small>Si está desactivado, solo verás el degradado base (sin tu imagen o vídeo).</small>
                                                         </div>
                                                         <input type="checkbox" id="themeWallpaperEnabled">
                                                         <span class="theme-toggle-track" aria-hidden="true"></span>
@@ -1589,6 +1597,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260505-wallpaper-migrate"></script>
+    <script src="app.js?v=20260507-bg-bubbles-toggle"></script>
 </body>
 </html>
