@@ -500,6 +500,8 @@ const THEME_DEFAULTS = {
     preset: 'midnight',
     ...THEME_PRESETS.midnight,
     autoContrast: true,
+    /** Orbes animados (.gradients-container) detrás del contenido */
+    backgroundBubbles: true,
     wallpaperEnabled: false,
     wallpaperStorage: 'none',
     wallpaperKind: 'none',
@@ -1271,6 +1273,10 @@ function normalizeThemeSettings(input = {}) {
         atmosphere: clampNumber(Number.parseInt(input.atmosphere ?? preset.atmosphere, 10) || preset.atmosphere, 0, 100),
         borderStrength: clampNumber(Number.parseInt(input.borderStrength ?? preset.borderStrength, 10) || preset.borderStrength, 0, 100),
         autoContrast: typeof input.autoContrast === 'boolean' ? input.autoContrast : autoContrastFallback,
+        backgroundBubbles:
+            typeof input.backgroundBubbles === 'boolean'
+                ? input.backgroundBubbles
+                : THEME_DEFAULTS.backgroundBubbles,
         wallpaperEnabled: input.wallpaperEnabled === true,
         wallpaperStorage,
         wallpaperKind,
@@ -1358,6 +1364,11 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--theme-pattern-tertiary', rgbaFromHex(normalized.borderColor, 0.04 + (patternStrength * 0.1)));
     root.style.setProperty('--theme-glow-color', rgbaFromHex(normalized.accentPrimary, 0.12 + (patternStrength * 0.32)));
     root.style.setProperty('--theme-lines-opacity', String(0.1 + (patternStrength * 0.22)));
+
+    const gradientBgEl = document.querySelector('.gradient-bg');
+    if (gradientBgEl) {
+        gradientBgEl.classList.toggle('gradient-bg--no-bubbles', normalized.backgroundBubbles === false);
+    }
 
     applyWallpaperVeilCss(normalized);
 
@@ -1474,6 +1485,10 @@ function getThemeControlsState() {
         atmosphere: document.getElementById('themeAtmosphere')?.value,
         borderStrength: document.getElementById('themeBorderStrength')?.value,
         autoContrast: document.getElementById('themeAutoContrast')?.checked,
+        backgroundBubbles:
+            document.getElementById('themeBackgroundBubbles') != null
+                ? Boolean(document.getElementById('themeBackgroundBubbles').checked)
+                : baseWp.backgroundBubbles !== false,
         wallpaperEnabled: document.getElementById('themeWallpaperEnabled')?.checked ?? baseWp.wallpaperEnabled,
         wallpaperStorage: baseWp.wallpaperStorage ?? THEME_DEFAULTS.wallpaperStorage,
         wallpaperKind: baseWp.wallpaperKind ?? THEME_DEFAULTS.wallpaperKind,
@@ -1509,6 +1524,11 @@ function syncThemeControls(theme = themeSettings) {
     const autoContrastInput = document.getElementById('themeAutoContrast');
     if (autoContrastInput && autoContrastInput.checked !== normalized.autoContrast) {
         autoContrastInput.checked = normalized.autoContrast;
+    }
+
+    const bubblesInput = document.getElementById('themeBackgroundBubbles');
+    if (bubblesInput && bubblesInput.checked !== normalized.backgroundBubbles) {
+        bubblesInput.checked = normalized.backgroundBubbles;
     }
 
     const atmosphereValue = document.getElementById('themeAtmosphereValue');
@@ -1563,6 +1583,7 @@ function setThemePreset(presetId) {
     applyThemeSettings({
         preset: presetId,
         ...preset,
+        backgroundBubbles: cur.backgroundBubbles,
         wallpaperEnabled: cur.wallpaperEnabled,
         wallpaperStorage: cur.wallpaperStorage,
         wallpaperKind: cur.wallpaperKind,
@@ -1626,6 +1647,7 @@ function bindThemeControls() {
         'themeAtmosphere',
         'themeBorderStrength',
         'themeAutoContrast',
+        'themeBackgroundBubbles',
         'themeWallpaperBloom',
         'themeWallpaperVeil'
     ];

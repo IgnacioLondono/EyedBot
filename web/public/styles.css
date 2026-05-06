@@ -110,6 +110,21 @@ body {
     opacity: 0.92;
 }
 
+.gradient-bg.gradient-bg--no-bubbles .gradients-container {
+    opacity: 0 !important;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.gradient-bg.gradient-bg--no-bubbles .gradients-container .g1,
+.gradient-bg.gradient-bg--no-bubbles .gradients-container .g2,
+.gradient-bg.gradient-bg--no-bubbles .gradients-container .g3,
+.gradient-bg.gradient-bg--no-bubbles .gradients-container .g4,
+.gradient-bg.gradient-bg--no-bubbles .gradients-container .g5,
+.gradient-bg.gradient-bg--no-bubbles .gradients-container .interactive {
+    animation-play-state: paused !important;
+}
+
 .g1,
 .g2,
 .g3,
