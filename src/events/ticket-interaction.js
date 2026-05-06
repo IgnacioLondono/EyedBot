@@ -320,7 +320,21 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
         transcriptEntries
     };
 
-    await db.set(`ticket_report_${reportId}`, reportData).catch(() => null);
+    try {
+        await db.set(`ticket_report_${reportId}`, reportData);
+    } catch (err) {
+        console.warn(`⚠️ Error guardando informe ${reportId} en la base de datos:`, err?.message || err);
+    }
+
+    // Verificacion rápida: intentar leer lo guardado
+    try {
+        const verify = await db.get(`ticket_report_${reportId}`);
+        if (!verify) {
+            console.warn(`⚠️ Verificacion fallida: informe ${reportId} no se encontro despues de guardar (guild ${guild.id})`);
+        }
+    } catch (err) {
+        console.warn(`⚠️ Error comprobando informe ${reportId}:`, err?.message || err);
+    }
 
     const cfg = await resolveConfig(guild.id).catch(() => null);
     const receiptHistoryChannelId = String(cfg?.receiptHistoryChannelId || '').trim();
@@ -1641,6 +1655,46 @@ async function listTicketReports(guildId, limit = 50) {
     }
 }
 
+// Fallback amplio: intenta buscar claves con distintos formatos si no se encontraron informes
+async function listTicketReportsWithFallback(guildId, limit = 50) {
+    const primary = await listTicketReports(guildId, limit).catch(() => []);
+    if (primary && primary.length) return primary;
+
+    // Intentar patron mas amplio: ticket_report_%{guildId}%
+    try {
+        const safeGuildId = String(guildId || '');
+        const lim = Math.max(1, Math.min(500, Number(limit) || 50));
+        const altLike = `ticket_report_%${safeGuildId}%`;
+        const altRows = await db.query(
+            'SELECT `value` FROM key_value_store WHERE `key` LIKE ? ORDER BY updated_at DESC LIMIT ?',
+            [altLike, lim]
+        ).catch(() => []);
+
+        const out = [];
+        for (const row of altRows || []) {
+            try {
+                const raw = row?.value;
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) {
+                    out.push(parsed);
+                }
+            } catch (e) {
+                // ignorar parse errors
+            }
+        }
+
+        if (out.length) {
+            out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+            console.warn(`⚠️ Se recuperaron informes de tickets con un patron alternativo para guild ${guildId}: encontrados ${out.length}`);
+            return out;
+        }
+    } catch (err) {
+        console.warn('⚠️ Fallback listTicketReports fallo:', err?.message || err);
+    }
+
+    return [];
+}
+
 async function getTicketReport(guildId, reportId) {
     const safeGuildId = String(guildId || '');
     const safeReportId = String(reportId || '');
@@ -1937,6 +1991,7 @@ module.exports = {
     claimTicketFromWeb,
     listPendingRequests,
     listTicketReports,
+    listTicketReportsWithFallback,
     getTicketReport,
     listActiveTicketChannels,
     listTicketChannelMessages,

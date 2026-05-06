@@ -31,6 +31,7 @@ const {
     claimTicketFromWeb,
     listPendingRequests,
     listTicketReports,
+    listTicketReportsWithFallback,
     getTicketReport,
     listActiveTicketChannels,
     listTicketChannelMessages,
@@ -1993,7 +1994,17 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) =>
 
         const rawActive = listActiveTicketChannels(guild);
         const rawPending = await listPendingRequests(guildId);
-        const rawReports = await listTicketReports(guildId, historyLimit);
+        let rawReports = await listTicketReports(guildId, historyLimit);
+        if (!rawReports || !rawReports.length) {
+            try {
+                // Intentar una consulta alternativa si por alguna razon no hay reports con el patron esperado
+                if (typeof listTicketReportsWithFallback === 'function') {
+                    rawReports = await listTicketReportsWithFallback(guildId, historyLimit);
+                }
+            } catch (e) {
+                console.warn('Fallback listTicketReports fallo:', e?.message || e);
+            }
+        }
 
         const [active, pending, history] = await Promise.all([
             enrichActiveTickets(guild, botClient, rawActive),
