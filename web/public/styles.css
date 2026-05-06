@@ -937,7 +937,7 @@ body {
     padding-right: 0;
 }
 
-.section#profileSettingsSection .theme-lab-grid {
+.section#profileSettingsSection .settings-theme-layout {
     max-height: none;
     overflow: visible;
     padding-right: 0;
@@ -977,7 +977,8 @@ body {
         grid-template-columns: 1fr;
     }
 
-    .theme-lab-grid {
+    .theme-lab-grid,
+    .section#profileSettingsSection .settings-theme-layout {
         grid-template-columns: 1fr;
     }
 }
@@ -1017,7 +1018,8 @@ body {
         min-height: 0;
     }
 
-    .theme-controls-card {
+    .theme-controls-card,
+    .section#profileSettingsSection .settings-theme-pane--controls {
         max-height: 46vh;
         padding-right: 0.35rem;
     }
