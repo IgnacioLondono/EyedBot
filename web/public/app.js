@@ -5219,6 +5219,29 @@ async function publishVerifyEmbed(guildId) {
     }
 }
 
+async function updateVerifyEmbedInDiscord(guildId) {
+    const saved = await saveVerifyConfig(guildId, false);
+    if (!saved) return;
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/verify-embed-update`, {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo actualizar el embed en Discord', 'error');
+            return;
+        }
+        if (document.getElementById('verifyMessageId') && data.messageId) {
+            document.getElementById('verifyMessageId').value = data.messageId;
+        }
+        showToast('Embed de verificación actualizado en el canal', 'success');
+    } catch (error) {
+        console.error('Error actualizando verify embed:', error);
+        showToast('Error actualizando verify embed', 'error');
+    }
+}
+
 async function uploadVerifyImage(guildId) {
     const fileInput = document.getElementById('verifyImageFile');
     const imageUrlInput = document.getElementById('verifyImageUrl');
@@ -5303,6 +5326,7 @@ async function loadVerifyPanel(guildId) {
             actionsHtml: `
                 <span class="dpx-status-chip ${enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${enabled ? 'Activo' : 'Inactivo'}</span>
                 <button type="button" id="saveVerifyBtn" class="btn btn-secondary">Guardar</button>
+                <button type="button" id="updateVerifyEmbedBtn" class="btn btn-secondary" ${isPublished ? '' : 'disabled'} title="${isPublished ? 'Edita el mensaje ya publicado (mismo Message ID)' : 'Publica primero un embed'}">Actualizar en Discord</button>
                 <button type="button" id="publishVerifyBtn" class="btn btn-primary">Publicar embed</button>
             `
         });
@@ -5446,8 +5470,10 @@ async function loadVerifyPanel(guildId) {
         const saveBtn = document.getElementById('saveVerifyBtn');
         const publishBtn = document.getElementById('publishVerifyBtn');
         const uploadBtn = document.getElementById('verifyUploadImageBtn');
+        const updateVerifyBtn = document.getElementById('updateVerifyEmbedBtn');
         if (saveBtn) saveBtn.addEventListener('click', () => saveVerifyConfig(guildId, true));
         if (publishBtn) publishBtn.addEventListener('click', () => publishVerifyEmbed(guildId));
+        if (updateVerifyBtn) updateVerifyBtn.addEventListener('click', () => updateVerifyEmbedInDiscord(guildId));
         if (uploadBtn) uploadBtn.addEventListener('click', () => uploadVerifyImage(guildId));
     } catch (error) {
         console.error('Error cargando panel de verificación:', error);
@@ -5538,6 +5564,29 @@ async function publishTicketPanel(guildId) {
     }
 }
 
+async function updateTicketPanelInDiscord(guildId) {
+    const saved = await saveTicketConfig(guildId, false);
+    if (!saved) return;
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/ticket-embed-update`, {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo actualizar el panel en Discord', 'error');
+            return;
+        }
+        if (document.getElementById('ticketMessageId') && data.messageId) {
+            document.getElementById('ticketMessageId').value = data.messageId;
+        }
+        showToast('Panel de tickets actualizado en el canal', 'success');
+    } catch (error) {
+        console.error('Error actualizando panel de tickets:', error);
+        showToast('Error actualizando panel de tickets', 'error');
+    }
+}
+
 async function loadTicketPanel(guildId) {
     const container = document.getElementById('ticketContainer');
     if (!container) return;
@@ -5563,6 +5612,7 @@ async function loadTicketPanel(guildId) {
             .filter((role) => role && role.id && role.name && role.name !== '@everyone')
             .sort((a, b) => (b.position || 0) - (a.position || 0));
 
+        const ticketPanelPublished = !!cfg.messageId;
         const panelChannelName = cfg.panelChannelId ? (channels.find((c) => c.id === cfg.panelChannelId)?.name || 'Desconocido') : 'No configurado';
         const requestChannelName = cfg.requestChannelId
             ? (channels.find((c) => c.id === cfg.requestChannelId)?.name || 'Desconocido')
@@ -5579,6 +5629,7 @@ async function loadTicketPanel(guildId) {
             actionsHtml: `
                 <span class="dpx-status-chip ${cfg.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${cfg.enabled ? 'Sistema activo' : 'Sistema inactivo'}</span>
                 <button type="button" id="saveTicketBtn" class="btn btn-secondary">Guardar configuración</button>
+                <button type="button" id="updateTicketPanelBtn" class="btn btn-secondary" ${ticketPanelPublished ? '' : 'disabled'} title="${ticketPanelPublished ? 'Edita el mensaje ya publicado (mismo Message ID)' : 'Publica primero el panel'}">Actualizar en Discord</button>
                 <button type="button" id="publishTicketBtn" class="btn btn-primary">Publicar panel</button>
             `
         });
@@ -5723,8 +5774,10 @@ async function loadTicketPanel(guildId) {
 
         const saveBtn = document.getElementById('saveTicketBtn');
         const publishBtn = document.getElementById('publishTicketBtn');
+        const updateTicketBtn = document.getElementById('updateTicketPanelBtn');
         if (saveBtn) saveBtn.addEventListener('click', () => saveTicketConfig(guildId, true));
         if (publishBtn) publishBtn.addEventListener('click', () => publishTicketPanel(guildId));
+        if (updateTicketBtn) updateTicketBtn.addEventListener('click', () => updateTicketPanelInDiscord(guildId));
     } catch (error) {
         console.error('Error cargando panel de tickets:', error);
         container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--error-color);">Error cargando sistema de tickets.</div>';
