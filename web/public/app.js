@@ -178,7 +178,11 @@ const THEME_PRESETS = {
 const THEME_DEFAULTS = {
     preset: 'midnight',
     ...THEME_PRESETS.midnight,
-    autoContrast: true
+    autoContrast: true,
+    wallpaperEnabled: false,
+    wallpaperUrl: '',
+    wallpaperBloom: 42,
+    wallpaperVeil: 38
 };
 
 const DASHBOARD_ICON = `
@@ -895,6 +899,11 @@ function normalizeThemeSettings(input = {}) {
     const preset = THEME_PRESETS[presetId] || THEME_DEFAULTS;
     const autoContrastFallback = typeof preset.autoContrast === 'boolean' ? preset.autoContrast : THEME_DEFAULTS.autoContrast;
 
+    let wallpaperUrl = typeof input.wallpaperUrl === 'string' ? input.wallpaperUrl.trim() : '';
+    if (wallpaperUrl.length > 3_500_000) {
+        wallpaperUrl = wallpaperUrl.slice(0, 3_500_000);
+    }
+
     return {
         preset: presetId,
         accentPrimary: normalizeHexColor(input.accentPrimary, preset.accentPrimary),
@@ -907,7 +916,11 @@ function normalizeThemeSettings(input = {}) {
         borderColor: normalizeHexColor(input.borderColor, preset.borderColor),
         atmosphere: clampNumber(Number.parseInt(input.atmosphere ?? preset.atmosphere, 10) || preset.atmosphere, 0, 100),
         borderStrength: clampNumber(Number.parseInt(input.borderStrength ?? preset.borderStrength, 10) || preset.borderStrength, 0, 100),
-        autoContrast: typeof input.autoContrast === 'boolean' ? input.autoContrast : autoContrastFallback
+        autoContrast: typeof input.autoContrast === 'boolean' ? input.autoContrast : autoContrastFallback,
+        wallpaperEnabled: input.wallpaperEnabled === true,
+        wallpaperUrl,
+        wallpaperBloom: clampNumber(Number.parseInt(input.wallpaperBloom ?? THEME_DEFAULTS.wallpaperBloom, 10) || THEME_DEFAULTS.wallpaperBloom, 0, 100),
+        wallpaperVeil: clampNumber(Number.parseInt(input.wallpaperVeil ?? THEME_DEFAULTS.wallpaperVeil, 10) || THEME_DEFAULTS.wallpaperVeil, 0, 100)
     };
 }
 
@@ -918,6 +931,11 @@ function saveThemeSettings(theme = themeSettings) {
         localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(normalized));
     } catch (error) {
         console.warn('No se pudo guardar la personalizacion visual:', error);
+        const code = error?.code;
+        const name = error?.name || '';
+        if (name === 'QuotaExceededError' || code === 22) {
+            showToast('Espacio del navegador lleno: prueba otra imagen más pequeña o quita el fondo.', 'error');
+        }
     }
 }
 
@@ -979,6 +997,36 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--theme-pattern-tertiary', rgbaFromHex(normalized.borderColor, 0.04 + (patternStrength * 0.1)));
     root.style.setProperty('--theme-glow-color', rgbaFromHex(normalized.accentPrimary, 0.12 + (patternStrength * 0.32)));
     root.style.setProperty('--theme-lines-opacity', String(0.1 + (patternStrength * 0.22)));
+
+    const wpLayer = document.getElementById('userWallpaperLayer');
+    const wpActive = Boolean(normalized.wallpaperEnabled && normalized.wallpaperUrl && normalized.wallpaperUrl.length > 64);
+    if (wpLayer) {
+        wpLayer.classList.toggle('is-off', !wpActive);
+        wpLayer.setAttribute('aria-hidden', wpActive ? 'false' : 'true');
+    }
+
+    if (wpActive) {
+        const safeUrl = normalized.wallpaperUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        root.style.setProperty('--user-wallpaper-url', `url("${safeUrl}")`);
+        const bloomNorm = clampNumber(normalized.wallpaperBloom / 100, 0, 1);
+        const veilNorm = clampNumber(normalized.wallpaperVeil / 100, 0, 1);
+        const bloomBoost = bloomNorm * (0.45 + patternStrength * 0.55);
+        root.style.setProperty('--user-wallpaper-blur', `${28 + bloomBoost * 76}px`);
+        root.style.setProperty('--user-wallpaper-bloom-opacity', String(0.14 + bloomBoost * 0.52));
+        const veilStrength = veilNorm * (0.55 + patternStrength * 0.45);
+        root.style.setProperty('--wallpaper-veil-t', String(0.18 + veilStrength * 0.5));
+        root.style.setProperty('--wallpaper-veil-m', String(0.14 + veilStrength * 0.44));
+        root.style.setProperty('--wallpaper-veil-accent', String(0.05 + veilStrength * patternStrength * 0.18));
+        root.style.setProperty('--wallpaper-veil-layer-opacity', String(0.72 + veilNorm * 0.22));
+    } else {
+        root.style.setProperty('--user-wallpaper-url', 'none');
+        root.style.removeProperty('--user-wallpaper-blur');
+        root.style.removeProperty('--user-wallpaper-bloom-opacity');
+        root.style.removeProperty('--wallpaper-veil-t');
+        root.style.removeProperty('--wallpaper-veil-m');
+        root.style.removeProperty('--wallpaper-veil-accent');
+        root.style.removeProperty('--wallpaper-veil-layer-opacity');
+    }
 
     const rgbAccentPrimary = hexToRgb(normalized.accentPrimary);
     const rgbAccentSecondary = hexToRgb(normalized.accentSecondary);
@@ -1079,6 +1127,7 @@ function initializeInteractiveGradient() {
 }
 
 function getThemeControlsState() {
+    const baseWp = themeSettings || {};
     return normalizeThemeSettings({
         preset: document.querySelector('.theme-preset-btn.active')?.dataset.themePreset || themeSettings?.preset || THEME_DEFAULTS.preset,
         accentPrimary: document.getElementById('themeAccentPrimary')?.value,
@@ -1091,7 +1140,11 @@ function getThemeControlsState() {
         borderColor: document.getElementById('themeBorderColor')?.value,
         atmosphere: document.getElementById('themeAtmosphere')?.value,
         borderStrength: document.getElementById('themeBorderStrength')?.value,
-        autoContrast: document.getElementById('themeAutoContrast')?.checked
+        autoContrast: document.getElementById('themeAutoContrast')?.checked,
+        wallpaperEnabled: document.getElementById('themeWallpaperEnabled')?.checked ?? baseWp.wallpaperEnabled,
+        wallpaperUrl: baseWp.wallpaperUrl ?? '',
+        wallpaperBloom: document.getElementById('themeWallpaperBloom')?.value ?? baseWp.wallpaperBloom,
+        wallpaperVeil: document.getElementById('themeWallpaperVeil')?.value ?? baseWp.wallpaperVeil
     });
 }
 
@@ -1127,6 +1180,17 @@ function syncThemeControls(theme = themeSettings) {
     const borderStrengthValue = document.getElementById('themeBorderStrengthValue');
     if (borderStrengthValue) borderStrengthValue.textContent = `${normalized.borderStrength}%`;
 
+    const wpEnabled = document.getElementById('themeWallpaperEnabled');
+    if (wpEnabled) wpEnabled.checked = normalized.wallpaperEnabled === true;
+    const wpBloom = document.getElementById('themeWallpaperBloom');
+    if (wpBloom) wpBloom.value = String(normalized.wallpaperBloom);
+    const wpBloomVal = document.getElementById('themeWallpaperBloomValue');
+    if (wpBloomVal) wpBloomVal.textContent = `${normalized.wallpaperBloom}%`;
+    const wpVeil = document.getElementById('themeWallpaperVeil');
+    if (wpVeil) wpVeil.value = String(normalized.wallpaperVeil);
+    const wpVeilVal = document.getElementById('themeWallpaperVeilValue');
+    if (wpVeilVal) wpVeilVal.textContent = `${normalized.wallpaperVeil}%`;
+
     document.querySelectorAll('.theme-preset-btn').forEach((button) => {
         button.classList.toggle('active', button.dataset.themePreset === normalized.preset);
     });
@@ -1158,7 +1222,15 @@ function applyThemeSettings(theme = themeSettings, options = {}) {
 
 function setThemePreset(presetId) {
     const preset = THEME_PRESETS[presetId] || THEME_PRESETS[THEME_DEFAULTS.preset];
-    applyThemeSettings({ preset: presetId, ...preset });
+    const cur = normalizeThemeSettings(themeSettings || {});
+    applyThemeSettings({
+        preset: presetId,
+        ...preset,
+        wallpaperEnabled: cur.wallpaperEnabled,
+        wallpaperUrl: cur.wallpaperUrl,
+        wallpaperBloom: cur.wallpaperBloom,
+        wallpaperVeil: cur.wallpaperVeil
+    });
     showToast(`Tema aplicado: ${presetId}`, 'success');
 }
 
@@ -1199,6 +1271,39 @@ function bindSettingsPaneNavigation() {
     switchSettingsPane(currentSettingsPaneId, { silent: true });
 }
 
+function resizeWallpaperToDataUrl(file, maxEdge = 2200, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objUrl = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(objUrl);
+            let { width, height } = img;
+            const ratio = Math.min(1, maxEdge / Math.max(width, height));
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Canvas no disponible'));
+                return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            try {
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            } catch (err) {
+                reject(err);
+            }
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(objUrl);
+            reject(new Error('No se pudo leer la imagen'));
+        };
+        img.src = objUrl;
+    });
+}
+
 function bindThemeControls() {
     const controlIds = [
         'themeAccentPrimary',
@@ -1211,17 +1316,82 @@ function bindThemeControls() {
         'themeBorderColor',
         'themeAtmosphere',
         'themeBorderStrength',
-        'themeAutoContrast'
+        'themeAutoContrast',
+        'themeWallpaperBloom',
+        'themeWallpaperVeil'
     ];
 
     controlIds.forEach((id) => {
         const el = document.getElementById(id);
         if (!el) return;
         el.addEventListener('input', () => {
+            if (id === 'themeWallpaperBloom') {
+                const lab = document.getElementById('themeWallpaperBloomValue');
+                if (lab) lab.textContent = `${el.value}%`;
+            }
+            if (id === 'themeWallpaperVeil') {
+                const lab = document.getElementById('themeWallpaperVeilValue');
+                if (lab) lab.textContent = `${el.value}%`;
+            }
             const nextTheme = getThemeControlsState();
             applyThemeSettings(nextTheme, { persist: true });
         });
     });
+
+    const wpToggle = document.getElementById('themeWallpaperEnabled');
+    if (wpToggle) {
+        wpToggle.addEventListener('change', () => {
+            applyThemeSettings(getThemeControlsState(), { persist: true });
+        });
+    }
+
+    const wpFile = document.getElementById('themeWallpaperFile');
+    if (wpFile) {
+        wpFile.addEventListener('change', async () => {
+            const file = wpFile.files?.[0];
+            if (!file) return;
+            if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
+                showToast('Usa JPG, PNG o WebP', 'warning');
+                wpFile.value = '';
+                return;
+            }
+            try {
+                const dataUrl = await resizeWallpaperToDataUrl(file);
+                applyThemeSettings(
+                    normalizeThemeSettings({
+                        ...getThemeControlsState(),
+                        wallpaperUrl: dataUrl,
+                        wallpaperEnabled: true
+                    }),
+                    { persist: true }
+                );
+                syncThemeControls(themeSettings);
+                const wt = document.getElementById('themeWallpaperEnabled');
+                if (wt) wt.checked = true;
+                showToast('Fondo aplicado', 'success');
+            } catch (e) {
+                console.warn(e);
+                showToast(e.message || 'No se pudo procesar la imagen', 'error');
+            }
+            wpFile.value = '';
+        });
+    }
+
+    const wpClear = document.getElementById('themeWallpaperClearBtn');
+    if (wpClear) {
+        wpClear.addEventListener('click', () => {
+            applyThemeSettings(
+                normalizeThemeSettings({
+                    ...getThemeControlsState(),
+                    wallpaperUrl: '',
+                    wallpaperEnabled: false
+                }),
+                { persist: true }
+            );
+            syncThemeControls(themeSettings);
+            showToast('Fondo quitado', 'success');
+        });
+    }
 
     document.querySelectorAll('.theme-preset-btn').forEach((button) => {
         button.addEventListener('click', () => {

@@ -102,6 +102,8 @@ body {
 }
 
 .gradients-container {
+    position: relative;
+    z-index: 1;
     filter: url(#goo) blur(40px);
     width: 100%;
     height: 100%;
@@ -180,6 +182,57 @@ body {
     top: -50%;
     left: -50%;
     opacity: 0.38;
+}
+
+/* Wallpaper opcional: capa nítida + halo borroso; el velo mezcla acentos del tema */
+.user-wallpaper {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.user-wallpaper.is-off {
+    display: none;
+}
+
+.user-wallpaper__bloom,
+.user-wallpaper__sharp,
+.user-wallpaper__veil {
+    position: absolute;
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+.user-wallpaper__bloom {
+    inset: -12%;
+    z-index: 0;
+    background-image: var(--user-wallpaper-url, none);
+    filter: blur(var(--user-wallpaper-blur, 52px)) saturate(1.2) brightness(1.06);
+    opacity: var(--user-wallpaper-bloom-opacity, 0.38);
+    transform: scale(1.03);
+}
+
+.user-wallpaper__sharp {
+    inset: 0;
+    z-index: 1;
+    background-image: var(--user-wallpaper-url, none);
+    filter: saturate(1.05) contrast(1.03);
+}
+
+.user-wallpaper__veil {
+    inset: 0;
+    z-index: 2;
+    background: linear-gradient(
+        168deg,
+        rgba(var(--bg-primary-rgb, 18, 11, 34), var(--wallpaper-veil-t, 0.42)) 0%,
+        rgba(var(--bg-secondary-rgb, 21, 12, 38), var(--wallpaper-veil-m, 0.36)) 48%,
+        rgba(var(--accent-primary-rgb, 124, 77, 255), var(--wallpaper-veil-accent, 0.14)) 100%
+    );
+    mix-blend-mode: soft-light;
+    opacity: var(--wallpaper-veil-layer-opacity, 0.88);
 }
 
 @keyframes moveInCircle {
