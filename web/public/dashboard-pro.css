@@ -1131,11 +1131,6 @@ label { color: var(--text-secondary); font-weight: 500; }
     height: 100%;
 }
 
-#profileSettingsSection .settings-pane-shell.theme-lab {
-    position: relative;
-    overflow: hidden;
-}
-
 #profileSettingsSection .settings-pane-hero.dpx-hero {
     flex-shrink: 0;
 }
@@ -1194,29 +1189,90 @@ label { color: var(--text-secondary); font-weight: 500; }
     word-break: break-word;
 }
 
-#profileSettingsSection .settings-pane-theme-grid.theme-lab-grid {
+/* Personalización: mismo shell que Cuenta/Web; cuerpo a pantalla completa sin tarjetas anidadas */
+#profileSettingsSection #settingsPaneTheme.active .settings-pane-body.settings-theme-body {
     flex: 1;
     min-height: 0;
-    margin-top: 0;
-    position: relative;
-    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
-/* Theme lab panel */
+#profileSettingsSection .settings-theme-layout {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.4fr);
+    gap: 1.35rem 1.65rem;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.15rem 0.35rem 0.35rem 0;
+}
+
+#profileSettingsSection .settings-theme-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 0;
+}
+
+#profileSettingsSection .settings-theme-section-head.dpx-section-head {
+    padding-bottom: 0;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+#profileSettingsSection .settings-theme-head-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+#profileSettingsSection .settings-theme-pane--preview .settings-theme-preview-panel.theme-preview-panel {
+    flex: 1;
+    min-height: 160px;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    gap: 1rem;
+}
+
+/* Barras de muestra: menos “marco”, integradas en el panel */
+#profileSettingsSection .settings-theme-pane--preview .theme-preview-bar {
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.12);
+}
+
+#profileSettingsSection .settings-theme-pane--preview .theme-preview-avatar {
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.14);
+}
+
+#profileSettingsSection .settings-theme-pane--controls {
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+@media (max-width: 1100px) {
+    #profileSettingsSection .settings-theme-layout {
+        grid-template-columns: 1fr;
+    }
+
+    #profileSettingsSection .settings-theme-pane--controls {
+        max-height: none;
+    }
+}
+
+/* Theme lab panel (legado: otros contextos) */
 .theme-lab {
     background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 18, 11, 34), 0.85), rgba(var(--bg-primary-rgb, 10, 6, 22), 0.85));
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
     border-radius: var(--pro-radius-lg);
     padding: 1.5rem 1.75rem;
     box-shadow: var(--pro-shadow-md);
-}
-
-#profileSettingsSection .theme-lab.settings-pane-shell {
-    padding: 1rem;
-    border-radius: 22px;
-    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.38);
-    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.94), rgba(var(--bg-primary-rgb, 14, 7, 30), 0.97));
-    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
 }
 
 .theme-lab-kicker {

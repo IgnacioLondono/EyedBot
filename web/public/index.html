@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
-    <link rel="stylesheet" href="styles.css?v=20260505-mention-preview">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-scrollbar-gutter-fix">
+    <link rel="stylesheet" href="styles.css?v=20260505-settings-theme-layout">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-settings-theme-flat-preview">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -335,7 +335,7 @@
                         </section>
 
                         <section id="settingsPaneTheme" class="settings-pane">
-                            <div class="theme-lab settings-pane-shell dpx-panel" id="themeLab">
+                            <div class="settings-pane-shell dpx-panel" id="themeLab">
                                 <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#6ee7b7;--dpx-hero-glow-1:rgba(110,231,183,0.24);--dpx-hero-glow-2:rgba(124,77,255,0.18);">
                                     <div class="dpx-hero-text">
                                         <div class="dpx-hero-kicker">Personalización visual</div>
@@ -350,91 +350,105 @@
                                     </div>
                                 </header>
 
-                                <div class="theme-lab-grid settings-pane-theme-grid">
-                                    <div class="theme-preview-card">
-                                        <div class="theme-preview-head">
-                                            <span class="theme-preview-chip">Vista previa</span>
-                                            <span class="theme-preview-tag">En vivo</span>
-                                        </div>
-                                        <div class="theme-preview-panel">
-                                            <div class="theme-preview-panel-top">
-                                                <div class="theme-preview-avatar"></div>
-                                                <div>
-                                                    <div class="theme-preview-title">EyedBot UI</div>
-                                                    <div class="theme-preview-subtitle">Panel de control personalizado</div>
+                                <div class="settings-pane-body settings-theme-body">
+                                    <div class="settings-theme-layout">
+                                        <section class="settings-theme-pane settings-theme-pane--preview" aria-labelledby="settingsThemePreviewHeading">
+                                            <header class="dpx-section-head settings-theme-section-head">
+                                                <div class="dpx-section-head-text">
+                                                    <h4 id="settingsThemePreviewHeading">Vista previa</h4>
+                                                    <p>Acentos, fondos y superficies que verás en el panel.</p>
+                                                </div>
+                                                <div class="settings-theme-head-badges">
+                                                    <span class="theme-preview-chip">Vista previa</span>
+                                                    <span class="theme-preview-tag">En vivo</span>
+                                                </div>
+                                            </header>
+                                            <div class="theme-preview-panel settings-theme-preview-panel">
+                                                <div class="theme-preview-panel-top">
+                                                    <div class="theme-preview-avatar"></div>
+                                                    <div>
+                                                        <div class="theme-preview-title">EyedBot UI</div>
+                                                        <div class="theme-preview-subtitle">Panel de control personalizado</div>
+                                                    </div>
+                                                </div>
+                                                <div class="theme-preview-bars">
+                                                    <span class="theme-preview-bar theme-preview-bar--primary" data-theme-swatch="accentPrimary"></span>
+                                                    <span class="theme-preview-bar theme-preview-bar--secondary" data-theme-swatch="accentSecondary"></span>
+                                                    <span class="theme-preview-bar theme-preview-bar--bg" data-theme-swatch="bgPrimary"></span>
+                                                    <span class="theme-preview-bar theme-preview-bar--card" data-theme-swatch="bgCard"></span>
+                                                </div>
+                                                <div class="theme-preview-copy">
+                                                    <span>Los colores del panel, los botones, el fondo y los bordes cambian según la configuración.</span>
                                                 </div>
                                             </div>
-                                            <div class="theme-preview-bars">
-                                                <span class="theme-preview-bar theme-preview-bar--primary" data-theme-swatch="accentPrimary"></span>
-                                                <span class="theme-preview-bar theme-preview-bar--secondary" data-theme-swatch="accentSecondary"></span>
-                                                <span class="theme-preview-bar theme-preview-bar--bg" data-theme-swatch="bgPrimary"></span>
-                                                <span class="theme-preview-bar theme-preview-bar--card" data-theme-swatch="bgCard"></span>
-                                            </div>
-                                            <div class="theme-preview-copy">
-                                                <span>Los colores del panel, los botones, el fondo y los bordes cambian según la configuración.</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                        </section>
 
-                                    <div class="theme-controls-card">
-                                        <div class="theme-preset-row" id="themePresetRow" aria-label="Presets de tema">
-                                            <button type="button" class="theme-preset-btn active" data-theme-preset="midnight">Midnight</button>
-                                            <button type="button" class="theme-preset-btn" data-theme-preset="aurora">Aurora</button>
-                                            <button type="button" class="theme-preset-btn" data-theme-preset="ember">Ember</button>
-                                            <button type="button" class="theme-preset-btn" data-theme-preset="ocean">Ocean</button>
-                                            <button type="button" class="theme-preset-btn" data-theme-preset="forest">Forest</button>
-                                            <button type="button" class="theme-preset-btn" data-theme-preset="mono">Mono</button>
-                                        </div>
+                                        <section class="settings-theme-pane settings-theme-pane--controls" aria-labelledby="settingsThemeControlsHeading">
+                                            <header class="dpx-section-head settings-theme-section-head">
+                                                <div class="dpx-section-head-text">
+                                                    <h4 id="settingsThemeControlsHeading">Colores y atmósfera</h4>
+                                                    <p>Presets y ajustes finos; cambios en vivo.</p>
+                                                </div>
+                                            </header>
+                                            <div class="theme-preset-row" id="themePresetRow" aria-label="Presets de tema">
+                                                <button type="button" class="theme-preset-btn active" data-theme-preset="midnight">Midnight</button>
+                                                <button type="button" class="theme-preset-btn" data-theme-preset="aurora">Aurora</button>
+                                                <button type="button" class="theme-preset-btn" data-theme-preset="ember">Ember</button>
+                                                <button type="button" class="theme-preset-btn" data-theme-preset="ocean">Ocean</button>
+                                                <button type="button" class="theme-preset-btn" data-theme-preset="forest">Forest</button>
+                                                <button type="button" class="theme-preset-btn" data-theme-preset="mono">Mono</button>
+                                            </div>
 
-                                        <div class="theme-form-grid">
-                                            <div class="form-group">
-                                                <label for="themeAccentPrimary">Acento principal</label>
-                                                <input type="color" id="themeAccentPrimary" class="form-control color-input" value="#9a6dff">
+                                            <div class="theme-form-grid">
+                                                <div class="form-group">
+                                                    <label for="themeAccentPrimary">Acento principal</label>
+                                                    <input type="color" id="themeAccentPrimary" class="form-control color-input" value="#9a6dff">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="themeAccentSecondary">Acento secundario</label>
+                                                    <input type="color" id="themeAccentSecondary" class="form-control color-input" value="#ff78d1">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="themeBgPrimary">Fondo principal</label>
+                                                    <input type="color" id="themeBgPrimary" class="form-control color-input" value="#090512">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="themeBgSecondary">Fondo secundario</label>
+                                                    <input type="color" id="themeBgSecondary" class="form-control color-input" value="#150c26">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="themeBgCard">Superficies</label>
+                                                    <input type="color" id="themeBgCard" class="form-control color-input" value="#1a1030">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="themeTextPrimary">Texto principal</label>
+                                                    <input type="color" id="themeTextPrimary" class="form-control color-input" value="#f4eeff">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="themeTextSecondary">Texto secundario</label>
+                                                    <input type="color" id="themeTextSecondary" class="form-control color-input" value="#cbb7f6">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="themeBorderColor">Color de bordes</label>
+                                                    <input type="color" id="themeBorderColor" class="form-control color-input" value="#be9bff">
+                                                </div>
+                                                <div class="form-group theme-slider-group">
+                                                    <label for="themeAtmosphere">Intensidad ambiental</label>
+                                                    <input type="range" id="themeAtmosphere" class="form-control" min="0" max="100" value="55" step="1">
+                                                    <small id="themeAtmosphereValue">55%</small>
+                                                </div>
+                                                <div class="form-group theme-slider-group">
+                                                    <label for="themeBorderStrength">Fuerza de bordes</label>
+                                                    <input type="range" id="themeBorderStrength" class="form-control" min="0" max="100" value="28" step="1">
+                                                    <small id="themeBorderStrengthValue">28%</small>
+                                                </div>
                                             </div>
-                                            <div class="form-group">
-                                                <label for="themeAccentSecondary">Acento secundario</label>
-                                                <input type="color" id="themeAccentSecondary" class="form-control color-input" value="#ff78d1">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="themeBgPrimary">Fondo principal</label>
-                                                <input type="color" id="themeBgPrimary" class="form-control color-input" value="#090512">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="themeBgSecondary">Fondo secundario</label>
-                                                <input type="color" id="themeBgSecondary" class="form-control color-input" value="#150c26">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="themeBgCard">Superficies</label>
-                                                <input type="color" id="themeBgCard" class="form-control color-input" value="#1a1030">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="themeTextPrimary">Texto principal</label>
-                                                <input type="color" id="themeTextPrimary" class="form-control color-input" value="#f4eeff">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="themeTextSecondary">Texto secundario</label>
-                                                <input type="color" id="themeTextSecondary" class="form-control color-input" value="#cbb7f6">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="themeBorderColor">Color de bordes</label>
-                                                <input type="color" id="themeBorderColor" class="form-control color-input" value="#be9bff">
-                                            </div>
-                                            <div class="form-group theme-slider-group">
-                                                <label for="themeAtmosphere">Intensidad ambiental</label>
-                                                <input type="range" id="themeAtmosphere" class="form-control" min="0" max="100" value="55" step="1">
-                                                <small id="themeAtmosphereValue">55%</small>
-                                            </div>
-                                            <div class="form-group theme-slider-group">
-                                                <label for="themeBorderStrength">Fuerza de bordes</label>
-                                                <input type="range" id="themeBorderStrength" class="form-control" min="0" max="100" value="28" step="1">
-                                                <small id="themeBorderStrengthValue">28%</small>
-                                            </div>
-                                        </div>
 
-                                        <div class="theme-status-line">
-                                            <span class="theme-status-dot"></span>
-                                            <span>El panel se guarda automáticamente con tu navegador.</span>
-                                        </div>
+                                            <div class="theme-status-line">
+                                                <span class="theme-status-dot"></span>
+                                                <span>El panel se guarda automáticamente con tu navegador.</span>
+                                            </div>
+                                        </section>
                                     </div>
                                 </div>
                             </div>
