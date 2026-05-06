@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
-    <link rel="stylesheet" href="styles.css?v=20260505-wallpaper-bg">
+    <link rel="stylesheet" href="styles.css?v=20260505-wallpaper-idb-video">
     <link rel="stylesheet" href="dashboard-pro.css?v=20260505-wallpaper-bg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,9 @@
 <body>
     <!-- Background Effects -->
     <div class="gradient-bg" aria-hidden="true">
-        <div class="user-wallpaper is-off" id="userWallpaperLayer" aria-hidden="true">
+        <div class="user-wallpaper is-off is-image" id="userWallpaperLayer" aria-hidden="true">
+            <video class="user-wallpaper__video user-wallpaper__video--bloom" id="userWallpaperVideoBloom" muted loop playsinline autoplay preload="metadata"></video>
+            <video class="user-wallpaper__video user-wallpaper__video--sharp" id="userWallpaperVideoSharp" muted loop playsinline autoplay preload="metadata"></video>
             <div class="user-wallpaper__bloom"></div>
             <div class="user-wallpaper__sharp"></div>
             <div class="user-wallpaper__veil"></div>
@@ -470,7 +472,7 @@
                                                         <span class="theme-toggle-track" aria-hidden="true"></span>
                                                     </label>
                                                     <div class="settings-wallpaper-file-row">
-                                                        <input type="file" id="themeWallpaperFile" class="form-control" accept="image/jpeg,image/png,image/webp,image/gif">
+                                                        <input type="file" id="themeWallpaperFile" class="form-control" accept="image/*,video/*">
                                                         <button type="button" id="themeWallpaperClearBtn" class="btn btn-secondary btn-sm">Quitar imagen</button>
                                                     </div>
                                                     <div class="form-group theme-slider-group">
@@ -483,7 +485,7 @@
                                                         <input type="range" id="themeWallpaperVeil" class="form-control" min="0" max="100" value="38" step="1">
                                                         <small id="themeWallpaperVeilValue">38%</small>
                                                     </div>
-                                                    <p class="settings-wallpaper-hint">PNG, JPG, WebP o <strong>GIF</strong> (los GIF siguen animados; no se recomprimen). Fotos estáticas se optimizan a ~2200 px. GIF hasta ~10 MB.</p>
+                                                    <p class="settings-wallpaper-hint">Casi cualquier <strong>imagen</strong> o <strong>vídeo</strong> (MP4, WebM, MOV…). Los datos pesados van a <strong>IndexedDB</strong> (más capacidad). Raster se comprime a JPEG ~2400 px; GIF/SVG/vídeo se guardan tal cual.</p>
                                                 </div>
                                             </section>
 
@@ -1587,6 +1589,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260505-wallpaper-gif"></script>
+    <script src="app.js?v=20260505-wallpaper-migrate"></script>
 </body>
 </html>
