@@ -20,6 +20,7 @@ const {
 const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate } = require('./events/temp-voice');
 const { handleTempVoiceButton, handleTempVoiceModal } = require('./events/temp-voice-interaction');
+const { handleAFKMentions } = require('./events/messageCreate');
 const guildActivityStore = require('./utils/guild-activity-store');
 const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
@@ -330,6 +331,7 @@ client.on('guildCreate', (guild) => {
 
 client.on('messageCreate', async (message) => {
     try {
+        await handleAFKMentions(message);
         await handleDisboardBumpMessage(message);
         await handleCountingMessage(message);
         await handleMessageCreate(message);
