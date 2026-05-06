@@ -50,9 +50,327 @@ let serverSummaryRefreshInterval = null;
 let isSwitchingServer = false;
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
-const WALLPAPER_MAX_URL_CHARS = 9_000_000;
-/** GIF sin pasar por canvas (conserva animación); tamaño razonable para localStorage */
-const WALLPAPER_MAX_GIF_BYTES = 10 * 1024 * 1024;
+/** Data URL en JSON (legacy); IndexedDB lleva el archivo pesado */
+const WALLPAPER_MAX_INLINE_URL_CHARS = 5_000_000;
+const WALLPAPER_MAX_VIDEO_BYTES = 180 * 1024 * 1024;
+/** Original raster/SVG/GIF si no se puede comprimir a JPEG */
+const WALLPAPER_MAX_RAW_IMAGE_BYTES = 45 * 1024 * 1024;
+const WALLPAPER_VIDEO_NAME_HINT = /\.(mp4|webm|ogg|ogv|mov|mkv|m4v|avi)(\?|$)/i;
+const WALLPAPER_IMAGE_NAME_HINT = /\.(gif|png|jpe?g|webp|bmp|svg|avif|ico|heic|heif)(\?|$)/i;
+/** Data URLs más largas que esto se mueven a IndexedDB para aliviar localStorage */
+const LEGACY_INLINE_WALLPAPER_MIN_CHARS = 64 * 1024;
+
+const WALLPAPER_IDB_NAME = 'EyedBotWallpaper';
+const WALLPAPER_IDB_VERSION = 1;
+const WALLPAPER_IDB_STORE = 'wallpaper';
+const WALLPAPER_IDB_RECORD_ID = 'panel-bg';
+
+/** @type {Promise<IDBDatabase> | null} */
+let wallpaperDbPromise = null;
+/** @type {string[]} */
+const wallpaperObjectUrls = [];
+
+function wallpaperDbOpen() {
+    if (!wallpaperDbPromise) {
+        wallpaperDbPromise = new Promise((resolve, reject) => {
+            const req = indexedDB.open(WALLPAPER_IDB_NAME, WALLPAPER_IDB_VERSION);
+            req.onerror = () => reject(req.error || new Error('IndexedDB'));
+            req.onsuccess = () => resolve(req.result);
+            req.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(WALLPAPER_IDB_STORE)) {
+                    db.createObjectStore(WALLPAPER_IDB_STORE, { keyPath: 'id' });
+                }
+            };
+        });
+    }
+    return wallpaperDbPromise;
+}
+
+/** @returns {Promise<void>} */
+function wallpaperIdbPut(blob, mime, kind) {
+    return wallpaperDbOpen().then(
+        (db) =>
+            new Promise((resolve, reject) => {
+                const tx = db.transaction(WALLPAPER_IDB_STORE, 'readwrite');
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error || new Error('IndexedDB write'));
+                tx.objectStore(WALLPAPER_IDB_STORE).put({
+                    id: WALLPAPER_IDB_RECORD_ID,
+                    blob,
+                    mime: typeof mime === 'string' ? mime : '',
+                    kind: kind === 'video' ? 'video' : 'image',
+                    updatedAt: Date.now()
+                });
+            })
+    );
+}
+
+/** @returns {Promise<{ blob: Blob, mime: string, kind: string } | null>} */
+function wallpaperIdbGet() {
+    return wallpaperDbOpen().then(
+        (db) =>
+            new Promise((resolve, reject) => {
+                const tx = db.transaction(WALLPAPER_IDB_STORE, 'readonly');
+                const req = tx.objectStore(WALLPAPER_IDB_STORE).get(WALLPAPER_IDB_RECORD_ID);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => reject(req.error || new Error('IndexedDB read'));
+            })
+    );
+}
+
+/** @returns {Promise<void>} */
+function wallpaperIdbDelete() {
+    return wallpaperDbOpen().then(
+        (db) =>
+            new Promise((resolve, reject) => {
+                const tx = db.transaction(WALLPAPER_IDB_STORE, 'readwrite');
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error || new Error('IndexedDB delete'));
+                tx.objectStore(WALLPAPER_IDB_STORE).delete(WALLPAPER_IDB_RECORD_ID);
+            })
+    );
+}
+
+function revokeWallpaperObjectUrls() {
+    while (wallpaperObjectUrls.length) {
+        const u = wallpaperObjectUrls.pop();
+        try {
+            URL.revokeObjectURL(u);
+        } catch {
+            /* ignore */
+        }
+    }
+}
+
+/** @param {string} url */
+function registerWallpaperObjectUrl(url) {
+    wallpaperObjectUrls.push(url);
+}
+
+/** @param {ReturnType<normalizeThemeSettings>} n */
+function hasWallpaperMediaSync(n) {
+    if (n.wallpaperEnabled !== true) return false;
+    if (n.wallpaperStorage === 'indexeddb') {
+        return n.wallpaperKind === 'image' || n.wallpaperKind === 'video';
+    }
+    if (n.wallpaperStorage === 'inline') {
+        return (n.wallpaperUrl?.length || 0) > 64;
+    }
+    return false;
+}
+
+/** @param {Record<string, unknown>} normalized */
+function applyWallpaperVeilCss(normalized) {
+    const root = document.documentElement;
+    const patternStrength = clampNumber(Number(normalized.atmosphere) / 100, 0, 1);
+    const wpTint = hasWallpaperMediaSync(normalized);
+
+    if (wpTint) {
+        const bloomNorm = clampNumber(Number(normalized.wallpaperBloom) / 100, 0, 1);
+        const veilNorm = clampNumber(Number(normalized.wallpaperVeil) / 100, 0, 1);
+        const bloomBoost = bloomNorm * (0.45 + patternStrength * 0.55);
+        root.style.setProperty('--user-wallpaper-blur', `${28 + bloomBoost * 76}px`);
+        root.style.setProperty('--user-wallpaper-bloom-opacity', String(0.14 + bloomBoost * 0.52));
+        const veilStrength = veilNorm * (0.55 + patternStrength * 0.45);
+        root.style.setProperty('--wallpaper-veil-t', String(0.18 + veilStrength * 0.5));
+        root.style.setProperty('--wallpaper-veil-m', String(0.14 + veilStrength * 0.44));
+        root.style.setProperty('--wallpaper-veil-accent', String(0.05 + veilStrength * patternStrength * 0.18));
+        root.style.setProperty('--wallpaper-veil-layer-opacity', String(0.72 + veilNorm * 0.22));
+    } else {
+        root.style.setProperty('--user-wallpaper-url', 'none');
+        root.style.removeProperty('--user-wallpaper-blur');
+        root.style.removeProperty('--user-wallpaper-bloom-opacity');
+        root.style.removeProperty('--wallpaper-veil-t');
+        root.style.removeProperty('--wallpaper-veil-m');
+        root.style.removeProperty('--wallpaper-veil-accent');
+        root.style.removeProperty('--wallpaper-veil-layer-opacity');
+    }
+
+    const wpLayer = document.getElementById('userWallpaperLayer');
+    if (wpLayer) {
+        wpLayer.classList.toggle('is-off', !wpTint);
+        wpLayer.setAttribute('aria-hidden', wpTint ? 'false' : 'true');
+    }
+}
+
+async function hydrateWallpaperLayer(normalized) {
+    const root = document.documentElement;
+    const layer = document.getElementById('userWallpaperLayer');
+    const vBloom = document.getElementById('userWallpaperVideoBloom');
+    const vSharp = document.getElementById('userWallpaperVideoSharp');
+
+    revokeWallpaperObjectUrls();
+
+    const pauseAndClearVideos = () => {
+        [vBloom, vSharp].forEach((v) => {
+            if (!(v instanceof HTMLVideoElement)) return;
+            v.pause();
+            v.removeAttribute('src');
+            v.load?.();
+        });
+    };
+    pauseAndClearVideos();
+
+    if (layer) {
+        layer.classList.remove('is-video');
+        layer.classList.add('is-image');
+    }
+
+    const baseActive = hasWallpaperMediaSync(normalized);
+
+    if (!baseActive) {
+        root.style.setProperty('--user-wallpaper-url', 'none');
+        applyWallpaperVeilCss(normalized);
+        return;
+    }
+
+    root.style.setProperty('--user-wallpaper-url', 'none');
+
+    const applyOrphan = () => {
+        root.style.setProperty('--user-wallpaper-url', 'none');
+        pauseAndClearVideos();
+        applyWallpaperVeilCss({ ...normalized, wallpaperEnabled: false });
+    };
+
+    try {
+        if (normalized.wallpaperStorage === 'inline') {
+            const safeUrl = (normalized.wallpaperUrl || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            root.style.setProperty('--user-wallpaper-url', safeUrl ? `url("${safeUrl}")` : 'none');
+            applyWallpaperVeilCss(normalized);
+            return;
+        }
+
+        if (normalized.wallpaperStorage === 'indexeddb') {
+            const rec = await wallpaperIdbGet();
+            if (!rec?.blob || !(rec.blob instanceof Blob)) {
+                applyOrphan();
+                return;
+            }
+
+            const blobUrl = URL.createObjectURL(rec.blob);
+            registerWallpaperObjectUrl(blobUrl);
+            const kind = rec.kind === 'video' ? 'video' : 'image';
+
+            if (kind === 'video' && vBloom instanceof HTMLVideoElement && vSharp instanceof HTMLVideoElement) {
+                root.style.setProperty('--user-wallpaper-url', 'none');
+                layer?.classList.add('is-video');
+                layer?.classList.remove('is-image');
+                vBloom.src = blobUrl;
+                vSharp.src = blobUrl;
+                const tryPlay = () => {
+                    Promise.all([vBloom.play().catch(() => {}), vSharp.play().catch(() => {})]).catch(() => {});
+                };
+                tryPlay();
+                applyWallpaperVeilCss(normalized);
+                return;
+            }
+
+            const safeUrl = blobUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            root.style.setProperty('--user-wallpaper-url', `url("${safeUrl}")`);
+            applyWallpaperVeilCss(normalized);
+        }
+    } catch (e) {
+        console.warn('hydrateWallpaperLayer', e);
+        applyOrphan();
+    }
+}
+
+/**
+ * @param {File} file
+ * @param {number} maxEdge
+ * @param {number} quality
+ * @returns {Promise<Blob | null>}
+ */
+function resizeImageFileToJpegBlob(file, maxEdge = 2400, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objUrl = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(objUrl);
+            let { width, height } = img;
+            const ratio = Math.min(1, maxEdge / Math.max(width, height));
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Canvas no disponible'));
+                return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(
+                (blob) => resolve(blob && blob.size > 0 ? blob : null),
+                'image/jpeg',
+                quality
+            );
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(objUrl);
+            reject(new Error('No se pudo leer la imagen'));
+        };
+        img.src = objUrl;
+    });
+}
+
+/** @param {string} dataUrl */
+function parseDataUrlMime(dataUrl) {
+    const match = /^data:([^;,]+)/i.exec(dataUrl);
+    return match ? match[1].trim() : '';
+}
+
+let legacyWallpaperMigrationScheduled = false;
+
+async function migrateLegacyInlineWallpaperToIdbIfNeeded() {
+    const cur = normalizeThemeSettings(themeSettings || {});
+    if (!cur.wallpaperEnabled || cur.wallpaperStorage !== 'inline') return;
+    const url = cur.wallpaperUrl;
+    if (!url || url.length < LEGACY_INLINE_WALLPAPER_MIN_CHARS || !url.startsWith('data:')) return;
+
+    try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        if (!blob || blob.size === 0) return;
+        if (blob.size > WALLPAPER_MAX_VIDEO_BYTES) {
+            console.warn('[EyedBot] Migración de fondo omitida: archivo demasiado grande.');
+            return;
+        }
+
+        let mime = blob.type || parseDataUrlMime(url);
+        if (!mime) mime = 'application/octet-stream';
+        const kind = mime.startsWith('video/') ? 'video' : 'image';
+
+        await wallpaperIdbPut(blob, mime, kind);
+
+        applyThemeSettings(
+            normalizeThemeSettings({
+                ...cur,
+                wallpaperStorage: 'indexeddb',
+                wallpaperKind: kind,
+                wallpaperMime: mime,
+                wallpaperUrl: '',
+                wallpaperEnabled: true
+            }),
+            { persist: true }
+        );
+        showToast('Fondo migrado a IndexedDB para liberar espacio en localStorage.', 'success');
+    } catch (e) {
+        console.warn('migrateLegacyInlineWallpaperToIdbIfNeeded', e);
+    }
+}
+
+function scheduleLegacyWallpaperMigration() {
+    if (legacyWallpaperMigrationScheduled) return;
+    legacyWallpaperMigrationScheduled = true;
+    const run = () => void migrateLegacyInlineWallpaperToIdbIfNeeded();
+    if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(run, { timeout: 4500 });
+    } else {
+        setTimeout(run, 400);
+    }
+}
 
 const THEME_PRESETS = {
     midnight: {
@@ -183,6 +501,9 @@ const THEME_DEFAULTS = {
     ...THEME_PRESETS.midnight,
     autoContrast: true,
     wallpaperEnabled: false,
+    wallpaperStorage: 'none',
+    wallpaperKind: 'none',
+    wallpaperMime: '',
     wallpaperUrl: '',
     wallpaperBloom: 42,
     wallpaperVeil: 38
@@ -903,7 +1224,37 @@ function normalizeThemeSettings(input = {}) {
     const autoContrastFallback = typeof preset.autoContrast === 'boolean' ? preset.autoContrast : THEME_DEFAULTS.autoContrast;
 
     let wallpaperUrl = typeof input.wallpaperUrl === 'string' ? input.wallpaperUrl.trim() : '';
-    if (wallpaperUrl.length > WALLPAPER_MAX_URL_CHARS) {
+    if (wallpaperUrl.length > WALLPAPER_MAX_INLINE_URL_CHARS) {
+        wallpaperUrl = '';
+    }
+
+    let wallpaperStorage = typeof input.wallpaperStorage === 'string' ? input.wallpaperStorage.trim() : '';
+    if (!['none', 'inline', 'indexeddb'].includes(wallpaperStorage)) {
+        wallpaperStorage = wallpaperUrl.length > 64 ? 'inline' : 'none';
+    }
+    if (wallpaperStorage === 'none' && wallpaperUrl.length > 64) {
+        wallpaperStorage = 'inline';
+    }
+
+    let wallpaperKind = typeof input.wallpaperKind === 'string' ? input.wallpaperKind.trim() : '';
+    if (!['none', 'image', 'video'].includes(wallpaperKind)) {
+        wallpaperKind = 'none';
+    }
+    if (wallpaperStorage === 'indexeddb') {
+        wallpaperKind = wallpaperKind === 'video' ? 'video' : 'image';
+    } else if (wallpaperStorage === 'inline' && wallpaperUrl.length > 64) {
+        wallpaperKind = 'image';
+    } else {
+        wallpaperKind = 'none';
+    }
+
+    let wallpaperMime =
+        typeof input.wallpaperMime === 'string' ? input.wallpaperMime.trim().slice(0, 160) : '';
+    if (wallpaperStorage !== 'indexeddb') {
+        wallpaperMime = '';
+    }
+
+    if (wallpaperStorage === 'indexeddb') {
         wallpaperUrl = '';
     }
 
@@ -921,6 +1272,9 @@ function normalizeThemeSettings(input = {}) {
         borderStrength: clampNumber(Number.parseInt(input.borderStrength ?? preset.borderStrength, 10) || preset.borderStrength, 0, 100),
         autoContrast: typeof input.autoContrast === 'boolean' ? input.autoContrast : autoContrastFallback,
         wallpaperEnabled: input.wallpaperEnabled === true,
+        wallpaperStorage,
+        wallpaperKind,
+        wallpaperMime,
         wallpaperUrl,
         wallpaperBloom: clampNumber(Number.parseInt(input.wallpaperBloom ?? THEME_DEFAULTS.wallpaperBloom, 10) || THEME_DEFAULTS.wallpaperBloom, 0, 100),
         wallpaperVeil: clampNumber(Number.parseInt(input.wallpaperVeil ?? THEME_DEFAULTS.wallpaperVeil, 10) || THEME_DEFAULTS.wallpaperVeil, 0, 100)
@@ -931,7 +1285,11 @@ function saveThemeSettings(theme = themeSettings) {
     const normalized = normalizeThemeSettings(theme);
     themeSettings = normalized;
     try {
-        localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(normalized));
+        const forDisk = { ...normalized };
+        if (forDisk.wallpaperStorage === 'indexeddb') {
+            forDisk.wallpaperUrl = '';
+        }
+        localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(forDisk));
     } catch (error) {
         console.warn('No se pudo guardar la personalizacion visual:', error);
         const code = error?.code;
@@ -1001,35 +1359,7 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--theme-glow-color', rgbaFromHex(normalized.accentPrimary, 0.12 + (patternStrength * 0.32)));
     root.style.setProperty('--theme-lines-opacity', String(0.1 + (patternStrength * 0.22)));
 
-    const wpLayer = document.getElementById('userWallpaperLayer');
-    const wpActive = Boolean(normalized.wallpaperEnabled && normalized.wallpaperUrl && normalized.wallpaperUrl.length > 64);
-    if (wpLayer) {
-        wpLayer.classList.toggle('is-off', !wpActive);
-        wpLayer.setAttribute('aria-hidden', wpActive ? 'false' : 'true');
-    }
-
-    if (wpActive) {
-        const safeUrl = normalized.wallpaperUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        root.style.setProperty('--user-wallpaper-url', `url("${safeUrl}")`);
-        const bloomNorm = clampNumber(normalized.wallpaperBloom / 100, 0, 1);
-        const veilNorm = clampNumber(normalized.wallpaperVeil / 100, 0, 1);
-        const bloomBoost = bloomNorm * (0.45 + patternStrength * 0.55);
-        root.style.setProperty('--user-wallpaper-blur', `${28 + bloomBoost * 76}px`);
-        root.style.setProperty('--user-wallpaper-bloom-opacity', String(0.14 + bloomBoost * 0.52));
-        const veilStrength = veilNorm * (0.55 + patternStrength * 0.45);
-        root.style.setProperty('--wallpaper-veil-t', String(0.18 + veilStrength * 0.5));
-        root.style.setProperty('--wallpaper-veil-m', String(0.14 + veilStrength * 0.44));
-        root.style.setProperty('--wallpaper-veil-accent', String(0.05 + veilStrength * patternStrength * 0.18));
-        root.style.setProperty('--wallpaper-veil-layer-opacity', String(0.72 + veilNorm * 0.22));
-    } else {
-        root.style.setProperty('--user-wallpaper-url', 'none');
-        root.style.removeProperty('--user-wallpaper-blur');
-        root.style.removeProperty('--user-wallpaper-bloom-opacity');
-        root.style.removeProperty('--wallpaper-veil-t');
-        root.style.removeProperty('--wallpaper-veil-m');
-        root.style.removeProperty('--wallpaper-veil-accent');
-        root.style.removeProperty('--wallpaper-veil-layer-opacity');
-    }
+    applyWallpaperVeilCss(normalized);
 
     const rgbAccentPrimary = hexToRgb(normalized.accentPrimary);
     const rgbAccentSecondary = hexToRgb(normalized.accentSecondary);
@@ -1145,6 +1475,9 @@ function getThemeControlsState() {
         borderStrength: document.getElementById('themeBorderStrength')?.value,
         autoContrast: document.getElementById('themeAutoContrast')?.checked,
         wallpaperEnabled: document.getElementById('themeWallpaperEnabled')?.checked ?? baseWp.wallpaperEnabled,
+        wallpaperStorage: baseWp.wallpaperStorage ?? THEME_DEFAULTS.wallpaperStorage,
+        wallpaperKind: baseWp.wallpaperKind ?? THEME_DEFAULTS.wallpaperKind,
+        wallpaperMime: baseWp.wallpaperMime ?? THEME_DEFAULTS.wallpaperMime,
         wallpaperUrl: baseWp.wallpaperUrl ?? '',
         wallpaperBloom: document.getElementById('themeWallpaperBloom')?.value ?? baseWp.wallpaperBloom,
         wallpaperVeil: document.getElementById('themeWallpaperVeil')?.value ?? baseWp.wallpaperVeil
@@ -1217,6 +1550,7 @@ function applyThemeSettings(theme = themeSettings, options = {}) {
     themeSettings = normalized;
     setThemeCssVariables(normalized);
     syncThemeControls(normalized);
+    void hydrateWallpaperLayer(normalized);
 
     if (options.persist !== false) {
         saveThemeSettings(normalized);
@@ -1230,6 +1564,9 @@ function setThemePreset(presetId) {
         preset: presetId,
         ...preset,
         wallpaperEnabled: cur.wallpaperEnabled,
+        wallpaperStorage: cur.wallpaperStorage,
+        wallpaperKind: cur.wallpaperKind,
+        wallpaperMime: cur.wallpaperMime,
         wallpaperUrl: cur.wallpaperUrl,
         wallpaperBloom: cur.wallpaperBloom,
         wallpaperVeil: cur.wallpaperVeil
@@ -1237,7 +1574,9 @@ function setThemePreset(presetId) {
     showToast(`Tema aplicado: ${presetId}`, 'success');
 }
 
-function resetThemeSettings() {
+async function resetThemeSettings() {
+    await wallpaperIdbDelete().catch(() => {});
+    revokeWallpaperObjectUrls();
     applyThemeSettings({ ...THEME_DEFAULTS }, { persist: true });
     showToast('Personalizacion restablecida', 'success');
 }
@@ -1272,48 +1611,6 @@ function bindSettingsPaneNavigation() {
     });
 
     switchSettingsPane(currentSettingsPaneId, { silent: true });
-}
-
-function readWallpaperGifAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('No se pudo leer el GIF'));
-        reader.readAsDataURL(file);
-    });
-}
-
-function resizeWallpaperToDataUrl(file, maxEdge = 2200, quality = 0.82) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        const objUrl = URL.createObjectURL(file);
-        img.onload = () => {
-            URL.revokeObjectURL(objUrl);
-            let { width, height } = img;
-            const ratio = Math.min(1, maxEdge / Math.max(width, height));
-            width = Math.max(1, Math.round(width * ratio));
-            height = Math.max(1, Math.round(height * ratio));
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                reject(new Error('Canvas no disponible'));
-                return;
-            }
-            ctx.drawImage(img, 0, 0, width, height);
-            try {
-                resolve(canvas.toDataURL('image/jpeg', quality));
-            } catch (err) {
-                reject(err);
-            }
-        };
-        img.onerror = () => {
-            URL.revokeObjectURL(objUrl);
-            reject(new Error('No se pudo leer la imagen'));
-        };
-        img.src = objUrl;
-    });
 }
 
 function bindThemeControls() {
@@ -1362,38 +1659,96 @@ function bindThemeControls() {
         wpFile.addEventListener('change', async () => {
             const file = wpFile.files?.[0];
             if (!file) return;
-            if (!/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
-                showToast('Usa JPG, PNG, WebP o GIF', 'warning');
+
+            let isVideo = false;
+            let isImage = false;
+            if (file.type.startsWith('video/')) isVideo = true;
+            else if (file.type.startsWith('image/')) isImage = true;
+            else if (WALLPAPER_VIDEO_NAME_HINT.test(file.name)) isVideo = true;
+            else if (WALLPAPER_IMAGE_NAME_HINT.test(file.name)) isImage = true;
+
+            if (!isVideo && !isImage) {
+                showToast('Formato no admitido. Usa imagen o vídeo.', 'warning');
                 wpFile.value = '';
                 return;
             }
+
             try {
-                let dataUrl;
-                if (/^image\/gif$/i.test(file.type)) {
-                    if (file.size > WALLPAPER_MAX_GIF_BYTES) {
-                        showToast('GIF demasiado grande (máx. ~10 MB para poder guardarlo en el navegador).', 'warning');
+                if (isVideo) {
+                    if (file.size > WALLPAPER_MAX_VIDEO_BYTES) {
+                        showToast(`El vídeo supera el límite (~${Math.round(WALLPAPER_MAX_VIDEO_BYTES / (1024 * 1024))} MB).`, 'warning');
                         wpFile.value = '';
                         return;
                     }
-                    dataUrl = await readWallpaperGifAsDataUrl(file);
+                    await wallpaperIdbPut(file, file.type || 'video/mp4', 'video');
+                    applyThemeSettings(
+                        normalizeThemeSettings({
+                            ...getThemeControlsState(),
+                            wallpaperStorage: 'indexeddb',
+                            wallpaperKind: 'video',
+                            wallpaperMime: file.type || 'video/mp4',
+                            wallpaperUrl: '',
+                            wallpaperEnabled: true
+                        }),
+                        { persist: true }
+                    );
+                    showToast('Vídeo de fondo aplicado', 'success');
                 } else {
-                    dataUrl = await resizeWallpaperToDataUrl(file);
+                    const forceRaw =
+                        /^image\/gif/i.test(file.type) ||
+                        /\.gif$/i.test(file.name) ||
+                        /^image\/svg/i.test(file.type) ||
+                        /\.svg$/i.test(file.name);
+
+                    let blobToStore = null;
+                    let mimeOut = file.type || 'image/jpeg';
+
+                    if (!forceRaw) {
+                        try {
+                            const jpegBlob = await resizeImageFileToJpegBlob(file);
+                            if (jpegBlob && jpegBlob.size > 0) {
+                                blobToStore = jpegBlob;
+                                mimeOut = 'image/jpeg';
+                            }
+                        } catch {
+                            /* usar original */
+                        }
+                    }
+
+                    if (!blobToStore) {
+                        if (file.size > WALLPAPER_MAX_RAW_IMAGE_BYTES) {
+                            showToast(
+                                `Imagen demasiado grande sin poder comprimirla (máx. ~${Math.round(WALLPAPER_MAX_RAW_IMAGE_BYTES / (1024 * 1024))} MB).`,
+                                'warning'
+                            );
+                            wpFile.value = '';
+                            return;
+                        }
+                        blobToStore = file;
+                        mimeOut = file.type || 'application/octet-stream';
+                    }
+
+                    await wallpaperIdbPut(blobToStore, mimeOut, 'image');
+                    applyThemeSettings(
+                        normalizeThemeSettings({
+                            ...getThemeControlsState(),
+                            wallpaperStorage: 'indexeddb',
+                            wallpaperKind: 'image',
+                            wallpaperMime: mimeOut,
+                            wallpaperUrl: '',
+                            wallpaperEnabled: true
+                        }),
+                        { persist: true }
+                    );
+                    showToast(forceRaw ? 'Imagen aplicada (sin recomprimir para conservar animación o SVG)' : 'Fondo aplicado y optimizado', 'success');
                 }
-                applyThemeSettings(
-                    normalizeThemeSettings({
-                        ...getThemeControlsState(),
-                        wallpaperUrl: dataUrl,
-                        wallpaperEnabled: true
-                    }),
-                    { persist: true }
-                );
+
                 syncThemeControls(themeSettings);
                 const wt = document.getElementById('themeWallpaperEnabled');
                 if (wt) wt.checked = true;
-                showToast(/^image\/gif$/i.test(file.type) ? 'GIF aplicado (animado si el archivo lo es)' : 'Fondo aplicado', 'success');
             } catch (e) {
                 console.warn(e);
-                showToast(e.message || 'No se pudo procesar la imagen', 'error');
+                showToast(e.message || 'No se pudo guardar el archivo (IndexedDB o formato no soportado)', 'error');
             }
             wpFile.value = '';
         });
@@ -1401,12 +1756,17 @@ function bindThemeControls() {
 
     const wpClear = document.getElementById('themeWallpaperClearBtn');
     if (wpClear) {
-        wpClear.addEventListener('click', () => {
+        wpClear.addEventListener('click', async () => {
+            await wallpaperIdbDelete().catch(() => {});
+            revokeWallpaperObjectUrls();
             applyThemeSettings(
                 normalizeThemeSettings({
                     ...getThemeControlsState(),
                     wallpaperUrl: '',
-                    wallpaperEnabled: false
+                    wallpaperEnabled: false,
+                    wallpaperStorage: 'none',
+                    wallpaperKind: 'none',
+                    wallpaperMime: ''
                 }),
                 { persist: true }
             );
@@ -1437,6 +1797,7 @@ function bindThemeControls() {
 
 themeSettings = loadThemeSettings();
 applyThemeSettings(themeSettings, { persist: false });
+scheduleLegacyWallpaperMigration();
 
 function buildPanelHistoryState(sectionId = 'dashboard', guard = false) {
     return { panel: true, sectionId, guard };
