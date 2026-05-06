@@ -4,8 +4,7 @@ const { runRangos } = require('./leveling-shared');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('rangos')
-        .setDescription('Roles de nivel del panel; si no hay ninguno, referencia Eyed por nivel.')
-        .setDefaultMemberPermissions(0n),
+        .setDescription('Roles de nivel del panel; si no hay ninguno, referencia Eyed por nivel.'),
     cooldown: 4,
     async execute(interaction) {
         if (!interaction.guild) {

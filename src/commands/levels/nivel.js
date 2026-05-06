@@ -10,8 +10,7 @@ module.exports = {
                 .setName('usuario')
                 .setDescription('Miembro a consultar (si no eliges a nadie, se muestra el tuyo)')
                 .setRequired(false)
-        )
-        .setDefaultMemberPermissions(0n),
+        ),
     cooldown: 4,
     async execute(interaction) {
         if (!interaction.guild) {

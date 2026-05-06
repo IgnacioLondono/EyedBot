@@ -1199,6 +1199,206 @@ function normalizeVerifyEmojiInput(rawEmoji = '✅') {
     return { reactValue: raw, stored: raw, display: raw };
 }
 
+function buildVerifyEmbedFromConfig(cfg) {
+    const embed = new EmbedBuilder()
+        .setColor((cfg.color || '7c4dff').replace('#', ''))
+        .setTitle(cfg.title || 'Verify')
+        .setDescription(cfg.message || '¡Reacciona para verificarte!');
+    if (cfg.footer) embed.setFooter({ text: cfg.footer });
+    const files = [];
+    if (cfg.imageUrl) {
+        const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
+        if (localImagePath) {
+            const attachmentName = path.basename(localImagePath);
+            embed.setImage(`attachment://${attachmentName}`);
+            files.push({ attachment: localImagePath, name: attachmentName });
+        } else {
+            embed.setImage(cfg.imageUrl);
+        }
+    }
+    return { embed, files };
+}
+
+function buildTicketPanelPayload(guildId, cfg) {
+    const embed = new EmbedBuilder()
+        .setColor((cfg.color || '7c4dff').replace('#', ''))
+        .setTitle(cfg.title || 'Soporte')
+        .setDescription(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.');
+    if (cfg.footer) embed.setFooter({ text: cfg.footer });
+    const openTicketBtn = new ButtonBuilder()
+        .setCustomId(ticketButtonCustomIdForGuild(guildId))
+        .setStyle(ButtonStyle.Primary)
+        .setLabel(cfg.buttonLabel || 'Solicitar ticket');
+    const components = [new ActionRowBuilder().addComponents(openTicketBtn)];
+    return { embed, components };
+}
+
+async function syncVerifyPanelReaction(message, cfg) {
+    const emojiData = normalizeVerifyEmojiInput(cfg.emoji || '✅');
+    const botId = message.client.user.id;
+    const targetId = emojiData.reactValue;
+
+    for (const reaction of message.reactions.cache.values()) {
+        const users = await reaction.users.fetch().catch(() => null);
+        if (!users || !users.has(botId)) continue;
+
+        const isTarget =
+            (reaction.emoji.id && reaction.emoji.id === targetId) ||
+            (!reaction.emoji.id && reaction.emoji.name === targetId);
+
+        if (!isTarget) {
+            await reaction.users.remove(botId).catch(() => null);
+        }
+    }
+
+    let targetReact = message.reactions.cache.find((r) => {
+        if (r.emoji.id) return r.emoji.id === targetId;
+        return r.emoji.name === targetId;
+    });
+    if (!targetReact) {
+        await message.react(emojiData.reactValue).catch(() => null);
+        return;
+    }
+    const targetUsers = await targetReact.users.fetch().catch(() => null);
+    if (!targetUsers?.has(botId)) {
+        await message.react(emojiData.reactValue).catch(() => null);
+    }
+}
+
+async function refreshVerifyPanelMessage(guildId, updatedByUserId) {
+    if (!botClient) {
+        const e = new Error('Bot no disponible');
+        e.statusCode = 500;
+        throw e;
+    }
+    const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+    if (!guild) {
+        const e = new Error('Servidor no encontrado');
+        e.statusCode = 404;
+        throw e;
+    }
+
+    const cfg = await verifyStore.getVerifyConfig(guildId);
+    if (!cfg?.messageId || !cfg?.channelId) {
+        const e = new Error('No hay embed publicado para actualizar. Usa «Publicar embed» primero.');
+        e.statusCode = 400;
+        throw e;
+    }
+
+    const channel = guild.channels.cache.get(cfg.channelId) || await guild.channels.fetch(cfg.channelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) {
+        const e = new Error('Canal de verificación no encontrado o no es de texto');
+        e.statusCode = 404;
+        throw e;
+    }
+
+    const message = await channel.messages.fetch(cfg.messageId).catch(() => null);
+    if (!message) {
+        const e = new Error('Mensaje no encontrado (pudo borrarse). Vuelve a publicar el embed.');
+        e.statusCode = 404;
+        throw e;
+    }
+    if (message.author.id !== botClient.user.id) {
+        const e = new Error('Ese mensaje no fue enviado por el bot; no se puede editar desde el panel.');
+        e.statusCode = 400;
+        throw e;
+    }
+
+    const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+    if (!me) {
+        const e = new Error('No pude obtener los permisos del bot en el servidor');
+        e.statusCode = 500;
+        throw e;
+    }
+    if (!channel.permissionsFor(me)?.has(['SendMessages', 'EmbedLinks', 'AddReactions'])) {
+        const e = new Error('Faltan permisos: Enviar mensajes, Insertar enlaces o Añadir reacciones');
+        e.statusCode = 403;
+        throw e;
+    }
+
+    const { embed, files } = buildVerifyEmbedFromConfig(cfg);
+    await message.edit({
+        embeds: [embed],
+        files: files.length ? files : []
+    });
+
+    await syncVerifyPanelReaction(message, cfg);
+
+    const emojiData = normalizeVerifyEmojiInput(cfg.emoji || '✅');
+    const updatedCfg = {
+        ...cfg,
+        emoji: emojiData.stored,
+        emojiDisplay: emojiData.display,
+        updatedAt: new Date().toISOString(),
+        updatedBy: updatedByUserId || 'unknown'
+    };
+    await verifyStore.setVerifyConfig(guildId, updatedCfg);
+    return { messageId: message.id, channelId: channel.id, config: updatedCfg };
+}
+
+async function refreshTicketPanelMessage(guildId, updatedByUserId) {
+    if (!botClient) {
+        const e = new Error('Bot no disponible');
+        e.statusCode = 500;
+        throw e;
+    }
+    const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+    if (!guild) {
+        const e = new Error('Servidor no encontrado');
+        e.statusCode = 404;
+        throw e;
+    }
+
+    const cfg = await ticketStore.getTicketConfig(guildId);
+    if (!cfg?.messageId || !cfg?.panelChannelId) {
+        const e = new Error('No hay panel publicado para actualizar. Usa «Publicar panel» primero.');
+        e.statusCode = 400;
+        throw e;
+    }
+
+    const channel = guild.channels.cache.get(cfg.panelChannelId) || await guild.channels.fetch(cfg.panelChannelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) {
+        const e = new Error('Canal del panel no encontrado o no es de texto');
+        e.statusCode = 404;
+        throw e;
+    }
+
+    const message = await channel.messages.fetch(cfg.messageId).catch(() => null);
+    if (!message) {
+        const e = new Error('Mensaje no encontrado (pudo borrarse). Vuelve a publicar el panel.');
+        e.statusCode = 404;
+        throw e;
+    }
+    if (message.author.id !== botClient.user.id) {
+        const e = new Error('Ese mensaje no fue enviado por el bot; no se puede editar desde el panel.');
+        e.statusCode = 400;
+        throw e;
+    }
+
+    const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+    if (!me) {
+        const e = new Error('No pude obtener los permisos del bot en el servidor');
+        e.statusCode = 500;
+        throw e;
+    }
+    if (!channel.permissionsFor(me)?.has(['SendMessages', 'EmbedLinks'])) {
+        const e = new Error('Faltan permisos: Enviar mensajes o Insertar enlaces');
+        e.statusCode = 403;
+        throw e;
+    }
+
+    const { embed, components } = buildTicketPanelPayload(guildId, cfg);
+    await message.edit({ embeds: [embed], components });
+
+    const updatedCfg = {
+        ...cfg,
+        updatedAt: new Date().toISOString(),
+        updatedBy: updatedByUserId || 'unknown'
+    };
+    await ticketStore.setTicketConfig(guildId, updatedCfg);
+    return { messageId: message.id, channelId: channel.id, config: updatedCfg };
+}
+
 app.get('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -1294,24 +1494,7 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
             return res.status(403).json({ error: 'El bot no puede administrar ese rol (revisa jerarquía y permiso Gestionar roles)' });
         }
 
-        const { EmbedBuilder } = require('discord.js');
-        const embed = new EmbedBuilder()
-            .setColor((cfg.color || '7c4dff').replace('#', ''))
-            .setTitle(cfg.title || 'Verify')
-            .setDescription(cfg.message || '¡Reacciona para verificarte!');
-
-        if (cfg.footer) embed.setFooter({ text: cfg.footer });
-        const files = [];
-        if (cfg.imageUrl) {
-            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
-            if (localImagePath) {
-                const attachmentName = path.basename(localImagePath);
-                embed.setImage(`attachment://${attachmentName}`);
-                files.push({ attachment: localImagePath, name: attachmentName });
-            } else {
-                embed.setImage(cfg.imageUrl);
-            }
-        }
+        const { embed, files } = buildVerifyEmbedFromConfig(cfg);
 
         const posted = await channel.send({ embeds: [embed], files });
 
@@ -1335,6 +1518,22 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
     } catch (error) {
         console.error('Error publicando verify embed:', error);
         res.status(500).json({ error: 'Error al publicar el embed de verificación' });
+    }
+});
+
+app.post('/api/guild/:guildId/verify-embed-update', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const result = await refreshVerifyPanelMessage(guildId, req.session.user?.id);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error actualizando verify embed:', error);
+        const code = Number(error.statusCode);
+        const status = code >= 400 && code < 600 ? code : 500;
+        res.status(status).json({ error: error.message || 'Error al actualizar el embed de verificación' });
     }
 });
 
@@ -1575,21 +1774,11 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => 
             return res.status(403).json({ error: 'Faltan permisos: Enviar mensajes o Insertar enlaces' });
         }
 
-        const embed = new EmbedBuilder()
-            .setColor((cfg.color || '7c4dff').replace('#', ''))
-            .setTitle(cfg.title || 'Soporte')
-            .setDescription(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.');
-
-        if (cfg.footer) embed.setFooter({ text: cfg.footer });
-
-        const openTicketBtn = new ButtonBuilder()
-            .setCustomId(ticketButtonCustomIdForGuild(guildId))
-            .setStyle(ButtonStyle.Primary)
-            .setLabel(cfg.buttonLabel || 'Solicitar ticket');
+        const { embed, components } = buildTicketPanelPayload(guildId, cfg);
 
         const posted = await channel.send({
             embeds: [embed],
-            components: [new ActionRowBuilder().addComponents(openTicketBtn)]
+            components
         });
 
         const updatedCfg = {
@@ -1606,6 +1795,62 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => 
     } catch (error) {
         console.error('Error publicando ticket panel:', error);
         res.status(500).json({ error: 'Error al publicar panel de tickets' });
+    }
+});
+
+app.post('/api/guild/:guildId/ticket-embed-update', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const result = await refreshTicketPanelMessage(guildId, req.session.user?.id);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error actualizando panel de tickets:', error);
+        const code = Number(error.statusCode);
+        const status = code >= 400 && code < 600 ? code : 500;
+        res.status(status).json({ error: error.message || 'Error al actualizar el panel de tickets' });
+    }
+});
+
+app.post('/api/guild/:guildId/panel-embeds-refresh', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const uid = req.session.user?.id || 'unknown';
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const wantVerify = body.verify !== false;
+        const wantTicket = body.ticket !== false;
+
+        const out = { verify: null, ticket: null };
+
+        if (wantVerify) {
+            try {
+                out.verify = { ok: true, ...(await refreshVerifyPanelMessage(guildId, uid)) };
+            } catch (e) {
+                out.verify = { ok: false, error: e.message || String(e) };
+            }
+        } else {
+            out.verify = { ok: false, skipped: true, error: 'omitido por solicitud' };
+        }
+
+        if (wantTicket) {
+            try {
+                out.ticket = { ok: true, ...(await refreshTicketPanelMessage(guildId, uid)) };
+            } catch (e) {
+                out.ticket = { ok: false, error: e.message || String(e) };
+            }
+        } else {
+            out.ticket = { ok: false, skipped: true, error: 'omitido por solicitud' };
+        }
+
+        res.json({ success: true, results: out });
+    } catch (error) {
+        console.error('Error refrescando paneles:', error);
+        res.status(500).json({ error: error.message || 'Error al refrescar paneles' });
     }
 });
 
