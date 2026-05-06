@@ -470,7 +470,7 @@
                                                         <span class="theme-toggle-track" aria-hidden="true"></span>
                                                     </label>
                                                     <div class="settings-wallpaper-file-row">
-                                                        <input type="file" id="themeWallpaperFile" class="form-control" accept="image/jpeg,image/png,image/webp">
+                                                        <input type="file" id="themeWallpaperFile" class="form-control" accept="image/jpeg,image/png,image/webp,image/gif">
                                                         <button type="button" id="themeWallpaperClearBtn" class="btn btn-secondary btn-sm">Quitar imagen</button>
                                                     </div>
                                                     <div class="form-group theme-slider-group">
@@ -483,7 +483,7 @@
                                                         <input type="range" id="themeWallpaperVeil" class="form-control" min="0" max="100" value="38" step="1">
                                                         <small id="themeWallpaperVeilValue">38%</small>
                                                     </div>
-                                                    <p class="settings-wallpaper-hint">PNG, JPG o WebP. Se optimiza en el navegador (máx. ~2200 px). Guarda con el botón superior si cambias otros colores.</p>
+                                                    <p class="settings-wallpaper-hint">PNG, JPG, WebP o <strong>GIF</strong> (los GIF siguen animados; no se recomprimen). Fotos estáticas se optimizan a ~2200 px. GIF hasta ~10 MB.</p>
                                                 </div>
                                             </section>
 
@@ -1587,6 +1587,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260505-wallpaper-bg"></script>
+    <script src="app.js?v=20260505-wallpaper-gif"></script>
 </body>
 </html>
