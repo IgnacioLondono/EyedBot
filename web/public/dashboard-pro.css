@@ -11211,3 +11211,290 @@ body {
         border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
     }
 }
+
+/* =====================================================================
+   Configuraciones — mismo layout pantalla completa que panel servidor
+   ===================================================================== */
+.main-content:has(#profileSettingsSection.active) {
+    padding: 0 !important;
+}
+
+#profileSettingsSection.section {
+    height: calc(100vh - 70px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#profileSettingsSection.section > .container {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    flex: 1 !important;
+}
+
+#profileSettingsSection .settings-page-head.section-header {
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0.65rem 1rem 0.55rem !important;
+    border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
+}
+
+#profileSettingsSection .settings-layout.settings-shell,
+#profileSettingsSection .settings-layout {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: 260px minmax(0, 1fr) !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    align-items: stretch !important;
+}
+
+#profileSettingsSection .settings-sidebar {
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    align-self: stretch !important;
+    margin: 0 !important;
+    padding: 0.85rem 0.75rem !important;
+    border-radius: 0 !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
+    box-shadow: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    background:
+        linear-gradient(
+            125deg,
+            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.08) 0%,
+            transparent 48%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.52),
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.44)
+        ) !important;
+    backdrop-filter: blur(14px) saturate(165%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(165%) !important;
+}
+
+#profileSettingsSection .settings-content.settings-content-area,
+#profileSettingsSection .settings-content {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0.55rem 1rem 1rem !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background:
+        linear-gradient(
+            125deg,
+            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.08) 0%,
+            transparent 48%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.52),
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.44)
+        ) !important;
+    backdrop-filter: blur(14px) saturate(165%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(165%) !important;
+}
+
+#profileSettingsSection .settings-sidebar::-webkit-scrollbar,
+#profileSettingsSection .settings-content::-webkit-scrollbar {
+    width: 9px !important;
+}
+
+#profileSettingsSection .settings-sidebar::-webkit-scrollbar-thumb,
+#profileSettingsSection .settings-content::-webkit-scrollbar-thumb {
+    border-radius: 999px !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.52) !important;
+}
+
+/* Sin “tarjeta” envolviendo cada pestaña */
+#profileSettingsSection .settings-pane-shell.dpx-panel {
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    gap: 0 !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+}
+
+#profileSettingsSection .settings-pane-hero.dpx-hero {
+    flex-shrink: 0 !important;
+    margin: 0 0 0.75rem !important;
+    padding: 0.35rem 0 0.65rem !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+#profileSettingsSection .settings-pane-body {
+    padding-top: 0 !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+}
+
+/* Cuenta / Web: filas en lugar de mini-tarjetas */
+#profileSettingsSection .settings-kv-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+}
+
+#profileSettingsSection .settings-kv-card {
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12) !important;
+    padding: 0.85rem 0 !important;
+    box-shadow: none !important;
+}
+
+#profileSettingsSection .settings-kv-card:last-child {
+    border-bottom: none !important;
+}
+
+#profileSettingsSection #settingsPaneTheme.active .settings-pane-body.settings-theme-body {
+    overflow: visible !important;
+}
+
+#profileSettingsSection .settings-theme-layout {
+    overflow: visible !important;
+}
+
+#profileSettingsSection .settings-theme-pane--controls {
+    overflow-y: visible !important;
+}
+
+@media (max-width: 1024px) {
+    #profileSettingsSection.section {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #profileSettingsSection.section > .container {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #profileSettingsSection .settings-layout.settings-shell,
+    #profileSettingsSection .settings-layout {
+        grid-template-columns: 1fr !important;
+        gap: 0.65rem !important;
+    }
+
+    #profileSettingsSection .settings-sidebar {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        border: none !important;
+        border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16) !important;
+    }
+
+    #profileSettingsSection .settings-content.settings-content-area,
+    #profileSettingsSection .settings-content {
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0.65rem 1rem 1rem !important;
+    }
+}
+
+/* =====================================================================
+   Dashboard (servidores) + Acerca de — full bleed como panel servidor
+   ===================================================================== */
+.main-content:has(#dashboard.active),
+.main-content:has(#controlCenterSection.active) {
+    padding: 0 !important;
+}
+
+#dashboard.section,
+#controlCenterSection.section {
+    height: calc(100vh - 70px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#dashboard.section > .container.fullbleed-shell,
+#controlCenterSection.section > .container.fullbleed-shell {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    flex: 1 !important;
+    padding-right: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+#dashboard .dashboard-search-header.section-header {
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0.65rem 1rem 0.55rem !important;
+    border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14) !important;
+}
+
+#dashboard .guilds-grid {
+    flex: 1 !important;
+    min-height: 0 !important;
+    padding: 0.85rem 1rem 1rem !important;
+    align-content: start !important;
+}
+
+#controlCenterSection .about-rb3-head {
+    flex-shrink: 0 !important;
+    margin: 0 0 0.85rem !important;
+    padding: 0.85rem 1rem 0 !important;
+}
+
+#controlCenterSection .about-rb3-grid {
+    padding: 0 1rem 1.25rem !important;
+}
+
+@media (max-width: 1024px) {
+    #dashboard.section,
+    #controlCenterSection.section {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #dashboard.section > .container.fullbleed-shell,
+    #controlCenterSection.section > .container.fullbleed-shell {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #controlCenterSection .about-rb3-head {
+        padding: 0.75rem 0.85rem 0 !important;
+    }
+
+    #controlCenterSection .about-rb3-grid {
+        padding: 0 0.85rem 1.1rem !important;
+    }
+}

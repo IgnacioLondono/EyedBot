@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260507-bg-bubbles-toggle">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260505-wallpaper-bg">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260507-fullbleed-dashboard-about">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -144,7 +144,7 @@
     <main class="main-content">
         <!-- Dashboard -->
         <section id="dashboard" class="section active">
-            <div class="container dashboard-shell">
+            <div class="container fullbleed-shell">
                 <div class="section-header section-header--split dashboard-search-header">
                     <div class="section-heading">
                         <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13l4-4 4 4 8-8"></path><path d="M3 21h18"></path><path d="M3 3v18"></path></svg>Servidores</h2>
@@ -170,7 +170,7 @@
         </section>
 
         <section id="controlCenterSection" class="section">
-            <div class="container dashboard-shell about-rb3-shell">
+            <div class="container fullbleed-shell">
                 <header class="about-rb3-head reveal-on-scroll" data-reveal="up">
                     <p class="about-rb3-kicker">Acerca de EyedBot</p>
                     <h2>Caracteristicas</h2>
@@ -255,13 +255,13 @@
         </section>
 
         <section id="profileSettingsSection" class="section">
-            <div class="container dashboard-shell">
-                <div class="section-header">
+            <div class="container">
+                <header class="section-header settings-page-head">
                     <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"></path></svg>Configuraciones</h2>
                     <div class="title-accent"></div>
-                </div>
+                </header>
 
-                <div class="settings-layout" id="settingsLayout">
+                <div class="settings-layout settings-shell" id="settingsLayout">
                     <aside class="settings-sidebar" id="settingsSidebar">
                         <button type="button" class="settings-side-btn active" data-settings-pane="settingsPaneAccount">
                             <span>Cuenta</span>
@@ -274,7 +274,7 @@
                         </button>
                     </aside>
 
-                    <div class="settings-content">
+                    <div class="settings-content settings-content-area">
                         <section id="settingsPaneAccount" class="settings-pane active">
                             <div class="settings-pane-shell dpx-panel">
                                 <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#6ec8ff;--dpx-hero-glow-1:rgba(110,200,255,0.22);--dpx-hero-glow-2:rgba(124,77,255,0.18);">
