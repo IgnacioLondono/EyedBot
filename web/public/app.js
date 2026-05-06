@@ -123,6 +123,55 @@ const THEME_PRESETS = {
         borderColor: '#cbd5e1',
         atmosphere: 40,
         borderStrength: 18
+    },
+    /** OLED: negro total y tipografía clara */
+    void: {
+        accentPrimary: '#ffffff',
+        accentSecondary: '#e5e5e5',
+        bgPrimary: '#000000',
+        bgSecondary: '#000000',
+        bgCard: '#0d0d0d',
+        textPrimary: '#ffffff',
+        textSecondary: '#d4d4d4',
+        borderColor: '#2a2a2a',
+        atmosphere: 22,
+        borderStrength: 16
+    },
+    ruby: {
+        accentPrimary: '#ff3d3d',
+        accentSecondary: '#ff8080',
+        bgPrimary: '#0c0202',
+        bgSecondary: '#170707',
+        bgCard: '#221010',
+        textPrimary: '#fff5f5',
+        textSecondary: '#fecaca',
+        borderColor: '#ff3d3d',
+        atmosphere: 54,
+        borderStrength: 30
+    },
+    gold: {
+        accentPrimary: '#f59e0b',
+        accentSecondary: '#fcd34d',
+        bgPrimary: '#0c0a03',
+        bgSecondary: '#171206',
+        bgCard: '#221c0c',
+        textPrimary: '#fffbeb',
+        textSecondary: '#fde68a',
+        borderColor: '#f59e0b',
+        atmosphere: 52,
+        borderStrength: 26
+    },
+    indigo: {
+        accentPrimary: '#7c8cff',
+        accentSecondary: '#b794f6',
+        bgPrimary: '#070614',
+        bgSecondary: '#0e0c22',
+        bgCard: '#14122c',
+        textPrimary: '#eef2ff',
+        textSecondary: '#c7d2fe',
+        borderColor: '#7c8cff',
+        atmosphere: 56,
+        borderStrength: 27
     }
 };
 
