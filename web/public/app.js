@@ -50,6 +50,9 @@ let serverSummaryRefreshInterval = null;
 let isSwitchingServer = false;
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
+const WALLPAPER_MAX_URL_CHARS = 9_000_000;
+/** GIF sin pasar por canvas (conserva animación); tamaño razonable para localStorage */
+const WALLPAPER_MAX_GIF_BYTES = 10 * 1024 * 1024;
 
 const THEME_PRESETS = {
     midnight: {
@@ -900,8 +903,8 @@ function normalizeThemeSettings(input = {}) {
     const autoContrastFallback = typeof preset.autoContrast === 'boolean' ? preset.autoContrast : THEME_DEFAULTS.autoContrast;
 
     let wallpaperUrl = typeof input.wallpaperUrl === 'string' ? input.wallpaperUrl.trim() : '';
-    if (wallpaperUrl.length > 3_500_000) {
-        wallpaperUrl = wallpaperUrl.slice(0, 3_500_000);
+    if (wallpaperUrl.length > WALLPAPER_MAX_URL_CHARS) {
+        wallpaperUrl = '';
     }
 
     return {
@@ -1271,6 +1274,15 @@ function bindSettingsPaneNavigation() {
     switchSettingsPane(currentSettingsPaneId, { silent: true });
 }
 
+function readWallpaperGifAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('No se pudo leer el GIF'));
+        reader.readAsDataURL(file);
+    });
+}
+
 function resizeWallpaperToDataUrl(file, maxEdge = 2200, quality = 0.82) {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -1350,13 +1362,23 @@ function bindThemeControls() {
         wpFile.addEventListener('change', async () => {
             const file = wpFile.files?.[0];
             if (!file) return;
-            if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
-                showToast('Usa JPG, PNG o WebP', 'warning');
+            if (!/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
+                showToast('Usa JPG, PNG, WebP o GIF', 'warning');
                 wpFile.value = '';
                 return;
             }
             try {
-                const dataUrl = await resizeWallpaperToDataUrl(file);
+                let dataUrl;
+                if (/^image\/gif$/i.test(file.type)) {
+                    if (file.size > WALLPAPER_MAX_GIF_BYTES) {
+                        showToast('GIF demasiado grande (máx. ~10 MB para poder guardarlo en el navegador).', 'warning');
+                        wpFile.value = '';
+                        return;
+                    }
+                    dataUrl = await readWallpaperGifAsDataUrl(file);
+                } else {
+                    dataUrl = await resizeWallpaperToDataUrl(file);
+                }
                 applyThemeSettings(
                     normalizeThemeSettings({
                         ...getThemeControlsState(),
@@ -1368,7 +1390,7 @@ function bindThemeControls() {
                 syncThemeControls(themeSettings);
                 const wt = document.getElementById('themeWallpaperEnabled');
                 if (wt) wt.checked = true;
-                showToast('Fondo aplicado', 'success');
+                showToast(/^image\/gif$/i.test(file.type) ? 'GIF aplicado (animado si el archivo lo es)' : 'Fondo aplicado', 'success');
             } catch (e) {
                 console.warn(e);
                 showToast(e.message || 'No se pudo procesar la imagen', 'error');
