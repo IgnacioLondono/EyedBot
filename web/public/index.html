@@ -469,7 +469,7 @@
                                 </button>
                                 <button type="button" id="sendEmbedBtn" class="btn btn-primary">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                                    <span>Enviar embed</span>
+                                    <span id="sendEmbedBtnLabel">Enviar embed</span>
                                 </button>
                             </div>
                         </div>
@@ -515,6 +515,11 @@
                                         <select id="channelSelect" class="form-control" disabled>
                                             <option value="">Primero selecciona un servidor</option>
                                         </select>
+                                    </div>
+                                    <div class="dpx-field is-full">
+                                        <label for="embedTargetMessageId">ID del mensaje (opcional)</label>
+                                        <input type="text" id="embedTargetMessageId" class="form-control" placeholder="Para editar un mensaje ya enviado por el bot en este canal" inputmode="numeric" autocomplete="off" maxlength="25">
+                                        <small class="dpx-field-hint">Si lo rellenas, se <strong>actualiza</strong> ese mensaje en lugar de enviar uno nuevo. Activa modo desarrollador en Discord y clic derecho en el mensaje → «Copiar ID».</small>
                                     </div>
                                 </div>
                             </section>
@@ -1525,6 +1530,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260505-settings-redesign"></script>
+    <script src="app.js?v=20260505-embed-edit-by-id"></script>
 </body>
 </html>

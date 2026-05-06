@@ -3377,10 +3377,11 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
     }
 });
 
-// Ruta para enviar embeds
+// Ruta para enviar embeds (o editar uno existente del bot si llega messageId)
 app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'thumbnailFile', maxCount: 1 }]), async (req, res) => {
     try {
         const { guildId, channelId } = req.body;
+        const rawMessageId = String(req.body?.messageId || req.body?.targetMessageId || '').trim();
         const embedRaw = req.body?.embed;
         const embed = typeof embedRaw === 'string' ? JSON.parse(embedRaw) : embedRaw;
 
@@ -3392,21 +3393,20 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) {
+            return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        }
+
+        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
 
-        const channel = guild.channels.cache.get(channelId);
-        if (!channel) {
-            return res.status(404).json({ error: 'Canal no encontrado' });
-        }
-
-        // Verificar permisos
-        const hasFiles = (req.files?.imageFile?.length || 0) > 0 || (req.files?.thumbnailFile?.length || 0) > 0;
-        const requiredPerms = hasFiles ? ['SendMessages', 'EmbedLinks', 'AttachFiles'] : ['SendMessages', 'EmbedLinks'];
-        if (!channel.permissionsFor(guild.members.me)?.has(requiredPerms)) {
-            return res.status(403).json({ error: 'El bot no tiene permisos en este canal' });
+        const channel =
+            guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
+        if (!channel || !channel.isTextBased()) {
+            return res.status(404).json({ error: 'Canal no encontrado o no admite mensajes' });
         }
 
         // Crear embed usando discord.js
@@ -3455,12 +3455,45 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             if (!embed.thumbnail) discordEmbed.setThumbnail(`attachment://${thumbName}`);
         }
 
+        const hasFiles = files.length > 0;
+        const requiredPerms = hasFiles ? ['SendMessages', 'EmbedLinks', 'AttachFiles'] : ['SendMessages', 'EmbedLinks'];
+        if (!channel.permissionsFor(guild.members.me)?.has(requiredPerms)) {
+            return res.status(403).json({ error: 'El bot no tiene permisos en este canal' });
+        }
+
+        if (rawMessageId) {
+            if (!/^\d{10,25}$/.test(rawMessageId)) {
+                return res.status(400).json({ error: 'ID de mensaje inválido' });
+            }
+
+            const message = await channel.messages.fetch(rawMessageId).catch(() => null);
+            if (!message) {
+                return res.status(404).json({ error: 'No se encontró el mensaje en ese canal (revisa el ID y el canal)' });
+            }
+            if (message.author.id !== botClient.user.id) {
+                return res.status(400).json({ error: 'Solo se pueden editar mensajes enviados por el bot' });
+            }
+
+            await message.edit({
+                embeds: [discordEmbed],
+                files: hasFiles ? files : []
+            });
+
+            console.log(`[Embed] ${req.session.user.username} editó mensaje ${rawMessageId} en ${guild.name}/${channel.name}`);
+
+            return res.json({
+                success: true,
+                updated: true,
+                messageId: message.id,
+                message: 'Mensaje actualizado correctamente'
+            });
+        }
+
         await channel.send({ embeds: [discordEmbed], files });
 
-        // Guardar en logs (opcional)
         console.log(`[Embed] ${req.session.user.username} envió un embed en ${guild.name}/${channel.name}`);
 
-        res.json({ success: true, message: 'Embed enviado correctamente' });
+        res.json({ success: true, updated: false, message: 'Embed enviado correctamente' });
     } catch (error) {
         console.error('Error enviando embed:', error);
         res.status(500).json({ error: error.message || 'Error al enviar embed' });

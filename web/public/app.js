@@ -697,6 +697,7 @@ function saveState() {
             thumbnailCropW: Number.parseInt(document.getElementById('embedThumbnailCropW')?.value || '100', 10),
             thumbnailCropH: Number.parseInt(document.getElementById('embedThumbnailCropH')?.value || '100', 10),
             timestamp: document.getElementById('embedTimestamp')?.checked || false,
+            targetMessageId: document.getElementById('embedTargetMessageId')?.value?.trim() || '',
             fields: []
         },
         serverSection: {
@@ -1247,6 +1248,10 @@ function restoreEmbedForm(state) {
     if (document.getElementById('embedThumbnailCropW')) document.getElementById('embedThumbnailCropW').value = `${form.thumbnailCropW || 100}`;
     if (document.getElementById('embedThumbnailCropH')) document.getElementById('embedThumbnailCropH').value = `${form.thumbnailCropH || 100}`;
     if (document.getElementById('embedTimestamp')) document.getElementById('embedTimestamp').checked = form.timestamp || false;
+    if (document.getElementById('embedTargetMessageId')) {
+        document.getElementById('embedTargetMessageId').value = form.targetMessageId || '';
+    }
+    syncEmbedSendButtonLabel();
 
     // Restaurar servidor y canal (después de cargar los servidores)
     if (form.guildId) {
@@ -1895,6 +1900,14 @@ function setupEventListeners() {
         saveState();
     });
     document.getElementById('channelSelect').addEventListener('change', saveState);
+    const embedTargetMid = document.getElementById('embedTargetMessageId');
+    if (embedTargetMid) {
+        embedTargetMid.addEventListener('input', () => {
+            syncEmbedSendButtonLabel();
+            saveState();
+        });
+    }
+    syncEmbedSendButtonLabel();
     document.getElementById('previewBtn')?.addEventListener('click', updateEmbedPreview);
     document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
@@ -2606,6 +2619,9 @@ function clearEmbedComposer({ keepDestination = true, silent = false } = {}) {
     syncEmbedTextCounters();
     updateEmbedStats();
     updateEmbedPreview();
+    const mid = document.getElementById('embedTargetMessageId');
+    if (mid) mid.value = '';
+    syncEmbedSendButtonLabel();
     saveState();
 
     if (!silent) {
@@ -2869,6 +2885,12 @@ function updateEmbedStats() {
     }
 }
 
+function syncEmbedSendButtonLabel() {
+    const id = document.getElementById('embedTargetMessageId')?.value?.trim();
+    const label = document.getElementById('sendEmbedBtnLabel');
+    if (label) label.textContent = id ? 'Actualizar mensaje' : 'Enviar embed';
+}
+
 // Enviar embed
 async function sendEmbed() {
     const guildId = document.getElementById('guildSelect').value;
@@ -2887,6 +2909,11 @@ async function sendEmbed() {
         const formData = new FormData();
         formData.append('guildId', guildId);
         formData.append('channelId', channelId);
+
+        const targetMessageId = document.getElementById('embedTargetMessageId')?.value?.trim() || '';
+        if (targetMessageId) {
+            formData.append('messageId', targetMessageId);
+        }
 
         if (uploadedImageFile) {
             const resizedMain = await resizeImageFile(uploadedImageFile, imageScale, 1600, getCropSettings('image'));
@@ -2912,7 +2939,7 @@ async function sendEmbed() {
         const data = await response.json();
 
         if (response.ok) {
-            showToast('Embed enviado correctamente', 'success');
+            showToast(data.updated ? 'Mensaje actualizado en Discord' : 'Embed enviado correctamente', 'success');
             clearEmbedComposer({ keepDestination: true, silent: true });
         } else {
             showToast(data.error || 'Error al enviar embed', 'error');
