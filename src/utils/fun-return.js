@@ -6,13 +6,14 @@ const path = require('path');
 
 const DATA_DIR = path.join(__dirname, '../../data');
 const MENTIONS_FILE = path.join(DATA_DIR, 'fun-mentions.json');
-const GIF_CACHE_TTL_MS = Math.max(60_000, Number.parseInt(process.env.FUN_GIF_CACHE_TTL_MS || '900000', 10));
 const TRANSLATION_CACHE_TTL_MS = Math.max(60_000, Number.parseInt(process.env.FUN_TRANSLATION_CACHE_TTL_MS || '900000', 10));
+const GIF_RECENT_LIMIT = Math.max(3, Number.parseInt(process.env.FUN_GIF_RECENT_LIMIT || '5', 10));
 
 let mentionsCache = null;
 let writeQueue = Promise.resolve();
 const gifCache = new Map();
 const gifInflight = new Map();
+const gifRecent = new Map();
 const translationCache = new Map();
 const translationInflight = new Map();
 
@@ -202,7 +203,8 @@ async function fetchFromTenor(action) {
         }
     });
 
-    const item = response?.data?.results?.[0];
+    const items = response?.data?.results || [];
+    const item = items[Math.floor(Math.random() * items.length)] || items[0];
     const url = item?.media_formats?.gif?.url || null;
     if (!url) return null;
     const desc = item?.content_description?.trim();
@@ -226,7 +228,8 @@ async function fetchGifFromSearchTenor(query) {
         }
     });
 
-    const item = response?.data?.results?.[0];
+    const items = response?.data?.results || [];
+    const item = items[Math.floor(Math.random() * items.length)] || items[0];
     const url = item?.media_formats?.gif?.url || null;
     if (!url) return null;
     const desc = item?.content_description?.trim();
@@ -267,46 +270,68 @@ async function fetchGifFromNekosFallback(query) {
     return url ? { url, source: null } : null;
 }
 
-function getCachedGif(cacheKey) {
-    const cached = gifCache.get(cacheKey);
-    if (!cached) return null;
-    if (cached.expiresAt <= Date.now()) {
-        gifCache.delete(cacheKey);
-        return null;
-    }
-    return cached.value;
+function getRecentGifList(cacheKey) {
+    return gifRecent.get(cacheKey) || [];
 }
 
-function setCachedGif(cacheKey, value) {
+function rememberGif(cacheKey, value) {
     if (!value?.url) return;
-    gifCache.set(cacheKey, {
-        value,
-        expiresAt: Date.now() + GIF_CACHE_TTL_MS
-    });
+
+    const current = getRecentGifList(cacheKey).filter((item) => item?.url && item.url !== value.url);
+    current.unshift(value);
+    gifRecent.set(cacheKey, current.slice(0, GIF_RECENT_LIMIT));
+}
+
+function isRecentGif(cacheKey, url) {
+    if (!url) return false;
+    return getRecentGifList(cacheKey).some((item) => item?.url === url);
+}
+
+function shuffleItems(items) {
+    return [...items].sort(() => Math.random() - 0.5);
 }
 
 async function resolveGif(cacheKey, providers) {
-    const cached = getCachedGif(cacheKey);
-    if (cached) return cached;
-
     if (gifInflight.has(cacheKey)) {
         return gifInflight.get(cacheKey);
     }
 
-    const request = Promise.any(
-        providers.map((provider) =>
-            Promise.resolve()
-                .then(() => provider())
-                .then((result) => {
-                    if (result?.url) return result;
-                    throw new Error('GIF not found');
-                })
-        )
-    ).catch(() => ({ url: null, source: null }))
-        .then((result) => {
-            if (result?.url) setCachedGif(cacheKey, result);
-            return result;
-        })
+    const request = (async () => {
+        let fallback = null;
+
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            const settled = await Promise.allSettled(
+                shuffleItems(providers).map((provider) => Promise.resolve().then(() => provider()))
+            );
+
+            const results = settled
+                .filter((entry) => entry.status === 'fulfilled' && entry.value?.url)
+                .map((entry) => entry.value);
+
+            if (!results.length) continue;
+
+            if (!fallback) {
+                fallback = results[Math.floor(Math.random() * results.length)] || null;
+            }
+
+            const freshResults = results.filter((result) => !isRecentGif(cacheKey, result.url));
+            const selected = freshResults.length
+                ? freshResults[Math.floor(Math.random() * freshResults.length)]
+                : null;
+
+            if (selected?.url) {
+                rememberGif(cacheKey, selected);
+                return selected;
+            }
+        }
+
+        if (fallback?.url) {
+            rememberGif(cacheKey, fallback);
+            return fallback;
+        }
+
+        return { url: null, source: null };
+    })()
         .finally(() => {
             gifInflight.delete(cacheKey);
         });
@@ -335,7 +360,8 @@ async function fetchSearchGif(query) {
     }
     providers.push(() => fetchGifFromGiphy(normalizedQuery));
 
-    const primaryResult = await resolveGif(`search:${normalizedQuery}`, providers);
+    const cacheKey = `search:${normalizedQuery}`;
+    const primaryResult = await resolveGif(cacheKey, providers);
     if (primaryResult?.url) return primaryResult;
 
     return fetchGifFromNekosFallback(normalizedQuery).catch(() => ({ url: null, source: null }));
