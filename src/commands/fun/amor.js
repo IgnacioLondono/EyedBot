@@ -49,9 +49,9 @@ function drawCircleAvatar(ctx, image, cx, cy, radius) {
     ctx.stroke();
 }
 
-function drawHeart(ctx, x, y, size) {
+function drawHeart(ctx, centerX, centerY, size) {
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(centerX - (size / 2), centerY - (size / 2));
     ctx.scale(size / 100, size / 100);
     ctx.beginPath();
     ctx.moveTo(50, 85);
@@ -99,7 +99,7 @@ async function buildLoveImage(author, target, percent) {
 
     drawCircleAvatar(ctx, authorAvatar, 210, 165, 95);
     drawCircleAvatar(ctx, targetAvatar, 710, 165, 95);
-    drawHeart(ctx, 460, 115, 165);
+    drawHeart(ctx, 460, 165, 165);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
