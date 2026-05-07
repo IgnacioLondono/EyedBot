@@ -436,6 +436,8 @@ async function handleReturnInteraction(interaction) {
         return true;
     }
 
+    await interaction.deferReply().catch(() => {});
+
     const [media, counts, pairCounts] = await Promise.all([
         fetchInteractionGif(parsed.action),
         incrementMentionCount(parsed.action, interaction.guild?.id || null, parsed.authorId).catch(() => ({ total: null, actionCount: null })),
@@ -473,7 +475,7 @@ async function handleReturnInteraction(interaction) {
     });
 
     await interaction.message.edit({ components: disabledRows }).catch(() => {});
-    await interaction.reply({ embeds: [embed] }).catch(() => {});
+    await interaction.editReply({ embeds: [embed] }).catch(() => {});
     return true;
 }
 
