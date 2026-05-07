@@ -1,0 +1,67 @@
+const Embeds = require('../utils/embeds');
+const countingStore = require('../utils/counting-store');
+
+const guildLocks = new Map();
+
+function enqueueGuild(guildId, task) {
+    const prev = guildLocks.get(guildId) || Promise.resolve();
+    const next = prev.catch(() => null).then(task);
+
+    guildLocks.set(guildId, next.finally(() => {
+        if (guildLocks.get(guildId) === next) {
+            guildLocks.delete(guildId);
+        }
+    }));
+
+    return next;
+}
+
+async function resetCountingDueToFailure(message, guildId, state, reasonSentence) {
+    await message.react('❌').catch(() => null);
+    const reached = Math.max(0, Number.parseInt(state.current || 0, 10) || 0);
+    await countingStore.resetProgress(guildId);
+    await message.channel.send({
+        embeds: [
+            Embeds.error(
+                'Contador reiniciado',
+                `${message.author} ${reasonSentence}\nNumero alcanzado: **${reached}**.\nEmpiecen de nuevo en **1**.`
+            )
+        ]
+    }).catch(() => null);
+}
+
+async function handleCountingMessage(message) {
+    if (!message || !message.guild || message.author?.bot) return;
+
+    const guildId = message.guild.id;
+    await enqueueGuild(guildId, async () => {
+        const state = await countingStore.getGuildConfig(guildId);
+        if (!state.enabled || !state.channelId) return;
+        if (message.channel.id !== state.channelId) return;
+
+        const content = (message.content || '').trim();
+        // Solo cuenta mensajes que son únicamente dígitos; el resto se ignora para poder charlar en el mismo canal.
+        if (!/^\d+$/.test(content)) return;
+
+        const expected = Math.max(0, Number.parseInt(state.current || 0, 10) || 0) + 1;
+        const parsed = Number.parseInt(content, 10);
+
+        if (parsed === expected) {
+            await countingStore.setProgress(guildId, { current: parsed });
+            await message.react('✅').catch(() => null);
+            return;
+        }
+
+        const provided = String(parsed);
+        await resetCountingDueToFailure(
+            message,
+            guildId,
+            state,
+            `fallo la secuencia. Se esperaba **${expected}** y llego **${provided}**.`
+        );
+    });
+}
+
+module.exports = {
+    handleCountingMessage
+};

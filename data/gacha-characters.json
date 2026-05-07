@@ -1,0 +1,24 @@
+{
+  "characters": [
+    { "id": "ch_001", "name": "Aira Nova", "series": "Celestial Archive", "rarity": "SSR", "imageUrl": "https://i.imgur.com/7vQD0fPs.jpeg", "baseValue": 500 },
+    { "id": "ch_002", "name": "Kael Draven", "series": "Celestial Archive", "rarity": "SR", "imageUrl": "https://i.imgur.com/NQ6f2vTs.jpeg", "baseValue": 180 },
+    { "id": "ch_003", "name": "Mira Elowen", "series": "Moonlit Engine", "rarity": "R", "imageUrl": "https://i.imgur.com/8Q5M8fzs.jpeg", "baseValue": 70 },
+    { "id": "ch_004", "name": "Ren Azuki", "series": "Moonlit Engine", "rarity": "N", "imageUrl": "https://i.imgur.com/qf1xwBAs.jpeg", "baseValue": 25 },
+    { "id": "ch_005", "name": "Lys Ardent", "series": "Iron Symphony", "rarity": "SR", "imageUrl": "https://i.imgur.com/QlPRx2Ds.jpeg", "baseValue": 190 },
+    { "id": "ch_006", "name": "Noa Kisaragi", "series": "Iron Symphony", "rarity": "R", "imageUrl": "https://i.imgur.com/ikPjL9Ts.jpeg", "baseValue": 80 },
+    { "id": "ch_007", "name": "Eiden Volt", "series": "Prism Frontier", "rarity": "N", "imageUrl": "https://i.imgur.com/f9xQ8gAs.jpeg", "baseValue": 20 },
+    { "id": "ch_008", "name": "Sera Yume", "series": "Prism Frontier", "rarity": "R", "imageUrl": "https://i.imgur.com/4CVsVq1s.jpeg", "baseValue": 75 },
+    { "id": "ch_009", "name": "Orin Fable", "series": "Echo Garden", "rarity": "SR", "imageUrl": "https://i.imgur.com/RrZjQpKs.jpeg", "baseValue": 170 },
+    { "id": "ch_010", "name": "Talia Rune", "series": "Echo Garden", "rarity": "SSR", "imageUrl": "https://i.imgur.com/2NN8V4Bs.jpeg", "baseValue": 520 },
+    { "id": "ch_011", "name": "Haru Zenith", "series": "Skyward Guild", "rarity": "N", "imageUrl": "https://i.imgur.com/zujWRMVs.jpeg", "baseValue": 22 },
+    { "id": "ch_012", "name": "Nemi Vale", "series": "Skyward Guild", "rarity": "R", "imageUrl": "https://i.imgur.com/wgRrR2fs.jpeg", "baseValue": 78 },
+    { "id": "ch_013", "name": "Ryuu Sol", "series": "Night Protocol", "rarity": "SR", "imageUrl": "https://i.imgur.com/5gtco1Ks.jpeg", "baseValue": 210 },
+    { "id": "ch_014", "name": "Elia Crest", "series": "Night Protocol", "rarity": "SSR", "imageUrl": "https://i.imgur.com/9q5VtBks.jpeg", "baseValue": 560 },
+    { "id": "ch_015", "name": "Pia Lumen", "series": "Aurora Circuit", "rarity": "R", "imageUrl": "https://i.imgur.com/3A8mSZWs.jpeg", "baseValue": 72 },
+    { "id": "ch_016", "name": "Zane Hollow", "series": "Aurora Circuit", "rarity": "N", "imageUrl": "https://i.imgur.com/3qVp8nAs.jpeg", "baseValue": 24 },
+    { "id": "ch_017", "name": "Mako Tsuru", "series": "Blade of Echoes", "rarity": "SR", "imageUrl": "https://i.imgur.com/3zuVZV8s.jpeg", "baseValue": 200 },
+    { "id": "ch_018", "name": "Celine Vox", "series": "Blade of Echoes", "rarity": "R", "imageUrl": "https://i.imgur.com/Ln7D9f7s.jpeg", "baseValue": 85 },
+    { "id": "ch_019", "name": "Iris Kuro", "series": "Zero Garden", "rarity": "SSR", "imageUrl": "https://i.imgur.com/ROk8JG7s.jpeg", "baseValue": 610 },
+    { "id": "ch_020", "name": "Theo Garnet", "series": "Zero Garden", "rarity": "N", "imageUrl": "https://i.imgur.com/WTy6aT3s.jpeg", "baseValue": 21 }
+  ]
+}

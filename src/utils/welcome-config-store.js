@@ -1,0 +1,227 @@
+const fs = require('fs');
+const path = require('path');
+const db = require('./database');
+
+const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'welcome-configs.json');
+const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
+const cache = new Map();
+
+function cacheGet(key) {
+    const cached = cache.get(key);
+    if (!cached) return null;
+    if (Date.now() > cached.expiresAt) {
+        cache.delete(key);
+        return null;
+    }
+    return cached.value;
+}
+
+function cacheSet(key, value) {
+    cache.set(key, {
+        value,
+        expiresAt: Date.now() + CACHE_TTL_MS
+    });
+}
+
+function ensureStore() {
+    const dir = path.dirname(STORE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(STORE_PATH)) {
+        fs.writeFileSync(STORE_PATH, JSON.stringify({ guilds: {} }, null, 2), 'utf8');
+    }
+}
+
+function readStore() {
+    ensureStore();
+    try {
+        const raw = fs.readFileSync(STORE_PATH, 'utf8');
+        const parsed = JSON.parse(raw || '{}');
+        if (!parsed || typeof parsed !== 'object') return { guilds: {} };
+        if (!parsed.guilds || typeof parsed.guilds !== 'object') parsed.guilds = {};
+        return parsed;
+    } catch {
+        return { guilds: {} };
+    }
+}
+
+function writeStore(data) {
+    ensureStore();
+    fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
+}
+
+function ensureGuildBucket(store, guildId) {
+    if (!store.guilds[guildId]) {
+        store.guilds[guildId] = {
+            welcomeChannelId: null,
+            welcomeConfig: null,
+            goodbyeChannelId: null,
+            goodbyeConfig: null
+        };
+    }
+    if (!Object.prototype.hasOwnProperty.call(store.guilds[guildId], 'goodbyeChannelId')) {
+        store.guilds[guildId].goodbyeChannelId = null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(store.guilds[guildId], 'goodbyeConfig')) {
+        store.guilds[guildId].goodbyeConfig = null;
+    }
+    return store.guilds[guildId];
+}
+
+async function getWelcomeChannelId(guildId) {
+    const cacheKey = `welcomeChannel_${guildId}`;
+    const fromCache = cacheGet(cacheKey);
+    if (fromCache !== null) return fromCache;
+
+    try {
+        const fromDb = await db.get(`welcome_${guildId}`);
+        if (fromDb) {
+            cacheSet(cacheKey, fromDb);
+            return fromDb;
+        }
+    } catch {
+        // ignore db failures and fallback to file
+    }
+
+    const store = readStore();
+    const fallback = store.guilds[guildId]?.welcomeChannelId || null;
+    cacheSet(cacheKey, fallback);
+    return fallback;
+}
+
+async function setWelcomeChannelId(guildId, channelId) {
+    try {
+        await db.set(`welcome_${guildId}`, channelId);
+    } catch {
+        // ignore db failures and still persist locally
+    }
+
+    const store = readStore();
+    const bucket = ensureGuildBucket(store, guildId);
+    bucket.welcomeChannelId = channelId;
+    writeStore(store);
+    cacheSet(`welcomeChannel_${guildId}`, channelId || null);
+    return true;
+}
+
+async function getWelcomeConfig(guildId) {
+    const cacheKey = `welcomeConfig_${guildId}`;
+    const fromCache = cacheGet(cacheKey);
+    if (fromCache !== null) return fromCache;
+
+    try {
+        const fromDb = await db.get(`welcome_config_${guildId}`);
+        if (fromDb && typeof fromDb === 'object') {
+            cacheSet(cacheKey, fromDb);
+            return fromDb;
+        }
+    } catch {
+        // ignore db failures and fallback to file
+    }
+
+    const store = readStore();
+    const fallback = store.guilds[guildId]?.welcomeConfig || null;
+    cacheSet(cacheKey, fallback);
+    return fallback;
+}
+
+async function setWelcomeConfig(guildId, config) {
+    try {
+        await db.set(`welcome_config_${guildId}`, config);
+    } catch {
+        // ignore db failures and still persist locally
+    }
+
+    const store = readStore();
+    const bucket = ensureGuildBucket(store, guildId);
+    bucket.welcomeConfig = config;
+    if (config?.channelId) bucket.welcomeChannelId = config.channelId;
+    writeStore(store);
+    cacheSet(`welcomeConfig_${guildId}`, config || null);
+    if (config?.channelId) cacheSet(`welcomeChannel_${guildId}`, config.channelId);
+    return true;
+}
+
+async function getGoodbyeChannelId(guildId) {
+    const cacheKey = `goodbyeChannel_${guildId}`;
+    const fromCache = cacheGet(cacheKey);
+    if (fromCache !== null) return fromCache;
+
+    try {
+        const fromDb = await db.get(`goodbye_${guildId}`);
+        if (fromDb) {
+            cacheSet(cacheKey, fromDb);
+            return fromDb;
+        }
+    } catch {
+        // ignore db failures and fallback to file
+    }
+
+    const store = readStore();
+    const fallback = ensureGuildBucket(store, guildId).goodbyeChannelId || null;
+    cacheSet(cacheKey, fallback);
+    return fallback;
+}
+
+async function setGoodbyeChannelId(guildId, channelId) {
+    try {
+        await db.set(`goodbye_${guildId}`, channelId);
+    } catch {
+        // ignore db failures and still persist locally
+    }
+
+    const store = readStore();
+    const bucket = ensureGuildBucket(store, guildId);
+    bucket.goodbyeChannelId = channelId;
+    writeStore(store);
+    cacheSet(`goodbyeChannel_${guildId}`, channelId || null);
+    return true;
+}
+
+async function getGoodbyeConfig(guildId) {
+    const cacheKey = `goodbyeConfig_${guildId}`;
+    const fromCache = cacheGet(cacheKey);
+    if (fromCache !== null) return fromCache;
+
+    try {
+        const fromDb = await db.get(`goodbye_config_${guildId}`);
+        if (fromDb && typeof fromDb === 'object') {
+            cacheSet(cacheKey, fromDb);
+            return fromDb;
+        }
+    } catch {
+        // ignore db failures and fallback to file
+    }
+
+    const store = readStore();
+    const fallback = ensureGuildBucket(store, guildId).goodbyeConfig || null;
+    cacheSet(cacheKey, fallback);
+    return fallback;
+}
+
+async function setGoodbyeConfig(guildId, config) {
+    try {
+        await db.set(`goodbye_config_${guildId}`, config);
+    } catch {
+        // ignore db failures and still persist locally
+    }
+
+    const store = readStore();
+    const bucket = ensureGuildBucket(store, guildId);
+    bucket.goodbyeConfig = config;
+    if (config?.channelId) bucket.goodbyeChannelId = config.channelId;
+    writeStore(store);
+    cacheSet(`goodbyeConfig_${guildId}`, config || null);
+    if (config?.channelId) cacheSet(`goodbyeChannel_${guildId}`, config.channelId);
+    return true;
+}
+
+module.exports = {
+    getWelcomeChannelId,
+    setWelcomeChannelId,
+    getWelcomeConfig,
+    setWelcomeConfig,
+    getGoodbyeChannelId,
+    setGoodbyeChannelId,
+    getGoodbyeConfig,
+    setGoodbyeConfig
+};
