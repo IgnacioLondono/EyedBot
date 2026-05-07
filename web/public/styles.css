@@ -5749,9 +5749,23 @@ body {
 
 .summary-top-user-rank {
     min-width: 34px;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: var(--lavender);
     font-size: 0.78rem;
     font-weight: 700;
+}
+
+.summary-top-user-rank svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+}
+
+.summary-top-user-rank-number {
+    line-height: 1;
 }
 
 .summary-top-user-avatar {

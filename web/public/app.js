@@ -7585,7 +7585,7 @@ function renderTopUsersMarkup(topUsers = [], options = {}) {
 
         return `
             <div class="summary-top-user-item">
-                <div class="summary-top-user-rank">#${index + 1}</div>
+                <div class="summary-top-user-rank">${summaryRankBadge(index)}</div>
                 ${avatar}
                 <div class="summary-top-user-copy">
                     <div class="summary-top-user-name">${safeTag}</div>
@@ -7618,7 +7618,7 @@ function renderServerProfileList(items = [], options = {}) {
 
         return `
             <div class="summary-top-user-item">
-                <div class="summary-top-user-rank">#${index + 1}</div>
+                <div class="summary-top-user-rank">${summaryRankBadge(index)}</div>
                 ${avatar}
                 <div class="summary-top-user-copy">
                     <div class="summary-top-user-name">${safeTitle}</div>
@@ -7751,6 +7751,21 @@ function summaryTitle(label, iconType, tone = 'violet') {
             <div class="summary-label">${label}</div>
         </div>
     `;
+}
+
+function summaryRankBadge(index) {
+    const rank = Number(index) + 1;
+    const icons = [
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"></circle><path d="M9.5 14.5 8 21l4-2 4 2-1.5-6.5"></path><path d="M12 3v2"></path><path d="M9 6l-2-2"></path><path d="M15 6l2-2"></path></svg>',
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"></circle><path d="M9.5 14.5 8 21l4-2 4 2-1.5-6.5"></path><path d="M9 6.5 7 4.5"></path><path d="M15 6.5 17 4.5"></path></svg>',
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"></circle><path d="M9.5 14.5 8 21l4-2 4 2-1.5-6.5"></path><path d="M8.5 6.5 6.5 5"></path><path d="M15.5 6.5 17.5 5"></path></svg>'
+    ];
+
+    if (index >= 0 && index < icons.length) {
+        return `<span class="summary-top-user-rank-icon summary-top-user-rank-icon--${rank}">${icons[index]}</span>`;
+    }
+
+    return `<span class="summary-top-user-rank-number">#${rank}</span>`;
 }
 
 function createServerActivityChartDatasets(points = []) {
@@ -8246,7 +8261,7 @@ function buildServerInsightDetailMarkup(info, insightId) {
                             : `<div class="summary-top-user-avatar summary-top-user-avatar--placeholder">${safeTag.charAt(0).toUpperCase()}</div>`;
                         return `
                             <div class="summary-top-user-item">
-                                <div class="summary-top-user-rank">#${index + 1}</div>
+                                <div class="summary-top-user-rank">${summaryRankBadge(index)}</div>
                                 ${avatar}
                                 <div class="summary-top-user-copy">
                                     <div class="summary-top-user-name">${safeTag}</div>
@@ -8771,7 +8786,7 @@ function displayServerInfo(info) {
 
             return `
                 <div class="summary-top-user-item">
-                    <div class="summary-top-user-rank">#${index + 1}</div>
+                    <div class="summary-top-user-rank">${summaryRankBadge(index)}</div>
                     ${avatar}
                     <div class="summary-top-user-copy">
                         <div class="summary-top-user-name">${safeTag}</div>
