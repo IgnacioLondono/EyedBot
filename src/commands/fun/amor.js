@@ -149,7 +149,7 @@ module.exports = {
                 .setDescription(`${author} + ${target}\n**${percent}%** de compatibilidad\n${loveComment(percent, isSelfLove)}`)
                 .setImage('attachment://amor.png');
 
-            setInteractionFooter(embed, interaction.user.tag, 'Love Lab');
+            setInteractionFooter(embed, interaction.user.tag);
 
             return interaction.editReply({ embeds: [embed], files: [attachment] });
         } catch {
