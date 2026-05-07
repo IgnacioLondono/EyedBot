@@ -148,8 +148,6 @@ module.exports = {
                 .setDescription(`${author} + ${target}\n**${percent}%** de compatibilidad\n${loveComment(percent, isSelfLove)}`)
                 .setImage('attachment://amor.png');
 
-            embed.setFooter({ text: `Solicitado por ${interaction.user.tag}` });
-
             return interaction.editReply({ embeds: [embed], files: [attachment] });
         } catch {
             return interaction.editReply({
