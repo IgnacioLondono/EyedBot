@@ -38,6 +38,16 @@ function mentionKeys(action, guildId, userId) {
     };
 }
 
+function pairInteractionKeys(action, guildId, userAId, userBId) {
+    const scope = guildId || 'global';
+    const [left, right] = [String(userAId || ''), String(userBId || '')].sort();
+    const pairKey = `${left}:${right}`;
+    return {
+        total: `fun:pair:total:${scope}:${pairKey}`,
+        action: `fun:pair:${action}:${scope}:${pairKey}`
+    };
+}
+
 async function ensureMentionsStoreLoaded() {
     if (mentionsCache) return mentionsCache;
 
@@ -73,6 +83,23 @@ async function persistMentionsStore() {
 async function incrementMentionCount(action, guildId, userId) {
     await ensureMentionsStoreLoaded();
     const keys = mentionKeys(action, guildId, userId);
+
+    const totalRaw = mentionsCache[keys.total] || 0;
+    const actionRaw = mentionsCache[keys.action] || 0;
+
+    const total = Number.parseInt(totalRaw, 10) + 1;
+    const actionCount = Number.parseInt(actionRaw, 10) + 1;
+
+    mentionsCache[keys.total] = total;
+    mentionsCache[keys.action] = actionCount;
+    await persistMentionsStore();
+
+    return { total, actionCount };
+}
+
+async function incrementPairInteractionCount(action, guildId, userAId, userBId) {
+    await ensureMentionsStoreLoaded();
+    const keys = pairInteractionKeys(action, guildId, userAId, userBId);
 
     const totalRaw = mentionsCache[keys.total] || 0;
     const actionRaw = mentionsCache[keys.action] || 0;
@@ -409,8 +436,11 @@ async function handleReturnInteraction(interaction) {
         return true;
     }
 
-    const media = await fetchInteractionGif(parsed.action);
-    const counts = await incrementMentionCount(parsed.action, interaction.guild?.id || null, parsed.authorId).catch(() => ({ total: null, actionCount: null }));
+    const [media, counts, pairCounts] = await Promise.all([
+        fetchInteractionGif(parsed.action),
+        incrementMentionCount(parsed.action, interaction.guild?.id || null, parsed.authorId).catch(() => ({ total: null, actionCount: null })),
+        incrementPairInteractionCount(parsed.action, interaction.guild?.id || null, interaction.user.id, parsed.authorId).catch(() => ({ total: null, actionCount: null }))
+    ]);
 
     const embed = new EmbedBuilder()
         .setColor(config.embedColor)
@@ -421,6 +451,14 @@ async function handleReturnInteraction(interaction) {
         embed.addFields({
             name: '📊 Conteo',
             value: `Menciones a <@${parsed.authorId}>: **${counts.total}** total (**${counts.actionCount}** en ${parsed.action})`,
+            inline: false
+        });
+    }
+
+    if (Number.isFinite(pairCounts?.total) && Number.isFinite(pairCounts?.actionCount)) {
+        embed.addFields({
+            name: '🤝 Interacciones Entre Ambos',
+            value: `**${pairCounts.total}** devoluciones total (**${pairCounts.actionCount}** en ${parsed.action})`,
             inline: false
         });
     }
