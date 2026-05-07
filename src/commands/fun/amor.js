@@ -4,47 +4,58 @@ const config = require('../../config');
 
 const CARD_WIDTH = 920;
 const CARD_HEIGHT = 420;
+const AVATAR_RADIUS = 94;
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function randomLovePercent(authorId, targetId) {
-    // Keep some variety while staying stable for the same pair during a short window.
-    const seedBase = `${authorId}:${targetId}:${Math.floor(Date.now() / 3600000)}`;
+function hashString(input) {
     let hash = 0;
-    for (let i = 0; i < seedBase.length; i += 1) {
-        hash = ((hash << 5) - hash) + seedBase.charCodeAt(i);
+    for (let i = 0; i < input.length; i += 1) {
+        hash = ((hash << 5) - hash) + input.charCodeAt(i);
         hash |= 0;
     }
-
-    const normalized = Math.abs(hash % 101);
-    return clamp(normalized, 0, 100);
+    return Math.abs(hash);
 }
 
-function loveComment(percent, isSelfLove) {
+function buildPairSeed(authorId, targetId) {
+    const sorted = [String(authorId), String(targetId)].sort();
+    return `${sorted[0]}:${sorted[1]}`;
+}
+
+function getLovePercent(authorId, targetId) {
+    if (authorId === targetId) return 100;
+    return clamp(hashString(buildPairSeed(authorId, targetId)) % 101, 0, 100);
+}
+
+function getLoveComment(percent, isSelfLove) {
     if (isSelfLove) return 'Amor propio al 100%. Esa vibra no falla.';
-    if (percent <= 10) return 'Uy... esto está más frío que un iceberg.';
-    if (percent <= 25) return 'Hay química, pero toca remar bastante.';
+    if (percent <= 10) return 'Uy... esto esta mas frio que un iceberg.';
+    if (percent <= 25) return 'Hay quimica, pero toca remar bastante.';
     if (percent <= 45) return 'Puede funcionar si hay paciencia y memes.';
-    if (percent <= 65) return 'Buen match. Hay señales positivas.';
-    if (percent <= 85) return 'Alta compatibilidad. Aquí hay chispas.';
-    return '¡Match legendario! Esto parece destino.';
+    if (percent <= 65) return 'Buen match. Hay senales positivas.';
+    if (percent <= 85) return 'Alta compatibilidad. Aqui hay chispas.';
+    return 'Match legendario. Esto parece destino.';
 }
 
-function drawCircleAvatar(ctx, image, cx, cy, radius) {
+function truncateLabel(value, limit = 18) {
+    return String(value || '').slice(0, limit);
+}
+
+function drawAvatar(ctx, image, centerX, centerY, radius) {
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.closePath();
     ctx.clip();
-    ctx.drawImage(image, cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.drawImage(image, centerX - radius, centerY - radius, radius * 2, radius * 2);
     ctx.restore();
 
     ctx.lineWidth = 7;
     ctx.strokeStyle = 'rgba(255,255,255,0.95)';
     ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.stroke();
 }
 
@@ -61,43 +72,45 @@ function drawHeart(ctx, centerX, centerY, size) {
     ctx.closePath();
 
     const gradient = ctx.createLinearGradient(0, 0, 100, 100);
-    gradient.addColorStop(0, '#ff4d6d');
-    gradient.addColorStop(1, '#ff8fa3');
+    gradient.addColorStop(0, '#ff5d8f');
+    gradient.addColorStop(1, '#ff839f');
     ctx.fillStyle = gradient;
     ctx.fill();
     ctx.restore();
 }
 
-async function buildLoveImage(author, target, percent) {
+function drawBackground(ctx) {
+    const gradient = ctx.createLinearGradient(0, 0, CARD_WIDTH, CARD_HEIGHT);
+    gradient.addColorStop(0, '#2b0b5f');
+    gradient.addColorStop(0.5, '#6a1b9a');
+    gradient.addColorStop(1, '#ef476f');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+
+    for (let i = 0; i < 18; i += 1) {
+        const x = (i * 53) % CARD_WIDTH;
+        const y = (i * 97) % CARD_HEIGHT;
+        const radius = 8 + ((i * 11) % 22);
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)';
+        ctx.beginPath();
+        ctx.arc(x + 30, y + 24, radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+async function buildLoveCard(author, target, percent) {
     const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    const bgGradient = ctx.createLinearGradient(0, 0, CARD_WIDTH, CARD_HEIGHT);
-    bgGradient.addColorStop(0, '#240046');
-    bgGradient.addColorStop(0.5, '#5a189a');
-    bgGradient.addColorStop(1, '#ff4d6d');
-    ctx.fillStyle = bgGradient;
-    ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+    drawBackground(ctx);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    for (let i = 0; i < 16; i += 1) {
-        const x = Math.floor(Math.random() * CARD_WIDTH);
-        const y = Math.floor(Math.random() * CARD_HEIGHT);
-        const r = Math.floor(Math.random() * 24) + 8;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    const authorAvatarUrl = author.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-    const targetAvatarUrl = target.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
     const [authorAvatar, targetAvatar] = await Promise.all([
-        loadImage(authorAvatarUrl),
-        loadImage(targetAvatarUrl)
+        loadImage(author.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true })),
+        loadImage(target.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true }))
     ]);
 
-    drawCircleAvatar(ctx, authorAvatar, 210, 165, 95);
-    drawCircleAvatar(ctx, targetAvatar, 710, 165, 95);
+    drawAvatar(ctx, authorAvatar, 210, 165, AVATAR_RADIUS);
+    drawAvatar(ctx, targetAvatar, 710, 165, AVATAR_RADIUS);
     drawHeart(ctx, 460, 165, 165);
 
     ctx.textAlign = 'center';
@@ -113,8 +126,8 @@ async function buildLoveImage(author, target, percent) {
 
     ctx.font = 'bold 24px Arial';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(author.username.slice(0, 18), 210, 280);
-    ctx.fillText(target.username.slice(0, 18), 710, 280);
+    ctx.fillText(truncateLabel(author.username), 210, 280);
+    ctx.fillText(truncateLabel(target.username), 710, 280);
 
     return canvas.encode('png');
 }
@@ -133,28 +146,33 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
 
-        const target = interaction.options.getUser('usuario');
         const author = interaction.user;
-        const isSelfLove = target.id === author.id;
+        const target = interaction.options.getUser('usuario');
+        const isSelfLove = author.id === target.id;
 
         try {
-            const percent = isSelfLove ? 100 : randomLovePercent(author.id, target.id);
-            const image = await buildLoveImage(author, target, percent);
+            const percent = getLovePercent(author.id, target.id);
+            const image = await buildLoveCard(author, target, percent);
             const attachment = new AttachmentBuilder(image, { name: 'amor.png' });
 
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
                 .setTitle('💘 Medidor de Amor')
-                .setDescription(`${author} + ${target}\n**${percent}%** de compatibilidad\n${loveComment(percent, isSelfLove)}`)
+                .setDescription(`${author} + ${target}\n**${percent}%** de compatibilidad\n${getLoveComment(percent, isSelfLove)}`)
                 .setImage('attachment://amor.png');
 
-            return interaction.editReply({ embeds: [embed], files: [attachment] });
+            return interaction.editReply({
+                embeds: [embed],
+                files: [attachment]
+            });
         } catch {
             return interaction.editReply({
-                embeds: [new EmbedBuilder()
-                    .setColor('#FF0000')
-                    .setTitle('❌ Error')
-                    .setDescription('No pude generar la carta de amor ahora mismo.')]
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle('❌ Error')
+                        .setDescription('No pude generar la carta de amor ahora mismo.')
+                ]
             });
         }
     }
