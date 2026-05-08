@@ -26,7 +26,8 @@ function buildPairSeed(authorId, targetId) {
 
 function getLovePercent(authorId, targetId) {
     if (authorId === targetId) return 100;
-    return clamp(hashString(buildPairSeed(authorId, targetId)) % 101, 0, 100);
+    // Genera un porcentaje aleatorio en cada ejecución para dar resultados distintos
+    return Math.floor(Math.random() * 101);
 }
 
 function getLoveComment(percent, isSelfLove) {
