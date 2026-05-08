@@ -6587,6 +6587,20 @@ function renderTierIcon(iconId, size = 20) {
     }
 }
 
+function renderPodiumMedal(rank, size = 28) {
+    const common = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"`;
+    switch (rank) {
+        case 1:
+            return `<svg ${common}><defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#ffd54a"/><stop offset="1" stop-color="#ffb300"/></linearGradient></defs><circle cx="12" cy="10" r="6" fill="url(#g1)" stroke="rgba(0,0,0,0.12)"/><path d="M8 21l4-3 4 3" stroke="rgba(0,0,0,0.12)" fill="none"/></svg>`;
+        case 2:
+            return `<svg ${common}><defs><linearGradient id="g2" x1="0" x2="1"><stop offset="0" stop-color="#e0e0e0"/><stop offset="1" stop-color="#bdbdbd"/></linearGradient></defs><circle cx="12" cy="10" r="6" fill="url(#g2)" stroke="rgba(0,0,0,0.08)"/><path d="M8 21l4-3 4 3" stroke="rgba(0,0,0,0.08)" fill="none"/></svg>`;
+        case 3:
+            return `<svg ${common}><defs><linearGradient id="g3" x1="0" x2="1"><stop offset="0" stop-color="#ffab91"/><stop offset="1" stop-color="#ff7043"/></linearGradient></defs><circle cx="12" cy="10" r="6" fill="url(#g3)" stroke="rgba(0,0,0,0.08)"/><path d="M8 21l4-3 4 3" stroke="rgba(0,0,0,0.08)" fill="none"/></svg>`;
+        default:
+            return '';
+    }
+}
+
 function renderTierBadge(tier, size = 'sm') {
     if (!tier) return '';
     const iconSize = size === 'lg' ? 28 : size === 'md' ? 18 : 14;
@@ -6955,8 +6969,8 @@ function renderLeaderboardPodium(entries) {
                 const positionClass = realRank === 1 ? 'levels-podium-slot--first' : realRank === 2 ? 'levels-podium-slot--second' : 'levels-podium-slot--third';
                 const tier = tierForLevel(entry.level);
                 return `
-                    <div class="levels-podium-slot ${positionClass}">
-                        <div class="levels-podium-medal">${realRank === 1 ? '🥇' : realRank === 2 ? '🥈' : '🥉'}</div>
+                        <div class="levels-podium-slot ${positionClass}">
+                        <div class="levels-podium-medal">${renderPodiumMedal(realRank)}</div>
                         ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${tier.color};">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${tier.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
                         <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
                         <div class="levels-podium-level">Nivel ${entry.level}</div>
