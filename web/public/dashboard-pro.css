@@ -7309,10 +7309,10 @@ mark.receipt-highlight {
 
 .levels-podium-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--tier-color, var(--iris-400)), lighter(var(--tier-color, var(--iris-400))));
+    background: var(--tier-color, var(--iris-400));
     border-radius: 999px;
     transition: width 0.3s ease;
-    box-shadow: 0 0 8px rgba(var(--accent-primary-rgb, 154, 109, 255), 0.4);
+    box-shadow: 0 0 12px var(--tier-color, var(--iris-400));
 }
 
 .levels-podium-xp {
