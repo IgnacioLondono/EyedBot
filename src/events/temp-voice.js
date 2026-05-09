@@ -64,6 +64,37 @@ async function restoreProtectedUserIfOwnerKickedFromTempVoice(oldState, newState
     }, 900);
 }
 
+async function restoreProtectedUserIfForceMovedOrDisconnected(oldState, newState) {
+    const guild = newState.guild || oldState.guild;
+    const member = newState.member;
+    if (!guild || !member?.user || member.user.bot) return false;
+    if (!isTempVoiceProtectedFromOwnerKick(member.id)) return false;
+
+    const oldChannel = oldState.channel;
+    if (!oldChannel || oldChannel.type !== ChannelType.GuildVoice) return false;
+    if (newState.channelId === oldState.channelId) return false;
+
+    const me = guild.members.me;
+    if (!me?.permissions.has(PermissionsBitField.Flags.MoveMembers)) return false;
+
+    const tryOnce = async () => {
+        const executor = await findRecentVoiceDisconnectOrMoveExecutor(guild, member.id);
+        if (!executor || String(executor.id) === String(member.id)) return false;
+        if (member.voice?.channelId === oldChannel.id) return true;
+        await member.voice.setChannel(oldChannel, 'Escudo de voz: reingreso automático').catch(() => null);
+        return true;
+    };
+
+    const restored = await tryOnce();
+    if (!restored) return false;
+
+    setTimeout(() => {
+        tryOnce().catch(() => null);
+    }, 900);
+
+    return true;
+}
+
 function sanitizeChannelName(raw = '') {
     const cleaned = String(raw || '')
         .trim()
@@ -302,6 +333,10 @@ async function handleVoiceStateUpdate(oldState, newState) {
     try {
         const guild = newState.guild || oldState.guild;
         if (!guild) return;
+
+        if (await restoreProtectedUserIfForceMovedOrDisconnected(oldState, newState)) {
+            return;
+        }
 
         const config = await tempVoiceStore.getTempVoiceConfig(guild.id);
         if (!config || config.enabled !== true) {
