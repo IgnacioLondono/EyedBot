@@ -6968,12 +6968,16 @@ function renderLeaderboardPodium(entries) {
                 const realRank = entries.indexOf(entry) + 1;
                 const positionClass = realRank === 1 ? 'levels-podium-slot--first' : realRank === 2 ? 'levels-podium-slot--second' : 'levels-podium-slot--third';
                 const tier = tierForLevel(entry.level);
+                const progress = Math.max(0, Math.min(100, Number(entry.progressPercent) || 0));
                 return `
                         <div class="levels-podium-slot ${positionClass}">
                         <div class="levels-podium-medal">${renderPodiumMedal(realRank)}</div>
                         ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${tier.color};">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${tier.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
                         <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
                         <div class="levels-podium-level">Nivel ${entry.level}</div>
+                        <div class="levels-podium-progress">
+                            <div class="levels-podium-progress-bar" style="width:${progress}%; --tier-color:${tier.color};"></div>
+                        </div>
                         <div class="levels-podium-xp">${levelingFormatNumber(entry.xp)} XP</div>
                         ${renderTierBadge(tier, 'sm')}
                     </div>
