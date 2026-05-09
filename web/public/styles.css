@@ -73,11 +73,8 @@ body {
     font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
     background: var(--bg-primary);
     color: var(--text-primary);
-    min-height: 100vh;
     padding-top: 70px;
     position: relative;
-    /* allow scrolling if content exceeds viewport to avoid clipped/gapped edges */
-    overflow-y: auto;
     line-height: 1.6;
 }
 
