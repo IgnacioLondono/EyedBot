@@ -270,7 +270,7 @@ body::before {
 
 /* ---------- Main content / secciones ---------- */
 .main-content {
-    padding: 1.35rem 1.25rem 2rem;
+    padding: 0.5rem 1.25rem 2rem;
     max-width: none !important;
     width: 100% !important;
     margin: 0 !important;
