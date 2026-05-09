@@ -1257,8 +1257,7 @@ body {
     padding: 3rem 2rem;
     position: relative;
     z-index: 1;
-    height: calc(100vh - 70px);
-    overflow: hidden;
+    /* height y overflow eliminados para evitar separación inferior */
 }
 
 .chip-btn {
