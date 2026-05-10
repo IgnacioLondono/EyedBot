@@ -2137,6 +2137,29 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Opciones editor styling (tickets) */
+.options-editor {
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.6), rgba(var(--bg-primary-rgb, 14, 8, 28), 0.6));
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
+    padding: 0.6rem;
+    border-radius: 12px;
+}
+.options-list { display:flex; flex-direction:column; gap:0.55rem; }
+.option-row { display:flex; gap:0.6rem; align-items:center; }
+.option-fields { flex:1; display:flex; gap:0.5rem; flex-direction:column; }
+.option-fields .form-control { padding:0.5rem; }
+.option-actions { display:flex; flex-direction:column; gap:0.35rem; }
+.option-actions button { width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12); background: rgba(255,255,255,0.03); color: var(--text-primary); cursor:pointer; }
+.option-actions .btn-danger { background: linear-gradient(135deg, rgba(244,63,94,0.9), rgba(239,68,68,0.9)); color:#fff; border:none; box-shadow: 0 8px 18px rgba(244,63,94,0.14); }
+.options-editor-footer { margin-top:0.6rem; display:flex; justify-content:flex-start; }
+.options-editor-footer .option-add { padding:0.5rem 0.9rem; }
+
+@media (max-width:720px) {
+    .option-row { flex-direction:column; align-items:stretch; }
+    .option-actions { flex-direction:row; justify-content:flex-end; }
+}
+
+
 /* ---------- Barra de estadisticas ---------- */
 .tm-stats-grid {
     display: grid;
