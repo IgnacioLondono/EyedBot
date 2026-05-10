@@ -10821,7 +10821,16 @@ function renderTicketsManage(data) {
 
     container.querySelectorAll('.tm-tab-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
-            _ticketsManageState.tab = btn.dataset.tmTab;
+            const newTab = btn.dataset.tmTab;
+            const guildId = _ticketsManageState.guildId || currentServerGuildId;
+            // Si estamos en config y hay cambios no guardados, preguntar antes de salir
+            if (_ticketsManageState.tab === 'config' && newTab !== 'config' && hasTicketConfigChanges(guildId)) {
+                if (!confirm('Hay cambios no guardados en la configuración. ¿Descartar cambios?')) {
+                    return;
+                }
+                clearDraftTicketConfig(guildId);
+            }
+            _ticketsManageState.tab = newTab;
             renderTicketsManage(_ticketsManageState.lastData);
         });
     });
@@ -10834,19 +10843,63 @@ function renderTicketsManage(data) {
 }
 
 // ===== Ticket Manage: Configuración =====
+function saveDraftTicketConfig(guildId) {
+    const draft = {
+        enabled: document.getElementById('tm_ticketEnabled')?.checked,
+        panelChannelId: document.getElementById('tm_ticketChannelSelect')?.value || '',
+        requestChannelId: document.getElementById('tm_ticketRequestChannelSelect')?.value || '',
+        title: document.getElementById('tm_ticketTitle')?.value || '',
+        message: document.getElementById('tm_ticketMessage')?.value || '',
+        footer: document.getElementById('tm_ticketFooter')?.value || '',
+        buttonLabel: document.getElementById('tm_ticketButtonLabel')?.value || '',
+        adminRoleIds: Array.from(document.getElementById('tm_ticketAdminRoles')?.selectedOptions||[]).map(o=>o.value),
+        ticketCategories: getOptionsFromTmEditor('tm_ticketCategoriesEditor'),
+        commonProblems: getOptionsFromTmEditor('tm_ticketCommonProblemsEditor'),
+        minecraftServers: getOptionsFromTmEditor('tm_ticketMinecraftServersEditor'),
+        timestamp: Date.now()
+    };
+    localStorage.setItem(`ticketConfigDraft_${guildId}`, JSON.stringify(draft));
+}
+
+function loadDraftTicketConfig(guildId) {
+    try {
+        const draft = localStorage.getItem(`ticketConfigDraft_${guildId}`);
+        return draft ? JSON.parse(draft) : null;
+    } catch (e) { return null; }
+}
+
+function clearDraftTicketConfig(guildId) {
+    localStorage.removeItem(`ticketConfigDraft_${guildId}`);
+}
+
+function hasTicketConfigChanges(guildId) {
+    const draft = loadDraftTicketConfig(guildId);
+    if (!draft) return false;
+    // Si hay draft y más de 30 segundos sin guardar, hay cambios
+    return (Date.now() - draft.timestamp) < 30000;
+}
+
 async function loadTicketManageConfig() {
     const guildId = _ticketsManageState.guildId || currentServerGuildId;
     const container = document.getElementById('tmListContainer');
     if (!container) return;
     container.innerHTML = `<div class="ticket-manage-loading"><div class="loading-spinner"></div><p>Cargando configuración de tickets...</p></div>`;
     try {
-        const resp = await fetchWithCredentials(`/api/guild/${guildId}/ticket-config`);
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
+        const [cfgResp, channelsResp, infoResp] = await Promise.all([
+            fetchWithCredentials(`/api/guild/${guildId}/ticket-config`),
+            fetchWithCredentials(`/api/guild/${guildId}/channels`),
+            fetchWithCredentials(`/api/guild/${guildId}/info`)
+        ]);
+        if (!cfgResp.ok) {
+            const err = await cfgResp.json().catch(() => ({}));
             container.innerHTML = `<div class="tm-list-empty"><strong>Error</strong><p>${escapeHtml(err.error || 'No se pudo cargar la configuración')}</p></div>`;
             return;
         }
-        const cfg = await resp.json();
+        const cfg = await cfgResp.json();
+        const channels = await channelsResp.json().catch(() => []);
+        const info = await infoResp.json().catch(() => ({}));
+        window._lastGuildChannels = Array.isArray(channels) ? channels : [];
+        window._lastGuildRoles = Array.isArray(info.roles) ? info.roles : (info && Array.isArray(info.guild?.roles) ? info.guild.roles : []);
         renderTicketManageConfig(cfg, guildId);
     } catch (e) {
         console.error('Error cargando config tickets en manage pane:', e);
@@ -10926,7 +10979,7 @@ function renderTicketManageConfig(cfg, guildId) {
     `;
 
     // Render option editors
-    (function renderTmOptionsEditor(editorId, items) {
+    function renderTmOptionsEditor(editorId, items) {
         const container = document.getElementById(editorId);
         if (!container) return;
         container.innerHTML = '';
@@ -10969,9 +11022,10 @@ function renderTicketManageConfig(cfg, guildId) {
             if (t.classList.contains('option-move-up')) { const prev = row.previousElementSibling; if (prev) row.parentNode.insertBefore(row, prev); return; }
             if (t.classList.contains('option-move-down')) { const next = row.nextElementSibling; if (next) row.parentNode.insertBefore(next, row); return; }
         });
-    })( 'tm_ticketCategoriesEditor', cfg.ticketCategories || [] );
-    (function(editorId, items){ document.getElementById(editorId) && (function(){})(); })( 'tm_ticketCommonProblemsEditor', cfg.commonProblems || [] );
-    (function(editorId, items){ document.getElementById(editorId) && (function(){})(); })( 'tm_ticketMinecraftServersEditor', cfg.minecraftServers || [] );
+    }
+    renderTmOptionsEditor('tm_ticketCategoriesEditor', cfg.ticketCategories || []);
+    renderTmOptionsEditor('tm_ticketCommonProblemsEditor', cfg.commonProblems || []);
+    renderTmOptionsEditor('tm_ticketMinecraftServersEditor', cfg.minecraftServers || []);
 
     document.getElementById('tm_saveTicketBtn')?.addEventListener('click', () => saveTicketsManageConfig(guildId));
     document.getElementById('tm_publishTicketBtn')?.addEventListener('click', async () => {
@@ -10982,9 +11036,39 @@ function renderTicketManageConfig(cfg, guildId) {
             const data = await resp.json().catch(()=>({}));
             if (!resp.ok) { showToast(data.error || 'Error publicando panel', 'error'); return; }
             showToast('Panel de tickets publicado', 'success');
+            clearDraftTicketConfig(guildId);
             loadTicketsManage({ showLoader: false, force: true });
         } catch (e) { showToast('Error publicando panel', 'error'); }
     });
+
+    // Auto-save draft cuando el usuario edita
+    const formInputs = container.querySelectorAll('input, textarea, select');
+    formInputs.forEach(input => {
+        input.addEventListener('change', () => saveDraftTicketConfig(guildId));
+        input.addEventListener('input', () => saveDraftTicketConfig(guildId));
+    });
+
+    // Restaurar draft si existe
+    const draft = loadDraftTicketConfig(guildId);
+    if (draft) {
+        setTimeout(() => {
+            if (document.getElementById('tm_ticketEnabled')) {
+                document.getElementById('tm_ticketEnabled').checked = draft.enabled;
+                document.getElementById('tm_ticketChannelSelect').value = draft.panelChannelId;
+                document.getElementById('tm_ticketRequestChannelSelect').value = draft.requestChannelId;
+                document.getElementById('tm_ticketTitle').value = draft.title;
+                document.getElementById('tm_ticketMessage').value = draft.message;
+                document.getElementById('tm_ticketFooter').value = draft.footer;
+                document.getElementById('tm_ticketButtonLabel').value = draft.buttonLabel;
+                // Restaurar roles seleccionados
+                const roleSelect = document.getElementById('tm_ticketAdminRoles');
+                Array.from(roleSelect.options).forEach(opt => {
+                    opt.selected = draft.adminRoleIds.includes(opt.value);
+                });
+                showToast('Configuración recuperada de borrador anterior', 'info');
+            }
+        }, 100);
+    }
 }
 
 function getOptionsFromTmEditor(editorId) {
@@ -11019,6 +11103,7 @@ async function saveTicketsManageConfig(guildId, showSuccessToast = true) {
         const data = await resp.json().catch(()=>({}));
         if (!resp.ok) { showToast(data.error || 'No se pudo guardar la configuración', 'error'); return false; }
         if (showSuccessToast) showToast('Configuración de tickets guardada', 'success');
+        clearDraftTicketConfig(guildId);
         return true;
     } catch (e) { console.error('Error guardando config tickets:', e); showToast('Error guardando configuración', 'error'); return false; }
 }
