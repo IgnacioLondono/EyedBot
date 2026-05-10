@@ -4060,7 +4060,23 @@ async function selectServerGuild(guildId, options = {}) {
         verifyContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de verificación...</p></div>';
     }
     if (ticketContainer) {
-        ticketContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de tickets...</p></div>';
+        ticketContainer.innerHTML = `
+            <div class="dpx-panel">
+                <div class="dpx-section">
+                    <h4>Tickets (movido)</h4>
+                    <p>La configuración y gestión de tickets se ha movido a la pantalla "Gestión de tickets". Aquí solo se muestra un acceso rápido.</p>
+                    <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+                        <button class="btn btn-primary" id="openTicketsManageQuickBtn">Abrir Gestión de tickets</button>
+                        <button class="btn btn-secondary" id="openTicketsManageNewTabBtn">Abrir en pestaña</button>
+                    </div>
+                </div>
+            </div>`;
+        setTimeout(() => {
+            const b = document.getElementById('openTicketsManageQuickBtn');
+            if (b && !b._wired) { b._wired = true; b.addEventListener('click', () => openTicketsManagePane()); }
+            const b2 = document.getElementById('openTicketsManageNewTabBtn');
+            if (b2 && !b2._wired) { b2._wired = true; b2.addEventListener('click', () => { window.location.hash = 'tickets-manage'; openTicketsManagePane(); }); }
+        }, 50);
     }
     if (levelsContainer) {
         levelsContainer.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando sistema de niveles...</p></div>';
@@ -4087,7 +4103,6 @@ async function selectServerGuild(guildId, options = {}) {
             loadServerMembers(guildId),
             loadWelcomePanel(guildId),
             loadVerifyPanel(guildId),
-            loadTicketPanel(guildId),
             loadLevelsPanel(guildId),
             loadVoiceCreatorPanel(guildId),
             loadAutomationPanel(guildId),
