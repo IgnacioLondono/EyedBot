@@ -10796,6 +10796,9 @@ function renderTicketsManage(data) {
                 <span>Historial</span>
                 <span class="tm-tab-count">${closedCount}</span>
             </button>
+            <button type="button" class="tm-tab-btn ${tab === 'config' ? 'active' : ''}" data-tm-tab="config">
+                <span>Configuración</span>
+            </button>
         </div>
 
         <div id="tmListContainer" class="tm-list-container"></div>
@@ -10808,7 +10811,201 @@ function renderTicketsManage(data) {
         });
     });
 
-    renderTmList(data, tab);
+    if (tab === 'config') {
+        loadTicketManageConfig();
+    } else {
+        renderTmList(data, tab);
+    }
+}
+
+// ===== Ticket Manage: Configuración =====
+async function loadTicketManageConfig() {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    const container = document.getElementById('tmListContainer');
+    if (!container) return;
+    container.innerHTML = `<div class="ticket-manage-loading"><div class="loading-spinner"></div><p>Cargando configuración de tickets...</p></div>`;
+    try {
+        const resp = await fetchWithCredentials(`/api/guild/${guildId}/ticket-config`);
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            container.innerHTML = `<div class="tm-list-empty"><strong>Error</strong><p>${escapeHtml(err.error || 'No se pudo cargar la configuración')}</p></div>`;
+            return;
+        }
+        const cfg = await resp.json();
+        renderTicketManageConfig(cfg, guildId);
+    } catch (e) {
+        console.error('Error cargando config tickets en manage pane:', e);
+        container.innerHTML = `<div class="tm-list-empty"><strong>Error de red</strong><p>No se pudo cargar la configuración.</p></div>`;
+    }
+}
+
+function renderTicketManageConfig(cfg, guildId) {
+    const container = document.getElementById('tmListContainer');
+    if (!container) return;
+
+    const channels = Array.isArray(window._lastGuildChannels) ? window._lastGuildChannels : [];
+    const roles = Array.isArray(window._lastGuildRoles) ? window._lastGuildRoles : [];
+
+    container.innerHTML = `
+        <div class="dpx-section">
+            <h4>Configuración de tickets</h4>
+            <div class="dpx-field-grid" style="margin-top:1rem;">
+                <div class="dpx-field">
+                    <label>Activo</label>
+                    <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
+                </div>
+                <div class="dpx-field">
+                    <label>Canal panel</label>
+                    <select id="tm_ticketChannelSelect" class="form-control">
+                        <option value="">Selecciona un canal</option>
+                        ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.panelChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="dpx-field">
+                    <label>Canal peticiones</label>
+                    <select id="tm_ticketRequestChannelSelect" class="form-control">
+                        <option value="">Usar canal del panel</option>
+                        ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.requestChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Título</label>
+                    <input id="tm_ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Mensaje</label>
+                    <textarea id="tm_ticketMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '')}</textarea>
+                </div>
+                <div class="dpx-field">
+                    <label>Texto botón</label>
+                    <input id="tm_ticketButtonLabel" class="form-control" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}">
+                </div>
+                <div class="dpx-field">
+                    <label>Footer</label>
+                    <input id="tm_ticketFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || '')}">
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Roles que gestionan</label>
+                    <select id="tm_ticketAdminRoles" class="form-control" multiple size="6">
+                        ${(roles || []).map((r) => `<option value="${r.id}" ${Array.isArray(cfg.adminRoleIds) && cfg.adminRoleIds.map(String).includes(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Opciones - Categorías</label>
+                    <div id="tm_ticketCategoriesEditor" class="options-editor"></div>
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Opciones - Problemas comunes</label>
+                    <div id="tm_ticketCommonProblemsEditor" class="options-editor"></div>
+                </div>
+                <div class="dpx-field is-full">
+                    <label>Opciones - Servidores Minecraft</label>
+                    <div id="tm_ticketMinecraftServersEditor" class="options-editor"></div>
+                </div>
+            </div>
+            <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+                <button class="btn btn-secondary" id="tm_saveTicketBtn">Guardar</button>
+                <button class="btn btn-primary" id="tm_publishTicketBtn">Publicar panel</button>
+            </div>
+        </div>
+    `;
+
+    // Render option editors
+    (function renderTmOptionsEditor(editorId, items) {
+        const container = document.getElementById(editorId);
+        if (!container) return;
+        container.innerHTML = '';
+        const list = document.createElement('div'); list.className = 'options-list';
+        (Array.isArray(items) ? items : []).forEach((it) => {
+            const row = document.createElement('div'); row.className = 'option-row';
+            row.innerHTML = `
+                <div class="option-fields">
+                    <input type="text" class="form-control option-label" placeholder="Etiqueta" value="${escapeHtmlForValue(it.label || '')}">
+                    <input type="text" class="form-control option-desc" placeholder="Descripción (opcional)" value="${escapeHtmlForValue(it.description || '')}">
+                </div>
+                <div class="option-actions">
+                    <button type="button" class="btn btn-tertiary option-move-up">▲</button>
+                    <button type="button" class="btn btn-tertiary option-move-down">▼</button>
+                    <button type="button" class="btn btn-danger option-remove">✖</button>
+                </div>
+            `;
+            list.appendChild(row);
+        });
+        const footer = document.createElement('div'); footer.className = 'options-editor-footer'; footer.innerHTML = `<button type="button" class="btn btn-primary option-add">Agregar opción</button>`;
+        container.appendChild(list); container.appendChild(footer);
+        footer.querySelector('.option-add')?.addEventListener('click', () => {
+            const row = document.createElement('div'); row.className = 'option-row';
+            row.innerHTML = `
+                <div class="option-fields">
+                    <input type="text" class="form-control option-label" placeholder="Etiqueta">
+                    <input type="text" class="form-control option-desc" placeholder="Descripción (opcional)">
+                </div>
+                <div class="option-actions">
+                    <button type="button" class="btn btn-tertiary option-move-up">▲</button>
+                    <button type="button" class="btn btn-tertiary option-move-down">▼</button>
+                    <button type="button" class="btn btn-danger option-remove">✖</button>
+                </div>
+            `;
+            list.appendChild(row);
+        });
+        list.addEventListener('click', (ev) => {
+            const t = ev.target; const row = t.closest('.option-row'); if (!row) return;
+            if (t.classList.contains('option-remove')) { row.remove(); return; }
+            if (t.classList.contains('option-move-up')) { const prev = row.previousElementSibling; if (prev) row.parentNode.insertBefore(row, prev); return; }
+            if (t.classList.contains('option-move-down')) { const next = row.nextElementSibling; if (next) row.parentNode.insertBefore(next, row); return; }
+        });
+    })( 'tm_ticketCategoriesEditor', cfg.ticketCategories || [] );
+    (function(editorId, items){ document.getElementById(editorId) && (function(){})(); })( 'tm_ticketCommonProblemsEditor', cfg.commonProblems || [] );
+    (function(editorId, items){ document.getElementById(editorId) && (function(){})(); })( 'tm_ticketMinecraftServersEditor', cfg.minecraftServers || [] );
+
+    document.getElementById('tm_saveTicketBtn')?.addEventListener('click', () => saveTicketsManageConfig(guildId));
+    document.getElementById('tm_publishTicketBtn')?.addEventListener('click', async () => {
+        const saved = await saveTicketsManageConfig(guildId, false);
+        if (!saved) return;
+        try {
+            const resp = await fetchWithCredentials(`/api/guild/${guildId}/ticket-publish`, { method: 'POST' });
+            const data = await resp.json().catch(()=>({}));
+            if (!resp.ok) { showToast(data.error || 'Error publicando panel', 'error'); return; }
+            showToast('Panel de tickets publicado', 'success');
+            loadTicketsManage({ showLoader: false, force: true });
+        } catch (e) { showToast('Error publicando panel', 'error'); }
+    });
+}
+
+function getOptionsFromTmEditor(editorId) {
+    const container = document.getElementById(editorId);
+    if (!container) return [];
+    const rows = Array.from(container.querySelectorAll('.option-row'));
+    return rows.map((row) => ({ label: (row.querySelector('.option-label')?.value||'').toString().trim().slice(0,100), description: (row.querySelector('.option-desc')?.value||'').toString().trim().slice(0,200) })).filter(o=>o.label);
+}
+
+async function saveTicketsManageConfig(guildId, showSuccessToast = true) {
+    const adminRoleSelect = document.getElementById('tm_ticketAdminRoles');
+    const adminRoleIds = adminRoleSelect ? Array.from(adminRoleSelect.selectedOptions||[]).map(o=>o.value).filter(Boolean) : [];
+    const payload = {
+        enabled: document.getElementById('tm_ticketEnabled')?.checked === true,
+        panelChannelId: document.getElementById('tm_ticketChannelSelect')?.value || '',
+        requestChannelId: document.getElementById('tm_ticketRequestChannelSelect')?.value || '',
+        receiptHistoryChannelId: '',
+        adminRoleIds,
+        title: document.getElementById('tm_ticketTitle')?.value || 'Soporte',
+        message: document.getElementById('tm_ticketMessage')?.value || '',
+        color: (document.getElementById('tm_ticketColor')?.value || '').replace('#','') || '7c4dff',
+        footer: document.getElementById('tm_ticketFooter')?.value || '',
+        buttonLabel: document.getElementById('tm_ticketButtonLabel')?.value || 'Solicitar ticket',
+        ticketCategories: getOptionsFromTmEditor('tm_ticketCategoriesEditor'),
+        commonProblems: getOptionsFromTmEditor('tm_ticketCommonProblemsEditor'),
+        minecraftServers: getOptionsFromTmEditor('tm_ticketMinecraftServersEditor'),
+        caseRoleMap: {},
+        messageId: document.getElementById('tm_ticketMessageId')?.value || ''
+    };
+    try {
+        const resp = await fetchWithCredentials(`/api/guild/${guildId}/ticket-config`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const data = await resp.json().catch(()=>({}));
+        if (!resp.ok) { showToast(data.error || 'No se pudo guardar la configuración', 'error'); return false; }
+        if (showSuccessToast) showToast('Configuración de tickets guardada', 'success');
+        return true;
+    } catch (e) { console.error('Error guardando config tickets:', e); showToast('Error guardando configuración', 'error'); return false; }
 }
 
 function renderTmStatCard(type, label, value, sub, iconSvg) {
