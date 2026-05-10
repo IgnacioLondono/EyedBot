@@ -4497,6 +4497,80 @@ async function loadVoiceCreatorPanel(guildId) {
 
         bindDpxTabs(container);
 
+        // Render option editors for ticket dropdowns
+        function renderOptionsEditor(editorId, items) {
+            const container = document.getElementById(editorId);
+            if (!container) return;
+            container.innerHTML = '';
+            const list = document.createElement('div');
+            list.className = 'options-list';
+            (Array.isArray(items) ? items : []).forEach((it, idx) => {
+                const row = document.createElement('div');
+                row.className = 'option-row';
+                row.innerHTML = `
+                    <div class="option-fields">
+                        <input type="text" class="form-control option-label" placeholder="Etiqueta" value="${escapeHtmlForValue(it.label || '')}">
+                        <input type="text" class="form-control option-desc" placeholder="Descripción (opcional)" value="${escapeHtmlForValue(it.description || '')}">
+                    </div>
+                    <div class="option-actions">
+                        <button type="button" class="btn btn-tertiary option-move-up" title="Mover arriba">▲</button>
+                        <button type="button" class="btn btn-tertiary option-move-down" title="Mover abajo">▼</button>
+                        <button type="button" class="btn btn-danger option-remove" title="Eliminar">✖</button>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+
+            const footer = document.createElement('div');
+            footer.className = 'options-editor-footer';
+            footer.innerHTML = `<button type="button" class="btn btn-primary option-add">Agregar opción</button>`;
+
+            container.appendChild(list);
+            container.appendChild(footer);
+
+            // Delegated events
+            footer.querySelector('.option-add')?.addEventListener('click', () => {
+                const row = document.createElement('div');
+                row.className = 'option-row';
+                row.innerHTML = `
+                    <div class="option-fields">
+                        <input type="text" class="form-control option-label" placeholder="Etiqueta">
+                        <input type="text" class="form-control option-desc" placeholder="Descripción (opcional)">
+                    </div>
+                    <div class="option-actions">
+                        <button type="button" class="btn btn-tertiary option-move-up" title="Mover arriba">▲</button>
+                        <button type="button" class="btn btn-tertiary option-move-down" title="Mover abajo">▼</button>
+                        <button type="button" class="btn btn-danger option-remove" title="Eliminar">✖</button>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+
+            list.addEventListener('click', (ev) => {
+                const t = ev.target;
+                const row = t.closest('.option-row');
+                if (!row) return;
+                if (t.classList.contains('option-remove')) {
+                    row.remove();
+                    return;
+                }
+                if (t.classList.contains('option-move-up')) {
+                    const prev = row.previousElementSibling;
+                    if (prev) row.parentNode.insertBefore(row, prev);
+                    return;
+                }
+                if (t.classList.contains('option-move-down')) {
+                    const next = row.nextElementSibling;
+                    if (next) row.parentNode.insertBefore(next, row);
+                    return;
+                }
+            });
+        }
+
+        renderOptionsEditor('ticketCategoriesEditor', cfg.ticketCategories || []);
+        renderOptionsEditor('ticketCommonProblemsEditor', cfg.commonProblems || []);
+        renderOptionsEditor('ticketMinecraftServersEditor', cfg.minecraftServers || []);
+
         const saveBtn = document.getElementById('saveTempVoiceBtn');
         if (saveBtn) {
             saveBtn.addEventListener('click', async () => {
@@ -6153,8 +6227,29 @@ function collectTicketConfigFromForm() {
     };
 }
 
+function getOptionsFromEditor(editorId) {
+    const container = document.getElementById(editorId);
+    if (!container) return [];
+    const rows = Array.from(container.querySelectorAll('.option-row'));
+    return rows.map((row) => {
+        const label = (row.querySelector('.option-label')?.value || '').toString().trim().slice(0, 100);
+        const description = (row.querySelector('.option-desc')?.value || '').toString().trim().slice(0, 200);
+        return { label, description };
+    }).filter((o) => o.label);
+}
+
+function collectTicketConfigFromForm_withOptions() {
+    const base = collectTicketConfigFromForm();
+    return {
+        ...base,
+        ticketCategories: getOptionsFromEditor('ticketCategoriesEditor'),
+        commonProblems: getOptionsFromEditor('ticketCommonProblemsEditor'),
+        minecraftServers: getOptionsFromEditor('ticketMinecraftServersEditor')
+    };
+}
+
 async function saveTicketConfig(guildId, showSuccessToast = true) {
-    const payload = collectTicketConfigFromForm();
+    const payload = collectTicketConfigFromForm_withOptions();
     if (!payload.panelChannelId) {
         showToast('Selecciona el canal donde se publicara el panel de tickets', 'warning');
         return false;
@@ -6330,6 +6425,21 @@ async function loadTicketPanel(guildId) {
                             <div class="dpx-field is-full">
                                 <label for="ticketMessage">Mensaje</label>
                                 <textarea id="ticketMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.')}</textarea>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label>Opciones - Categorías</label>
+                                <div id="ticketCategoriesEditor" class="options-editor"></div>
+                                <small class="muted">Edita las etiquetas y descripciones que aparecen en el menú desplegable del ticket.</small>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label>Opciones - Problemas comunes</label>
+                                <div id="ticketCommonProblemsEditor" class="options-editor"></div>
+                                <small class="muted">Opciones rápidas que los usuarios pueden seleccionar al crear un ticket.</small>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label>Opciones - Servidores Minecraft</label>
+                                <div id="ticketMinecraftServersEditor" class="options-editor"></div>
+                                <small class="muted">Lista de servidores/mapas para solicitudes relacionadas con Minecraft.</small>
                             </div>
                             <div class="dpx-field">
                                 <label for="ticketButtonLabel">Texto del botón</label>
