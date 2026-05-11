@@ -10973,11 +10973,22 @@ function escapeHtml(text) {
    ================================================================ */
 
 const TICKETS_MANAGE_AUTO_REFRESH_MS = 20000;
+const TM_HISTORY_FILTER_SCOPES = [
+    { id: 'all', label: 'Todo' },
+    { id: 'user', label: 'Usuario' },
+    { id: 'staff', label: 'Staff' },
+    { id: 'report', label: 'ID informe' },
+    { id: 'channel', label: 'Canal' },
+    { id: 'category', label: 'Categoría' },
+    { id: 'reason', label: 'Motivo' }
+];
+
 let _ticketsManageState = {
     guildId: '',
     tab: 'pending', // 'pending' | 'active' | 'history'
     activityRange: '7d', // '7d' | 'all'
     historyFilter: '',
+    historyScope: 'all',
     timer: null,
     lastData: null,
     loading: false
@@ -11197,10 +11208,20 @@ function renderTicketsManage(data) {
 
         <div id="tmHistoryToolbar" class="tm-history-toolbar ${tab === 'history' ? '' : 'is-hidden'}">
             ${histOverflowNote}
-            <p class="tm-history-toolbar-hint">Filtra por usuario, staff que cerró, ID del informe, nombre del canal, categoría o motivo.</p>
-            <div class="tm-history-toolbar-row">
-                <input type="search" id="tmHistorySearch" class="tm-history-search" placeholder="Ej.: usuario, TK-123…, ticket-soporte…" autocomplete="off" value="${escapeHtml(_ticketsManageState.historyFilter || '')}" />
-                <button type="button" class="tm-btn tm-btn-ghost tm-history-clear" id="tmHistoryClearFilter">Limpiar</button>
+            <div class="tm-history-toolbar-scopes" role="group" aria-label="Ámbito de búsqueda">
+                ${TM_HISTORY_FILTER_SCOPES.map((scope) => `
+                    <button type="button" class="tm-history-scope-btn ${(_ticketsManageState.historyScope || 'all') === scope.id ? 'active' : ''}" data-tm-history-scope="${scope.id}">
+                        ${escapeHtml(scope.label)}
+                    </button>
+                `).join('')}
+            </div>
+            <div class="tm-history-toolbar-actions">
+                <label class="tm-history-search-field" for="tmHistorySearch">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                    <input type="search" id="tmHistorySearch" class="tm-history-search" placeholder="Buscar en el historial…" autocomplete="off" value="${escapeHtml(_ticketsManageState.historyFilter || '')}" />
+                </label>
+                <button type="button" class="tm-btn tm-btn-primary tm-history-apply" id="tmHistoryApplyFilter">Buscar</button>
+                <button type="button" class="tm-btn tm-btn-ghost tm-history-reset" id="tmHistoryResetFilter">Limpiar</button>
             </div>
         </div>
 
@@ -11235,18 +11256,45 @@ function renderTicketsManage(data) {
     });
 
     const tmHistorySearch = container.querySelector('#tmHistorySearch');
-    const tmHistoryClear = container.querySelector('#tmHistoryClearFilter');
-    if (tmHistorySearch && tmHistoryClear) {
-        tmHistorySearch.addEventListener('input', () => {
-            _ticketsManageState.historyFilter = tmHistorySearch.value || '';
-            if (_ticketsManageState.tab === 'history') refreshTmHistoryListFromState();
-        });
-        tmHistoryClear.addEventListener('click', () => {
-            _ticketsManageState.historyFilter = '';
-            tmHistorySearch.value = '';
-            if (_ticketsManageState.tab === 'history') refreshTmHistoryListFromState();
+    const tmHistoryApply = container.querySelector('#tmHistoryApplyFilter');
+    const tmHistoryReset = container.querySelector('#tmHistoryResetFilter');
+    const applyTmHistoryFilter = () => {
+        if (!tmHistorySearch) return;
+        _ticketsManageState.historyFilter = tmHistorySearch.value || '';
+        if (_ticketsManageState.tab === 'history') refreshTmHistoryListFromState();
+    };
+    if (tmHistorySearch && tmHistoryApply) {
+        tmHistoryApply.addEventListener('click', applyTmHistoryFilter);
+        tmHistorySearch.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                applyTmHistoryFilter();
+            }
         });
     }
+    if (tmHistoryReset) {
+        tmHistoryReset.addEventListener('click', () => {
+            _ticketsManageState.historyFilter = '';
+            _ticketsManageState.historyScope = 'all';
+            if (tmHistorySearch) tmHistorySearch.value = '';
+            if (_ticketsManageState.tab === 'history') {
+                saveTicketsManageScrollPosition();
+                renderTicketsManage(_ticketsManageState.lastData);
+            }
+        });
+    }
+    container.querySelectorAll('[data-tm-history-scope]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const scope = btn.getAttribute('data-tm-history-scope');
+            if (!scope || !TM_HISTORY_FILTER_SCOPES.some((entry) => entry.id === scope)) return;
+            _ticketsManageState.historyScope = scope;
+            saveTicketsManageScrollPosition();
+            renderTicketsManage(_ticketsManageState.lastData);
+            if (String(_ticketsManageState.historyFilter || '').trim() && _ticketsManageState.tab === 'history') {
+                refreshTmHistoryListFromState();
+            }
+        });
+    });
 
     // Restaurar scroll position
     restoreTicketsManageScrollPosition();
@@ -11780,14 +11828,12 @@ function renderTmTrendCard(last7, byMonth) {
         </div>`;
 }
 
-function filterTmHistoryItems(items, queryRaw) {
-    const q = String(queryRaw || '').trim().toLowerCase();
-    if (!q) return Array.isArray(items) ? items : [];
-    const needles = q.split(/\s+/).filter(Boolean);
-    return (items || []).filter((item) => {
-        const o = item.owner || {};
-        const c = item.closer || {};
-        const hay = [
+function getTmHistorySearchHaystack(item, scope = 'all') {
+    const o = item.owner || {};
+    const c = item.closer || {};
+    const participants = Array.isArray(item.participants) ? item.participants.join(' ') : '';
+    const scopeFields = {
+        all: [
             item.reportId,
             item.channelName,
             item.category,
@@ -11800,9 +11846,26 @@ function filterTmHistoryItems(items, queryRaw) {
             o.tag,
             c.username,
             c.tag,
-            Array.isArray(item.participants) ? item.participants.join(' ') : ''
-        ].filter(Boolean).join(' ').toLowerCase();
-        return needles.every((n) => hay.includes(n));
+            participants
+        ],
+        user: [o.username, o.tag, item.ownerId, participants],
+        staff: [c.username, c.tag, item.closedById, item.closedByTag],
+        report: [item.reportId],
+        channel: [item.channelName],
+        category: [item.category],
+        reason: [item.reason, item.common]
+    };
+    return (scopeFields[scope] || scopeFields.all).filter(Boolean).join(' ').toLowerCase();
+}
+
+function filterTmHistoryItems(items, queryRaw, scopeRaw = 'all') {
+    const q = String(queryRaw || '').trim().toLowerCase();
+    const scope = TM_HISTORY_FILTER_SCOPES.some((entry) => entry.id === scopeRaw) ? scopeRaw : 'all';
+    if (!q) return Array.isArray(items) ? items : [];
+    const needles = q.split(/\s+/).filter(Boolean);
+    return (items || []).filter((item) => {
+        const hay = getTmHistorySearchHaystack(item, scope);
+        return needles.every((needle) => hay.includes(needle));
     });
 }
 
@@ -11824,11 +11887,12 @@ function renderTmList(data, tab) {
         wireTmActiveActions();
     } else {
         const raw = data?.history || [];
-        const filtered = filterTmHistoryItems(raw, _ticketsManageState.historyFilter);
+        const filtered = filterTmHistoryItems(raw, _ticketsManageState.historyFilter, _ticketsManageState.historyScope);
         const filterActive = !!String(_ticketsManageState.historyFilter || '').trim();
         container.innerHTML = renderTmHistoryList(filtered, {
             filterActive,
-            totalSourceCount: raw.length
+            totalSourceCount: raw.length,
+            scope: _ticketsManageState.historyScope || 'all'
         });
         wireTmHistoryActions();
     }
@@ -11930,14 +11994,15 @@ function renderTmActiveCard(item) {
 }
 
 function renderTmHistoryList(items, meta = {}) {
-    const { filterActive, totalSourceCount } = meta;
+    const { filterActive, totalSourceCount, scope = 'all' } = meta;
     if (!items?.length) {
         if (filterActive && totalSourceCount > 0) return renderTmEmpty('historyFiltered');
         return renderTmEmpty('history');
     }
+    const scopeLabel = TM_HISTORY_FILTER_SCOPES.find((entry) => entry.id === scope)?.label || 'Todo';
     const hint =
         filterActive && typeof totalSourceCount === 'number'
-            ? `<div class="tm-history-filter-hint">Coincidencias: <strong>${items.length}</strong> de <strong>${totalSourceCount}</strong> en esta carga</div>`
+            ? `<div class="tm-history-filter-hint">Coincidencias: <strong>${items.length}</strong> de <strong>${totalSourceCount}</strong> · ámbito <strong>${escapeHtml(scopeLabel)}</strong></div>`
             : '';
     return `${hint}<div class="tm-list">${items.map(renderTmHistoryCard).join('')}</div>`;
 }
@@ -12002,7 +12067,7 @@ function renderTmEmpty(tab) {
         pending: { icon: tmIconHourglass(), title: 'Sin solicitudes pendientes', desc: 'Cuando alguien solicite un ticket aparecerá aquí.' },
         active: { icon: tmIconActivity(), title: 'Sin tickets activos', desc: 'No hay canales de tickets abiertos en este momento.' },
         history: { icon: tmIconCheck(), title: 'Historial vacío', desc: 'Cuando se cierren tickets los verás aquí con todos sus detalles.' },
-        historyFiltered: { icon: tmIconCheck(), title: 'Sin coincidencias', desc: 'Prueba otro texto o pulsa Limpiar para ver todo el historial cargado.' }
+        historyFiltered: { icon: tmIconCheck(), title: 'Sin coincidencias', desc: 'Prueba otro término, cambia el ámbito o pulsa Limpiar para ver todo el historial cargado.' }
     }[tab] || { icon: '', title: 'Sin datos', desc: '' };
 
     return `
