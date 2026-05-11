@@ -4558,8 +4558,10 @@ mark.receipt-highlight {
 .server-insight-section {
     padding: 1.1rem 1.2rem !important;
     border-radius: 18px !important;
-    background: rgba(var(--bg-secondary-rgb, 18, 10, 42), 0.78) !important;
+    background: rgba(var(--bg-secondary-rgb, 18, 10, 42), 0.92) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18) !important;
+    overflow: hidden;
+    background-clip: padding-box;
 }
 .server-insight-section h4 {
     margin: 0 0 0.8rem !important;
@@ -12419,4 +12421,48 @@ body {
     #serverSection .server-side-menu {
         border-right: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
     }
+}
+
+/* Panel servidor + tarjetas: sin franja del fondo en la base */
+.section#serverSection,
+#serverSection.section {
+    min-height: 100% !important;
+    height: 100% !important;
+}
+
+#serverSection.section > .container {
+    min-height: 100% !important;
+    height: 100% !important;
+}
+
+#serverSection .server-content-area {
+    padding-bottom: 0.65rem !important;
+}
+
+#serverSection .server-pane.active,
+#serverSection .server-pane-surface {
+    min-height: 0 !important;
+}
+
+#serverSection .server-side-menu,
+#serverSection .server-content-area {
+    background:
+        linear-gradient(
+            125deg,
+            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.08) 0%,
+            transparent 48%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.94),
+            rgba(var(--bg-primary-rgb, 10, 12, 26), 0.96)
+        ) !important;
+}
+
+#serverSection .summary-card,
+#serverSection .server-insight-section,
+#serverSection .server-insight-grid > article,
+#serverSection .server-insight-grid > div {
+    overflow: hidden;
+    background-clip: padding-box;
 }
