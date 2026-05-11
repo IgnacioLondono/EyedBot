@@ -1025,17 +1025,23 @@ async function fetchCachedGetJSON(url, ttlMs = 30000, options = {}) {
     const now = Date.now();
     const cached = apiGetCache.get(url);
     if (cached && cached.expiresAt > now) {
+        console.log(`✨ Cache HIT para ${url}`);
         return cached.data;
     }
 
+    console.log(`🔄 Fetching ${url}...`);
     const response = await fetchWithCredentials(url, options);
+    console.log(`📡 Respuesta ${url}:`, response.status, response.ok);
     if (!response.ok) {
+        const errorBody = await response.text().catch(() => '(no body)');
+        console.error(`❌ Error ${response.status}:`, errorBody);
         const error = new Error(`GET ${url} failed (${response.status})`);
         error.status = response.status;
         throw error;
     }
 
     const data = await response.json();
+    console.log(`✅ JSON parsed para ${url}:`, data);
     apiGetCache.set(url, { data, expiresAt: now + ttlMs });
     return data;
 }
@@ -2825,14 +2831,19 @@ function showSection(sectionId, options = {}) {
 // Cargar servidores
 async function loadGuilds() {
     try {
+        console.log('📡 Iniciando loadGuilds...');
         const guilds = await fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds);
+        console.log('✅ Servidores recibidos:', guilds);
         dashboardGuildsCache = Array.isArray(guilds) ? guilds : [];
+        console.log('📊 Cache actualizado:', dashboardGuildsCache.length, 'servidores');
         displayGuilds(getFilteredDashboardGuilds());
+        console.log('🎨 Servidores mostrados en pantalla');
     } catch (error) {
-        console.error('Error cargando servidores:', error);
+        console.error('❌ Error cargando servidores:', error);
         const container = document.getElementById('guildsList');
         const isAuth = error && (error.status === 401 || (error.message && error.message.toLowerCase().includes('401')));
-        const msg = isAuth ? 'No autenticado. Por favor inicia sesión.' : 'Error al cargar servidores';
+        const msg = isAuth ? 'No autenticado. Por favor inicia sesión.' : `Error al cargar servidores: ${error?.message || 'desconocido'}`;
+        console.error('📋 Mensaje de error:', msg);
         if (container) {
             container.innerHTML = `<div class="loading"><p>${escapeHtml(String(msg))}</p></div>`;
         }
@@ -2852,13 +2863,16 @@ function getFilteredDashboardGuilds() {
 // Mostrar servidores
 function displayGuilds(guilds) {
     const container = document.getElementById('guildsList');
+    console.log('🎨 displayGuilds() llamado con:', guilds?.length || 0, 'servidores');
     
     if (guilds.length === 0) {
         const emptyLabel = dashboardGuildSearchQuery ? 'No se encontraron servidores' : 'No hay servidores disponibles';
+        console.warn('⚠️ Sin servidores:', emptyLabel);
         container.innerHTML = `<div class="loading">${emptyLabel}</div>`;
         return;
     }
 
+    console.log('📝 Renderizando', guilds.length, 'tarjetas de servidor');
     container.innerHTML = guilds.map(guild => `
         <div class="guild-card" onclick="selectGuild('${guild.id}')">
             <div class="guild-card-top">
@@ -2888,6 +2902,7 @@ function displayGuilds(guilds) {
             </div>
         </div>
     `).join('');
+    console.log('✅ Servidores renderizados exitosamente');
 }
 
 // Cargar servidores para el formulario de embed
