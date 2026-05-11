@@ -1582,6 +1582,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
                 requestChannelId: '',
                 receiptHistoryChannelId: '',
                 sendDmReceipt: true,
+                sendDmPendingStatus: false,
                 adminRoleIds: [],
                 title: 'Soporte',
                 message: 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.',
@@ -1600,6 +1601,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             ...cfg,
             receiptHistoryChannelId: String(cfg.receiptHistoryChannelId || '').trim(),
             sendDmReceipt: cfg.sendDmReceipt !== false,
+            sendDmPendingStatus: cfg.sendDmPendingStatus === true,
             ticketCategories: Array.isArray(cfg.ticketCategories) && cfg.ticketCategories.length ? cfg.ticketCategories : defaultTicketCategories,
             commonProblems: Array.isArray(cfg.commonProblems) && cfg.commonProblems.length ? cfg.commonProblems : defaultCommonProblems,
             minecraftServers: Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultMinecraftServers,
@@ -1741,6 +1743,10 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
                 typeof body.sendDmReceipt === 'boolean'
                     ? body.sendDmReceipt
                     : currentCfg?.sendDmReceipt !== false,
+            sendDmPendingStatus:
+                typeof body.sendDmPendingStatus === 'boolean'
+                    ? body.sendDmPendingStatus
+                    : currentCfg?.sendDmPendingStatus === true,
             adminRoleIds,
             title: String(body.title || 'Soporte').slice(0, 256),
             message: String(body.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.').slice(0, 2000),
