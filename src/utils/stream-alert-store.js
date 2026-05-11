@@ -72,6 +72,8 @@ function defaultConfig() {
         descriptionTemplate: '{title}\n{url}',
         color: '7c4dff',
         footerText: 'EyedBot Stream Alerts',
+        /** Si es true, la miniatura del directo va como imagen grande del embed; si false, como thumbnail. */
+        embedLargePreview: true,
         sources: [],
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
@@ -109,6 +111,7 @@ function normalizeConfig(raw = {}) {
         descriptionTemplate: String(raw.descriptionTemplate || base.descriptionTemplate).slice(0, 1500),
         color: String(raw.color || base.color).replace('#', '').slice(0, 6) || base.color,
         footerText: String(raw.footerText || base.footerText).slice(0, 200),
+        embedLargePreview: raw.embedLargePreview !== false,
         sources,
         updatedAt: raw.updatedAt || new Date().toISOString(),
         updatedBy: String(raw.updatedBy || 'system')
