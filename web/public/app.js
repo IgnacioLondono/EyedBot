@@ -1025,23 +1025,17 @@ async function fetchCachedGetJSON(url, ttlMs = 30000, options = {}) {
     const now = Date.now();
     const cached = apiGetCache.get(url);
     if (cached && cached.expiresAt > now) {
-        console.log(`✨ Cache HIT para ${url}`);
         return cached.data;
     }
 
-    console.log(`🔄 Fetching ${url}...`);
     const response = await fetchWithCredentials(url, options);
-    console.log(`📡 Respuesta ${url}:`, response.status, response.ok);
     if (!response.ok) {
-        const errorBody = await response.text().catch(() => '(no body)');
-        console.error(`❌ Error ${response.status}:`, errorBody);
         const error = new Error(`GET ${url} failed (${response.status})`);
         error.status = response.status;
         throw error;
     }
 
     const data = await response.json();
-    console.log(`✅ JSON parsed para ${url}:`, data);
     apiGetCache.set(url, { data, expiresAt: now + ttlMs });
     return data;
 }
@@ -1986,74 +1980,110 @@ function restoreServerState(state) {
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
-    initializeInteractiveGradient();
-    initBrandEyeAnimation();
+    console.log('🚀 DOMContentLoaded iniciado');
+    try {
+        initializeInteractiveGradient();
+        console.log('✅ initializeInteractiveGradient completado');
+        
+        initBrandEyeAnimation();
+        console.log('✅ initBrandEyeAnimation completado');
 
-    const isAuthenticated = await checkAuth();
-    
-    // Solo continuar si el usuario está autenticado
-    if (!isAuthenticated) {
-        return; // No cargar datos si no hay autenticación
-    }
-    
-    registerGatedNavigationButtons();
-    setupEventListeners();
-    initializeScrollReveal();
-    
-    // Cargar estado guardado
-    const savedState = loadState();
-    serverFeaturesUnlocked = false;
-    currentServerGuildId = '';
+        const isAuthenticated = await checkAuth();
+        console.log('✅ checkAuth completado:', isAuthenticated);
+        
+        // Solo continuar si el usuario está autenticado
+        if (!isAuthenticated) {
+            console.warn('⚠️ Usuario no autenticado, retornando');
+            return; // No cargar datos si no hay autenticación
+        }
+        
+        registerGatedNavigationButtons();
+        console.log('✅ registerGatedNavigationButtons completado');
+        
+        setupEventListeners();
+        console.log('✅ setupEventListeners completado');
+        
+        initializeScrollReveal();
+        console.log('✅ initializeScrollReveal completado');
+        
+        // Cargar estado guardado
+        const savedState = loadState();
+        serverFeaturesUnlocked = false;
+        currentServerGuildId = '';
 
-    if (savedState?.serverSection?.selectedGuildId) {
-        currentServerGuildId = savedState.serverSection.selectedGuildId;
-        serverFeaturesUnlocked = true;
-        if (savedState.serverSection.activePaneId) {
-            currentServerPaneId = savedState.serverSection.activePaneId;
+        if (savedState?.serverSection?.selectedGuildId) {
+            currentServerGuildId = savedState.serverSection.selectedGuildId;
+            serverFeaturesUnlocked = true;
+            if (savedState.serverSection.activePaneId) {
+                currentServerPaneId = savedState.serverSection.activePaneId;
+            }
+        }
+
+        setServerFeaturesNavigationVisible(false);
+        if (serverFeaturesUnlocked) {
+            setServerFeaturesNavigationVisible(true);
+        }
+        updateServerMenuIdentity();
+        updateDashboardButtonState();
+        
+        console.log('📋 Cargando guilds...');
+        await loadGuilds();
+        console.log('✅ loadGuilds completado');
+        
+        await loadStats();
+        console.log('✅ loadStats completado');
+        
+        await loadAboutOverview();
+        console.log('✅ loadAboutOverview completado');
+        // setupServerSummaryAutoRefresh(); // Deshabilitado: no cargar automáticamente, solo al actualizar página
+        
+        const initialSection = savedState?.activeSection || 'dashboard';
+        showSection(initialSection, { skipHistory: true });
+        console.log('✅ showSection completado:', initialSection);
+        
+        initializePanelHistory(initialSection);
+        refreshActiveSectionReveal();
+        
+        // Restaurar estados específicos
+        if (savedState) {
+            restoreEmbedForm(savedState);
+            restoreLogsState(savedState);
+            restoreServerState(savedState);
+        }
+        
+        console.log('✅ Inicialización completada exitosamente');
+        // Guardar estado periódicamente y en eventos
+        setInterval(saveState, 2000); // Guardar cada 2 segundos
+    } catch (error) {
+        console.error('❌ Error fatal durante inicialización:', error);
+        console.error('Stack:', error?.stack);
+        const guildsList = document.getElementById('guildsList');
+        if (guildsList) {
+            guildsList.innerHTML = `<div class="loading"><p>Error: ${escapeHtml(String(error?.message || 'Error desconocido'))}</p></div>`;
         }
     }
-
-    setServerFeaturesNavigationVisible(false);
-    if (serverFeaturesUnlocked) {
-        setServerFeaturesNavigationVisible(true);
-    }
-    updateServerMenuIdentity();
-    updateDashboardButtonState();
-    
-    await loadGuilds();
-    await loadStats();
-    await loadAboutOverview();
-    // setupServerSummaryAutoRefresh(); // Deshabilitado: no cargar automáticamente, solo al actualizar página
-    
-    const initialSection = savedState?.activeSection || 'dashboard';
-    showSection(initialSection, { skipHistory: true });
-    initializePanelHistory(initialSection);
-    refreshActiveSectionReveal();
-    
-    // Restaurar estados específicos
-    if (savedState) {
-        restoreEmbedForm(savedState);
-        restoreLogsState(savedState);
-        restoreServerState(savedState);
-    }
-    
-    // Guardar estado periódicamente y en eventos
-    setInterval(saveState, 2000); // Guardar cada 2 segundos
 });
 
 // Verificar autenticación
 async function checkAuth() {
     try {
+        console.log('🔐 Verificando autenticación en /api/user...');
         const response = await fetchWithCredentials('/api/user');
+        console.log('📊 Respuesta de /api/user:', response.status, response.statusText);
+        
         if (response.ok) {
             const contentType = String(response.headers.get('content-type') || '').toLowerCase();
             if (!contentType.includes('application/json')) {
+                console.error('❌ Respuesta no es JSON:', contentType);
                 window.location.replace('/login.html');
                 return false;
             }
 
             const data = await response.json();
+            console.log('✅ Datos del usuario cargados:', data?.user?.username);
+            
             if (!data || !data.user) {
+                console.error('❌ No hay datos de usuario en la respuesta');
                 window.location.replace('/login.html');
                 return false;
             }
@@ -2062,24 +2092,27 @@ async function checkAuth() {
             isOwnerUser = Boolean(data.isOwner);
             currentGuilds = data.guilds || [];
             botInviteUrl = String(data.inviteUrl || '').trim();
+            console.log('✅ Usuario autenticado:', currentUser.username, '| Guilds en sesión:', currentGuilds.length);
             updateUserUI();
             return true;
         }
 
         if (response.status === 401) {
+            console.warn('⚠️ No autenticado (401)');
             const data = await response.json().catch(() => ({}));
             const target = data.redirect || '/login.html';
             window.location.replace(target);
             return false;
         }
 
-        console.error('Error verificando autenticación:', response.status);
+        console.error('❌ Error verificando autenticación:', response.status);
         if (!window.location.pathname.includes('login')) {
             window.location.replace('/login.html');
         }
         return false;
     } catch (error) {
-        console.error('Error verificando autenticación:', error);
+        console.error('❌ Excepción verificando autenticación:', error);
+        console.error('Stack:', error?.stack);
         if (!window.location.pathname.includes('login')) {
             window.location.replace('/login.html');
         }
@@ -2831,19 +2864,14 @@ function showSection(sectionId, options = {}) {
 // Cargar servidores
 async function loadGuilds() {
     try {
-        console.log('📡 Iniciando loadGuilds...');
         const guilds = await fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds);
-        console.log('✅ Servidores recibidos:', guilds);
         dashboardGuildsCache = Array.isArray(guilds) ? guilds : [];
-        console.log('📊 Cache actualizado:', dashboardGuildsCache.length, 'servidores');
         displayGuilds(getFilteredDashboardGuilds());
-        console.log('🎨 Servidores mostrados en pantalla');
     } catch (error) {
-        console.error('❌ Error cargando servidores:', error);
+        console.error('Error cargando servidores:', error);
         const container = document.getElementById('guildsList');
         const isAuth = error && (error.status === 401 || (error.message && error.message.toLowerCase().includes('401')));
-        const msg = isAuth ? 'No autenticado. Por favor inicia sesión.' : `Error al cargar servidores: ${error?.message || 'desconocido'}`;
-        console.error('📋 Mensaje de error:', msg);
+        const msg = isAuth ? 'No autenticado. Por favor inicia sesión.' : 'Error al cargar servidores';
         if (container) {
             container.innerHTML = `<div class="loading"><p>${escapeHtml(String(msg))}</p></div>`;
         }
@@ -2863,16 +2891,13 @@ function getFilteredDashboardGuilds() {
 // Mostrar servidores
 function displayGuilds(guilds) {
     const container = document.getElementById('guildsList');
-    console.log('🎨 displayGuilds() llamado con:', guilds?.length || 0, 'servidores');
     
     if (guilds.length === 0) {
         const emptyLabel = dashboardGuildSearchQuery ? 'No se encontraron servidores' : 'No hay servidores disponibles';
-        console.warn('⚠️ Sin servidores:', emptyLabel);
         container.innerHTML = `<div class="loading">${emptyLabel}</div>`;
         return;
     }
 
-    console.log('📝 Renderizando', guilds.length, 'tarjetas de servidor');
     container.innerHTML = guilds.map(guild => `
         <div class="guild-card" onclick="selectGuild('${guild.id}')">
             <div class="guild-card-top">
@@ -2902,7 +2927,6 @@ function displayGuilds(guilds) {
             </div>
         </div>
     `).join('');
-    console.log('✅ Servidores renderizados exitosamente');
 }
 
 // Cargar servidores para el formulario de embed
