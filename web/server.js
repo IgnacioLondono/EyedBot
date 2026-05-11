@@ -914,7 +914,10 @@ async function syncSessionGuilds(req, options = {}) {
     }
 
     try {
-        const freshGuilds = await oauth.getUserGuilds(req.session.accessToken);
+        const freshGuilds = await withOauthTimeout(
+            oauth.getUserGuilds(req.session.accessToken),
+            'oauth.getUserGuilds syncSessionGuilds timeout'
+        );
         if (!Array.isArray(freshGuilds)) return currentGuilds;
 
         req.session.guilds = freshGuilds;
