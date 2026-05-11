@@ -5794,12 +5794,13 @@ async function loadGachaPanel(guildId) {
     if (!container) return;
 
     try {
-        const [channelsResponse, configResponse, statsResponse, myInventoryResponse, marketResponse] = await Promise.all([
+        const [channelsResponse, configResponse, statsResponse, myInventoryResponse, marketResponse, shopResponse] = await Promise.all([
             fetchWithCredentials(`/api/guild/${guildId}/channels`).catch(() => null),
             fetchWithCredentials(`/api/guild/${guildId}/gacha-config`).catch(() => null),
             fetchWithCredentials(`/api/guild/${guildId}/gacha-stats`).catch(() => null),
-            fetchWithCredentials(`/api/guild/${guildId}/gacha-inventory?limit=150`).catch(() => null),
-            fetchWithCredentials(`/api/guild/${guildId}/gacha-market`).catch(() => null)
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-inventory?limit=300`).catch(() => null),
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-market`).catch(() => null),
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-shop`).catch(() => null)
         ]);
 
         const channels = channelsResponse && channelsResponse.ok
@@ -5813,7 +5814,17 @@ async function loadGachaPanel(guildId) {
             claimCooldownSec: 30,
             claimWindowSec: 120,
             pityThreshold: 30,
-            coinsPerClaim: 10
+            coinsPerClaim: 10,
+            economyEnabled: false,
+            shopEnabled: true,
+            coinsPerXp: 1,
+            coinsPerLevelUp: 75,
+            coinsPerVoiceMinute: 1,
+            shopPriceMultiplier: 2,
+            minigameCoinflipReward: 8,
+            minigameDiceReward: 6,
+            minigameTriviaReward: 18,
+            minigameCooldownSec: 45
         };
         let config = { ...defaultConfig };
         if (configResponse && configResponse.ok) {
@@ -5839,6 +5850,10 @@ async function loadGachaPanel(guildId) {
             ? await marketResponse.json().catch(() => ({ listings: [] }))
             : { listings: [] };
         const marketListings = Array.isArray(marketPayload.listings) ? marketPayload.listings : [];
+        const shopPayload = shopResponse && shopResponse.ok
+            ? await shopResponse.json().catch(() => ({ items: [] }))
+            : { items: [] };
+        const shopItems = Array.isArray(shopPayload.items) ? shopPayload.items : [];
 
         const topRows = Array.isArray(stats.topClaimers) ? stats.topClaimers.slice(0, 10) : [];
         const topHtml = topRows.length
@@ -5856,9 +5871,9 @@ async function loadGachaPanel(guildId) {
         container.innerHTML = `
             <div class="dpx-panel">
                 ${dpxRenderHero({
-                    kicker: 'Módulo Gacha',
-                    title: 'Configura tu sistema estilo waifu',
-                    description: 'Ajusta canal, cooldowns y economía. Además revisa estadísticas y ranking de usuarios.',
+                    kicker: 'Economía y Gacha',
+                    title: 'Tienda, inventario, mercado y recompensas',
+                    description: 'Configura gacha, economía por XP, tienda en Discord y minijuegos con monedas desde un panel organizado.',
                     accent: '#f6c244',
                     glow1: 'rgba(246,194,68,0.22)',
                     glow2: 'rgba(124,77,255,0.24)',
@@ -5874,10 +5889,12 @@ async function loadGachaPanel(guildId) {
                     ${dpxRenderStatCard({ label: 'Colección global', value: Number(stats.totalCollection || 0).toLocaleString('es-ES'), hint: 'Suma de colecciones del servidor', accent: '#f6c244' })}
                 </div>
                 ${dpxRenderTabs([
-                    { key: 'gacha-config', label: 'Configuración', iconName: 'gear' },
-                    { key: 'gacha-top', label: 'Top usuarios', iconName: 'users' },
+                    { key: 'gacha-config', label: 'Gacha', iconName: 'gear' },
+                    { key: 'gacha-economy', label: 'Economía', iconName: 'sparkles' },
+                    { key: 'gacha-shop', label: 'Tienda', iconName: 'book' },
                     { key: 'gacha-inventory', label: 'Inventario', iconName: 'book' },
-                    { key: 'gacha-market', label: 'Mercado', iconName: 'sparkles' }
+                    { key: 'gacha-market', label: 'Mercado', iconName: 'users' },
+                    { key: 'gacha-top', label: 'Ranking', iconName: 'users' }
                 ], 'gacha-config')}
 
                 <section class="dpx-tab-panel is-active" data-dpx-panel="gacha-config">
@@ -5913,6 +5930,70 @@ async function loadGachaPanel(guildId) {
                                 <label for="gachaCoinsPerClaim">Monedas por claim</label>
                                 <input id="gachaCoinsPerClaim" class="form-control" type="number" min="1" max="1000" value="${Number(config.coinsPerClaim || 10)}">
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="gacha-economy">
+                    <div class="dpx-section">
+                        <div class="dpx-toggle-grid">
+                            ${dpxRenderToggle({ id: 'gachaEconomyEnabled', checked: !!config.economyEnabled, title: 'Activar economía', description: 'Habilita monedas por XP, tienda /tienda y recompensas de minijuegos.' })}
+                            ${dpxRenderToggle({ id: 'gachaShopEnabled', checked: config.shopEnabled !== false, title: 'Activar tienda', description: 'Permite comprar personajes con monedas desde /tienda.' })}
+                        </div>
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field">
+                                <label for="gachaCoinsPerXp">Monedas por XP</label>
+                                <input id="gachaCoinsPerXp" class="form-control" type="number" min="0" max="100" value="${Number(config.coinsPerXp ?? 1)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaCoinsPerLevelUp">Monedas por subida de nivel</label>
+                                <input id="gachaCoinsPerLevelUp" class="form-control" type="number" min="0" max="5000" value="${Number(config.coinsPerLevelUp ?? 75)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaCoinsPerVoiceMinute">Monedas por minuto en voz</label>
+                                <input id="gachaCoinsPerVoiceMinute" class="form-control" type="number" min="0" max="100" value="${Number(config.coinsPerVoiceMinute ?? 1)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaShopPriceMultiplier">Multiplicador de precios</label>
+                                <input id="gachaShopPriceMultiplier" class="form-control" type="number" min="0.5" max="10" step="0.1" value="${Number(config.shopPriceMultiplier ?? 2)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaMinigameCoinflipReward">Recompensa /coinflip</label>
+                                <input id="gachaMinigameCoinflipReward" class="form-control" type="number" min="0" max="1000" value="${Number(config.minigameCoinflipReward ?? 8)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaMinigameDiceReward">Recompensa /dice</label>
+                                <input id="gachaMinigameDiceReward" class="form-control" type="number" min="0" max="1000" value="${Number(config.minigameDiceReward ?? 6)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaMinigameTriviaReward">Recompensa /trivia</label>
+                                <input id="gachaMinigameTriviaReward" class="form-control" type="number" min="0" max="5000" value="${Number(config.minigameTriviaReward ?? 18)}">
+                            </div>
+                            <div class="dpx-field">
+                                <label for="gachaMinigameCooldownSec">Cooldown minijuegos (s)</label>
+                                <input id="gachaMinigameCooldownSec" class="form-control" type="number" min="5" max="3600" value="${Number(config.minigameCooldownSec ?? 45)}">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dpx-tab-panel" data-dpx-panel="gacha-shop">
+                    <div class="dpx-section">
+                        <div class="dpx-section-head">
+                            <div class="dpx-section-head-text">
+                                <h4>Catálogo de tienda</h4>
+                                <p>Los usuarios exploran y compran en Discord con <code>/tienda</code> y flechas del embed.</p>
+                            </div>
+                        </div>
+                        <div class="dpx-item-list">
+                            ${shopItems.slice(0, 120).map((item, index) => `
+                                <div class="dpx-item-row">
+                                    <div class="dpx-item-main">
+                                        <div class="dpx-item-title">#${index + 1} ${escapeHtml(item.name)}</div>
+                                        <div class="dpx-item-sub">${escapeHtml(item.series)} · ${escapeHtml(item.rarity)} · Precio ${Number(item.price || 0).toLocaleString('es-ES')}</div>
+                                    </div>
+                                </div>
+                            `).join('') || '<div class="dpx-empty">No hay artículos en el catálogo.</div>'}
                         </div>
                     </div>
                 </section>
@@ -6029,7 +6110,17 @@ async function loadGachaPanel(guildId) {
                     claimCooldownSec: Number.parseInt(document.getElementById('gachaClaimCooldownSec')?.value || '30', 10),
                     claimWindowSec: Number.parseInt(document.getElementById('gachaClaimWindowSec')?.value || '120', 10),
                     pityThreshold: Number.parseInt(document.getElementById('gachaPityThreshold')?.value || '30', 10),
-                    coinsPerClaim: Number.parseInt(document.getElementById('gachaCoinsPerClaim')?.value || '10', 10)
+                    coinsPerClaim: Number.parseInt(document.getElementById('gachaCoinsPerClaim')?.value || '10', 10),
+                    economyEnabled: document.getElementById('gachaEconomyEnabled')?.checked === true,
+                    shopEnabled: document.getElementById('gachaShopEnabled')?.checked !== false,
+                    coinsPerXp: Number.parseInt(document.getElementById('gachaCoinsPerXp')?.value || '1', 10),
+                    coinsPerLevelUp: Number.parseInt(document.getElementById('gachaCoinsPerLevelUp')?.value || '75', 10),
+                    coinsPerVoiceMinute: Number.parseInt(document.getElementById('gachaCoinsPerVoiceMinute')?.value || '1', 10),
+                    shopPriceMultiplier: Number.parseFloat(document.getElementById('gachaShopPriceMultiplier')?.value || '2'),
+                    minigameCoinflipReward: Number.parseInt(document.getElementById('gachaMinigameCoinflipReward')?.value || '8', 10),
+                    minigameDiceReward: Number.parseInt(document.getElementById('gachaMinigameDiceReward')?.value || '6', 10),
+                    minigameTriviaReward: Number.parseInt(document.getElementById('gachaMinigameTriviaReward')?.value || '18', 10),
+                    minigameCooldownSec: Number.parseInt(document.getElementById('gachaMinigameCooldownSec')?.value || '45', 10)
                 };
 
                 try {
