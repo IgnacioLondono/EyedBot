@@ -3,6 +3,11 @@ const levelingStore = require('../utils/leveling-store');
 const guildActivityStore = require('../utils/guild-activity-store');
 const { getLevelFromXp, sanitizeDifficulty } = require('../utils/leveling-math');
 const { parseRoleRewards } = require('../utils/leveling-rewards');
+const {
+    awardCoinsForXp,
+    awardCoinsForLevelUp,
+    awardCoinsForVoiceMinute
+} = require('../utils/economy-rewards');
 
 const messageCooldownMap = new Map();
 const voiceAnalyticsSessions = new Map();
@@ -138,11 +143,13 @@ async function awardXpToMember(member, amount, source = 'message') {
     };
 
     await levelingStore.setUserState(guildId, userId, nextState);
+    await awardCoinsForXp(guildId, userId, amount).catch(() => null);
 
     if (newLevel > oldLevel) {
         const rewards = parseRoleRewards(cfg.roleRewards);
         await applyRoleRewards(member, newLevel, rewards);
         await sendLevelUpAnnouncements(member, oldLevel, newLevel, cfg);
+        await awardCoinsForLevelUp(guildId, userId, oldLevel, newLevel).catch(() => null);
     }
 
     return nextState;
@@ -235,6 +242,7 @@ async function runVoiceXpCycle(client) {
                 for (const member of channel.members.values()) {
                     if (member.user?.bot) continue;
                     await awardXpToMember(member, voiceXpPerMinute, 'voice');
+                    await awardCoinsForVoiceMinute(guild.id, member.user.id).catch(() => null);
                 }
             }
         }

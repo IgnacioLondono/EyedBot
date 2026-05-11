@@ -449,6 +449,52 @@ client.on('interactionCreate', async interaction => {
                 }
             }
 
+            if (interaction.customId.startsWith('shop_')) {
+                const shopCmd = interaction.client.commands?.get?.('tienda');
+                if (shopCmd && typeof shopCmd.handleShopButton === 'function') {
+                    const handled = await shopCmd.handleShopButton(interaction);
+                    if (handled) return;
+                }
+            }
+
+            if (interaction.customId.startsWith('trivia_')) {
+                const triviaData = interaction.client.triviaAnswers?.[interaction.message.interaction?.id];
+                if (!triviaData) {
+                    await safeReply(interaction, {
+                        content: 'Esta trivia ya expiró.',
+                        flags: 64
+                    }).catch(() => {});
+                    return;
+                }
+
+                const answerIndex = Number.parseInt(interaction.customId.split('_')[1], 10);
+                const selectedAnswer = triviaData.answers[answerIndex];
+                const isCorrect = answerIndex === triviaData.correctIndex || selectedAnswer === triviaData.correct;
+                let rewardLine = '';
+
+                if (isCorrect && interaction.guildId) {
+                    const { awardMinigameCoins } = require('./utils/economy-rewards');
+                    const reward = await awardMinigameCoins(interaction.guildId, interaction.user.id, 'trivia');
+                    if (reward?.ok) {
+                        rewardLine = `\n\nGanaste **${Number(reward.reward || 0).toLocaleString('es-ES')}** monedas.`;
+                    }
+                }
+
+                const { EmbedBuilder } = require('discord.js');
+                const config = require('./config');
+                const embed = new EmbedBuilder()
+                    .setColor(isCorrect ? config.embedColor : '#FF0000')
+                    .setTitle(isCorrect ? 'Correcto' : 'Incorrecto')
+                    .setDescription(isCorrect
+                        ? `La respuesta correcta era: **${triviaData.correct}**${rewardLine}`
+                        : `La respuesta correcta era: **${triviaData.correct}**`)
+                    .setFooter({ text: `Respondido por ${interaction.user.tag}` });
+
+                await safeReply(interaction, { embeds: [embed], flags: 64 }).catch(() => {});
+                delete interaction.client.triviaAnswers[interaction.message.interaction?.id];
+                return;
+            }
+
             if (interaction.customId.startsWith('search_select_')) {
                 if (!MUSIC_ENABLED) {
                     await safeReply(interaction, { content: '🎵 La música está desactivada temporalmente.', flags: 64 }).catch(() => {});

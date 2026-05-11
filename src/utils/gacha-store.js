@@ -83,6 +83,16 @@ function defaultConfig() {
         claimWindowSec: 120,
         pityThreshold: 30,
         coinsPerClaim: 10,
+        economyEnabled: false,
+        shopEnabled: true,
+        coinsPerXp: 1,
+        coinsPerLevelUp: 75,
+        coinsPerVoiceMinute: 1,
+        shopPriceMultiplier: 2,
+        minigameCoinflipReward: 8,
+        minigameDiceReward: 6,
+        minigameTriviaReward: 18,
+        minigameCooldownSec: 45,
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
     };
@@ -97,6 +107,16 @@ function normalizeConfig(raw = {}) {
         claimWindowSec: Math.max(30, Math.min(600, Number.parseInt(`${raw.claimWindowSec || 120}`, 10) || 120)),
         pityThreshold: Math.max(5, Math.min(200, Number.parseInt(`${raw.pityThreshold || 30}`, 10) || 30)),
         coinsPerClaim: Math.max(1, Math.min(1000, Number.parseInt(`${raw.coinsPerClaim || 10}`, 10) || 10)),
+        economyEnabled: raw.economyEnabled === true,
+        shopEnabled: raw.shopEnabled !== false,
+        coinsPerXp: Math.max(0, Math.min(100, Number.parseInt(`${raw.coinsPerXp ?? 1}`, 10) || 0)),
+        coinsPerLevelUp: Math.max(0, Math.min(5000, Number.parseInt(`${raw.coinsPerLevelUp ?? 75}`, 10) || 0)),
+        coinsPerVoiceMinute: Math.max(0, Math.min(100, Number.parseInt(`${raw.coinsPerVoiceMinute ?? 1}`, 10) || 0)),
+        shopPriceMultiplier: Math.max(0.5, Math.min(10, Number.parseFloat(`${raw.shopPriceMultiplier ?? 2}`) || 2)),
+        minigameCoinflipReward: Math.max(0, Math.min(1000, Number.parseInt(`${raw.minigameCoinflipReward ?? 8}`, 10) || 0)),
+        minigameDiceReward: Math.max(0, Math.min(1000, Number.parseInt(`${raw.minigameDiceReward ?? 6}`, 10) || 0)),
+        minigameTriviaReward: Math.max(0, Math.min(5000, Number.parseInt(`${raw.minigameTriviaReward ?? 18}`, 10) || 0)),
+        minigameCooldownSec: Math.max(5, Math.min(3600, Number.parseInt(`${raw.minigameCooldownSec ?? 45}`, 10) || 45)),
         updatedAt: String(raw.updatedAt || new Date().toISOString()),
         updatedBy: String(raw.updatedBy || 'system')
     };
@@ -547,6 +567,68 @@ async function buyMarketListing(guildId, buyerId, listingId) {
     return { ok: true, listing, buyer, seller };
 }
 
+function getShopPrice(character = {}, config = {}) {
+    const multiplier = Math.max(0.5, Number(config.shopPriceMultiplier || 2));
+    const base = Math.max(1, Number.parseInt(`${character.baseValue || 10}`, 10) || 10);
+    const rarityBoost = { SSR: 2.4, SR: 1.8, R: 1.35, N: 1 };
+    const boost = rarityBoost[String(character.rarity || 'N').toUpperCase()] || 1;
+    return Math.max(1, Math.round(base * multiplier * boost));
+}
+
+function getShopCatalog(config = {}) {
+    return CHARACTER_POOL.map((character) => ({
+        ...character,
+        price: getShopPrice(character, config)
+    })).sort((left, right) => getShopPrice(right, config) - getShopPrice(left, config));
+}
+
+async function addCoins(guildId, userId, amount = 0) {
+    const delta = Math.max(0, Number.parseInt(`${amount || 0}`, 10) || 0);
+    if (!delta) return getProfile(guildId, userId);
+
+    const profile = await getProfile(guildId, userId);
+    profile.coins = Math.max(0, (profile.coins || 0) + delta);
+    return setProfile(guildId, userId, profile);
+}
+
+async function trySpendCoins(guildId, userId, amount = 0) {
+    const cost = Math.max(0, Number.parseInt(`${amount || 0}`, 10) || 0);
+    const profile = await getProfile(guildId, userId);
+    if ((profile.coins || 0) < cost) {
+        return { ok: false, reason: 'insufficient_funds', profile };
+    }
+
+    profile.coins -= cost;
+    const saved = await setProfile(guildId, userId, profile);
+    return { ok: true, profile: saved };
+}
+
+async function purchaseShopCharacter(guildId, userId, characterId = '') {
+    const config = await getConfig(guildId);
+    if (!config.economyEnabled || config.shopEnabled === false) {
+        return { ok: false, reason: 'shop_disabled' };
+    }
+
+    const character = CHARACTER_POOL.find((item) => item.id === String(characterId || ''));
+    if (!character) return { ok: false, reason: 'item_not_found' };
+
+    const price = getShopPrice(character, config);
+    const spend = await trySpendCoins(guildId, userId, price);
+    if (!spend.ok) return { ok: false, reason: spend.reason, price, profile: spend.profile };
+
+    const profile = await getProfile(guildId, userId);
+    const item = buildInventoryEntry(character);
+    profile.inventory.unshift(item);
+    profile.collectionCount = profile.inventory.length;
+    const rarity = String(item.rarity || '').toUpperCase();
+    if (!profile.bestRarity || rarityRank(rarity) > rarityRank(profile.bestRarity)) {
+        profile.bestRarity = rarity;
+    }
+
+    await setProfile(guildId, userId, profile);
+    return { ok: true, item, price, profile };
+}
+
 async function getGuildStats(guildId) {
     const profiles = await listGuildProfiles(guildId);
     const sorted = profiles.slice().sort((a, b) => (b.totalClaims || 0) - (a.totalClaims || 0));
@@ -584,5 +666,10 @@ module.exports = {
     createMarketListing,
     buyMarketListing,
     listGuildProfiles,
-    getGuildStats
+    getGuildStats,
+    getShopPrice,
+    getShopCatalog,
+    addCoins,
+    trySpendCoins,
+    purchaseShopCharacter
 };

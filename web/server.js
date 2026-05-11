@@ -2575,6 +2575,16 @@ function normalizeGachaConfigInput(body = {}, current = null, userId = 'unknown'
         claimWindowSec: Number.parseInt(body.claimWindowSec ?? base.claimWindowSec ?? 120, 10),
         pityThreshold: Number.parseInt(body.pityThreshold ?? base.pityThreshold ?? 30, 10),
         coinsPerClaim: Number.parseInt(body.coinsPerClaim ?? base.coinsPerClaim ?? 10, 10),
+        economyEnabled: body.economyEnabled === true,
+        shopEnabled: body.shopEnabled !== false,
+        coinsPerXp: Number.parseInt(body.coinsPerXp ?? base.coinsPerXp ?? 1, 10),
+        coinsPerLevelUp: Number.parseInt(body.coinsPerLevelUp ?? base.coinsPerLevelUp ?? 75, 10),
+        coinsPerVoiceMinute: Number.parseInt(body.coinsPerVoiceMinute ?? base.coinsPerVoiceMinute ?? 1, 10),
+        shopPriceMultiplier: Number.parseFloat(body.shopPriceMultiplier ?? base.shopPriceMultiplier ?? 2),
+        minigameCoinflipReward: Number.parseInt(body.minigameCoinflipReward ?? base.minigameCoinflipReward ?? 8, 10),
+        minigameDiceReward: Number.parseInt(body.minigameDiceReward ?? base.minigameDiceReward ?? 6, 10),
+        minigameTriviaReward: Number.parseInt(body.minigameTriviaReward ?? base.minigameTriviaReward ?? 18, 10),
+        minigameCooldownSec: Number.parseInt(body.minigameCooldownSec ?? base.minigameCooldownSec ?? 45, 10),
         updatedAt: new Date().toISOString(),
         updatedBy: userId
     });
@@ -2895,6 +2905,21 @@ app.get('/api/guild/:guildId/gacha-market', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error obteniendo mercado gacha:', error);
         res.status(500).json({ error: 'Error al obtener mercado gacha' });
+    }
+});
+
+app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await gachaStore.getConfig(guildId);
+        const items = gachaStore.getShopCatalog(config).slice(0, 250);
+        res.json({ success: true, items, config });
+    } catch (error) {
+        console.error('Error obteniendo tienda gacha:', error);
+        res.status(500).json({ error: 'Error al obtener catálogo de tienda' });
     }
 });
 
