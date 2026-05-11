@@ -4560,8 +4560,7 @@ mark.receipt-highlight {
     border-radius: 18px !important;
     background: rgba(var(--bg-secondary-rgb, 18, 10, 42), 0.92) !important;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18) !important;
-    overflow: hidden;
-    background-clip: padding-box;
+    min-width: 0;
 }
 .server-insight-section h4 {
     margin: 0 0 0.8rem !important;
@@ -4671,6 +4670,26 @@ mark.receipt-highlight {
     color: var(--text-muted, #8a75b8) !important;
     font-size: 0.74rem;
     font-style: italic;
+}
+
+.server-insight-body > .summary-top-users-list,
+.server-insight-section .summary-top-users-list,
+.server-insight-section .server-detail-list {
+    min-width: 0;
+}
+
+.server-insight-section .server-detail-list--scroll {
+    max-height: min(480px, 60vh);
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 0.35rem;
+    padding-bottom: 0.15rem;
+}
+
+.server-insight-section .summary-top-user-item,
+.server-insight-section .server-detail-list-item,
+.server-insight-section .server-detail-list-item--button {
+    min-width: 0;
 }
 
 /* ==========================================================
@@ -12374,27 +12393,35 @@ body {
     flex-direction: column !important;
     flex: 1 1 auto !important;
     min-width: 0 !important;
-    padding: 0.55rem 0.7rem 0 !important;
+    padding: 0.55rem 0.7rem 0.65rem !important;
     overflow-y: auto !important;
 }
 
 #serverSection .server-pane.active {
     display: flex !important;
     flex-direction: column !important;
-    flex: 1 1 auto !important;
+    flex: 0 0 auto !important;
     width: 100% !important;
     min-height: 100% !important;
+    height: auto !important;
 }
 
 #serverSection .server-pane-surface {
     display: flex !important;
     flex-direction: column !important;
-    flex: 1 1 auto !important;
-    min-height: 100% !important;
+    flex: 1 0 auto !important;
+    min-height: auto !important;
+    height: auto !important;
 }
 
-#serverSection .moderation-container,
 #serverSection .server-info-container {
+    display: block !important;
+    flex: 0 0 auto !important;
+    min-height: auto !important;
+    height: auto !important;
+}
+
+#serverSection .moderation-container {
     display: flex !important;
     flex-direction: column !important;
     flex: 1 1 auto !important;
@@ -12439,11 +12466,6 @@ body {
     padding-bottom: 0.65rem !important;
 }
 
-#serverSection .server-pane.active,
-#serverSection .server-pane-surface {
-    min-height: 0 !important;
-}
-
 #serverSection .server-side-menu,
 #serverSection .server-content-area {
     background:
@@ -12459,10 +12481,7 @@ body {
         ) !important;
 }
 
-#serverSection .summary-card,
-#serverSection .server-insight-section,
-#serverSection .server-insight-grid > article,
-#serverSection .server-insight-grid > div {
-    overflow: hidden;
-    background-clip: padding-box;
+#serverSection .summary-card--top-users,
+#serverSection .server-insight-section {
+    overflow: visible;
 }
