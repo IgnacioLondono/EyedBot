@@ -10949,6 +10949,7 @@ function saveDraftTicketConfig(guildId) {
         requestChannelId: document.getElementById('tm_ticketRequestChannelSelect')?.value || '',
         receiptHistoryChannelId: document.getElementById('tm_ticketReceiptChannelSelect')?.value || '',
         sendDmReceipt: document.getElementById('tm_ticketSendDmReceipt')?.checked === true,
+        sendDmPendingStatus: document.getElementById('tm_ticketSendDmPendingStatus')?.checked === true,
         title: document.getElementById('tm_ticketTitle')?.value || '',
         message: document.getElementById('tm_ticketMessage')?.value || '',
         footer: document.getElementById('tm_ticketFooter')?.value || '',
@@ -11046,6 +11047,7 @@ function renderTicketManageConfig(cfg, guildId) {
     const roles = Array.isArray(window._lastGuildRoles) ? window._lastGuildRoles : [];
 
     const sendDmDefault = cfg.sendDmReceipt !== false;
+    const sendDmPendingDefault = cfg.sendDmPendingStatus === true;
 
     container.innerHTML = `
         <div class="dpx-section">
@@ -11053,12 +11055,12 @@ function renderTicketManageConfig(cfg, guildId) {
             <input type="hidden" id="tm_ticketMessageId" value="${escapeHtmlForValue(cfg.messageId || '')}">
             <input type="hidden" id="tm_ticketColor" value="#${escapeHtmlForValue(String(cfg.color || '7c4dff').replace(/#/g, ''))}">
             <div class="dpx-field-grid" style="margin-top:1rem; gap: 0.8rem;">
-                <div class="dpx-field is-full tm-switch-field tm-switch-field--hero">
+                <div class="dpx-field is-full tm-switch-field tm-switch-field--compact tm-switch-field--hero">
                     <div class="tm-switch-copy">
                         <span class="tm-switch-title">Sistema activo</span>
-                        <span class="tm-switch-desc">Desactiva para ocultar el panel sin borrar la configuración.</span>
+                        <span class="tm-switch-desc">Pausa tickets sin borrar la configuración.</span>
                     </div>
-                    <label class="tm-switch tm-switch--accent" title="Activar o pausar tickets">
+                    <label class="tm-switch tm-switch--accent tm-switch--sm" title="Activar o pausar tickets">
                         <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
                         <span class="tm-switch-slider"></span>
                     </label>
@@ -11085,15 +11087,27 @@ function renderTicketManageConfig(cfg, guildId) {
                         ${(channels || []).filter((c) => c.type === 0).map((c) => `<option value="${c.id}" ${String(cfg.receiptHistoryChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
                     </select>
                 </div>
-                <div class="dpx-field is-full tm-switch-field">
-                    <div class="tm-switch-copy">
-                        <span class="tm-switch-title">Comprobante por mensaje directo</span>
-                        <span class="tm-switch-desc">Al cerrar el ticket, envía al usuario que lo abrió un embed y la transcripción (.txt).</span>
+                <div class="tm-switch-pair-row">
+                    <div class="dpx-field is-full tm-switch-field tm-switch-field--compact">
+                        <div class="tm-switch-copy">
+                            <span class="tm-switch-title">MD al cerrar</span>
+                            <span class="tm-switch-desc">Comprobante (.txt) al usuario que abrió el ticket.</span>
+                        </div>
+                        <label class="tm-switch tm-switch--mint tm-switch--sm" title="Enviar copia del cierre por MD">
+                            <input type="checkbox" id="tm_ticketSendDmReceipt" ${sendDmDefault ? 'checked' : ''}>
+                            <span class="tm-switch-slider"></span>
+                        </label>
                     </div>
-                    <label class="tm-switch tm-switch--mint" title="Enviar copia del cierre por MD">
-                        <input type="checkbox" id="tm_ticketSendDmReceipt" ${sendDmDefault ? 'checked' : ''}>
-                        <span class="tm-switch-slider"></span>
-                    </label>
+                    <div class="dpx-field is-full tm-switch-field tm-switch-field--compact">
+                        <div class="tm-switch-copy">
+                            <span class="tm-switch-title">MD estado de solicitud</span>
+                            <span class="tm-switch-desc">Al enviar solicitud pendiente, copia del estado por MD.</span>
+                        </div>
+                        <label class="tm-switch tm-switch--sky tm-switch--sm" title="Notificar solicitud pendiente por MD">
+                            <input type="checkbox" id="tm_ticketSendDmPendingStatus" ${sendDmPendingDefault ? 'checked' : ''}>
+                            <span class="tm-switch-slider"></span>
+                        </label>
+                    </div>
                 </div>
                 <div class="dpx-field is-full">
                     <label>Título</label>
@@ -11165,6 +11179,8 @@ function renderTicketManageConfig(cfg, guildId) {
                 if (rc) rc.value = draft.receiptHistoryChannelId || '';
                 const dmR = document.getElementById('tm_ticketSendDmReceipt');
                 if (dmR) dmR.checked = draft.sendDmReceipt !== false;
+                const dmP = document.getElementById('tm_ticketSendDmPendingStatus');
+                if (dmP) dmP.checked = draft.sendDmPendingStatus === true;
                 document.getElementById('tm_ticketTitle').value = draft.title;
                 document.getElementById('tm_ticketMessage').value = draft.message;
                 document.getElementById('tm_ticketFooter').value = draft.footer;
@@ -11350,6 +11366,7 @@ async function saveTicketsManageConfig(guildId, showSuccessToast = true) {
         requestChannelId: document.getElementById('tm_ticketRequestChannelSelect')?.value || '',
         receiptHistoryChannelId: document.getElementById('tm_ticketReceiptChannelSelect')?.value || '',
         sendDmReceipt: document.getElementById('tm_ticketSendDmReceipt')?.checked === true,
+        sendDmPendingStatus: document.getElementById('tm_ticketSendDmPendingStatus')?.checked === true,
         adminRoleIds,
         title: document.getElementById('tm_ticketTitle')?.value || 'Soporte',
         message: document.getElementById('tm_ticketMessage')?.value || '',

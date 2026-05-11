@@ -728,6 +728,10 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
         )
         .setTimestamp();
 
+    if (cfg.sendDmPendingStatus === true) {
+        await interaction.user.send({ embeds: [userPendingEmbed] }).catch(() => null);
+    }
+
     await interaction.editReply({
         content: '\u200b',
         embeds: [userPendingEmbed],
