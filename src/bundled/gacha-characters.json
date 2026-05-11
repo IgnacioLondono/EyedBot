@@ -5,480 +5,480 @@
       "name": "Aira Nova",
       "series": "Celestial Archive",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_001%3AAira%20Nova&size=512&backgroundColor=fbe7a8",
-      "baseValue": 500
+      "baseValue": 500,
+      "description": "Reliquia Aira Nova forjada en el umbral de Celestial Archive. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_002",
       "name": "Kael Draven",
       "series": "Celestial Archive",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_002%3AKael%20Draven&size=512&backgroundColor=dcc8ff",
-      "baseValue": 180
+      "baseValue": 180,
+      "description": "Emblema místico de Celestial Archive. Kael Draven canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_003",
       "name": "Mira Elowen",
       "series": "Moonlit Engine",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_003%3AMira%20Elowen&size=512&backgroundColor=cfe9ff",
-      "baseValue": 70
+      "baseValue": 70,
+      "description": "Curio ritual descubierto en Moonlit Engine. Mira Elowen aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_004",
       "name": "Ren Azuki",
       "series": "Moonlit Engine",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_004%3ARen%20Azuki&size=512&backgroundColor=e7ebf2",
-      "baseValue": 25
+      "baseValue": 25,
+      "description": "Fetiche reciente de Moonlit Engine. Ren Azuki pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_005",
       "name": "Lys Ardent",
       "series": "Iron Symphony",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_005%3ALys%20Ardent&size=512&backgroundColor=dcc8ff",
-      "baseValue": 190
+      "baseValue": 190,
+      "description": "Emblema místico de Iron Symphony. Lys Ardent canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_006",
       "name": "Noa Kisaragi",
       "series": "Iron Symphony",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_006%3ANoa%20Kisaragi&size=512&backgroundColor=cfe9ff",
-      "baseValue": 80
+      "baseValue": 80,
+      "description": "Curio ritual descubierto en Iron Symphony. Noa Kisaragi aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_007",
       "name": "Eiden Volt",
       "series": "Prism Frontier",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_007%3AEiden%20Volt&size=512&backgroundColor=e7ebf2",
-      "baseValue": 20
+      "baseValue": 20,
+      "description": "Fetiche reciente de Prism Frontier. Eiden Volt pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_008",
       "name": "Sera Yume",
       "series": "Prism Frontier",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_008%3ASera%20Yume&size=512&backgroundColor=cfe9ff",
-      "baseValue": 75
+      "baseValue": 75,
+      "description": "Curio ritual descubierto en Prism Frontier. Sera Yume aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_009",
       "name": "Orin Fable",
       "series": "Echo Garden",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_009%3AOrin%20Fable&size=512&backgroundColor=dcc8ff",
-      "baseValue": 170
+      "baseValue": 170,
+      "description": "Emblema místico de Echo Garden. Orin Fable canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_010",
       "name": "Talia Rune",
       "series": "Echo Garden",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_010%3ATalia%20Rune&size=512&backgroundColor=fbe7a8",
-      "baseValue": 520
+      "baseValue": 520,
+      "description": "Reliquia Talia Rune forjada en el umbral de Echo Garden. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_011",
       "name": "Haru Zenith",
       "series": "Skyward Guild",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_011%3AHaru%20Zenith&size=512&backgroundColor=e7ebf2",
-      "baseValue": 22
+      "baseValue": 22,
+      "description": "Fetiche reciente de Skyward Guild. Haru Zenith pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_012",
       "name": "Nemi Vale",
       "series": "Skyward Guild",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_012%3ANemi%20Vale&size=512&backgroundColor=cfe9ff",
-      "baseValue": 78
+      "baseValue": 78,
+      "description": "Curio ritual descubierto en Skyward Guild. Nemi Vale aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_013",
       "name": "Ryuu Sol",
       "series": "Night Protocol",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_013%3ARyuu%20Sol&size=512&backgroundColor=dcc8ff",
-      "baseValue": 210
+      "baseValue": 210,
+      "description": "Emblema místico de Night Protocol. Ryuu Sol canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_014",
       "name": "Elia Crest",
       "series": "Night Protocol",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_014%3AElia%20Crest&size=512&backgroundColor=fbe7a8",
-      "baseValue": 560
+      "baseValue": 560,
+      "description": "Reliquia Elia Crest forjada en el umbral de Night Protocol. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_015",
       "name": "Pia Lumen",
       "series": "Aurora Circuit",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_015%3APia%20Lumen&size=512&backgroundColor=cfe9ff",
-      "baseValue": 72
+      "baseValue": 72,
+      "description": "Curio ritual descubierto en Aurora Circuit. Pia Lumen aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_016",
       "name": "Zane Hollow",
       "series": "Aurora Circuit",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_016%3AZane%20Hollow&size=512&backgroundColor=e7ebf2",
-      "baseValue": 24
+      "baseValue": 24,
+      "description": "Fetiche reciente de Aurora Circuit. Zane Hollow pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_017",
       "name": "Mako Tsuru",
       "series": "Blade of Echoes",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_017%3AMako%20Tsuru&size=512&backgroundColor=dcc8ff",
-      "baseValue": 200
+      "baseValue": 200,
+      "description": "Emblema místico de Blade of Echoes. Mako Tsuru canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_018",
       "name": "Celine Vox",
       "series": "Blade of Echoes",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_018%3ACeline%20Vox&size=512&backgroundColor=cfe9ff",
-      "baseValue": 85
+      "baseValue": 85,
+      "description": "Curio ritual descubierto en Blade of Echoes. Celine Vox aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_019",
       "name": "Iris Kuro",
       "series": "Zero Garden",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_019%3AIris%20Kuro&size=512&backgroundColor=fbe7a8",
-      "baseValue": 610
+      "baseValue": 610,
+      "description": "Reliquia Iris Kuro forjada en el umbral de Zero Garden. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_020",
       "name": "Theo Garnet",
       "series": "Zero Garden",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_020%3ATheo%20Garnet&size=512&backgroundColor=e7ebf2",
-      "baseValue": 21
+      "baseValue": 21,
+      "description": "Fetiche reciente de Zero Garden. Theo Garnet pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_021",
       "name": "Eyed Sentinel",
       "series": "EyedBot Collection",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_021%3AEyed%20Sentinel&size=512&backgroundColor=fbe7a8",
-      "baseValue": 640
+      "baseValue": 640,
+      "description": "Reliquia Eyed Sentinel forjada en el umbral de EyedBot Collection. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_022",
       "name": "Eyed Courier",
       "series": "EyedBot Collection",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_022%3AEyed%20Courier&size=512&backgroundColor=dcc8ff",
-      "baseValue": 195
+      "baseValue": 195,
+      "description": "Emblema místico de EyedBot Collection. Eyed Courier canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_023",
       "name": "Eyed Scout",
       "series": "EyedBot Collection",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_023%3AEyed%20Scout&size=512&backgroundColor=cfe9ff",
-      "baseValue": 88
+      "baseValue": 88,
+      "description": "Curio ritual descubierto en EyedBot Collection. Eyed Scout aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_024",
       "name": "Eyed Spark",
       "series": "EyedBot Collection",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_024%3AEyed%20Spark&size=512&backgroundColor=e7ebf2",
-      "baseValue": 28
+      "baseValue": 28,
+      "description": "Fetiche reciente de EyedBot Collection. Eyed Spark pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_025",
       "name": "Vega Ash",
       "series": "Mercado Nocturno",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_025%3AVega%20Ash&size=512&backgroundColor=fbe7a8",
-      "baseValue": 580
+      "baseValue": 580,
+      "description": "Reliquia Vega Ash forjada en el umbral de Mercado Nocturno. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_026",
       "name": "Luna Rivet",
       "series": "Mercado Nocturno",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_026%3ALuna%20Rivet&size=512&backgroundColor=dcc8ff",
-      "baseValue": 175
+      "baseValue": 175,
+      "description": "Emblema místico de Mercado Nocturno. Luna Rivet canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_027",
       "name": "Ciro Flint",
       "series": "Mercado Nocturno",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_027%3ACiro%20Flint&size=512&backgroundColor=cfe9ff",
-      "baseValue": 82
+      "baseValue": 82,
+      "description": "Curio ritual descubierto en Mercado Nocturno. Ciro Flint aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_028",
       "name": "Nix Clover",
       "series": "Mercado Nocturno",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_028%3ANix%20Clover&size=512&backgroundColor=e7ebf2",
-      "baseValue": 26
+      "baseValue": 26,
+      "description": "Fetiche reciente de Mercado Nocturno. Nix Clover pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_029",
       "name": "Aster Mirai",
       "series": "Coleccion Estelar",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_029%3AAster%20Mirai&size=512&backgroundColor=fbe7a8",
-      "baseValue": 590
+      "baseValue": 590,
+      "description": "Reliquia Aster Mirai forjada en el umbral de Coleccion Estelar. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_030",
       "name": "Kira Solis",
       "series": "Coleccion Estelar",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_030%3AKira%20Solis&size=512&backgroundColor=dcc8ff",
-      "baseValue": 205
+      "baseValue": 205,
+      "description": "Emblema místico de Coleccion Estelar. Kira Solis canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_031",
       "name": "Yume Hikari",
       "series": "Coleccion Estelar",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_031%3AYume%20Hikari&size=512&backgroundColor=cfe9ff",
-      "baseValue": 76
+      "baseValue": 76,
+      "description": "Curio ritual descubierto en Coleccion Estelar. Yume Hikari aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_032",
       "name": "Rin Atlas",
       "series": "Coleccion Estelar",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_032%3ARin%20Atlas&size=512&backgroundColor=e7ebf2",
-      "baseValue": 23
+      "baseValue": 23,
+      "description": "Fetiche reciente de Coleccion Estelar. Rin Atlas pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_033",
       "name": "Dante Ember",
       "series": "Forja Carmesi",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_033%3ADante%20Ember&size=512&backgroundColor=fbe7a8",
-      "baseValue": 630
+      "baseValue": 630,
+      "description": "Reliquia Dante Ember forjada en el umbral de Forja Carmesi. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_034",
       "name": "Isla Thorn",
       "series": "Forja Carmesi",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_034%3AIsla%20Thorn&size=512&backgroundColor=dcc8ff",
-      "baseValue": 188
+      "baseValue": 188,
+      "description": "Emblema místico de Forja Carmesi. Isla Thorn canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_035",
       "name": "Owen Pike",
       "series": "Forja Carmesi",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_035%3AOwen%20Pike&size=512&backgroundColor=cfe9ff",
-      "baseValue": 84
+      "baseValue": 84,
+      "description": "Curio ritual descubierto en Forja Carmesi. Owen Pike aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_036",
       "name": "Faye Copper",
       "series": "Forja Carmesi",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_036%3AFaye%20Copper&size=512&backgroundColor=e7ebf2",
-      "baseValue": 27
+      "baseValue": 27,
+      "description": "Fetiche reciente de Forja Carmesi. Faye Copper pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_037",
       "name": "Helix Nova",
       "series": "Protocolo Neon",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_037%3AHelix%20Nova&size=512&backgroundColor=fbe7a8",
-      "baseValue": 600
+      "baseValue": 600,
+      "description": "Reliquia Helix Nova forjada en el umbral de Protocolo Neon. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_038",
       "name": "Quinn Relay",
       "series": "Protocolo Neon",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_038%3AQuinn%20Relay&size=512&backgroundColor=dcc8ff",
-      "baseValue": 198
+      "baseValue": 198,
+      "description": "Emblema místico de Protocolo Neon. Quinn Relay canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_039",
       "name": "Mara Pulse",
       "series": "Protocolo Neon",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_039%3AMara%20Pulse&size=512&backgroundColor=cfe9ff",
-      "baseValue": 79
+      "baseValue": 79,
+      "description": "Curio ritual descubierto en Protocolo Neon. Mara Pulse aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_040",
       "name": "Taro Byte",
       "series": "Protocolo Neon",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_040%3ATaro%20Byte&size=512&backgroundColor=e7ebf2",
-      "baseValue": 24
+      "baseValue": 24,
+      "description": "Fetiche reciente de Protocolo Neon. Taro Byte pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_041",
       "name": "Sable Crown",
       "series": "Archivo Onirico",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_041%3ASable%20Crown&size=512&backgroundColor=fbe7a8",
-      "baseValue": 615
+      "baseValue": 615,
+      "description": "Reliquia Sable Crown forjada en el umbral de Archivo Onirico. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_042",
       "name": "Vera Mist",
       "series": "Archivo Onirico",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_042%3AVera%20Mist&size=512&backgroundColor=dcc8ff",
-      "baseValue": 182
+      "baseValue": 182,
+      "description": "Emblema místico de Archivo Onirico. Vera Mist canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_043",
       "name": "Ivo Shade",
       "series": "Archivo Onirico",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_043%3AIvo%20Shade&size=512&backgroundColor=cfe9ff",
-      "baseValue": 81
+      "baseValue": 81,
+      "description": "Curio ritual descubierto en Archivo Onirico. Ivo Shade aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_044",
       "name": "Poppy Lane",
       "series": "Archivo Onirico",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_044%3APoppy%20Lane&size=512&backgroundColor=e7ebf2",
-      "baseValue": 25
+      "baseValue": 25,
+      "description": "Fetiche reciente de Archivo Onirico. Poppy Lane pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_045",
       "name": "Atlas Rift",
       "series": "Gremio del Alba",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_045%3AAtlas%20Rift&size=512&backgroundColor=fbe7a8",
-      "baseValue": 605
+      "baseValue": 605,
+      "description": "Reliquia Atlas Rift forjada en el umbral de Gremio del Alba. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_046",
       "name": "Nora Bloom",
       "series": "Gremio del Alba",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_046%3ANora%20Bloom&size=512&backgroundColor=dcc8ff",
-      "baseValue": 192
+      "baseValue": 192,
+      "description": "Emblema místico de Gremio del Alba. Nora Bloom canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_047",
       "name": "Kian Orbit",
       "series": "Gremio del Alba",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_047%3AKian%20Orbit&size=512&backgroundColor=cfe9ff",
-      "baseValue": 77
+      "baseValue": 77,
+      "description": "Curio ritual descubierto en Gremio del Alba. Kian Orbit aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_048",
       "name": "Eli Wisp",
       "series": "Gremio del Alba",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_048%3AEli%20Wisp&size=512&backgroundColor=e7ebf2",
-      "baseValue": 22
+      "baseValue": 22,
+      "description": "Fetiche reciente de Gremio del Alba. Eli Wisp pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_049",
       "name": "Mythra Veil",
       "series": "Corte de Cristal",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_049%3AMythra%20Veil&size=512&backgroundColor=fbe7a8",
-      "baseValue": 650
+      "baseValue": 650,
+      "description": "Reliquia Mythra Veil forjada en el umbral de Corte de Cristal. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_050",
       "name": "Rowan Cipher",
       "series": "Corte de Cristal",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_050%3ARowan%20Cipher&size=512&backgroundColor=dcc8ff",
-      "baseValue": 215
+      "baseValue": 215,
+      "description": "Emblema místico de Corte de Cristal. Rowan Cipher canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_051",
       "name": "Eyed Merchant",
       "series": "EyedBot Collection",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_051%3AEyed%20Merchant&size=512&backgroundColor=fbe7a8",
-      "baseValue": 620
+      "baseValue": 620,
+      "description": "Reliquia Eyed Merchant forjada en el umbral de EyedBot Collection. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_052",
       "name": "Eyed Broker",
       "series": "EyedBot Collection",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_052%3AEyed%20Broker&size=512&backgroundColor=dcc8ff",
-      "baseValue": 210
+      "baseValue": 210,
+      "description": "Emblema místico de EyedBot Collection. Eyed Broker canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_053",
       "name": "Eyed Trader",
       "series": "EyedBot Collection",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_053%3AEyed%20Trader&size=512&backgroundColor=cfe9ff",
-      "baseValue": 86
+      "baseValue": 86,
+      "description": "Curio ritual descubierto en EyedBot Collection. Eyed Trader aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_054",
       "name": "Eyed Vendor",
       "series": "EyedBot Collection",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_054%3AEyed%20Vendor&size=512&backgroundColor=e7ebf2",
-      "baseValue": 29
+      "baseValue": 29,
+      "description": "Fetiche reciente de EyedBot Collection. Eyed Vendor pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_055",
       "name": "Nova Bazaar",
       "series": "Mercado Nocturno",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_055%3ANova%20Bazaar&size=512&backgroundColor=fbe7a8",
-      "baseValue": 595
+      "baseValue": 595,
+      "description": "Reliquia Nova Bazaar forjada en el umbral de Mercado Nocturno. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_056",
       "name": "Riven Market",
       "series": "Mercado Nocturno",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_056%3ARiven%20Market&size=512&backgroundColor=dcc8ff",
-      "baseValue": 178
+      "baseValue": 178,
+      "description": "Emblema místico de Mercado Nocturno. Riven Market canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     },
     {
       "id": "ch_057",
       "name": "Sable Exchange",
       "series": "Mercado Nocturno",
       "rarity": "R",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_057%3ASable%20Exchange&size=512&backgroundColor=cfe9ff",
-      "baseValue": 83
+      "baseValue": 83,
+      "description": "Curio ritual descubierto en Mercado Nocturno. Sable Exchange aún guarda ecos de un juramento sellado antes del Descenso."
     },
     {
       "id": "ch_058",
       "name": "Copper Stall",
       "series": "Mercado Nocturno",
       "rarity": "N",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_058%3ACopper%20Stall&size=512&backgroundColor=e7ebf2",
-      "baseValue": 27
+      "baseValue": 27,
+      "description": "Fetiche reciente de Mercado Nocturno. Copper Stall pulsa con una duda luminosa y enseña el primer paso hacia lo oculto."
     },
     {
       "id": "ch_059",
       "name": "Prism Curator",
       "series": "Coleccion Estelar",
       "rarity": "SSR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_059%3APrism%20Curator&size=512&backgroundColor=fbe7a8",
-      "baseValue": 608
+      "baseValue": 608,
+      "description": "Reliquia Prism Curator forjada en el umbral de Coleccion Estelar. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio."
     },
     {
       "id": "ch_060",
       "name": "Orbit Keeper",
       "series": "Coleccion Estelar",
       "rarity": "SR",
-      "imageUrl": "https://api.dicebear.com/7.x/lorelei/png?seed=ch_060%3AOrbit%20Keeper&size=512&backgroundColor=dcc8ff",
-      "baseValue": 202
+      "baseValue": 202,
+      "description": "Emblema místico de Coleccion Estelar. Orbit Keeper canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión."
     }
   ]
 }

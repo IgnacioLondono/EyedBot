@@ -8,14 +8,6 @@ const BUNDLED_CHARACTERS_PATH = path.join(__dirname, '..', 'bundled', 'gacha-cha
 const SYSTEM_MARKET_SELLER_ID = 'system';
 const DEFAULT_MARKET_LISTING_COUNT = 16;
 
-const CHARACTER_PORTRAIT_STYLE = 'lorelei';
-const CHARACTER_PORTRAIT_BACKGROUNDS = {
-    SSR: 'fbe7a8',
-    SR: 'dcc8ff',
-    R: 'cfe9ff',
-    N: 'e7ebf2'
-};
-
 const FALLBACK_CHARACTERS = [
     { id: 'ch_fb_001', name: 'Aira Nova', series: 'Celestial Archive', rarity: 'SSR', baseValue: 500 },
     { id: 'ch_fb_002', name: 'Kael Draven', series: 'Celestial Archive', rarity: 'SR', baseValue: 180 },
@@ -92,23 +84,20 @@ function resolveCharactersPath() {
     return CHARACTERS_PATH;
 }
 
-function buildCharacterPortraitUrl(character = {}) {
-    const id = String(character.id || 'eyedbot').trim();
-    const name = String(character.name || 'character').trim();
+function buildDefaultCharacterDescription(character = {}) {
+    const name = String(character.name || 'Artefacto').trim();
+    const series = String(character.series || 'Colección desconocida').trim();
     const rarity = ['SSR', 'SR', 'R', 'N'].includes(String(character.rarity || 'N').toUpperCase())
         ? String(character.rarity).toUpperCase()
         : 'N';
-    const seed = encodeURIComponent(`${id}:${name}`);
-    const backgroundColor = CHARACTER_PORTRAIT_BACKGROUNDS[rarity] || CHARACTER_PORTRAIT_BACKGROUNDS.N;
-    return `https://api.dicebear.com/7.x/${CHARACTER_PORTRAIT_STYLE}/png?seed=${seed}&size=512&backgroundColor=${backgroundColor}`;
-}
+    const flavor = {
+        SSR: `Reliquia ${name} forjada en el umbral de ${series}. Se dice que despierta portales antiguos y que solo unos pocos elegidos pueden portarla sin perder el juicio.`,
+        SR: `Emblema místico de ${series}. ${name} canaliza siglos de conjuros dormidos y deja un rastro de ceniza arcana tras cada misión.`,
+        R: `Curio ritual descubierto en ${series}. ${name} aún guarda ecos de un juramento sellado antes del Descenso.`,
+        N: `Fetiche reciente de ${series}. ${name} pulsa con una duda luminosa y enseña el primer paso hacia lo oculto.`
+    };
 
-function shouldRewriteCharacterImageUrl(url = '') {
-    const value = String(url || '').trim().toLowerCase();
-    if (!value) return true;
-    if (value.includes('imgur.com')) return true;
-    if (value.includes('api.dicebear.com/7.x/adventurer/')) return true;
-    return false;
+    return flavor[rarity] || flavor.N;
 }
 
 function normalizeCharacterRecord(item = {}) {
@@ -116,19 +105,40 @@ function normalizeCharacterRecord(item = {}) {
     const name = String(item.name || 'Unknown');
     const series = String(item.series || 'Original');
     const rarity = ['SSR', 'SR', 'R', 'N'].includes(String(item.rarity || 'N').toUpperCase()) ? String(item.rarity).toUpperCase() : 'N';
-    const explicitImageUrl = String(item.imageUrl || '').trim();
-    const imageUrl = shouldRewriteCharacterImageUrl(explicitImageUrl)
-        ? buildCharacterPortraitUrl({ id, name, rarity })
-        : explicitImageUrl;
+    const description = String(item.description || '').trim() || buildDefaultCharacterDescription({ name, series, rarity });
 
     return {
         id,
         name,
         series,
         rarity,
-        imageUrl,
+        description,
         baseValue: Math.max(1, Number.parseInt(`${item.baseValue || 10}`, 10) || 10)
     };
+}
+
+function applyCatalogOverride(character = {}, override = {}) {
+    if (!override || typeof override !== 'object') return normalizeCharacterRecord(character);
+    return normalizeCharacterRecord({
+        ...character,
+        ...override,
+        id: character.id
+    });
+}
+
+function normalizeCatalogOverride(raw = {}, base = {}) {
+    const patch = {};
+    if (raw.name !== undefined) patch.name = String(raw.name || '').trim().slice(0, 80);
+    if (raw.series !== undefined) patch.series = String(raw.series || '').trim().slice(0, 120);
+    if (raw.description !== undefined) patch.description = String(raw.description || '').trim().slice(0, 900);
+    if (raw.baseValue !== undefined) {
+        patch.baseValue = Math.max(1, Number.parseInt(`${raw.baseValue || base.baseValue || 10}`, 10) || 1);
+    }
+    if (raw.rarity !== undefined) {
+        const rarity = String(raw.rarity || base.rarity || 'N').toUpperCase();
+        if (['SSR', 'SR', 'R', 'N'].includes(rarity)) patch.rarity = rarity;
+    }
+    return patch;
 }
 
 function ensureCharacterCatalogFile() {
@@ -281,14 +291,19 @@ function defaultProfile(userId = '') {
 }
 
 function normalizeInventoryItem(raw = {}) {
+    const name = String(raw.name || 'Unknown');
+    const series = String(raw.series || 'Original');
+    const rarity = ['SSR', 'SR', 'R', 'N'].includes(String(raw.rarity || 'N').toUpperCase()) ? String(raw.rarity).toUpperCase() : 'N';
+    const description = String(raw.description || '').trim() || buildDefaultCharacterDescription({ name, series, rarity });
+
     return {
         uid: String(raw.uid || `inv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
         characterId: String(raw.characterId || ''),
-        name: String(raw.name || 'Unknown'),
-        series: String(raw.series || 'Original'),
-        rarity: ['SSR', 'SR', 'R', 'N'].includes(String(raw.rarity || 'N').toUpperCase()) ? String(raw.rarity).toUpperCase() : 'N',
+        name,
+        series,
+        rarity,
+        description,
         value: Math.max(1, Number.parseInt(`${raw.value || 10}`, 10) || 10),
-        imageUrl: String(raw.imageUrl || '').trim(),
         obtainedAt: Number.parseInt(`${raw.obtainedAt || Date.now()}`, 10) || Date.now()
     };
 }
@@ -364,8 +379,8 @@ function buildInventoryEntry(character = {}) {
         name: character.name,
         series: character.series,
         rarity: character.rarity,
+        description: character.description,
         value: variance,
-        imageUrl: character.imageUrl,
         obtainedAt: Date.now()
     });
 }
@@ -721,8 +736,57 @@ function getShopPrice(character = {}, config = {}) {
     return Math.max(1, Math.round(base * multiplier * boost));
 }
 
-function getShopCatalog(config = {}) {
-    return getCharacterPool().map((character) => ({
+async function getGuildCatalogOverrides(guildId) {
+    const key = `gacha_catalog_${guildId}`;
+    const fromCache = cacheGet(key);
+    if (fromCache !== null) return fromCache;
+
+    let overrides = {};
+    try {
+        const fromDb = await db.get(key);
+        if (fromDb && typeof fromDb === 'object' && !Array.isArray(fromDb)) {
+            overrides = fromDb;
+        }
+    } catch {}
+
+    if (!Object.keys(overrides).length) {
+        const store = readStore();
+        const fromFile = store.guilds[guildId]?.catalog;
+        if (fromFile && typeof fromFile === 'object' && !Array.isArray(fromFile)) {
+            overrides = fromFile;
+        }
+    }
+
+    cacheSet(key, overrides);
+    return overrides;
+}
+
+async function setGuildCatalogOverrides(guildId, overrides = {}) {
+    const key = `gacha_catalog_${guildId}`;
+    const normalized = overrides && typeof overrides === 'object' && !Array.isArray(overrides) ? overrides : {};
+    try { await db.set(key, normalized); } catch {}
+
+    const store = readStore();
+    if (!store.guilds[guildId]) {
+        store.guilds[guildId] = { config: defaultConfig(), profiles: {}, pending: {}, market: [], catalog: {} };
+    }
+    store.guilds[guildId].catalog = normalized;
+    writeStore(store);
+    cacheSet(key, normalized);
+    return normalized;
+}
+
+async function getGuildCharacterPool(guildId) {
+    const base = getCharacterPool();
+    if (!guildId) return base;
+
+    const overrides = await getGuildCatalogOverrides(guildId);
+    return base.map((character) => applyCatalogOverride(character, overrides[character.id]));
+}
+
+async function getShopCatalog(guildId, config = {}) {
+    const pool = await getGuildCharacterPool(guildId);
+    return pool.map((character) => ({
         ...character,
         price: getShopPrice(character, config)
     })).sort((left, right) => getShopPrice(right, config) - getShopPrice(left, config));
@@ -735,15 +799,38 @@ function buildCatalogMarketItem(character = {}) {
         name: character.name,
         series: character.series,
         rarity: character.rarity,
+        description: character.description,
         value: character.baseValue,
-        imageUrl: character.imageUrl,
         obtainedAt: Date.now()
     });
 }
 
+async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, updatedBy = 'system') {
+    const base = getCharacterPool().find((item) => item.id === String(characterId || ''));
+    if (!base) return { ok: false, reason: 'item_not_found' };
+
+    const patch = normalizeCatalogOverride(rawPatch, base);
+    if (!Object.keys(patch).length) return { ok: false, reason: 'empty_patch' };
+
+    const overrides = await getGuildCatalogOverrides(guildId);
+    const nextEntry = {
+        ...(overrides[base.id] || {}),
+        ...patch,
+        updatedAt: new Date().toISOString(),
+        updatedBy: String(updatedBy || 'system')
+    };
+    overrides[base.id] = nextEntry;
+    await setGuildCatalogOverrides(guildId, overrides);
+
+    return {
+        ok: true,
+        item: applyCatalogOverride(base, nextEntry)
+    };
+}
+
 async function ensureGuildEconomyContent(guildId) {
     const config = await getConfig(guildId);
-    const catalog = getShopCatalog(config);
+    const catalog = await getShopCatalog(guildId, config);
     if (!catalog.length) return;
 
     const market = await getGuildMarket(guildId);
@@ -754,8 +841,13 @@ async function ensureGuildEconomyContent(guildId) {
         if (row.sellerId !== SYSTEM_MARKET_SELLER_ID) continue;
         const character = byCharacterId.get(String(row.item?.characterId || ''));
         if (!character) continue;
-        if (row.item.imageUrl !== character.imageUrl) {
-            row.item.imageUrl = character.imageUrl;
+        const nextItem = buildCatalogMarketItem(character);
+        const current = normalizeInventoryItem(row.item || {});
+        if (current.name !== nextItem.name
+            || current.series !== nextItem.series
+            || current.rarity !== nextItem.rarity
+            || current.description !== nextItem.description) {
+            row.item = nextItem;
             marketChanged = true;
         }
     }
@@ -818,7 +910,8 @@ async function purchaseShopCharacter(guildId, userId, characterId = '') {
         return { ok: false, reason: 'shop_disabled' };
     }
 
-    const character = getCharacterPool().find((item) => item.id === String(characterId || ''));
+    const pool = await getGuildCharacterPool(guildId);
+    const character = pool.find((item) => item.id === String(characterId || ''));
     if (!character) return { ok: false, reason: 'item_not_found' };
 
     const price = getShopPrice(character, config);
@@ -881,6 +974,8 @@ module.exports = {
     getGuildStats,
     getShopPrice,
     getShopCatalog,
+    getGuildCharacterPool,
+    setGuildCatalogItem,
     ensureGuildEconomyContent,
     addCoins,
     trySpendCoins,
