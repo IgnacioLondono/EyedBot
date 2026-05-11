@@ -8,15 +8,23 @@ const BUNDLED_CHARACTERS_PATH = path.join(__dirname, '..', 'bundled', 'gacha-cha
 const SYSTEM_MARKET_SELLER_ID = 'system';
 const DEFAULT_MARKET_LISTING_COUNT = 16;
 
+const CHARACTER_PORTRAIT_STYLE = 'lorelei';
+const CHARACTER_PORTRAIT_BACKGROUNDS = {
+    SSR: 'fbe7a8',
+    SR: 'dcc8ff',
+    R: 'cfe9ff',
+    N: 'e7ebf2'
+};
+
 const FALLBACK_CHARACTERS = [
-    { id: 'ch_fb_001', name: 'Aira Nova', series: 'Celestial Archive', rarity: 'SSR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=aira-nova', baseValue: 500 },
-    { id: 'ch_fb_002', name: 'Kael Draven', series: 'Celestial Archive', rarity: 'SR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=kael-draven', baseValue: 180 },
-    { id: 'ch_fb_003', name: 'Mira Elowen', series: 'Moonlit Engine', rarity: 'R', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=mira-elowen', baseValue: 70 },
-    { id: 'ch_fb_004', name: 'Ren Azuki', series: 'Moonlit Engine', rarity: 'N', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=ren-azuki', baseValue: 25 },
-    { id: 'ch_fb_005', name: 'Eyed Sentinel', series: 'EyedBot Collection', rarity: 'SSR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-sentinel', baseValue: 640 },
-    { id: 'ch_fb_006', name: 'Eyed Courier', series: 'EyedBot Collection', rarity: 'SR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-courier', baseValue: 195 },
-    { id: 'ch_fb_007', name: 'Eyed Scout', series: 'EyedBot Collection', rarity: 'R', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-scout', baseValue: 88 },
-    { id: 'ch_fb_008', name: 'Eyed Spark', series: 'EyedBot Collection', rarity: 'N', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-spark', baseValue: 28 }
+    { id: 'ch_fb_001', name: 'Aira Nova', series: 'Celestial Archive', rarity: 'SSR', baseValue: 500 },
+    { id: 'ch_fb_002', name: 'Kael Draven', series: 'Celestial Archive', rarity: 'SR', baseValue: 180 },
+    { id: 'ch_fb_003', name: 'Mira Elowen', series: 'Moonlit Engine', rarity: 'R', baseValue: 70 },
+    { id: 'ch_fb_004', name: 'Ren Azuki', series: 'Moonlit Engine', rarity: 'N', baseValue: 25 },
+    { id: 'ch_fb_005', name: 'Eyed Sentinel', series: 'EyedBot Collection', rarity: 'SSR', baseValue: 640 },
+    { id: 'ch_fb_006', name: 'Eyed Courier', series: 'EyedBot Collection', rarity: 'SR', baseValue: 195 },
+    { id: 'ch_fb_007', name: 'Eyed Scout', series: 'EyedBot Collection', rarity: 'R', baseValue: 88 },
+    { id: 'ch_fb_008', name: 'Eyed Spark', series: 'EyedBot Collection', rarity: 'N', baseValue: 28 }
 ];
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
 const cache = new Map();
@@ -84,13 +92,41 @@ function resolveCharactersPath() {
     return CHARACTERS_PATH;
 }
 
+function buildCharacterPortraitUrl(character = {}) {
+    const id = String(character.id || 'eyedbot').trim();
+    const name = String(character.name || 'character').trim();
+    const rarity = ['SSR', 'SR', 'R', 'N'].includes(String(character.rarity || 'N').toUpperCase())
+        ? String(character.rarity).toUpperCase()
+        : 'N';
+    const seed = encodeURIComponent(`${id}:${name}`);
+    const backgroundColor = CHARACTER_PORTRAIT_BACKGROUNDS[rarity] || CHARACTER_PORTRAIT_BACKGROUNDS.N;
+    return `https://api.dicebear.com/7.x/${CHARACTER_PORTRAIT_STYLE}/png?seed=${seed}&size=512&backgroundColor=${backgroundColor}`;
+}
+
+function shouldRewriteCharacterImageUrl(url = '') {
+    const value = String(url || '').trim().toLowerCase();
+    if (!value) return true;
+    if (value.includes('imgur.com')) return true;
+    if (value.includes('api.dicebear.com/7.x/adventurer/')) return true;
+    return false;
+}
+
 function normalizeCharacterRecord(item = {}) {
+    const id = String(item.id || `ch_${Date.now()}`);
+    const name = String(item.name || 'Unknown');
+    const series = String(item.series || 'Original');
+    const rarity = ['SSR', 'SR', 'R', 'N'].includes(String(item.rarity || 'N').toUpperCase()) ? String(item.rarity).toUpperCase() : 'N';
+    const explicitImageUrl = String(item.imageUrl || '').trim();
+    const imageUrl = shouldRewriteCharacterImageUrl(explicitImageUrl)
+        ? buildCharacterPortraitUrl({ id, name, rarity })
+        : explicitImageUrl;
+
     return {
-        id: String(item.id || `ch_${Date.now()}`),
-        name: String(item.name || 'Unknown'),
-        series: String(item.series || 'Original'),
-        rarity: ['SSR', 'SR', 'R', 'N'].includes(String(item.rarity || 'N').toUpperCase()) ? String(item.rarity).toUpperCase() : 'N',
-        imageUrl: String(item.imageUrl || '').trim(),
+        id,
+        name,
+        series,
+        rarity,
+        imageUrl,
         baseValue: Math.max(1, Number.parseInt(`${item.baseValue || 10}`, 10) || 10)
     };
 }
@@ -711,30 +747,48 @@ async function ensureGuildEconomyContent(guildId) {
     if (!catalog.length) return;
 
     const market = await getGuildMarket(guildId);
+    const byCharacterId = new Map(catalog.map((character) => [character.id, character]));
+    let marketChanged = false;
+
+    for (const row of market) {
+        if (row.sellerId !== SYSTEM_MARKET_SELLER_ID) continue;
+        const character = byCharacterId.get(String(row.item?.characterId || ''));
+        if (!character) continue;
+        if (row.item.imageUrl !== character.imageUrl) {
+            row.item.imageUrl = character.imageUrl;
+            marketChanged = true;
+        }
+    }
+
     const systemListings = market.filter((row) => row.sellerId === SYSTEM_MARKET_SELLER_ID);
-    if (systemListings.length >= 8) return;
+    if (systemListings.length < 8) {
+        const listedCharacterIds = new Set(
+            market
+                .map((row) => row.item?.characterId)
+                .filter(Boolean)
+        );
 
-    const listedCharacterIds = new Set(
-        market
-            .map((row) => row.item?.characterId)
-            .filter(Boolean)
-    );
+        const seeded = catalog
+            .filter((character) => !listedCharacterIds.has(character.id))
+            .slice(0, DEFAULT_MARKET_LISTING_COUNT)
+            .map((character, index) => ({
+                id: `mk_seed_${character.id}`,
+                sellerId: SYSTEM_MARKET_SELLER_ID,
+                source: 'catalog',
+                item: buildCatalogMarketItem(character),
+                price: Math.max(1, Math.round((character.price || getShopPrice(character, config)) * 0.9)),
+                createdAt: Date.now() - index * 120000
+            }));
 
-    const seeded = catalog
-        .filter((character) => !listedCharacterIds.has(character.id))
-        .slice(0, DEFAULT_MARKET_LISTING_COUNT)
-        .map((character, index) => ({
-            id: `mk_seed_${character.id}`,
-            sellerId: SYSTEM_MARKET_SELLER_ID,
-            source: 'catalog',
-            item: buildCatalogMarketItem(character),
-            price: Math.max(1, Math.round((character.price || getShopPrice(character, config)) * 0.9)),
-            createdAt: Date.now() - index * 120000
-        }));
+        if (seeded.length) {
+            await setGuildMarket(guildId, [...seeded, ...market]);
+            return;
+        }
+    }
 
-    if (!seeded.length) return;
-
-    await setGuildMarket(guildId, [...seeded, ...market]);
+    if (marketChanged) {
+        await setGuildMarket(guildId, market);
+    }
 }
 
 async function addCoins(guildId, userId, amount = 0) {
