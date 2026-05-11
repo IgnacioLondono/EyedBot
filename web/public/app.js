@@ -4312,6 +4312,27 @@ function bindDpxTabs(container, options = {}) {
     }
 }
 
+/** Subpestañas dentro de Notificaciones → Directos (no usar data-dpx-tab para no mezclar con el panel principal). */
+function bindStreamDirectosSubtabs(rootEl) {
+    if (!rootEl) return;
+    const tabs = Array.from(rootEl.querySelectorAll('[data-stream-subtab]'));
+    const panels = Array.from(rootEl.querySelectorAll('[data-stream-subpanel]'));
+    if (!tabs.length || !panels.length) return;
+
+    const activate = (key) => {
+        tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-stream-subtab') === key));
+        panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-stream-subpanel') === key));
+    };
+
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => activate(tab.getAttribute('data-stream-subtab')));
+    });
+
+    if (!tabs.some((t) => t.classList.contains('is-active'))) {
+        activate(tabs[0].getAttribute('data-stream-subtab'));
+    }
+}
+
 function dpxIcon(name = '', className = 'dpx-icon') {
     const paths = {
         gear: '<circle cx="10" cy="10" r="3"/><path d="M10 1v3M10 16v3M4.22 4.22l2.12 2.12M13.66 13.66l2.12 2.12M1 10h3M16 10h3M4.22 15.78l2.12-2.12M13.66 6.34l2.12-2.12"/>',
@@ -5185,12 +5206,114 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
     };
     let streamSourcesSearchQuery = '';
 
+    const streamUrlPlaceholders = {
+        twitch: 'https://www.twitch.tv/usuario',
+        youtube: 'https://www.youtube.com/channel/UC… o /@usuario',
+        tiktok: 'URL del perfil o feed RSS alternativo',
+        custom: 'https://ejemplo.com/página-con-feed'
+    };
+
+    function extractTwitchLoginClient(url, name) {
+        const u = String(url || '').trim();
+        const match = u.match(/twitch\.tv\/([^/?#]+)/i);
+        if (match?.[1]) return String(match[1]).replace(/^@/, '').trim().toLowerCase();
+        return String(name || '').replace(/^@/, '').trim().toLowerCase();
+    }
+
+    function applyPlatformHintsToCard(card) {
+        if (!card) return;
+        const platform = card.querySelector('.stream-source-platform')?.value || 'custom';
+        const urlInput = card.querySelector('.stream-source-url');
+        const feedInput = card.querySelector('.stream-source-feed');
+        const imgLabel = card.querySelector('.stream-source-image-label');
+        if (urlInput) urlInput.placeholder = streamUrlPlaceholders[platform] || streamUrlPlaceholders.custom;
+        if (feedInput) {
+            feedInput.placeholder = platform === 'youtube'
+                ? 'Opcional: feed XML del canal'
+                : 'Opcional: https://…/feed.xml o Atom';
+        }
+        if (imgLabel) {
+            imgLabel.textContent = platform === 'twitch'
+                ? 'Imagen si no hay API de Twitch (opcional)'
+                : 'Imagen fallback / miniatura fija (opcional)';
+        }
+    }
+
+    const bumpTwitchPreviews = debounce(() => {
+        document.querySelectorAll('#streamSourcesList .stream-source-card').forEach((card) => {
+            refreshTwitchCardPreview(card);
+        });
+    }, 480);
+
+    async function refreshTwitchCardPreview(card) {
+        const row = card.querySelector('[data-twitch-preview-row]');
+        if (!row) return;
+
+        const platform = card.querySelector('.stream-source-platform')?.value;
+        if (platform !== 'twitch') {
+            row.style.display = 'none';
+            return;
+        }
+
+        row.style.display = '';
+        const url = card.querySelector('.stream-source-url')?.value || '';
+        const name = card.querySelector('.stream-source-name')?.value || '';
+        const login = extractTwitchLoginClient(url, name);
+
+        const img = card.querySelector('.stream-twitch-preview-img');
+        const badge = card.querySelector('.stream-twitch-preview-badge');
+        const hint = card.querySelector('.stream-twitch-preview-hint');
+
+        if (!login) {
+            if (img) img.removeAttribute('src');
+            if (badge) {
+                badge.textContent = '';
+                badge.classList.remove('is-live');
+            }
+            if (hint) hint.textContent = 'Indica la URL de Twitch o el nombre del canal para cargar la miniatura.';
+            return;
+        }
+
+        if (hint) hint.textContent = 'Cargando vista previa…';
+        try {
+            const qs = new URLSearchParams({ login });
+            const response = await fetchWithCredentials(`/api/guild/${guildId}/twitch-live-preview?${qs.toString()}`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'Error');
+
+            if (img && data.previewUrl) img.src = data.previewUrl;
+            if (badge) {
+                badge.textContent = data.live ? 'EN VIVO' : 'Sin emisión';
+                badge.classList.toggle('is-live', !!data.live);
+            }
+            if (hint) {
+                if (data.live && data.title) hint.textContent = data.title;
+                else if (data.live) hint.textContent = 'Directo activo.';
+                else hint.textContent = 'Canal sin directo ahora (miniatura estática de Twitch).';
+            }
+        } catch {
+            if (img) img.removeAttribute('src');
+            if (badge) {
+                badge.textContent = '';
+                badge.classList.remove('is-live');
+            }
+            if (hint) {
+                hint.textContent = 'No se pudo cargar la miniatura. Configura TWITCH_CLIENT_ID y TWITCH_CLIENT_SECRET en el servidor.';
+            }
+        }
+    }
+
     const platformIconNames = { twitch: 'twitch', youtube: 'youtube', tiktok: 'tiktok', custom: 'rss' };
     const platformLabels = { twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok', custom: 'Custom / RSS' };
     const sourceCardHtml = (source, index) => {
         const platform = String(source.platform || 'custom');
         const platformLabel = platformLabels[platform] || 'Custom';
         const platformIconName = platformIconNames[platform] || 'rss';
+        const urlPh = streamUrlPlaceholders[platform] || streamUrlPlaceholders.custom;
+        const feedPh = platform === 'youtube' ? 'Opcional: feed XML del canal' : 'Opcional: https://…/feed.xml';
+        const imgLabelText = platform === 'twitch'
+            ? 'Imagen si no hay API de Twitch (opcional)'
+            : 'Imagen fallback / miniatura fija (opcional)';
         return `
         <div class="stream-source-card dpx-item-card" data-index="${index}">
             <div class="dpx-item-head">
@@ -5220,19 +5343,28 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
                 </div>
                 <div class="dpx-field">
                     <label>Nombre</label>
-                    <input type="text" class="form-control stream-source-name" value="${escapeHtmlForValue(source.name || '')}" placeholder="Nombre de fuente">
+                    <input type="text" class="form-control stream-source-name" value="${escapeHtmlForValue(source.name || '')}" placeholder="Nombre visible en el aviso">
                 </div>
                 <div class="dpx-field is-full">
                     <label>URL canal / perfil</label>
-                    <input type="url" class="form-control stream-source-url" value="${escapeHtmlForValue(source.url || '')}" placeholder="https://...">
+                    <input type="url" class="form-control stream-source-url" value="${escapeHtmlForValue(source.url || '')}" placeholder="${escapeHtmlForValue(urlPh)}">
                 </div>
                 <div class="dpx-field is-full">
                     <label>Feed RSS / Atom (opcional)</label>
-                    <input type="url" class="form-control stream-source-feed" value="${escapeHtmlForValue(source.feedUrl || '')}" placeholder="https://.../feed.xml">
+                    <input type="url" class="form-control stream-source-feed" value="${escapeHtmlForValue(source.feedUrl || '')}" placeholder="${escapeHtmlForValue(feedPh)}">
                 </div>
                 <div class="dpx-field is-full">
-                    <label>Imagen fallback (opcional)</label>
+                    <label class="stream-source-image-label">${escapeHtml(imgLabelText)}</label>
                     <input type="url" class="form-control stream-source-image" value="${escapeHtmlForValue(source.imageUrl || '')}" placeholder="https://.../image.jpg">
+                </div>
+            </div>
+            <div class="stream-twitch-preview-row" data-twitch-preview-row style="display:none;">
+                <div class="stream-twitch-preview-inner">
+                    <div class="stream-twitch-preview-thumb-wrap">
+                        <img class="stream-twitch-preview-img" alt="Miniatura Twitch" width="320" height="180" loading="lazy" decoding="async" />
+                        <span class="stream-twitch-preview-badge" aria-live="polite"></span>
+                    </div>
+                    <p class="stream-twitch-preview-hint"></p>
                 </div>
             </div>
             <input type="hidden" class="stream-source-id" value="${escapeHtmlForValue(source.id || `src_${Date.now()}_${index}`)}">
@@ -5257,7 +5389,10 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
             });
         });
 
+        listEl.querySelectorAll('.stream-source-card').forEach((card) => applyPlatformHintsToCard(card));
+
         applyStreamSourcesFilter(streamSourcesSearchQuery);
+        bumpTwitchPreviews();
     }
 
     function applyStreamSourcesFilter(query = '') {
@@ -5299,11 +5434,32 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
             descriptionTemplate: document.getElementById('streamAlertsDescriptionTemplate')?.value || '{title}\n{url}',
             color: (document.getElementById('streamAlertsColor')?.value || '#7c4dff').replace('#', ''),
             footerText: document.getElementById('streamAlertsFooter')?.value || 'EyedBot Stream Alerts',
+            embedLargePreview: document.getElementById('streamAlertsEmbedLargePreview')?.checked ?? true,
             sources: collectStreamSourcesFromDom()
         };
     }
 
     renderStreamSources();
+
+    const streamSourcesListEl = document.getElementById('streamSourcesList');
+    if (streamSourcesListEl && !streamSourcesListEl.dataset.twitchPreviewDelegated) {
+        streamSourcesListEl.dataset.twitchPreviewDelegated = '1';
+        streamSourcesListEl.addEventListener('change', (event) => {
+            const target = event.target;
+            if (target && target.classList && target.classList.contains('stream-source-platform')) {
+                applyPlatformHintsToCard(target.closest('.stream-source-card'));
+                bumpTwitchPreviews();
+            }
+        });
+        streamSourcesListEl.addEventListener('input', (event) => {
+            const target = event.target;
+            if (!target || !target.classList) return;
+            if (
+                target.classList.contains('stream-source-url')
+                || target.classList.contains('stream-source-name')
+            ) bumpTwitchPreviews();
+        });
+    }
 
     const streamSourcesSearchInput = document.getElementById('streamSourcesSearch');
     if (streamSourcesSearchInput) {
@@ -5411,6 +5567,7 @@ async function loadNotificationsPanel(guildId) {
         descriptionTemplate: '{title}\n{url}',
         color: '7c4dff',
         footerText: 'EyedBot Stream Alerts',
+        embedLargePreview: true,
         sources: []
     };
     let streamConfig = { ...defaultStream };
@@ -5430,6 +5587,7 @@ async function loadNotificationsPanel(guildId) {
             streamConfig = {
                 ...defaultStream,
                 ...s,
+                embedLargePreview: s.embedLargePreview !== false,
                 sources: Array.isArray(s.sources) ? s.sources : defaultStream.sources
             };
         } catch (e) {
@@ -5524,69 +5682,88 @@ async function loadNotificationsPanel(guildId) {
             </section>
 
             <section class="dpx-tab-panel" data-dpx-panel="stream-directos">
-                <div class="dpx-section">
+                <div class="dpx-section stream-directos-section">
                     <div class="dpx-section-head">
                         <div class="dpx-section-head-text">
-                            <h4>Embed y canal de publicación</h4>
-                            <p>El bot publicará un aviso en el canal de texto que elijas cuando detecte un directo o contenido según las fuentes abajo. Es independiente del canal de “notificaciones generales”, salvo que uses el mismo.</p>
+                            <h4>Avisos de directo</h4>
+                            <p>Twitch usa la miniatura en vivo de la API cuando el canal está emitiendo; YouTube y RSS usan la miniatura del vídeo o del feed. Configura canal de destino, plantilla del embed y fuentes.</p>
                         </div>
                         <div class="dpx-actions" style="flex-wrap:wrap;">
                             <button type="button" class="btn btn-secondary" id="testStreamAlertsBtn">Enviar prueba</button>
                             <button type="button" class="btn btn-primary" id="saveStreamDirectosBtn">Guardar directos y fuentes</button>
                         </div>
                     </div>
-                    <div class="dpx-toggle-grid">
-                        ${dpxRenderToggle({ id: 'streamAlertsEnabled', checked: !!streamConfig.enabled, title: 'Activar avisos de directo', description: 'Publica embeds automáticos al detectar transmisión o novedad en las fuentes.' })}
-                    </div>
-                    <div class="dpx-field-grid" style="margin-top:1rem;">
-                        <div class="dpx-field">
-                            <label for="streamAlertsChannel">Canal donde se publica el aviso</label>
-                            <select id="streamAlertsChannel" class="form-control">
-                                <option value="">Selecciona canal de texto</option>
-                                ${streamChannelOptionsHtml}
-                            </select>
-                            <small>Puede ser el mismo u otro distinto al canal de notificaciones generales.</small>
-                        </div>
-                        <div class="dpx-field">
-                            <label for="streamAlertsColor">Color del embed</label>
-                            <input type="color" id="streamAlertsColor" class="form-control color-input" value="#${String(streamConfig.color || '7c4dff').replace('#', '')}">
-                        </div>
-                        <div class="dpx-field is-full">
-                            <label for="streamAlertsMentionText">Mensaje encima (opcional)</label>
-                            <input type="text" id="streamAlertsMentionText" class="form-control" value="${escapeHtmlForValue(streamConfig.mentionText || '')}" placeholder="@everyone o rol · ¡Nuevo directo!">
-                        </div>
-                        <div class="dpx-field is-full">
-                            <label for="streamAlertsTitleTemplate">Título del embed</label>
-                            <input type="text" id="streamAlertsTitleTemplate" class="form-control" value="${escapeHtmlForValue(streamConfig.titleTemplate || '🔴 {platform}: {name} en directo')}" placeholder="🔴 {platform}: {name} en directo">
-                        </div>
-                        <div class="dpx-field is-full">
-                            <label for="streamAlertsDescriptionTemplate">Cuerpo del embed</label>
-                            <textarea id="streamAlertsDescriptionTemplate" class="form-control" rows="3">${escapeHtmlForValue(streamConfig.descriptionTemplate || '{title}\n{url}')}</textarea>
-                        </div>
-                        <div class="dpx-field is-full">
-                            <label for="streamAlertsFooter">Footer</label>
-                            <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot — Directos')}">
-                        </div>
-                    </div>
-                    <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>Variables: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>. Activa en la pestaña <strong>Eventos</strong> el toggle “Avisos de directo” si quieres que el mensaje pase por el flujo de notificaciones del servidor (según el backend).</div></div>
-                </div>
 
-                <div class="dpx-section" style="margin-top:0.5rem;">
-                    <div class="dpx-section-head">
-                        <div class="dpx-section-head-text">
-                            <h4>Fuentes a vigilar</h4>
-                            <p>Twitch, YouTube, TikTok o feeds RSS. Añade creadores o canales; el bot comprobará novedades en intervalos.</p>
+                    <div id="streamDirectosRoot" class="stream-directos-root">
+                        <div class="dpx-stream-subtabs" role="tablist">
+                            <button type="button" class="dpx-stream-subtab is-active" data-stream-subtab="general" role="tab">${dpxIcon('antenna', 'dpx-icon')} General</button>
+                            <button type="button" class="dpx-stream-subtab" data-stream-subtab="embed" role="tab">${dpxIcon('layout', 'dpx-icon')} Plantilla del embed</button>
+                            <button type="button" class="dpx-stream-subtab" data-stream-subtab="sources" role="tab">${dpxIcon('broadcast', 'dpx-icon')} Fuentes</button>
                         </div>
-                        <button type="button" class="btn btn-secondary" id="addStreamSourceBtn">Añadir fuente</button>
-                    </div>
-                    <div class="dpx-field-grid" style="margin-bottom:0.75rem;">
-                        <div class="dpx-field is-full">
-                            <label for="streamSourcesSearch">Buscar en la lista</label>
-                            <input type="text" id="streamSourcesSearch" class="form-control" placeholder="Nombre, URL o plataforma…">
+
+                        <div class="stream-directos-subpanel is-active" data-stream-subpanel="general">
+                            <div class="dpx-toggle-grid">
+                                ${dpxRenderToggle({ id: 'streamAlertsEnabled', checked: !!streamConfig.enabled, title: 'Activar avisos de directo', description: 'El bot comprueba las fuentes cada pocos minutos y publica cuando hay directo o novedad en el feed.' })}
+                                ${dpxRenderToggle({ id: 'streamAlertsEmbedLargePreview', checked: streamConfig.embedLargePreview !== false, title: 'Miniatura grande en el embed', description: 'Muestra la imagen del directo como imagen principal del embed (recomendado). Si lo desactivas, se usa thumbnail pequeño.' })}
+                            </div>
+                            <div class="dpx-field-grid" style="margin-top:1rem;">
+                                <div class="dpx-field">
+                                    <label for="streamAlertsChannel">Canal donde se publica el aviso</label>
+                                    <select id="streamAlertsChannel" class="form-control">
+                                        <option value="">Selecciona canal de texto</option>
+                                        ${streamChannelOptionsHtml}
+                                    </select>
+                                    <small>Puede coincidir con el canal de notificaciones generales o ser uno dedicado a directos.</small>
+                                </div>
+                                <div class="dpx-field">
+                                    <label for="streamAlertsColor">Color del embed</label>
+                                    <input type="color" id="streamAlertsColor" class="form-control color-input" value="#${String(streamConfig.color || '7c4dff').replace('#', '')}">
+                                </div>
+                                <div class="dpx-field is-full">
+                                    <label for="streamAlertsMentionText">Mensaje encima del embed (opcional)</label>
+                                    <input type="text" id="streamAlertsMentionText" class="form-control" value="${escapeHtmlForValue(streamConfig.mentionText || '')}" placeholder="@everyone o rol · ¡En directo!">
+                                </div>
+                            </div>
+                            <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>Para el mismo mensaje en el canal global de notificaciones, activa en la pestaña <strong>Eventos</strong> el toggle «Avisos de directo».</div></div>
+                        </div>
+
+                        <div class="stream-directos-subpanel" data-stream-subpanel="embed">
+                            <div class="dpx-field-grid">
+                                <div class="dpx-field is-full">
+                                    <label for="streamAlertsTitleTemplate">Título del embed</label>
+                                    <input type="text" id="streamAlertsTitleTemplate" class="form-control" value="${escapeHtmlForValue(streamConfig.titleTemplate || '🔴 {platform}: {name} en directo')}" placeholder="🔴 {platform}: {name} en directo">
+                                    <small>El título final prioriza el título real del directo cuando existe.</small>
+                                </div>
+                                <div class="dpx-field is-full">
+                                    <label for="streamAlertsDescriptionTemplate">Cuerpo del embed</label>
+                                    <textarea id="streamAlertsDescriptionTemplate" class="form-control" rows="4">${escapeHtmlForValue(streamConfig.descriptionTemplate || '{title}\n{url}')}</textarea>
+                                </div>
+                                <div class="dpx-field is-full">
+                                    <label for="streamAlertsFooter">Pie del embed (footer)</label>
+                                    <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot — Directos')}">
+                                </div>
+                            </div>
+                            <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>Variables: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>.</div></div>
+                        </div>
+
+                        <div class="stream-directos-subpanel" data-stream-subpanel="sources">
+                            <div class="dpx-section-head" style="margin-bottom:0.75rem;padding:0;border:none;">
+                                <div class="dpx-section-head-text">
+                                    <h5 style="margin:0;font-size:1rem;">Lista de fuentes</h5>
+                                    <p style="margin:0.25rem 0 0 0;font-size:0.85rem;color:var(--text-secondary);">Hasta 20 entradas. En Twitch verás la miniatura en vivo al configurar la URL.</p>
+                                </div>
+                                <button type="button" class="btn btn-secondary" id="addStreamSourceBtn">Añadir fuente</button>
+                            </div>
+                            <div class="dpx-field-grid" style="margin-bottom:0.75rem;">
+                                <div class="dpx-field is-full">
+                                    <label for="streamSourcesSearch">Buscar en la lista</label>
+                                    <input type="text" id="streamSourcesSearch" class="form-control" placeholder="Nombre, URL o plataforma…">
+                                </div>
+                            </div>
+                            <div id="streamSourcesList" class="dpx-item-list"></div>
+                            <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div><strong>Twitch:</strong> URL <code>twitch.tv/usuario</code> (requiere <code>TWITCH_CLIENT_ID</code> y <code>TWITCH_CLIENT_SECRET</code> en el servidor para miniatura en vivo). <strong>YouTube:</strong> URL de canal con ID o feed RSS; con <code>YOUTUBE_API_KEY</code> se detecta directo. <strong>TikTok / custom:</strong> feed Atom/RSS.</div></div>
                         </div>
                     </div>
-                    <div id="streamSourcesList" class="dpx-item-list"></div>
-                    <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>YouTube: URL de canal o feed RSS. TikTok: feed RSS. Twitch: URL de canal. Custom: cualquier feed Atom/RSS que exponga novedades.</div></div>
                 </div>
             </section>
 
@@ -5616,6 +5793,7 @@ async function loadNotificationsPanel(guildId) {
     bindDpxTabs(container);
 
     initStreamAlertEditor(guildId, streamConfig.sources);
+    bindStreamDirectosSubtabs(container.querySelector('#streamDirectosRoot'));
 
     const saveBtn = document.getElementById('saveNotificationsBtn');
     const testBtn = document.getElementById('testNotificationsBtn');

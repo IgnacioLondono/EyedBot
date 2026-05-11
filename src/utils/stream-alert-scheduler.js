@@ -1,17 +1,19 @@
 const { EmbedBuilder } = require('discord.js');
 const streamAlertStore = require('./stream-alert-store');
+const {
+    fetchTwitchLiveByLogin,
+    extractTwitchLoginFromUrlOrName,
+    cacheBustPreviewUrl
+} = require('./twitch-stream-api');
 
 const STREAM_ALERT_CHECK_MS = Math.max(30_000, Number.parseInt(process.env.STREAM_ALERT_CHECK_MS || '120000', 10));
 const FETCH_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.STREAM_ALERT_FETCH_TIMEOUT_MS || '12000', 10));
-const TWITCH_CLIENT_ID = String(process.env.TWITCH_CLIENT_ID || '').trim();
-const TWITCH_CLIENT_SECRET = String(process.env.TWITCH_CLIENT_SECRET || '').trim();
 const YOUTUBE_API_KEY = String(process.env.YOUTUBE_API_KEY || '').trim();
 
 let intervalRef = null;
 let running = false;
 const liveState = new Map();
 const liveSessionState = new Map();
-let twitchTokenCache = { accessToken: '', expiresAt: 0 };
 
 function applyTemplate(template = '', values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => {
@@ -207,7 +209,7 @@ async function resolveYouTubeLive(source) {
             title,
             description: channelTitle ? `${channelTitle} está en directo en YouTube` : 'Directo activo en YouTube',
             url: videoUrl,
-            imageUrl: source.imageUrl || thumbnail,
+            imageUrl: thumbnail || String(source.imageUrl || '').trim(),
             publishedAt: String(liveItem?.snippet?.publishedAt || new Date().toISOString()),
             skipIfAlreadySeen: wasLive
         };
@@ -216,60 +218,14 @@ async function resolveYouTubeLive(source) {
     }
 }
 
-function extractTwitchLogin(source) {
-    const url = String(source.url || '').trim();
-    if (!url) return String(source.name || '').trim().replace(/^@/, '');
-
-    const match = url.match(/twitch\.tv\/([^/?#]+)/i);
-    if (match?.[1]) return String(match[1]).trim().replace(/^@/, '');
-    return String(source.name || '').trim().replace(/^@/, '');
-}
-
-async function getTwitchAppAccessToken() {
-    if (!TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET) return '';
-
-    const now = Date.now();
-    if (twitchTokenCache.accessToken && twitchTokenCache.expiresAt > now + 10_000) {
-        return twitchTokenCache.accessToken;
-    }
-
-    const tokenUrl = new URL('https://id.twitch.tv/oauth2/token');
-    tokenUrl.searchParams.set('client_id', TWITCH_CLIENT_ID);
-    tokenUrl.searchParams.set('client_secret', TWITCH_CLIENT_SECRET);
-    tokenUrl.searchParams.set('grant_type', 'client_credentials');
-    const tokenData = await fetchJsonWithTimeout(tokenUrl.toString(), { method: 'POST' });
-
-    const accessToken = String(tokenData?.access_token || '');
-    const expiresInSec = Math.max(60, Number.parseInt(String(tokenData?.expires_in || '0'), 10) || 3600);
-    if (!accessToken) return '';
-
-    twitchTokenCache = {
-        accessToken,
-        expiresAt: now + (expiresInSec * 1000)
-    };
-    return accessToken;
-}
-
 async function resolveTwitchLiveViaApi(source) {
-    const login = extractTwitchLogin(source);
-    if (!login || !TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET) return null;
+    const login = extractTwitchLoginFromUrlOrName(source);
+    if (!login) return null;
 
     try {
-        const token = await getTwitchAppAccessToken();
-        if (!token) return null;
-
-        const streamsUrl = new URL('https://api.twitch.tv/helix/streams');
-        streamsUrl.searchParams.set('user_login', login);
-        const streamsData = await fetchJsonWithTimeout(streamsUrl.toString(), {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Client-Id': TWITCH_CLIENT_ID
-            }
-        });
-        const stream = Array.isArray(streamsData?.data) ? streamsData.data[0] : null;
-
+        const live = await fetchTwitchLiveByLogin(login);
         const stateKey = `twitch:${login}`;
-        if (!stream) {
+        if (!live) {
             liveState.set(stateKey, false);
             liveSessionState.delete(stateKey);
             return null;
@@ -277,27 +233,24 @@ async function resolveTwitchLiveViaApi(source) {
 
         const wasLive = liveState.get(stateKey) === true;
         liveState.set(stateKey, true);
-        const streamId = String(stream.id || '');
+        const streamId = String(live.streamId || '');
         let sessionId = liveSessionState.get(stateKey);
         if (!sessionId || (streamId && !sessionId.includes(streamId))) {
             sessionId = streamId ? `twitch-live-${login}-${streamId}` : `twitch-live-${login}-${Date.now()}`;
             liveSessionState.set(stateKey, sessionId);
         }
 
-        let previewUrl = '';
-        if (stream.thumbnail_url) {
-            previewUrl = String(stream.thumbnail_url)
-                .replace('{width}', '1280')
-                .replace('{height}', '720');
-        }
+        const staticFallback = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+        const previewUrl = live.previewUrl || staticFallback;
+        const customFallback = String(source.imageUrl || '').trim();
 
         return {
             itemId: sessionId,
-            title: String(stream.title || `${source.name || login} está en directo`),
-            description: `En vivo en Twitch (${String(stream.game_name || 'Sin categoría')})`,
+            title: live.title || String(`${source.name || login} está en directo`),
+            description: `En vivo en Twitch (${live.gameName || 'Sin categoría'})${live.viewerCount ? ` · ~${live.viewerCount} espectadores` : ''}`,
             url: String(source.url || `https://twitch.tv/${login}`),
-            imageUrl: source.imageUrl || previewUrl || `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`,
-            publishedAt: String(stream.started_at || new Date().toISOString()),
+            imageUrl: previewUrl || customFallback || staticFallback,
+            publishedAt: String(live.startedAt || new Date().toISOString()),
             skipIfAlreadySeen: wasLive
         };
     } catch {
@@ -309,7 +262,7 @@ async function resolveTwitchLive(source) {
     const fromApi = await resolveTwitchLiveViaApi(source);
     if (fromApi) return fromApi;
 
-    const login = extractTwitchLogin(source);
+    const login = extractTwitchLoginFromUrlOrName(source);
     if (!login) return null;
 
     try {
@@ -342,12 +295,14 @@ async function resolveTwitchLive(source) {
             // fallback title below
         }
 
+        const staticFallback = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+        const customImg = String(source.imageUrl || '').trim();
         return {
             itemId: sessionId,
             title: liveTitle || `${source.name || login} está en directo`,
             description: `En vivo en Twitch (${uptimeRaw.trim()})`,
             url: String(source.url || `https://twitch.tv/${login}`),
-            imageUrl: source.imageUrl || `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`,
+            imageUrl: customImg || staticFallback,
             publishedAt: new Date().toISOString(),
             skipIfAlreadySeen: wasLive
         };
@@ -402,8 +357,14 @@ function buildEmbed(config, source, item) {
     const url = String(item.url || source.url || '').trim();
     if (url) embed.setURL(url);
 
-    const imageUrl = String(item.imageUrl || source.imageUrl || '').trim();
-    if (imageUrl) embed.setImage(imageUrl);
+    let imageUrl = String(item.imageUrl || source.imageUrl || '').trim();
+    if (imageUrl) imageUrl = cacheBustPreviewUrl(imageUrl);
+
+    const embedLarge = config.embedLargePreview !== false;
+    if (imageUrl) {
+        if (embedLarge) embed.setImage(imageUrl);
+        else embed.setThumbnail(imageUrl);
+    }
 
     const footerText = String(config.footerText || '').trim();
     if (footerText) embed.setFooter({ text: footerText.slice(0, 200) });
@@ -513,5 +474,6 @@ function stopStreamAlertScheduler() {
 module.exports = {
     startStreamAlertScheduler,
     stopStreamAlertScheduler,
-    runStreamAlertSweep
+    runStreamAlertSweep,
+    buildStreamAlertEmbed: buildEmbed
 };

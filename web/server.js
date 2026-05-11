@@ -24,6 +24,12 @@ const guildActivityStore = require('../src/utils/guild-activity-store');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
 const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
+const {
+    fetchTwitchLiveByLogin,
+    extractTwitchLoginFromUrlOrName,
+    cacheBustPreviewUrl
+} = require('../src/utils/twitch-stream-api');
+const { buildStreamAlertEmbed } = require('../src/utils/stream-alert-scheduler');
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
 const channelSetupTemplates = require('../src/utils/channel-setup-templates');
@@ -2538,6 +2544,11 @@ function normalizeStreamAlertConfigInput(body = {}, current = null, userId = 'un
         .filter((source) => Boolean(source.id))
         .slice(0, 20);
 
+    const embedLargeFromBody = body.embedLargePreview;
+    const embedLargePreview = typeof embedLargeFromBody === 'boolean'
+        ? embedLargeFromBody
+        : (base.embedLargePreview !== false);
+
     return {
         enabled: body.enabled === true,
         channelId: String(body.channelId ?? base.channelId ?? '').trim(),
@@ -2546,6 +2557,7 @@ function normalizeStreamAlertConfigInput(body = {}, current = null, userId = 'un
         descriptionTemplate: String(body.descriptionTemplate ?? base.descriptionTemplate ?? '{title}\n{url}').slice(0, 1500),
         color: String(body.color ?? base.color ?? '7c4dff').replace('#', '').slice(0, 6) || '7c4dff',
         footerText: String(body.footerText ?? base.footerText ?? 'EyedBot Stream Alerts').slice(0, 200),
+        embedLargePreview,
         sources,
         updatedAt: new Date().toISOString(),
         updatedBy: userId
@@ -2634,6 +2646,43 @@ app.post('/api/guild/:guildId/temp-voice-config', requireAuth, async (req, res) 
     }
 });
 
+app.get('/api/guild/:guildId/twitch-live-preview', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        let login = String(req.query.login || '').trim().replace(/^@/, '').toLowerCase();
+        if (!login) {
+            login = extractTwitchLoginFromUrlOrName({
+                url: String(req.query.url || ''),
+                name: String(req.query.name || '')
+            }).toLowerCase();
+        }
+
+        if (!login) {
+            return res.status(400).json({ error: 'Indica el canal de Twitch (login o URL twitch.tv/…)' });
+        }
+
+        const live = await fetchTwitchLiveByLogin(login);
+        const staticFallback = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+        const rawPreview = live?.previewUrl || staticFallback;
+        const previewUrl = cacheBustPreviewUrl(rawPreview);
+
+        res.json({
+            login,
+            live: Boolean(live),
+            previewUrl,
+            title: live?.title || '',
+            gameName: live?.gameName || '',
+            viewerCount: Number(live?.viewerCount || 0)
+        });
+    } catch (error) {
+        console.error('Error twitch-live-preview:', error);
+        res.status(500).json({ error: 'No se pudo obtener la vista previa' });
+    }
+});
+
 app.get('/api/guild/:guildId/stream-alert-config', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -2697,30 +2746,34 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
                 imageUrl: ''
             };
 
-        const values = {
-            platform: String(firstSource.platform || 'custom').toUpperCase(),
-            name: firstSource.name || 'Fuente',
+        let mockItem = {
+            itemId: 'web-test-preview',
             title: 'Stream de prueba en vivo',
+            description: 'Este es un mensaje de prueba desde el panel web.',
             url: firstSource.url || 'https://example.com/stream',
-            description: 'Este es un mensaje de prueba desde el panel web.'
+            imageUrl: String(firstSource.imageUrl || '').trim()
         };
 
-        const template = (text) => String(text || '').replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
-        const templateTitle = template(config.titleTemplate || '🔴 {platform}: {name} en directo').trim();
-        const finalTitle = String(values.title || templateTitle || 'Directo detectado').slice(0, 256);
+        const plat = String(firstSource.platform || 'custom').toLowerCase();
+        if (plat === 'twitch') {
+            const login = extractTwitchLoginFromUrlOrName(firstSource);
+            const live = login ? await fetchTwitchLiveByLogin(login) : null;
+            const staticFallback = login
+                ? `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`
+                : '';
+            const previewRaw = live?.previewUrl || staticFallback || mockItem.imageUrl;
+            mockItem = {
+                itemId: 'web-test-preview',
+                title: live?.title || mockItem.title,
+                description: live
+                    ? `En vivo en Twitch (${live.gameName || 'Sin categoría'})${live.viewerCount ? ` · ~${live.viewerCount} espectadores` : ''}`
+                    : mockItem.description,
+                url: String(firstSource.url || (login ? `https://twitch.tv/${login}` : mockItem.url)),
+                imageUrl: previewRaw ? cacheBustPreviewUrl(previewRaw) : mockItem.imageUrl
+            };
+        }
 
-        const embed = new EmbedBuilder()
-            .setColor(`#${String(config.color || '7c4dff').replace('#', '')}`)
-            .setTitle(finalTitle)
-            .setDescription(template(config.descriptionTemplate || '{title}\n{url}').slice(0, 4000))
-            .setURL(values.url)
-            .setTimestamp(new Date());
-
-        const imageUrl = String(firstSource.imageUrl || '').trim();
-        if (imageUrl) embed.setImage(imageUrl);
-
-        const footerText = String(config.footerText || '').trim();
-        if (footerText) embed.setFooter({ text: footerText.slice(0, 200) });
+        const embed = buildStreamAlertEmbed(config, firstSource, mockItem);
 
         await channel.send({
             content: String(config.mentionText || '').trim() || undefined,

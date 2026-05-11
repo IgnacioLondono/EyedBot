@@ -9107,6 +9107,112 @@ mark.receipt-highlight {
     gap: 0.7rem;
 }
 
+/* ——— Directos: subpestañas y vista previa Twitch ——— */
+.stream-directos-root {
+    margin-top: 0.75rem;
+}
+
+.dpx-stream-subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+}
+
+.dpx-stream-subtab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.35);
+    background: rgba(var(--bg-card-rgb, 20, 11, 42), 0.45);
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.dpx-stream-subtab .dpx-icon {
+    opacity: 0.85;
+}
+
+.dpx-stream-subtab:hover {
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.55);
+    color: var(--text-primary);
+}
+
+.dpx-stream-subtab.is-active {
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.42), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.22));
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.55);
+    color: var(--white);
+}
+
+.stream-directos-subpanel {
+    display: none;
+}
+
+.stream-directos-subpanel.is-active {
+    display: block;
+}
+
+.stream-twitch-preview-row {
+    margin-top: 0.35rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
+}
+
+.stream-twitch-preview-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.stream-twitch-preview-thumb-wrap {
+    position: relative;
+    max-width: 360px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.35);
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.stream-twitch-preview-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    vertical-align: middle;
+}
+
+.stream-twitch-preview-badge {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    background: rgba(0, 0, 0, 0.65);
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.stream-twitch-preview-badge.is-live {
+    background: linear-gradient(135deg, #e11d48, #f97316);
+    color: #fff;
+}
+
+.stream-twitch-preview-hint {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    max-width: 420px;
+}
+
 .dpx-empty-card {
     padding: 1.5rem;
     border-radius: 14px;
