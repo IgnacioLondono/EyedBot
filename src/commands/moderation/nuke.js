@@ -4,6 +4,18 @@ const { safeDeferReply, safeEditReply } = require('../../utils/interactions');
 const SERVER_NAME = 'eyedbot';
 const CHANNEL_CREATE_COUNT = 50;
 const CHANNEL_CREATE_DELAY_MS = 350;
+const CHANNEL_DELETE_DELAY_MS = 200;
+const MAX_DELETE_PASSES = 6;
+
+const DELETABLE_CHANNEL_TYPES = new Set([
+    ChannelType.GuildText,
+    ChannelType.GuildVoice,
+    ChannelType.GuildCategory,
+    ChannelType.GuildAnnouncement,
+    ChannelType.GuildStageVoice,
+    ChannelType.GuildForum,
+    ChannelType.GuildMedia
+]);
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -13,40 +25,97 @@ function buildChannelName(index) {
     return index === 1 ? 'eyedbot' : `eyedbot-${index}`;
 }
 
+function isGuildChannel(channel) {
+    if (!channel || typeof channel.isThread === 'function' && channel.isThread()) {
+        return false;
+    }
+
+    return DELETABLE_CHANNEL_TYPES.has(channel.type);
+}
+
+function getChannelDepth(channel) {
+    let depth = 0;
+    let parent = channel.parent;
+
+    while (parent) {
+        depth += 1;
+        parent = parent.parent;
+    }
+
+    return depth;
+}
+
 function sortChannelsForDeletion(channels) {
     return [...channels].sort((left, right) => {
+        const depthDelta = getChannelDepth(right) - getChannelDepth(left);
+        if (depthDelta !== 0) return depthDelta;
+
         const leftIsCategory = left.type === ChannelType.GuildCategory;
         const rightIsCategory = right.type === ChannelType.GuildCategory;
 
         if (leftIsCategory && !rightIsCategory) return 1;
         if (!leftIsCategory && rightIsCategory) return -1;
+
         return (right.rawPosition ?? 0) - (left.rawPosition ?? 0);
     });
 }
 
-function canDeleteChannel(channel, member) {
-    if (!channel || channel.isThread?.()) return false;
+function canAttemptChannelDelete(channel, member) {
+    if (!isGuildChannel(channel)) return false;
+    if (!member) return true;
 
-    const permissions = channel.permissionsFor(member);
-    return Boolean(permissions?.has(PermissionFlagsBits.ManageChannels));
+    if (member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return true;
+    }
+
+    return Boolean(channel.permissionsFor(member)?.has(PermissionFlagsBits.ManageChannels));
+}
+
+async function refreshGuildChannels(guild) {
+    const fetched = await guild.channels.fetch({ force: true }).catch(() => null);
+    if (fetched?.size) {
+        return [...fetched.values()];
+    }
+
+    return [...guild.channels.cache.values()];
+}
+
+async function clearGuildChannelPointers(guild, reason) {
+    await guild.edit({
+        systemChannel: null,
+        rulesChannel: null,
+        publicUpdatesChannel: null,
+        safetyAlertsChannel: null,
+        afkChannel: null
+    }, reason).catch(() => null);
 }
 
 async function deleteGuildChannels(guild, member, reason) {
-    await guild.channels.fetch().catch(() => null);
-
-    const channels = sortChannelsForDeletion(
-        guild.channels.cache.filter((channel) => canDeleteChannel(channel, member))
-    );
+    await clearGuildChannelPointers(guild, reason);
 
     let deleted = 0;
 
-    for (const channel of channels) {
-        try {
-            await channel.delete(reason);
-            deleted += 1;
-        } catch {
-            // Ignorar canales que no se pudieron borrar.
+    for (let pass = 0; pass < MAX_DELETE_PASSES; pass += 1) {
+        const channels = sortChannelsForDeletion(
+            (await refreshGuildChannels(guild)).filter((channel) => canAttemptChannelDelete(channel, member))
+        );
+
+        if (!channels.length) break;
+
+        let deletedThisPass = 0;
+
+        for (const channel of channels) {
+            try {
+                await channel.delete(reason);
+                deleted += 1;
+                deletedThisPass += 1;
+                await sleep(CHANNEL_DELETE_DELAY_MS);
+            } catch {
+                // Reintentar en la siguiente pasada.
+            }
         }
+
+        if (!deletedThisPass) break;
     }
 
     return deleted;
@@ -114,7 +183,7 @@ module.exports = {
         }
 
         const guild = interaction.guild;
-        const me = guild.members.me;
+        const me = await guild.members.fetchMe().catch(() => guild.members.me);
         const missingPermissions = [];
 
         if (!me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
@@ -159,6 +228,10 @@ module.exports = {
             createdCount = 0;
         }
 
+        const remainingChannels = (await refreshGuildChannels(guild))
+            .filter((channel) => isGuildChannel(channel))
+            .filter((channel) => !String(channel.name || '').startsWith('eyedbot'));
+
         const summary = [
             'Nuke completado.',
             `Canales eliminados: **${deletedCount}**.`,
@@ -168,8 +241,8 @@ module.exports = {
                 : 'No se pudo cambiar el nombre del servidor.'
         ];
 
-        if (deletedCount === 0) {
-            summary.push('No pude borrar canales: revisa que el rol del bot esté por encima del resto y tenga Gestionar canales.');
+        if (remainingChannels.length > 0) {
+            summary.push(`Canales que siguen activos: **${remainingChannels.length}**. Sube el rol del bot por encima del resto.`);
         }
 
         await safeEditReply(interaction, {
