@@ -5421,6 +5421,63 @@ mark.receipt-highlight {
     gap: 0.35rem;
     margin-top: 0.1rem;
 }
+#serverPaneWelcome .welcome-dpx-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.15rem 0 0;
+}
+#serverPaneWelcome .welcome-dpx-panel .dpx-hero {
+    margin-bottom: 0;
+}
+#serverPaneWelcome .welcome-mode-tabs {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+#serverPaneWelcome .welcome-mode-tabs .dpx-tab {
+    flex: 1 1 auto;
+    min-width: 8.5rem;
+    justify-content: center;
+}
+#serverPaneWelcome .welcome-mode-subtitle {
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #c4b8e8 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.55 !important;
+    max-width: 54rem;
+}
+#serverPaneWelcome .welcome-mode-subtitle code {
+    background: rgba(var(--bg-primary-rgb, 12, 6, 30), 0.65);
+    border: 1px solid color-mix(in srgb, var(--pane-accent) 28%, rgba(var(--border-rgb, 190, 155, 255), 0.22));
+    border-radius: 6px;
+    padding: 0.08rem 0.42rem;
+    color: color-mix(in srgb, var(--pane-accent) 72%, #ffffff);
+    font-size: 0.86em;
+}
+#serverPaneWelcome .welcome-section-tabs {
+    flex-wrap: wrap;
+    gap: 0.35rem !important;
+    margin-bottom: 0.15rem !important;
+}
+#serverPaneWelcome .welcome-section-tabs .dpx-tab {
+    min-height: 2.35rem;
+}
+#serverPaneWelcome .welcome-editor-pane-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1 1 auto;
+    min-height: 120px;
+}
+#serverPaneWelcome .welcome-editor-pane {
+    display: none !important;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+#serverPaneWelcome .welcome-editor-pane.is-active {
+    display: flex !important;
+}
 #serverPaneWelcome .greeting-page > .welcome-panel-title {
     margin-bottom: 0.35rem !important;
 }

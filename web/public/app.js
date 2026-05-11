@@ -9599,6 +9599,29 @@ function saveCurrentGreetingDraft() {
     setCurrentGreetingConfig(currentGreetingMode, collectWelcomeConfigFromForm());
 }
 
+function bindWelcomeEditorSectionTabs(container) {
+    const tabs = container.querySelectorAll('[data-welcome-section-tab]');
+    const panes = container.querySelectorAll('[data-welcome-pane]');
+    if (!tabs.length || !panes.length) return;
+
+    const activate = (key) => {
+        if (!key) return;
+        tabs.forEach((t) => {
+            const k = t.getAttribute('data-welcome-section-tab');
+            const on = k === key;
+            t.classList.toggle('is-active', on);
+            t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        panes.forEach((p) => {
+            p.classList.toggle('is-active', p.getAttribute('data-welcome-pane') === key);
+        });
+    };
+
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => activate(tab.getAttribute('data-welcome-section-tab')));
+    });
+}
+
 function renderGreetingPanel(guildId, channels, mode) {
     const container = document.getElementById('welcomeContainer');
     if (!container) return;
@@ -9607,26 +9630,45 @@ function renderGreetingPanel(guildId, channels, mode) {
     const cfg = getCurrentGreetingConfig(mode) || {};
     const subtitleHtml = mode === 'welcome' ? meta.subtitle : escapeHtml(meta.subtitle);
 
+    const heroHtml = dpxRenderHero({
+        kicker: 'Saludos automáticos',
+        title: 'Bienvenida y despedida',
+        description: 'Mismo flujo para entrada y salida: canal, embed con variables, miniatura e imagen, y DM opcional. La vista previa se actualiza en vivo.',
+        accent: '#c4b5fd',
+        glow1: 'rgba(196,181,253,0.18)',
+        glow2: 'rgba(167,139,250,0.22)',
+        actionsHtml: ''
+    });
+
+    const modeTabsHtml = `
+        <nav class="dpx-tabs welcome-mode-tabs" role="tablist" aria-label="Tipo de mensaje">
+            <button type="button" class="dpx-tab ${mode === 'welcome' ? 'is-active' : ''}" data-greeting-tab="welcome" role="tab" aria-selected="${mode === 'welcome' ? 'true' : 'false'}">
+                ${dpxIcon('sprout', 'dpx-tab-icon')}<span>Bienvenida</span>
+            </button>
+            <button type="button" class="dpx-tab ${mode === 'goodbye' ? 'is-active' : ''}" data-greeting-tab="goodbye" role="tab" aria-selected="${mode === 'goodbye' ? 'true' : 'false'}">
+                ${dpxIcon('door', 'dpx-tab-icon')}<span>Despedida</span>
+            </button>
+        </nav>`;
+
+    const sectionTabsHtml = `
+        <nav class="dpx-tabs welcome-section-tabs" role="tablist" aria-label="Apartados del editor">
+            <button type="button" class="dpx-tab is-active" data-welcome-section-tab="general" role="tab">${dpxIcon('gear', 'dpx-tab-icon')}<span>General</span></button>
+            <button type="button" class="dpx-tab" data-welcome-section-tab="message" role="tab">${dpxIcon('chat', 'dpx-tab-icon')}<span>Mensaje</span></button>
+            <button type="button" class="dpx-tab" data-welcome-section-tab="media" role="tab">${dpxIcon('image', 'dpx-tab-icon')}<span>Imágenes</span></button>
+            <button type="button" class="dpx-tab" data-welcome-section-tab="dm" role="tab">${dpxIcon('send', 'dpx-tab-icon')}<span>DM</span></button>
+        </nav>`;
+
     container.innerHTML = `
-        <div class="greeting-page" data-greeting-mode="${mode}">
-        <h3 class="welcome-panel-title">Bienvenida y Despedida</h3>
-        <header class="greeting-hero" aria-label="Selección de modo">
-            <div class="greeting-hero__bar">
-                <div class="greeting-tabs" role="tablist" aria-label="Tipo de mensaje automático">
-                    <button type="button" class="greeting-tab-btn ${mode === 'welcome' ? 'active' : ''}" data-greeting-tab="welcome" role="tab" aria-selected="${mode === 'welcome' ? 'true' : 'false'}">
-                        <span class="greeting-tab-btn__dot" aria-hidden="true"></span>
-                        <span class="greeting-tab-btn__label">Bienvenida</span>
-                    </button>
-                    <button type="button" class="greeting-tab-btn ${mode === 'goodbye' ? 'active' : ''}" data-greeting-tab="goodbye" role="tab" aria-selected="${mode === 'goodbye' ? 'true' : 'false'}">
-                        <span class="greeting-tab-btn__dot" aria-hidden="true"></span>
-                        <span class="greeting-tab-btn__label">Despedida</span>
-                    </button>
-                </div>
-            </div>
-            <p class="greeting-hero__subtitle">${subtitleHtml}</p>
-        </header>
-        <div class="welcome-layout">
+        <div class="greeting-page welcome-dpx-root" data-greeting-mode="${mode}">
+        <div class="dpx-panel welcome-dpx-panel">
+            ${heroHtml}
+            ${modeTabsHtml}
+            <p class="welcome-mode-subtitle">${subtitleHtml}</p>
+            <div class="welcome-layout">
             <div class="welcome-editor greeting-editor">
+                ${sectionTabsHtml}
+                <div class="welcome-editor-pane-stack">
+                <div class="welcome-editor-pane is-active" data-welcome-pane="general">
                 <section class="greeting-card" aria-labelledby="greeting-section-basics">
                     <div class="greeting-card__head">
                         <h4 id="greeting-section-basics" class="greeting-card__title">Canal y apariencia</h4>
@@ -9743,6 +9785,8 @@ function renderGreetingPanel(guildId, channels, mode) {
                 </section>
                 ` : ''}
 
+                </div>
+                <div class="welcome-editor-pane" data-welcome-pane="message">
                 <section class="greeting-card" aria-labelledby="greeting-section-embed">
                     <div class="greeting-card__head">
                         <h4 id="greeting-section-embed" class="greeting-card__title">${mode === 'welcome' ? 'Texto del mensaje' : 'Texto del embed'}</h4>
@@ -9768,7 +9812,9 @@ function renderGreetingPanel(guildId, channels, mode) {
                         <input type="text" id="welcomeFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || meta.defaultFooter)}">
                     </div>
                 </section>
+                </div>
 
+                <div class="welcome-editor-pane" data-welcome-pane="media">
                 <section class="greeting-card greeting-card--media" id="welcomeBgImageSection" aria-labelledby="greeting-section-thumb">
                     <div class="greeting-card__head">
                         <h4 id="greeting-section-thumb" class="greeting-card__title">Miniatura y fondo</h4>
@@ -9843,7 +9889,9 @@ function renderGreetingPanel(guildId, channels, mode) {
                         </div>
                     </div>
                 </section>
+                </div>
 
+                <div class="welcome-editor-pane" data-welcome-pane="dm">
                 <section class="greeting-card" aria-labelledby="greeting-section-dm">
                     <div class="greeting-card__head">
                         <h4 id="greeting-section-dm" class="greeting-card__title">Mensaje directo</h4>
@@ -9854,6 +9902,8 @@ function renderGreetingPanel(guildId, channels, mode) {
                         <textarea id="welcomeDmMessage" class="form-control" rows="3" placeholder="Ej.: Lee las reglas en #reglas">${escapeHtmlForValue(cfg.dmMessage || '')}</textarea>
                     </div>
                 </section>
+                </div>
+                </div>
 
                 <footer class="greeting-actions-bar form-actions">
                     <div class="greeting-actions-bar__inner">
@@ -9887,6 +9937,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                     ` : ''}
                 </div>
             </aside>
+        </div>
         </div>
         </div>
     `;
@@ -10009,8 +10060,12 @@ function renderGreetingPanel(guildId, channels, mode) {
     }
     container.querySelector('#welcomeScrollToBg')?.addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('welcomeBgImageSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        container.querySelector('[data-welcome-section-tab="media"]')?.click();
+        requestAnimationFrame(() => {
+            document.getElementById('welcomeBgImageSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
     });
+    bindWelcomeEditorSectionTabs(container);
     updateWelcomePreviewPanel(guildId);
     scheduleWelcomeCropVisualUpdate();
 }
