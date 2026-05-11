@@ -2900,6 +2900,7 @@ app.get('/api/guild/:guildId/gacha-market', requireAuth, async (req, res) => {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        await gachaStore.ensureGuildEconomyContent(guildId);
         const market = await gachaStore.getGuildMarket(guildId);
         res.json({ success: true, listings: market });
     } catch (error) {
@@ -2914,6 +2915,7 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
+        await gachaStore.ensureGuildEconomyContent(guildId);
         const config = await gachaStore.getConfig(guildId);
         const items = gachaStore.getShopCatalog(config).slice(0, 250);
         res.json({

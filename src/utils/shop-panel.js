@@ -44,6 +44,7 @@ function buildNavButton(kind, mode, page, ownerId, disabled = false) {
 }
 
 async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
+    await gachaStore.ensureGuildEconomyContent(guildId);
     const config = await gachaStore.getConfig(guildId);
     const profile = await gachaStore.getProfile(guildId, userId);
     const meta = SHOP_MODES[mode] || SHOP_MODES.shop;
@@ -106,12 +107,13 @@ async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
         const slice = listings.slice(currentPage * PAGE_SIZE.market, (currentPage + 1) * PAGE_SIZE.market);
 
         if (!slice.length) {
-            embed.setDescription('No hay publicaciones activas. Usa `/gacha mercado_publicar` para vender un ítem.');
+            embed.setDescription('No hay publicaciones activas. El catálogo del servidor se publicará aquí en cuanto haya artículos disponibles.');
         } else {
             embed.setDescription(slice.map((listing, index) => {
                 const rarity = gachaStore.rarityMeta(listing.item?.rarity);
                 const position = currentPage * PAGE_SIZE.market + index + 1;
-                return `${position}. ${rarity.emoji} **${listing.item?.name || 'Ítem'}** · ${listing.item?.rarity || 'N'} · 💰 ${Number(listing.price || 0).toLocaleString('es-ES')} · ID \`${listing.id}\``;
+                const sellerLabel = listing.sellerId === 'system' ? 'Catálogo' : `Vendedor ${listing.sellerId}`;
+                return `${position}. ${rarity.emoji} **${listing.item?.name || 'Ítem'}** · ${listing.item?.rarity || 'N'} · 💰 ${Number(listing.price || 0).toLocaleString('es-ES')} · ${sellerLabel} · ID \`${listing.id}\``;
             }).join('\n'));
             embed.addFields({ name: '📄 Página', value: `${currentPage + 1}/${totalPages}`, inline: true });
         }
