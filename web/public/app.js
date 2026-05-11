@@ -12112,10 +12112,22 @@ function renderReceiptTranscript() {
     const query = String(_receiptModalState.search || '').toLowerCase();
 
     if (entries.length === 0) {
+        const plain = typeof data.transcriptText === 'string' ? data.transcriptText.trim() : '';
+        if (plain) {
+            pane.innerHTML = `
+                <div class="receipt-transcript">
+                    <div class="receipt-transcript-head">
+                        <span><strong>Texto plano</strong> (sin mensajes estructurados)</span>
+                        <span>También puedes usar <em>Copiar</em> o <em>Descargar</em></span>
+                    </div>
+                    <pre class="receipt-transcript-plain">${escapeHtml(plain)}</pre>
+                </div>`;
+            return;
+        }
         pane.innerHTML = `
             <div class="receipt-empty">
-                <p><strong>Sin transcripción estructurada</strong></p>
-                <p>Este comprobante no tiene los mensajes guardados uno a uno. Usa <em>Descargar</em> para el archivo de texto.</p>
+                <p><strong>Sin transcripción</strong></p>
+                <p>No hay mensajes guardados en este comprobante. Si existe archivo, prueba <em>Descargar</em>.</p>
             </div>`;
         return;
     }
