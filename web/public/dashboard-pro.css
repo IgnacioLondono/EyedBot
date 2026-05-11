@@ -12434,7 +12434,7 @@ body {
     overflow: hidden !important;
 }
 
-#serverSection.section {
+#serverSection.section.active {
     display: flex !important;
     flex-direction: column !important;
     flex: 1 1 auto !important;
@@ -12443,6 +12443,13 @@ body {
     height: auto !important;
     min-height: 100% !important;
     max-height: none !important;
+    overflow: hidden !important;
+}
+
+#serverSection.section:not(.active) {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
     overflow: hidden !important;
 }
 
