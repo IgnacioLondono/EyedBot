@@ -58,7 +58,7 @@ async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
         .setTimestamp();
 
     if (mode === 'shop') {
-        const catalog = gachaStore.getShopCatalog(config);
+        const catalog = await gachaStore.getShopCatalog(guildId, config);
         const totalPages = Math.max(1, catalog.length);
         const currentPage = clampPage(page, totalPages);
         const item = catalog[currentPage];
@@ -67,14 +67,15 @@ async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
             embed.setDescription('No hay artículos disponibles en la tienda.');
         } else {
             const rarity = gachaStore.rarityMeta(item.rarity);
+            const lore = String(item.description || '').trim().slice(0, 1000) || 'Un objeto místico sin registro escrito.';
             embed
                 .setDescription(`**${item.name}**\n${item.series}`)
                 .addFields(
                     { name: `${rarity.emoji} Rareza`, value: item.rarity, inline: true },
                     { name: '💰 Precio', value: `${Number(item.price || 0).toLocaleString('es-ES')} monedas`, inline: true },
-                    { name: '📄 Página', value: `${currentPage + 1}/${totalPages}`, inline: true }
+                    { name: '📄 Página', value: `${currentPage + 1}/${totalPages}`, inline: true },
+                    { name: '📜 Lore mística', value: lore }
                 );
-            if (item.imageUrl) embed.setImage(item.imageUrl);
         }
 
         return { embed, totalPages, currentPage, item };

@@ -6080,15 +6080,42 @@ async function loadGachaPanel(guildId) {
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
                                 <h4>Catálogo de tienda</h4>
-                                <p>Los usuarios exploran y compran en Discord con <code>/tienda</code> y flechas del embed.</p>
+                                <p>Edita nombre, serie, rareza, lore mística y valor base. Los cambios se aplican en <code>/tienda</code> y en el mercado del servidor.</p>
                             </div>
                         </div>
-                        <div class="dpx-item-list">
+                        <div id="gachaCatalogEditor" class="dpx-item-list">
                             ${shopItems.slice(0, 120).map((item, index) => `
-                                <div class="dpx-item-row">
-                                    <div class="dpx-item-main">
-                                        <div class="dpx-item-title">#${index + 1} ${escapeHtml(item.name)}</div>
-                                        <div class="dpx-item-sub">${escapeHtml(item.series)} · ${escapeHtml(item.rarity)} · Precio ${Number(item.price || 0).toLocaleString('es-ES')}</div>
+                                <div class="dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}">
+                                    <div class="dpx-item-main" style="width:100%;">
+                                        <div class="dpx-item-title">#${index + 1} ${escapeHtml(item.id)} · Precio ${Number(item.price || 0).toLocaleString('es-ES')}</div>
+                                        <div class="dpx-field-grid" style="margin-top:0.75rem;">
+                                            <div class="dpx-field">
+                                                <label>Nombre</label>
+                                                <input class="form-control gacha-catalog-name" value="${escapeHtmlForValue(item.name || '')}">
+                                            </div>
+                                            <div class="dpx-field">
+                                                <label>Serie</label>
+                                                <input class="form-control gacha-catalog-series" value="${escapeHtmlForValue(item.series || '')}">
+                                            </div>
+                                            <div class="dpx-field">
+                                                <label>Rareza</label>
+                                                <select class="form-control gacha-catalog-rarity">
+                                                    ${['SSR', 'SR', 'R', 'N'].map((rarity) => `<option value="${rarity}" ${String(item.rarity || 'N').toUpperCase() === rarity ? 'selected' : ''}>${rarity}</option>`).join('')}
+                                                </select>
+                                            </div>
+                                            <div class="dpx-field">
+                                                <label>Valor base</label>
+                                                <input class="form-control gacha-catalog-base-value" type="number" min="1" value="${Number(item.baseValue || 1)}">
+                                            </div>
+                                            <div class="dpx-field is-full">
+                                                <label>Descripción mística</label>
+                                                <textarea class="form-control gacha-catalog-description" rows="3">${escapeHtml(item.description || '')}</textarea>
+                                            </div>
+                                            <div class="dpx-field">
+                                                <label>&nbsp;</label>
+                                                <button type="button" class="btn btn-secondary gacha-catalog-save-btn" data-gacha-save-item="${escapeHtml(item.id)}">Guardar objeto</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             `).join('') || '<div class="dpx-empty">No hay artículos en el catálogo.</div>'}
@@ -6197,6 +6224,40 @@ async function loadGachaPanel(guildId) {
         `;
 
         bindDpxTabs(container);
+
+                container.querySelectorAll('.gacha-catalog-save-btn').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const characterId = button.getAttribute('data-gacha-save-item');
+                const row = button.closest('.gacha-catalog-row');
+                if (!characterId || !row) return;
+
+                const payload = {
+                    name: row.querySelector('.gacha-catalog-name')?.value || '',
+                    series: row.querySelector('.gacha-catalog-series')?.value || '',
+                    rarity: row.querySelector('.gacha-catalog-rarity')?.value || 'N',
+                    description: row.querySelector('.gacha-catalog-description')?.value || '',
+                    baseValue: Number.parseInt(row.querySelector('.gacha-catalog-base-value')?.value || '1', 10)
+                };
+
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(characterId)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.error || 'No se pudo guardar el objeto', 'error');
+                        return;
+                    }
+                    showToast('Objeto del catálogo guardado', 'success');
+                    await loadGachaPanel(guildId);
+                } catch (error) {
+                    console.error('Error guardando objeto del catálogo:', error);
+                    showToast('Error guardando objeto del catálogo', 'error');
+                }
+            });
+        });
 
         const refreshBtn = document.getElementById('refreshGachaPanelBtn');
         if (refreshBtn) {
