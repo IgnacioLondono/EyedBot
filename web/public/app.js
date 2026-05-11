@@ -11391,12 +11391,12 @@ function renderTmHistoryCard(item) {
             <div class="tm-ticket-avatar">${avatar}</div>
             <div class="tm-ticket-body">
                 <div class="tm-ticket-title">
-                    <span>${escapeHtml(o.username || 'Usuario')}</span>
+                    <span>#${escapeHtml(item.channelName || 'ticket')}</span>
                     <span class="tm-badge closed">Cerrado</span>
                     <span class="tm-badge cat">${escapeHtml(item.category || 'Soporte general')}</span>
                 </div>
                 <div class="tm-ticket-meta">
-                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path></svg>${escapeHtml(item.reportId || 'SIN-ID')}</span>
+                    <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg>${escapeHtml(o.username || 'Usuario')}</span>
                     <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>${escapeHtml(when)}</span>
                     <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 4.8-3.4 9-8 10-4.6-1-8-5.2-8-10V6l8-4z"></path><path d="M9 12l2.2 2.2L15 10.5"></path></svg>Cerrado por ${escapeHtml(c.username || 'staff')}</span>
                     <span class="tm-ticket-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"></path></svg>${Number(item.messagesCount || 0)} mensajes</span>
@@ -11415,11 +11415,11 @@ function renderTmHistoryCard(item) {
             </div>
             <div class="tm-history-detail">
                 <dl>
-                    <dt>Canal</dt><dd>#${escapeHtml(item.channelName || '-')}</dd>
+                    <dt>ID</dt><dd>${escapeHtml(item.reportId || 'SIN-ID')}</dd>
+                    <dt>Usuario</dt><dd>${escapeHtml(o.username || '-')} (${escapeHtml(item.ownerId || '-')})</dd>
                     <dt>Categoría</dt><dd>${escapeHtml(item.category || 'Soporte general')}</dd>
                     <dt>Problema</dt><dd>${escapeHtml(item.common || '-')}</dd>
                     <dt>Motivo</dt><dd>${escapeHtml(item.reason || '-')}</dd>
-                    <dt>Usuario</dt><dd>${escapeHtml(o.username || '-')} (${escapeHtml(item.ownerId || '-')})</dd>
                     <dt>Cerrado por</dt><dd>${escapeHtml(c.username || item.closedByTag || '-')}</dd>
                     <dt>Mensajes</dt><dd>${Number(item.messagesCount || 0)}</dd>
                     <dt>Participantes</dt><dd>${Array.isArray(item.participants) ? item.participants.length : 0}</dd>
