@@ -151,26 +151,74 @@ body::before {
 }
 
 /* Pestañas del navbar — pills elegantes */
-.nav-tabs { gap: 0.35rem; padding: 0.35rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12); border-radius: 999px; }
+.nav-tabs {
+    gap: 0.28rem !important;
+    padding: 0.28rem !important;
+    border-radius: 999px !important;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)) !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 28px rgba(var(--bg-primary-rgb, 2, 1, 8), 0.28) !important;
+}
 .nav-link {
     position: relative;
     border-radius: 999px !important;
-    padding: 0.5rem 0.95rem !important;
+    padding: 0.42rem 0.9rem 0.42rem 0.42rem !important;
+    gap: 0.55rem !important;
     color: var(--text-secondary) !important;
-    transition: color 0.25s ease, background 0.25s ease, transform 0.2s ease;
+    font-weight: 600 !important;
+    font-size: 0.86rem !important;
+    letter-spacing: 0.01em;
+    transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     background: transparent !important;
-    border: none !important;
+    border: 1px solid transparent !important;
+    overflow: visible !important;
 }
 .nav-link::before { display: none !important; }
 .nav-link::after { display: none !important; }
-.nav-link:hover { color: var(--text-primary) !important; background: rgba(255, 255, 255, 0.05) !important; }
+.nav-link:hover {
+    color: var(--text-primary) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(var(--border-rgb, 190, 155, 255), 0.16) !important;
+    transform: translateY(-1px);
+}
 .nav-link.active {
     color: #fff !important;
-    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.85), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.85)) !important;
-    box-shadow: 0 10px 24px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.92), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.88)) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 10px 24px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
-.nav-link .nav-icon-shell { background: transparent; }
-.nav-link.active .nav-icon-shell, .nav-link.active .nav-icon { color: #fff !important; }
+.nav-link .nav-icon-shell {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 9px !important;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+.nav-link .nav-icon {
+    width: 15px !important;
+    height: 15px !important;
+    color: var(--iris-300, #d7c4ff) !important;
+    animation: none !important;
+    transform: none !important;
+}
+.nav-link:hover .nav-icon-shell {
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.38) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12) !important;
+}
+.nav-link:hover .nav-icon {
+    transform: none !important;
+}
+.nav-link.active .nav-icon-shell {
+    border-color: rgba(255, 255, 255, 0.34) !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+}
+.nav-link.active .nav-icon-shell,
+.nav-link.active .nav-icon {
+    color: #fff !important;
+}
 
 /* Añadir bot CTA */
 .add-bot-btn {

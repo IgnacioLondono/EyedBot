@@ -542,22 +542,23 @@ const THEME_DEFAULTS = {
     wallpaperVeil: 38
 };
 
+const NAV_ICON_STROKE = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+
 const DASHBOARD_ICON = `
     <span class="nav-icon-shell">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 13l4-4 4 4 8-8"></path>
-            <path d="M3 21h18"></path>
-            <path d="M3 3v18"></path>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" ${NAV_ICON_STROKE} aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
         </svg>
     </span>
 `;
 
 const HOME_ICON = `
     <span class="nav-icon-shell">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 11l9-7 9 7"></path>
-            <path d="M5 10v10h14V10"></path>
-            <path d="M10 20v-5h4v5"></path>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" ${NAV_ICON_STROKE} aria-hidden="true">
+            <path d="M15 18l-6-6 6-6"></path>
         </svg>
     </span>
 `;
