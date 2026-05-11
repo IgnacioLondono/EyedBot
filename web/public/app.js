@@ -20,6 +20,36 @@ let welcomeCardPreviewObjectUrl = '';
 let welcomeCropVisualTimer = null;
 let welcomeCropVisualCache = { src: '', img: null };
 let currentGreetingMode = 'welcome';
+
+/** Revoca blob de archivo pendiente y limpia el input file (la URL del campo se mantiene). */
+function clearWelcomeImagePendingPreview() {
+    if (welcomeImagePreviewUrl) {
+        try {
+            URL.revokeObjectURL(welcomeImagePreviewUrl);
+        } catch (_) {
+            /* ignore */
+        }
+        welcomeImagePreviewUrl = '';
+    }
+    welcomeImageFile = null;
+    const fi = document.getElementById('welcomeImageFile');
+    if (fi) fi.value = '';
+}
+
+/** URL absoluta para img/canvas: rutas `/uploads/...` respecto al origen del panel. */
+function resolveWelcomePreviewMediaUrl(raw) {
+    const u = String(raw || '').trim();
+    if (!u) return '';
+    if (/^(https?:|blob:|data:)/i.test(u)) return u;
+    if (u.startsWith('/')) {
+        try {
+            return new URL(u, window.location.origin).href;
+        } catch (_) {
+            return `${window.location.origin}${u}`;
+        }
+    }
+    return u;
+}
 const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
@@ -10216,9 +10246,7 @@ async function loadWelcomePanel(guildId) {
             currentWelcomeConfig.cardLayout = window.WelcomeCardStudio.mergeCardLayout(currentWelcomeConfig.cardLayout);
         }
 
-        if (welcomeImagePreviewUrl) URL.revokeObjectURL(welcomeImagePreviewUrl);
-        welcomeImageFile = null;
-        welcomeImagePreviewUrl = '';
+        clearWelcomeImagePendingPreview();
         if (welcomeCardPreviewObjectUrl) URL.revokeObjectURL(welcomeCardPreviewObjectUrl);
         welcomeCardPreviewObjectUrl = '';
         clearTimeout(welcomeCardPreviewTimer);
@@ -10396,11 +10424,13 @@ function renderWelcomeEmbedPreview(guildId) {
     const message = applyWelcomePreviewTemplate(payload.message, sample, previewOpts);
     const footer = applyWelcomePreviewTemplate(payload.footer, sample, previewOpts);
 
-    const image = welcomeImagePreviewUrl || payload.imageUrl;
+    const imageRaw = welcomeImagePreviewUrl || payload.imageUrl;
+    const image = resolveWelcomePreviewMediaUrl(imageRaw);
     const showThumb = payload.thumbnailMode === 'avatar' || (payload.thumbnailMode === 'url' && payload.thumbnailUrl);
-    const thumbSrc = payload.thumbnailMode === 'url'
+    const thumbSrcRaw = payload.thumbnailMode === 'url'
         ? payload.thumbnailUrl
         : `https://cdn.discordapp.com/embed/avatars/${(Number(currentUser?.discriminator || 0) % 5 + 5) % 5}.png`;
+    const thumbSrc = resolveWelcomePreviewMediaUrl(thumbSrcRaw) || thumbSrcRaw;
     const safeThumbSrc = escapeHtmlForValue(thumbSrc);
     const safeImageSrc = escapeHtmlForValue(image);
 
@@ -10422,11 +10452,7 @@ function handleWelcomeImageSelection(event) {
     const status = document.getElementById('welcomeImageUploadStatus');
 
     if (!file) {
-        welcomeImageFile = null;
-        if (welcomeImagePreviewUrl) {
-            URL.revokeObjectURL(welcomeImagePreviewUrl);
-            welcomeImagePreviewUrl = '';
-        }
+        clearWelcomeImagePendingPreview();
         if (status) status.textContent = '';
         updateWelcomePreviewPanel(currentServerGuildId);
         scheduleWelcomeCropVisualUpdate();
@@ -10499,6 +10525,7 @@ function updateWelcomeCropVisual() {
 
     const crop = getWelcomeImageCropSettings();
     const urlRaw = (welcomeImagePreviewUrl || document.getElementById('welcomeImageUrl')?.value || '').trim();
+    const loadSrc = resolveWelcomePreviewMediaUrl(urlRaw);
 
     ctx.fillStyle = '#1e1f22';
     ctx.fillRect(0, 0, cssW, cssH);
@@ -10519,6 +10546,12 @@ function updateWelcomeCropVisual() {
 
     if (!urlRaw) {
         drawPlaceholder('Sin imagen\nElige archivo o URL');
+        if (hint) hint.textContent = '';
+        return;
+    }
+
+    if (!loadSrc) {
+        drawPlaceholder('URL de imagen no válida');
         if (hint) hint.textContent = '';
         return;
     }
@@ -10558,27 +10591,28 @@ function updateWelcomeCropVisual() {
         }
     };
 
-    if (welcomeCropVisualCache.src === urlRaw && welcomeCropVisualCache.img && welcomeCropVisualCache.img.complete) {
+    if (welcomeCropVisualCache.src === loadSrc && welcomeCropVisualCache.img && welcomeCropVisualCache.img.complete) {
         paint(welcomeCropVisualCache.img);
         return;
     }
 
     const im = new Image();
     im.onload = () => {
-        welcomeCropVisualCache = { src: urlRaw, img: im };
+        welcomeCropVisualCache = { src: loadSrc, img: im };
         paint(im);
     };
     im.onerror = () => {
         welcomeCropVisualCache = { src: '', img: null };
         drawPlaceholder('Vista previa no disponible');
     };
-    im.src = urlRaw;
+    im.src = loadSrc;
 }
 
-async function uploadWelcomeEditedImage(guildId) {
+async function uploadWelcomeEditedImage(guildId, opts = {}) {
+    const { suppressSuccessToast = false } = opts;
     if (!welcomeImageFile) {
         showToast('Selecciona una imagen primero', 'warning');
-        return;
+        return false;
     }
 
     const uploadBtn = document.getElementById('welcomeUploadImageBtn');
@@ -10605,18 +10639,21 @@ async function uploadWelcomeEditedImage(guildId) {
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.url) {
             showToast(data.error || 'No se pudo subir la imagen', 'error');
-            return;
+            return false;
         }
 
         if (imageUrlInput) imageUrlInput.value = data.url;
         if (status) status.textContent = 'Imagen subida y aplicada';
-        showToast(getGreetingPanelMeta(currentGreetingMode).uploadSuccess, 'success');
+        if (!suppressSuccessToast) showToast(getGreetingPanelMeta(currentGreetingMode).uploadSuccess, 'success');
         welcomeCropVisualCache = { src: '', img: null };
+        clearWelcomeImagePendingPreview();
         updateWelcomePreviewPanel(guildId);
         scheduleWelcomeCropVisualUpdate();
+        return true;
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
         showToast('Error subiendo la imagen', 'error');
+        return false;
     } finally {
         if (uploadBtn) uploadBtn.disabled = false;
     }
@@ -10643,11 +10680,7 @@ async function processAndUploadWelcomeStudioBackground(guildId, file) {
 
     const imageUrlInput = document.getElementById('welcomeImageUrl');
     if (imageUrlInput) imageUrlInput.value = data.url;
-    if (welcomeImagePreviewUrl) URL.revokeObjectURL(welcomeImagePreviewUrl);
-    welcomeImageFile = null;
-    welcomeImagePreviewUrl = '';
-    const welcomeFileInput = document.getElementById('welcomeImageFile');
-    if (welcomeFileInput) welcomeFileInput.value = '';
+    clearWelcomeImagePendingPreview();
     const status = document.getElementById('welcomeImageUploadStatus');
     if (status) status.textContent = 'Imagen aplicada desde el editor';
 
@@ -10692,6 +10725,11 @@ function collectWelcomeConfigFromForm() {
 
 async function saveWelcomeConfig(guildId, showSuccessToast = true) {
     const meta = getGreetingPanelMeta(currentGreetingMode);
+    if (welcomeImageFile) {
+        const uploaded = await uploadWelcomeEditedImage(guildId, { suppressSuccessToast: true });
+        if (!uploaded) return false;
+    }
+
     const payload = collectWelcomeConfigFromForm();
     if (!payload.channelId) {
         showToast(meta.channelRequired, 'warning');
@@ -10710,8 +10748,19 @@ async function saveWelcomeConfig(guildId, showSuccessToast = true) {
             return false;
         }
 
+        const savedCfg = data.config || payload;
+        setCurrentGreetingConfig(currentGreetingMode, savedCfg);
+
+        const imageUrlInput = document.getElementById('welcomeImageUrl');
+        if (imageUrlInput && data.config && Object.prototype.hasOwnProperty.call(data.config, 'imageUrl')) {
+            imageUrlInput.value = String(data.config.imageUrl || '');
+        }
+        clearWelcomeImagePendingPreview();
+        welcomeCropVisualCache = { src: '', img: null };
+        updateWelcomePreviewPanel(guildId);
+        scheduleWelcomeCropVisualUpdate();
+
         if (showSuccessToast) showToast(meta.saveSuccess, 'success');
-        setCurrentGreetingConfig(currentGreetingMode, data.config || payload);
         return true;
     } catch (error) {
         console.error('Error guardando configuración de greetings:', error);
