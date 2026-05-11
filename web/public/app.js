@@ -5789,18 +5789,122 @@ async function loadNotificationsPanel(guildId) {
     }
 }
 
+function gachaRarityMeta(rarity = 'N') {
+    const key = String(rarity || 'N').toUpperCase();
+    const map = {
+        SSR: { label: 'SSR', color: '#f1c40f' },
+        SR: { label: 'SR', color: '#9b59b6' },
+        R: { label: 'R', color: '#3498db' },
+        N: { label: 'N', color: '#95a5a6' }
+    };
+    return map[key] || map.N;
+}
+
+function renderGachaRarityBadge(rarity, size = 'sm') {
+    const meta = gachaRarityMeta(rarity);
+    return `<span class="levels-tier-badge levels-tier-badge--${size}" style="--tier-color:${meta.color};">${meta.label}</span>`;
+}
+
+function renderGachaLeaderboardPodium(entries) {
+    const order = [entries[1], entries[0], entries[2]];
+    return `
+        <div class="levels-podium">
+            ${order.map((entry) => {
+                if (!entry) return '<div class="levels-podium-slot is-empty"></div>';
+                const realRank = entries.indexOf(entry) + 1;
+                const positionClass = realRank === 1 ? 'levels-podium-slot--first' : realRank === 2 ? 'levels-podium-slot--second' : 'levels-podium-slot--third';
+                const rarity = gachaRarityMeta(entry.bestRarity);
+                const progress = Math.max(0, Math.min(100, Number(entry.progressPercent) || 0));
+                return `
+                    <div class="levels-podium-slot ${positionClass}">
+                        <div class="levels-podium-medal">${renderPodiumMedal(realRank)}</div>
+                        ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${rarity.color};">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${rarity.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                        <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
+                        <div class="levels-podium-level">${levelingFormatNumber(entry.coins)} monedas</div>
+                        <div class="levels-podium-progress">
+                            <div class="levels-podium-progress-bar" style="width:${progress}%; --tier-color:${rarity.color};"></div>
+                        </div>
+                        <div class="levels-podium-xp">${levelingFormatNumber(entry.collectionCount)} ítems · ${levelingFormatNumber(entry.totalClaims)} claims</div>
+                        ${renderGachaRarityBadge(entry.bestRarity, 'sm')}
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function buildGachaLeaderboardHtml(payload) {
+    const rows = Array.isArray(payload?.leaderboard) ? payload.leaderboard : [];
+    if (!rows.length) {
+        return `
+            <div class="levels-empty-card">
+                <div class="levels-empty-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </div>
+                <div>
+                    <h5>Todavía no hay datos</h5>
+                    <p>Cuando los miembros empiecen a usar la economía y el gacha aparecerán aquí.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    const top3 = rows.slice(0, 3);
+    const rest = rows.slice(3, 15);
+    const restHtml = rest.map((item, idx) => {
+        const rank = idx + 4;
+        const progress = Math.max(0, Math.min(100, Number(item.progressPercent) || 0));
+        const rarity = gachaRarityMeta(item.bestRarity);
+        return `
+            <div class="levels-rank-row" style="--tier-color:${rarity.color};">
+                <div class="levels-rank-number">#${rank}</div>
+                ${item.avatar ? `<img src="${item.avatar}" alt="avatar" class="levels-rank-avatar">` : `<div class="levels-rank-avatar levels-rank-avatar--placeholder">${(item.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                <div class="levels-rank-body">
+                    <div class="levels-rank-head">
+                        <span class="levels-rank-name">${escapeHtml(item.tag || item.username || 'Usuario')}</span>
+                        <div class="levels-rank-head-tags">
+                            ${renderGachaRarityBadge(item.bestRarity, 'sm')}
+                            <span class="levels-rank-level">${levelingFormatNumber(item.coins)} monedas</span>
+                        </div>
+                    </div>
+                    <div class="levels-rank-progress">
+                        <div class="levels-rank-progress-bar" style="width:${progress}%; --tier-color:${rarity.color};"></div>
+                    </div>
+                    <div class="levels-rank-meta">
+                        <span>${levelingFormatNumber(item.totalClaims)} claims</span>
+                        <span>${levelingFormatNumber(item.collectionCount)} colección</span>
+                        <span>${levelingFormatNumber(item.totalRolls)} rolls</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        ${renderGachaLeaderboardPodium(top3)}
+        <div class="levels-rank-list">
+            ${restHtml || '<div class="levels-rank-empty">Solo hay ' + rows.length + ' miembro(s) con actividad gacha.</div>'}
+        </div>
+    `;
+}
+
 async function loadGachaPanel(guildId) {
     const container = document.getElementById('gachaContainer');
     if (!container) return;
 
+    container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando economía y gacha...</p></div>';
+
     try {
-        const [channelsResponse, configResponse, statsResponse, myInventoryResponse, marketResponse, shopResponse] = await Promise.all([
+        const [channelsResponse, configResponse, statsResponse, myInventoryResponse, marketResponse, shopResponse, leaderboardResponse] = await Promise.all([
             fetchWithCredentials(`/api/guild/${guildId}/channels`).catch(() => null),
             fetchWithCredentials(`/api/guild/${guildId}/gacha-config`).catch(() => null),
             fetchWithCredentials(`/api/guild/${guildId}/gacha-stats`).catch(() => null),
             fetchWithCredentials(`/api/guild/${guildId}/gacha-inventory?limit=300`).catch(() => null),
             fetchWithCredentials(`/api/guild/${guildId}/gacha-market`).catch(() => null),
-            fetchWithCredentials(`/api/guild/${guildId}/gacha-shop`).catch(() => null)
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-shop`).catch(() => null),
+            fetchWithCredentials(`/api/guild/${guildId}/gacha-leaderboard`).catch(() => null)
         ]);
 
         const channels = channelsResponse && channelsResponse.ok
@@ -5855,18 +5959,10 @@ async function loadGachaPanel(guildId) {
             : { items: [] };
         const shopItems = Array.isArray(shopPayload.items) ? shopPayload.items : [];
 
-        const topRows = Array.isArray(stats.topClaimers) ? stats.topClaimers.slice(0, 10) : [];
-        const topHtml = topRows.length
-            ? topRows.map((row, index) => `
-                <div class="dpx-item-row">
-                    <div class="dpx-item-main">
-                        <div class="dpx-item-title">#${index + 1} ${escapeHtml(row.username || row.tag || `ID ${row.userId}`)}</div>
-                        <div class="dpx-item-sub">Claims: ${Number(row.totalClaims || 0).toLocaleString('es-ES')} · Colección: ${Number(row.collectionCount || 0).toLocaleString('es-ES')} · Monedas: ${Number(row.coins || 0).toLocaleString('es-ES')}</div>
-                    </div>
-                    <div class="dpx-item-meta">${escapeHtml(row.bestRarity || 'N')}</div>
-                </div>
-            `).join('')
-            : '<div class="dpx-empty">Aún no hay actividad en gacha.</div>';
+        const gachaLeaderboard = leaderboardResponse && leaderboardResponse.ok
+            ? await leaderboardResponse.json().catch(() => ({ leaderboard: [] }))
+            : { leaderboard: [] };
+        const gachaLeaderboardHtml = buildGachaLeaderboardHtml(gachaLeaderboard);
 
         container.innerHTML = `
             <div class="dpx-panel">
@@ -5879,6 +5975,7 @@ async function loadGachaPanel(guildId) {
                     glow2: 'rgba(124,77,255,0.24)',
                     actionsHtml: `
                         <span class="dpx-status-chip ${config.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${config.enabled ? 'Activo' : 'Inactivo'}</span>
+                        <button type="button" class="btn btn-secondary" id="refreshGachaPanelBtn">Actualizar</button>
                         <button type="button" class="btn btn-primary" id="saveGachaConfigBtn">Guardar</button>
                     `
                 })}
@@ -5887,6 +5984,7 @@ async function loadGachaPanel(guildId) {
                     ${dpxRenderStatCard({ label: 'Rolls totales', value: Number(stats.totalRolls || 0).toLocaleString('es-ES'), hint: 'Rolls registrados', accent: '#ff78d1' })}
                     ${dpxRenderStatCard({ label: 'Claims totales', value: Number(stats.totalClaims || 0).toLocaleString('es-ES'), hint: 'Personajes reclamados', accent: '#7ef0b4' })}
                     ${dpxRenderStatCard({ label: 'Colección global', value: Number(stats.totalCollection || 0).toLocaleString('es-ES'), hint: 'Suma de colecciones del servidor', accent: '#f6c244' })}
+                    ${dpxRenderStatCard({ label: 'Artículos en tienda', value: Number(shopItems.length || 0).toLocaleString('es-ES'), hint: 'Catálogo disponible en /tienda', accent: '#8fd3ff' })}
                 </div>
                 ${dpxRenderTabs([
                     { key: 'gacha-config', label: 'Gacha', iconName: 'gear' },
@@ -5999,14 +6097,14 @@ async function loadGachaPanel(guildId) {
                 </section>
 
                 <section class="dpx-tab-panel" data-dpx-panel="gacha-top">
-                    <div class="dpx-section">
+                    <div class="dpx-section levels-leaderboard-shell">
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
                                 <h4>Ranking del servidor</h4>
-                                <p>Usuarios con más actividad y colección en el sistema gacha.</p>
+                                <p>${Number(gachaLeaderboard.totalTrackedUsers || 0).toLocaleString('es-ES')} miembro(s) con actividad en economía y gacha.</p>
                             </div>
                         </div>
-                        <div class="dpx-item-list">${topHtml}</div>
+                        <div id="gachaLeaderboardWrap">${gachaLeaderboardHtml}</div>
                     </div>
                 </section>
 
@@ -6099,6 +6197,11 @@ async function loadGachaPanel(guildId) {
         `;
 
         bindDpxTabs(container);
+
+        const refreshBtn = document.getElementById('refreshGachaPanelBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => loadGachaPanel(guildId));
+        }
 
         const saveBtn = document.getElementById('saveGachaConfigBtn');
         if (saveBtn) {
