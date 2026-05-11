@@ -96,7 +96,8 @@ async function resolveConfig(guildId) {
     if (!guildId) return null;
     const cfg = await ticketStore.getTicketConfig(guildId);
     if (!cfg || cfg.enabled === false) return null;
-    if (!cfg.panelChannelId || !cfg.messageId) return null;
+    /* No exigir messageId/panelChannelId aquí: al guardar desde el panel a veces llega messageId vacío
+       y se pisaba el valor en BD; los botones del mensaje antiguo seguían siendo válidos. */
     return cfg;
 }
 
@@ -336,7 +337,7 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
         console.warn(`⚠️ Error comprobando informe ${reportId}:`, err?.message || err);
     }
 
-    const cfg = await resolveConfig(guild.id).catch(() => null);
+    const cfg = await ticketStore.getTicketConfig(guild.id).catch(() => null);
     const receiptHistoryChannelId = String(cfg?.receiptHistoryChannelId || '').trim();
     const receiptHistoryChannel = receiptHistoryChannelId
         ? (guild.channels.cache.get(receiptHistoryChannelId) || await guild.channels.fetch(receiptHistoryChannelId).catch(() => null))
@@ -361,8 +362,10 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
         )
         .setTimestamp();
 
+    const sendDmReceipt = cfg?.sendDmReceipt !== false;
+
     let dmSent = false;
-    if (ownerId) {
+    if (sendDmReceipt && ownerId) {
         const ownerUser = await interaction.client.users.fetch(ownerId).catch(() => null);
         if (ownerUser) {
             await ownerUser.send({ embeds: [buildReportEmbed()], files: [createTranscriptFile()] }).then(() => {

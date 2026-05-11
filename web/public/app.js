@@ -10741,6 +10741,47 @@ function wireTicketsManageControls() {
         });
     }
 
+    /* Menú ⋯ (config / categorías): una sola vez — si se registra en cada renderTicketsManage,
+       varios listeners alternan display y el menú parece roto. */
+    const settingsBtn = document.getElementById('ticketManageSettingsBtn');
+    const settingsMenu = document.getElementById('ticketManageSettingsMenu');
+    if (settingsBtn && settingsMenu && !settingsBtn.dataset.tmDropdownWired) {
+        settingsBtn.dataset.tmDropdownWired = '1';
+        settingsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const open = settingsMenu.style.display === 'block';
+                settingsMenu.style.display = open ? 'none' : 'block';
+            });
+            document.addEventListener('click', (e) => {
+                if (settingsMenu.style.display !== 'block') return;
+                if (settingsBtn.contains(e.target) || settingsMenu.contains(e.target)) return;
+                settingsMenu.style.display = 'none';
+            });
+            settingsMenu.querySelectorAll('.tm-settings-menu-item').forEach((item) => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const newTab = item.dataset.tmTab;
+                    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+                    if (_ticketsManageState.tab === 'config' && newTab !== 'config' && hasTicketConfigChanges(guildId)) {
+                        if (!confirm('Hay cambios no guardados en la configuración. ¿Descartar cambios?')) {
+                            return;
+                        }
+                        clearDraftTicketConfig(guildId);
+                    }
+                    _ticketsManageState.tab = newTab;
+                    settingsMenu.style.display = 'none';
+                    saveTicketsManageScrollPosition();
+                    if (_ticketsManageState.lastData) {
+                        renderTicketsManage(_ticketsManageState.lastData);
+                    } else {
+                        loadTicketsManage({ showLoader: true, force: true });
+                    }
+                });
+            });
+    }
+
     // DESHABILITADO: Auto-refresh completamente desactivado
     // const autoCheckbox = document.getElementById('ticketManageAutoRefresh');
     // if (autoCheckbox && !autoCheckbox._wired) {
@@ -10858,7 +10899,7 @@ function renderTicketsManage(data) {
                 <span>Pendientes</span>
                 <span class="tm-tab-count">${pendingCount}</span>
             </button>
-            <button type="button" class="tm-tab-btn ${tab === 'active' ? 'active' : ''}" data-tm-tab="active">
+            <button type="button" class="tm-tab-btn tm-tab-btn--live ${tab === 'active' ? 'active' : ''}" data-tm-tab="active">
                 <span>Activos</span>
                 <span class="tm-tab-count">${activeCount}</span>
             </button>
@@ -10888,53 +10929,6 @@ function renderTicketsManage(data) {
         });
     });
 
-    // Manejar dropdown menu de configuración y categorías
-    const settingsBtn = document.getElementById('ticketManageSettingsBtn');
-    const settingsMenu = document.getElementById('ticketManageSettingsMenu');
-    
-    if (settingsBtn && settingsMenu) {
-        // Abrir/cerrar dropdown al hacer click en el botón
-        settingsBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isOpen = settingsMenu.style.display === 'block';
-            settingsMenu.style.display = isOpen ? 'none' : 'block';
-        });
-        
-        // Cerrar dropdown cuando se hace click afuera
-        const closeMenuListener = (e) => {
-            const isClickInsideBtn = settingsBtn.contains(e.target);
-            const isClickInsideMenu = settingsMenu.contains(e.target);
-            if (!isClickInsideBtn && !isClickInsideMenu) {
-                settingsMenu.style.display = 'none';
-            }
-        };
-        
-        // No reasignar el listener cada vez - hacerlo solo una vez
-        if (!document._ticketSettingsMenuListenerAdded) {
-            document.addEventListener('click', closeMenuListener);
-            document._ticketSettingsMenuListenerAdded = true;
-        }
-        
-        // Manejar clicks en los items del menú
-        settingsMenu.querySelectorAll('.tm-settings-menu-item').forEach((item) => {
-            item.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const newTab = item.dataset.tmTab;
-                const guildId = _ticketsManageState.guildId || currentServerGuildId;
-                if (_ticketsManageState.tab === 'config' && newTab !== 'config' && hasTicketConfigChanges(guildId)) {
-                    if (!confirm('Hay cambios no guardados en la configuración. ¿Descartar cambios?')) {
-                        return;
-                    }
-                    clearDraftTicketConfig(guildId);
-                }
-                _ticketsManageState.tab = newTab;
-                settingsMenu.style.display = 'none';
-                saveTicketsManageScrollPosition();
-                renderTicketsManage(_ticketsManageState.lastData);
-            });
-        });
-    }
-
     // Restaurar scroll position
     restoreTicketsManageScrollPosition();
 
@@ -10953,8 +10947,8 @@ function saveDraftTicketConfig(guildId) {
         enabled: document.getElementById('tm_ticketEnabled')?.checked,
         panelChannelId: document.getElementById('tm_ticketChannelSelect')?.value || '',
         requestChannelId: document.getElementById('tm_ticketRequestChannelSelect')?.value || '',
-       receiptHistoryChannelId: document.getElementById('tm_ticketReceiptChannelSelect')?.value || '',
-       sendDmReceipt: document.getElementById('tm_ticketSendDmReceipt')?.checked,
+        receiptHistoryChannelId: document.getElementById('tm_ticketReceiptChannelSelect')?.value || '',
+        sendDmReceipt: document.getElementById('tm_ticketSendDmReceipt')?.checked === true,
         title: document.getElementById('tm_ticketTitle')?.value || '',
         message: document.getElementById('tm_ticketMessage')?.value || '',
         footer: document.getElementById('tm_ticketFooter')?.value || '',
@@ -11051,27 +11045,55 @@ function renderTicketManageConfig(cfg, guildId) {
     const channels = Array.isArray(window._lastGuildChannels) ? window._lastGuildChannels : [];
     const roles = Array.isArray(window._lastGuildRoles) ? window._lastGuildRoles : [];
 
+    const sendDmDefault = cfg.sendDmReceipt !== false;
+
     container.innerHTML = `
         <div class="dpx-section">
             <h4>Configuración de tickets</h4>
+            <input type="hidden" id="tm_ticketMessageId" value="${escapeHtmlForValue(cfg.messageId || '')}">
+            <input type="hidden" id="tm_ticketColor" value="#${escapeHtmlForValue(String(cfg.color || '7c4dff').replace(/#/g, ''))}">
             <div class="dpx-field-grid" style="margin-top:1rem; gap: 0.8rem;">
-                <div class="dpx-field">
-                    <label>Activo</label>
-                    <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
+                <div class="dpx-field is-full tm-switch-field tm-switch-field--hero">
+                    <div class="tm-switch-copy">
+                        <span class="tm-switch-title">Sistema activo</span>
+                        <span class="tm-switch-desc">Desactiva para ocultar el panel sin borrar la configuración.</span>
+                    </div>
+                    <label class="tm-switch tm-switch--accent" title="Activar o pausar tickets">
+                        <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
+                        <span class="tm-switch-slider"></span>
+                    </label>
                 </div>
                 <div class="dpx-field">
-                    <label>Canal del panel</label>
+                    <label for="tm_ticketChannelSelect">Canal del panel</label>
                     <select id="tm_ticketChannelSelect" class="form-control">
                         <option value="">Selecciona un canal</option>
                         ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.panelChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
                     </select>
                 </div>
                 <div class="dpx-field">
-                    <label>Canal de peticiones</label>
+                    <label for="tm_ticketRequestChannelSelect">Canal de peticiones</label>
                     <select id="tm_ticketRequestChannelSelect" class="form-control">
                         <option value="">Usar el mismo canal</option>
                         ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.requestChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
                     </select>
+                </div>
+                <div class="dpx-field is-full">
+                    <label for="tm_ticketReceiptChannelSelect">Canal de historial de comprobantes</label>
+                    <p class="tm-field-hint">Copia del informe al cerrar (visible para staff con acceso al canal).</p>
+                    <select id="tm_ticketReceiptChannelSelect" class="form-control">
+                        <option value="">Sin canal dedicado</option>
+                        ${(channels || []).filter((c) => c.type === 0).map((c) => `<option value="${c.id}" ${String(cfg.receiptHistoryChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="dpx-field is-full tm-switch-field">
+                    <div class="tm-switch-copy">
+                        <span class="tm-switch-title">Comprobante por mensaje directo</span>
+                        <span class="tm-switch-desc">Al cerrar el ticket, envía al usuario que lo abrió un embed y la transcripción (.txt).</span>
+                    </div>
+                    <label class="tm-switch tm-switch--mint" title="Enviar copia del cierre por MD">
+                        <input type="checkbox" id="tm_ticketSendDmReceipt" ${sendDmDefault ? 'checked' : ''}>
+                        <span class="tm-switch-slider"></span>
+                    </label>
                 </div>
                 <div class="dpx-field is-full">
                     <label>Título</label>
@@ -11139,6 +11161,10 @@ function renderTicketManageConfig(cfg, guildId) {
                 document.getElementById('tm_ticketEnabled').checked = draft.enabled;
                 document.getElementById('tm_ticketChannelSelect').value = draft.panelChannelId;
                 document.getElementById('tm_ticketRequestChannelSelect').value = draft.requestChannelId;
+                const rc = document.getElementById('tm_ticketReceiptChannelSelect');
+                if (rc) rc.value = draft.receiptHistoryChannelId || '';
+                const dmR = document.getElementById('tm_ticketSendDmReceipt');
+                if (dmR) dmR.checked = draft.sendDmReceipt !== false;
                 document.getElementById('tm_ticketTitle').value = draft.title;
                 document.getElementById('tm_ticketMessage').value = draft.message;
                 document.getElementById('tm_ticketFooter').value = draft.footer;
@@ -11322,8 +11348,8 @@ async function saveTicketsManageConfig(guildId, showSuccessToast = true) {
         enabled: document.getElementById('tm_ticketEnabled')?.checked === true,
         panelChannelId: document.getElementById('tm_ticketChannelSelect')?.value || '',
         requestChannelId: document.getElementById('tm_ticketRequestChannelSelect')?.value || '',
-       receiptHistoryChannelId: document.getElementById('tm_ticketReceiptChannelSelect')?.value || '',
-       sendDmReceipt: document.getElementById('tm_ticketSendDmReceipt')?.checked === true,
+        receiptHistoryChannelId: document.getElementById('tm_ticketReceiptChannelSelect')?.value || '',
+        sendDmReceipt: document.getElementById('tm_ticketSendDmReceipt')?.checked === true,
         adminRoleIds,
         title: document.getElementById('tm_ticketTitle')?.value || 'Soporte',
         message: document.getElementById('tm_ticketMessage')?.value || '',
