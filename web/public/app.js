@@ -5206,6 +5206,9 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
     };
     let streamSourcesSearchQuery = '';
 
+    const platformIconNames = { twitch: 'twitch', youtube: 'youtube', tiktok: 'tiktok', custom: 'rss' };
+    const platformLabels = { twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok', custom: 'Custom / RSS' };
+
     const streamUrlPlaceholders = {
         twitch: 'https://www.twitch.tv/usuario',
         youtube: 'https://www.youtube.com/channel/UC… o /@usuario',
@@ -5236,6 +5239,21 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
             imgLabel.textContent = platform === 'twitch'
                 ? 'Imagen si no hay API de Twitch (opcional)'
                 : 'Imagen fallback / miniatura fija (opcional)';
+        }
+
+        const badge = card.querySelector('.dpx-platform-badge');
+        if (badge) {
+            const iconName = platformIconNames[platform] || 'rss';
+            badge.className = `dpx-platform-badge platform-${platform}`;
+            badge.innerHTML = dpxIcon(iconName, 'dpx-platform-icon');
+        }
+        const meta = card.querySelector('.dpx-source-meta');
+        if (meta) meta.textContent = platformLabels[platform] || 'Custom / RSS';
+        const headName = card.querySelector('.stream-source-head-name');
+        const nameInput = card.querySelector('.stream-source-name');
+        if (headName && nameInput) {
+            const n = String(nameInput.value || '').trim();
+            headName.textContent = n || 'Nueva fuente';
         }
     }
 
@@ -5303,8 +5321,6 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
         }
     }
 
-    const platformIconNames = { twitch: 'twitch', youtube: 'youtube', tiktok: 'tiktok', custom: 'rss' };
-    const platformLabels = { twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok', custom: 'Custom / RSS' };
     const sourceCardHtml = (source, index) => {
         const platform = String(source.platform || 'custom');
         const platformLabel = platformLabels[platform] || 'Custom';
@@ -5319,7 +5335,7 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
             <div class="dpx-item-head">
                 <div class="dpx-item-head-title">
                     <span class="dpx-platform-badge platform-${platform}">${dpxIcon(platformIconName, 'dpx-platform-icon')}</span>
-                    <span>${escapeHtml(source.name || 'Nueva fuente')}</span>
+                    <span class="stream-source-head-name">${escapeHtml(source.name || 'Nueva fuente')}</span>
                     <span class="dpx-source-meta">${escapeHtml(platformLabel)}</span>
                 </div>
                 <div style="display:inline-flex; align-items:center; gap:0.5rem;">
@@ -5454,6 +5470,9 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
         streamSourcesListEl.addEventListener('input', (event) => {
             const target = event.target;
             if (!target || !target.classList) return;
+            if (target.classList.contains('stream-source-name')) {
+                applyPlatformHintsToCard(target.closest('.stream-source-card'));
+            }
             if (
                 target.classList.contains('stream-source-url')
                 || target.classList.contains('stream-source-name')
