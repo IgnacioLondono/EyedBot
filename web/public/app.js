@@ -3709,20 +3709,20 @@ async function loadLogs() {
             clearInterval(logsInterval);
         }
         
-        // Actualizar logs cada 2 segundos
-        logsInterval = setInterval(async () => {
-            const level = document.getElementById('logLevelFilter').value;
-            const response = await fetchWithCredentials(`/api/logs?limit=100${level ? '&level=' + level : ''}`);
-            if (response.ok) {
-                const logs = await response.json();
-                if (logs && logs.length > 0) {
-                    displayLogs(logs);
-                    if (autoScroll) {
-                        container.scrollTop = container.scrollHeight;
-                    }
-                }
-            }
-        }, 2000);
+        // DESHABILITADO: No actualizar logs automáticamente
+        // logsInterval = setInterval(async () => {
+        //     const level = document.getElementById('logLevelFilter').value;
+        //     const response = await fetchWithCredentials(`/api/logs?limit=100${level ? '&level=' + level : ''}`);
+        //     if (response.ok) {
+        //         const logs = await response.json();
+        //         if (logs && logs.length > 0) {
+        //             displayLogs(logs);
+        //             if (autoScroll) {
+        //                 container.scrollTop = container.scrollHeight;
+        //             }
+        //         }
+        //     }
+        // }, 2000);
     } catch (error) {
         console.error('Error cargando logs:', error);
         container.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--error-color);"><p>Error al cargar logs: ${error.message}</p></div>`;
@@ -10682,7 +10682,8 @@ function openTicketsManagePane() {
     _ticketsManageState.guildId = String(currentServerGuildId || '');
     wireTicketsManageControls();
     loadTicketsManage({ showLoader: true });
-    startTicketsManageAutoRefresh();
+    // DESHABILITADO: No hacer auto-refresh
+    // startTicketsManageAutoRefresh();
 }
 
 function wireTicketsManageControls() {
@@ -10692,17 +10693,21 @@ function wireTicketsManageControls() {
         refreshBtn.addEventListener('click', () => loadTicketsManage({ showLoader: false, force: true }));
     }
 
-    const autoCheckbox = document.getElementById('ticketManageAutoRefresh');
-    if (autoCheckbox && !autoCheckbox._wired) {
-        autoCheckbox._wired = true;
-        autoCheckbox.addEventListener('change', () => {
-            if (autoCheckbox.checked) startTicketsManageAutoRefresh();
-            else stopTicketsManageAutoRefresh();
-        });
-    }
+    // DESHABILITADO: Auto-refresh completamente desactivado
+    // const autoCheckbox = document.getElementById('ticketManageAutoRefresh');
+    // if (autoCheckbox && !autoCheckbox._wired) {
+    //     autoCheckbox._wired = true;
+    //     autoCheckbox.addEventListener('change', () => {
+    //         if (autoCheckbox.checked) startTicketsManageAutoRefresh();
+    //         else stopTicketsManageAutoRefresh();
+    //     });
+    // }
 }
 
 function startTicketsManageAutoRefresh() {
+    // DESHABILITADO: Auto-refresh completamente desactivado
+    return;
+    /*
     stopTicketsManageAutoRefresh();
     const autoCheckbox = document.getElementById('ticketManageAutoRefresh');
     if (autoCheckbox && !autoCheckbox.checked) return;
@@ -10715,6 +10720,7 @@ function startTicketsManageAutoRefresh() {
         }
         loadTicketsManage({ showLoader: false });
     }, TICKETS_MANAGE_AUTO_REFRESH_MS);
+    */
 }
 
 function stopTicketsManageAutoRefresh() {
