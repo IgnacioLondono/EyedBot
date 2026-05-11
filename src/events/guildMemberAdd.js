@@ -1,8 +1,8 @@
 const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
+const { resolveWelcomeUploadFile } = require('../utils/welcome-upload-resolve');
 const { AttachmentBuilder } = require('discord.js');
-const fs = require('fs');
 const path = require('path');
 
 // Queue welcome sends by channel so simultaneous joins are processed one by one.
@@ -41,28 +41,6 @@ function applyTemplate(text, member) {
         .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
 }
 
-function resolveLocalUploadFile(rawUrl = '') {
-    const raw = String(rawUrl || '').trim();
-    if (!raw) return null;
-
-    let uploadPath = '';
-    if (raw.startsWith('/uploads/')) {
-        uploadPath = raw;
-    } else {
-        try {
-            const parsed = new URL(raw);
-            if (String(parsed.pathname || '').startsWith('/uploads/')) uploadPath = parsed.pathname;
-        } catch {
-            uploadPath = '';
-        }
-    }
-
-    if (!uploadPath) return null;
-    const absolute = path.join(__dirname, '..', '..', 'web', 'public', uploadPath.replace(/^\/+/, ''));
-    if (!fs.existsSync(absolute)) return null;
-    return absolute;
-}
-
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member) {
@@ -92,7 +70,7 @@ module.exports = {
             if (welcomeStyle === 'card') {
                 let buffer;
                 try {
-                    const localImagePath = resolveLocalUploadFile(welcomeConfig.imageUrl);
+                    const localImagePath = resolveWelcomeUploadFile(welcomeConfig.imageUrl);
                     buffer = await renderWelcomeCardPng({
                         avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
                         backgroundUrl: localImagePath ? null : welcomeConfig.imageUrl,
@@ -147,20 +125,33 @@ module.exports = {
             if (welcomeConfig.footer) embed.setFooter({ text: applyTemplate(welcomeConfig.footer, member) });
             const files = [];
             if (welcomeConfig.imageUrl) {
-                const localImagePath = resolveLocalUploadFile(welcomeConfig.imageUrl);
+                const localImagePath = resolveWelcomeUploadFile(welcomeConfig.imageUrl);
                 if (localImagePath) {
                     const attachmentName = path.basename(localImagePath);
                     embed.setImage(`attachment://${attachmentName}`);
                     files.push({ attachment: localImagePath, name: attachmentName });
                 } else {
-                    embed.setImage(welcomeConfig.imageUrl);
+                    const imgUrl = String(welcomeConfig.imageUrl || '').trim();
+                    // Discord solo acepta URLs http(s) públicas; rutas /uploads/ requieren archivo local (adjunto).
+                    if (/^https?:\/\//i.test(imgUrl)) {
+                        embed.setImage(imgUrl);
+                    }
                 }
             }
 
             if (welcomeConfig.thumbnailMode === 'avatar') {
                 embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
             } else if (welcomeConfig.thumbnailMode === 'url' && welcomeConfig.thumbnailUrl) {
-                embed.setThumbnail(welcomeConfig.thumbnailUrl);
+                const thumbLocal = resolveWelcomeUploadFile(welcomeConfig.thumbnailUrl);
+                if (thumbLocal) {
+                    const thumbName = path.basename(thumbLocal);
+                    const thumbAttachName = `thumb_${thumbName}`;
+                    embed.setThumbnail(`attachment://${thumbAttachName}`);
+                    files.push({ attachment: thumbLocal, name: thumbAttachName });
+                } else {
+                    const u = String(welcomeConfig.thumbnailUrl || '').trim();
+                    if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
+                }
             }
 
             await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files, allowedMentions })).catch(() => null);

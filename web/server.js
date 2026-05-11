@@ -12,6 +12,10 @@ const os = require('os');
 const multer = require('multer');
 const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
+const {
+    canonicalWelcomeMediaUrl,
+    resolveWelcomeUploadFile: resolveLocalUploadFile
+} = require('../src/utils/welcome-upload-resolve');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../src/utils/welcome-card');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
@@ -532,32 +536,6 @@ async function recordGlobalLoginEvent(user, guilds = []) {
 
     await safeDbSet(LOGIN_ANALYTICS_KEY, analytics);
     writeLoginAnalyticsToFile(analytics);
-}
-
-function extractUploadPath(rawUrl = '') {
-    const raw = String(rawUrl || '').trim();
-    if (!raw) return '';
-
-    if (raw.startsWith('/uploads/')) return raw;
-
-    try {
-        const parsed = new URL(raw);
-        if (String(parsed.pathname || '').startsWith('/uploads/')) return parsed.pathname;
-    } catch {
-        // non-URL strings
-    }
-
-    return '';
-}
-
-function resolveLocalUploadFile(rawUrl = '') {
-    const uploadPath = extractUploadPath(rawUrl);
-    if (!uploadPath) return null;
-
-    const cleaned = uploadPath.replace(/^\/+/, '');
-    const absolute = path.join(__dirname, 'public', cleaned);
-    if (!fs.existsSync(absolute)) return null;
-    return absolute;
 }
 
 function summarizePeakDay(daily = {}, key) {
@@ -1174,9 +1152,9 @@ function normalizeGreetingConfigInput(body = {}, mode, userId) {
         message: String(body.message || fallback.message).slice(0, 2000),
         color: String(body.color || (mode === 'goodbye' ? 'ff5f9e' : '7c4dff')).replace('#', '').slice(0, 6),
         footer: String(body.footer || '').slice(0, 300),
-        imageUrl: String(body.imageUrl || '').slice(0, 1000),
+        imageUrl: canonicalWelcomeMediaUrl(body.imageUrl).slice(0, 1000),
         thumbnailMode: ['none', 'avatar', 'url'].includes(String(body.thumbnailMode || 'avatar')) ? String(body.thumbnailMode) : 'avatar',
-        thumbnailUrl: String(body.thumbnailUrl || '').slice(0, 1000),
+        thumbnailUrl: canonicalWelcomeMediaUrl(body.thumbnailUrl).slice(0, 1000),
         dmEnabled: body.dmEnabled === true,
         dmMessage: String(body.dmMessage || '').slice(0, 1000),
         updatedAt: new Date().toISOString(),
@@ -1225,7 +1203,8 @@ function buildVerifyEmbedFromConfig(cfg) {
             embed.setImage(`attachment://${attachmentName}`);
             files.push({ attachment: localImagePath, name: attachmentName });
         } else {
-            embed.setImage(cfg.imageUrl);
+            const imgUrl = String(cfg.imageUrl || '').trim();
+            if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
         }
     }
     return { embed, files };
@@ -3370,11 +3349,22 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
                 embed.setImage(`attachment://${attachmentName}`);
                 files.push({ attachment: localImagePath, name: attachmentName });
             } else {
-                embed.setImage(cfg.imageUrl);
+                const imgUrl = String(cfg.imageUrl || '').trim();
+                if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
             }
         }
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
+        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+            const thumbLocal = resolveLocalUploadFile(cfg.thumbnailUrl);
+            if (thumbLocal) {
+                const tn = path.basename(thumbLocal);
+                embed.setThumbnail(`attachment://thumb_${tn}`);
+                files.push({ attachment: thumbLocal, name: `thumb_${tn}` });
+            } else {
+                const u = String(cfg.thumbnailUrl || '').trim();
+                if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
+            }
+        }
 
         await channel.send({ content, embeds: [embed], files, allowedMentions });
 
@@ -3515,11 +3505,22 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
                 embed.setImage(`attachment://${attachmentName}`);
                 files.push({ attachment: localImagePath, name: attachmentName });
             } else {
-                embed.setImage(cfg.imageUrl);
+                const imgUrl = String(cfg.imageUrl || '').trim();
+                if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
             }
         }
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) embed.setThumbnail(cfg.thumbnailUrl);
+        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+            const thumbLocal = resolveLocalUploadFile(cfg.thumbnailUrl);
+            if (thumbLocal) {
+                const tn = path.basename(thumbLocal);
+                embed.setThumbnail(`attachment://thumb_${tn}`);
+                files.push({ attachment: thumbLocal, name: `thumb_${tn}` });
+            } else {
+                const u = String(cfg.thumbnailUrl || '').trim();
+                if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
+            }
+        }
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;
         const allowedMentions = cfg?.mentionUser ? { parse: ['users'] } : undefined;
