@@ -773,9 +773,10 @@ function switchServerPane(paneId, button = null) {
     targetPane.classList.add('active');
     currentServerPaneId = paneId;
 
-    const contentArea = document.querySelector('.server-content-area');
-    if (contentArea) contentArea.scrollTop = 0;
-    targetPane.scrollTop = 0;
+    // No hacer scroll automático - mantener posición del usuario
+    // const contentArea = document.querySelector('.server-content-area');
+    // if (contentArea) contentArea.scrollTop = 0;
+    // targetPane.scrollTop = 0;
 
     if (button) {
         activateServerSideButton(button);
@@ -10918,78 +10919,101 @@ function renderTicketManageConfig(cfg, guildId) {
         <div class="dpx-section">
             <h4>Configuración de tickets</h4>
             
-            <!-- SECCIÓN: Configuración básica -->
-            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <h5 style="margin-top: 0;">📋 Configuración básica</h5>
-                <div class="dpx-field-grid">
-                    <div class="dpx-field">
-                        <label>Activo</label>
-                        <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                <!-- COLUMNA IZQUIERDA: Configuración básica -->
+                <div style="padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                    <h5 style="margin-top: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>
+                        Configuración
+                    </h5>
+                    <div class="dpx-field-grid" style="gap: 0.8rem;">
+                        <div class="dpx-field">
+                            <label>Activo</label>
+                            <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
+                        </div>
+                        <div class="dpx-field">
+                            <label>Canal del panel</label>
+                            <select id="tm_ticketChannelSelect" class="form-control">
+                                <option value="">Selecciona un canal</option>
+                                ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.panelChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="dpx-field">
+                            <label>Canal de peticiones</label>
+                            <select id="tm_ticketRequestChannelSelect" class="form-control">
+                                <option value="">Usar el mismo canal</option>
+                                ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.requestChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="dpx-field is-full">
+                            <label>Título</label>
+                            <input id="tm_ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
+                        </div>
+                        <div class="dpx-field is-full">
+                            <label>Descripción</label>
+                            <textarea id="tm_ticketMessage" class="form-control" rows="2" placeholder="Explicación...">${escapeHtmlForValue(cfg.message || '')}</textarea>
+                        </div>
+                        <div class="dpx-field">
+                            <label>Texto del botón</label>
+                            <input id="tm_ticketButtonLabel" class="form-control" placeholder="Ej: Crear ticket" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}">
+                        </div>
+                        <div class="dpx-field">
+                            <label>Footer</label>
+                            <input id="tm_ticketFooter" class="form-control" placeholder="Ej: © 2024" value="${escapeHtmlForValue(cfg.footer || '')}">
+                        </div>
+                        <div class="dpx-field is-full">
+                            <label>Roles gestores</label>
+                            <p style="font-size: 0.8rem; color: rgba(255,255,255,0.6); margin: 0.25rem 0 0.5rem 0;">Ctrl+Click para múltiples</p>
+                            <select id="tm_ticketAdminRoles" class="form-control" multiple size="4">
+                                ${(roles || []).map((r) => `<option value="${r.id}" ${Array.isArray(cfg.adminRoleIds) && cfg.adminRoleIds.map(String).includes(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                            </select>
+                        </div>
                     </div>
-                    <div class="dpx-field">
-                        <label>Canal donde mostrar el panel</label>
-                        <select id="tm_ticketChannelSelect" class="form-control">
-                            <option value="">Selecciona un canal</option>
-                            ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.panelChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                        </select>
+                </div>
+
+                <!-- COLUMNA DERECHA: Opciones -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- Categorías de tickets -->
+                    <div style="padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                        <h5 style="margin-top: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m0 0H3m2 0v4m0 0H5m-2 0a2 2 0 0 0 2 2h4m0 0v4m0 0h4m0 0a2 2 0 0 0 2-2v-4m0 0h2m-2 0v-4m0 0h2m0 0a2 2 0 0 0-2-2h-4"/></svg>
+                            Tipos de tickets
+                        </h5>
+                        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); margin: 0 0 0.8rem 0;">Categorías que verá el usuario</p>
+                        <div id="tm_ticketCategoriesEditor" class="options-editor"></div>
                     </div>
-                    <div class="dpx-field">
-                        <label>Canal donde recibir peticiones</label>
-                        <select id="tm_ticketRequestChannelSelect" class="form-control">
-                            <option value="">Usar el mismo canal del panel</option>
-                            ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.requestChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                        </select>
+
+                    <!-- Problemas comunes -->
+                    <div style="padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                        <h5 style="margin-top: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                            Problemas comunes
+                        </h5>
+                        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); margin: 0 0 0.8rem 0;">FAQ rápidas</p>
+                        <div id="tm_ticketCommonProblemsEditor" class="options-editor"></div>
                     </div>
-                    <div class="dpx-field is-full">
-                        <label>Título del panel</label>
-                        <input id="tm_ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
-                    </div>
-                    <div class="dpx-field is-full">
-                        <label>Descripción/Mensaje del panel</label>
-                        <textarea id="tm_ticketMessage" class="form-control" rows="3" placeholder="Explicación sobre cómo usar los tickets...">${escapeHtmlForValue(cfg.message || '')}</textarea>
-                    </div>
-                    <div class="dpx-field">
-                        <label>Texto del botón</label>
-                        <input id="tm_ticketButtonLabel" class="form-control" placeholder="Ej: Crear ticket" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}">
-                    </div>
-                    <div class="dpx-field">
-                        <label>Pie de página</label>
-                        <input id="tm_ticketFooter" class="form-control" placeholder="Ej: © 2024 Tu servidor" value="${escapeHtmlForValue(cfg.footer || '')}">
-                    </div>
-                    <div class="dpx-field is-full">
-                        <label>Roles que pueden gestionar tickets</label>
-                        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); margin: 0.25rem 0 0.5rem 0;">Selecciona múltiples roles (Ctrl+Click)</p>
-                        <select id="tm_ticketAdminRoles" class="form-control" multiple size="6">
-                            ${(roles || []).map((r) => `<option value="${r.id}" ${Array.isArray(cfg.adminRoleIds) && cfg.adminRoleIds.map(String).includes(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
-                        </select>
+
+                    <!-- Servidores -->
+                    <div style="padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                        <h5 style="margin-top: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                            Servidores
+                        </h5>
+                        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); margin: 0 0 0.8rem 0;">Opcional: Survival, Creative, etc.</p>
+                        <div id="tm_ticketMinecraftServersEditor" class="options-editor"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- SECCIÓN: Categorías de tickets -->
-            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <h5 style="margin-top: 0;">🏷️ Tipos de tickets</h5>
-                <p style="font-size: 0.9rem; color: rgba(255,255,255,0.7); margin: 0 0 1rem 0;">Opciones que verá el usuario al crear un ticket (ej: Soporte Técnico, Reporte de Bug, Sugerencia)</p>
-                <div id="tm_ticketCategoriesEditor" class="options-editor"></div>
-            </div>
-
-            <!-- SECCIÓN: Problemas comunes -->
-            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <h5 style="margin-top: 0;">❓ Problemas comunes</h5>
-                <p style="font-size: 0.9rem; color: rgba(255,255,255,0.7); margin: 0 0 1rem 0;">Preguntas frecuentes que el usuario puede seleccionar (ej: "¿Cómo pago?", "¿Dónde están mis items?")</p>
-                <div id="tm_ticketCommonProblemsEditor" class="options-editor"></div>
-            </div>
-
-            <!-- SECCIÓN: Servidores (opcional) -->
-            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <h5 style="margin-top: 0;">⛏️ Servidores (opcional)</h5>
-                <p style="font-size: 0.9rem; color: rgba(255,255,255,0.7); margin: 0 0 1rem 0;">Si tienes múltiples servidores, agrega las opciones aquí (ej: "Survival", "Creative", "PvP")</p>
-                <div id="tm_ticketMinecraftServersEditor" class="options-editor"></div>
-            </div>
-
-            <div style="margin-top:2rem;display:flex;gap:0.5rem;">
-                <button class="btn btn-secondary" id="tm_saveTicketBtn">💾 Guardar cambios</button>
-                <button class="btn btn-primary" id="tm_publishTicketBtn">🚀 Publicar panel en Discord</button>
+            <div style="margin-top:2rem;display:flex;gap:0.6rem; flex-wrap: wrap;">
+                <button class="btn btn-secondary" id="tm_saveTicketBtn" style="flex: 1; min-width: 150px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 0.4rem; vertical-align: -3px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Guardar
+                </button>
+                <button class="btn btn-primary" id="tm_publishTicketBtn" style="flex: 1; min-width: 150px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 0.4rem; vertical-align: -3px;"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+                    Publicar
+                </button>
             </div>
         </div>
     `;
@@ -11010,12 +11034,12 @@ function renderTicketManageConfig(cfg, guildId) {
             row.innerHTML = `
                 <div class="option-fields">
                     <input type="text" class="form-control option-label" placeholder="Nombre/Título" value="${escapeHtmlForValue(it.label || '')}" style="font-weight: 500;">
-                    <input type="text" class="form-control option-desc" placeholder="Descripción (mostrada cuando selecciona)" value="${escapeHtmlForValue(it.description || '')}" style="font-size: 0.9rem; opacity: 0.8;">
+                    <input type="text" class="form-control option-desc" placeholder="Descripción" value="${escapeHtmlForValue(it.description || '')}" style="font-size: 0.9rem; opacity: 0.8;">
                 </div>
                 <div class="option-actions">
-                    <button type="button" class="btn btn-sm option-move-up" title="Subir">▲</button>
-                    <button type="button" class="btn btn-sm option-move-down" title="Bajar">▼</button>
-                    <button type="button" class="btn btn-sm btn-danger option-remove" title="Eliminar">✖</button>
+                    <button type="button" class="btn btn-sm option-move-up" title="Subir"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                    <button type="button" class="btn btn-sm option-move-down" title="Bajar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                    <button type="button" class="btn btn-sm btn-danger option-remove" title="Eliminar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
                 </div>
             `;
             list.appendChild(row);
@@ -11024,7 +11048,7 @@ function renderTicketManageConfig(cfg, guildId) {
         // Footer con botón agregar
         const footer = document.createElement('div');
         footer.className = 'options-editor-footer';
-        footer.innerHTML = `<button type="button" class="btn btn-primary option-add">+ Agregar opción</button>`;
+        footer.innerHTML = `<button type="button" class="btn btn-primary option-add"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.3rem; display: inline;"><path d="M12 5v14M5 12h14"></path></svg>Agregar</button>`;
         
         container.appendChild(list);
         container.appendChild(footer);
@@ -11036,12 +11060,12 @@ function renderTicketManageConfig(cfg, guildId) {
             row.innerHTML = `
                 <div class="option-fields">
                     <input type="text" class="form-control option-label" placeholder="Nombre/Título" style="font-weight: 500;">
-                    <input type="text" class="form-control option-desc" placeholder="Descripción (mostrada cuando selecciona)" style="font-size: 0.9rem; opacity: 0.8;">
+                    <input type="text" class="form-control option-desc" placeholder="Descripción" style="font-size: 0.9rem; opacity: 0.8;">
                 </div>
                 <div class="option-actions">
-                    <button type="button" class="btn btn-sm option-move-up" title="Subir">▲</button>
-                    <button type="button" class="btn btn-sm option-move-down" title="Bajar">▼</button>
-                    <button type="button" class="btn btn-sm btn-danger option-remove" title="Eliminar">✖</button>
+                    <button type="button" class="btn btn-sm option-move-up" title="Subir"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                    <button type="button" class="btn btn-sm option-move-down" title="Bajar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                    <button type="button" class="btn btn-sm btn-danger option-remove" title="Eliminar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
                 </div>
             `;
             list.appendChild(row);

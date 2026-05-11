@@ -515,7 +515,7 @@ body::before {
 
 /* Tamaños de botones */
 .btn-sm {
-    padding: 6px 12px !important;
+    padding: 6px 10px !important;
     font-size: 0.8rem !important;
     min-width: 32px;
     height: 32px;
@@ -523,6 +523,13 @@ body::before {
     align-items: center;
     justify-content: center;
     border-radius: 8px !important;
+    gap: 0.3rem;
+}
+
+.btn-sm svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
 }
 
 .btn-primary {
