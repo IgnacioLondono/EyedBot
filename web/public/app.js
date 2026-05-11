@@ -23,6 +23,7 @@ let currentGreetingMode = 'welcome';
 const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
+let pendingAutomationDpxTab = null;
 /** Evita dos loadGuildsForServer en paralelo (showSection + restore a los 100ms). */
 let loadGuildsForServerPromise = null;
 /** Ignora respuestas viejas si se dispara otra carga del generador de canales. */
@@ -761,6 +762,12 @@ function activateServerSideButton(button) {
 
 function switchServerPane(paneId, button = null) {
     if (!paneId) return;
+
+    if (paneId === 'serverPaneChannelSetup') {
+        pendingAutomationDpxTab = 'channelsetup';
+        paneId = 'serverPaneAutomation';
+    }
+
     const panes = document.querySelectorAll('.server-pane');
     panes.forEach((pane) => pane.classList.remove('active'));
 
@@ -796,8 +803,14 @@ function switchServerPane(paneId, button = null) {
         try { openFreeGamesPane(); } catch (e) { console.error('openFreeGamesPane error', e); }
     }
 
-    if (paneId === 'serverPaneChannelSetup' && typeof openChannelSetupPane === 'function') {
-        try { openChannelSetupPane(); } catch (e) { console.error('openChannelSetupPane error', e); }
+    if (paneId === 'serverPaneAutomation' && pendingAutomationDpxTab) {
+        const tabKey = pendingAutomationDpxTab;
+        pendingAutomationDpxTab = null;
+        queueMicrotask(() => {
+            const ac = document.getElementById('automationContainer');
+            const tabBtn = ac?.querySelector(`[data-dpx-tab="${tabKey}"]`);
+            if (tabBtn) tabBtn.click();
+        });
     }
 }
 
@@ -1958,6 +1971,10 @@ function restoreServerState(state) {
     if (state.serverSection.activePaneId) {
         currentServerPaneId = state.serverSection.activePaneId;
     }
+    if (currentServerPaneId === 'serverPaneChannelSetup') {
+        pendingAutomationDpxTab = 'channelsetup';
+        currentServerPaneId = 'serverPaneAutomation';
+    }
     currentServerInsightView = state.serverSection.insightView || 'overview';
     currentServerInsightPayload = state.serverSection.insightPayload || null;
     
@@ -2014,6 +2031,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             serverFeaturesUnlocked = true;
             if (savedState.serverSection.activePaneId) {
                 currentServerPaneId = savedState.serverSection.activePaneId;
+            }
+            if (currentServerPaneId === 'serverPaneChannelSetup') {
+                pendingAutomationDpxTab = 'channelsetup';
+                currentServerPaneId = 'serverPaneAutomation';
             }
         }
 
@@ -4266,15 +4287,20 @@ function collectPanelValues(containerId) {
 
 // ====== Generic dashboard panel UI helpers (dpx-*) ======
 
-function bindDpxTabs(container) {
+function bindDpxTabs(container, options = {}) {
     if (!container) return;
     const tabs = Array.from(container.querySelectorAll('[data-dpx-tab]'));
     const panels = Array.from(container.querySelectorAll('[data-dpx-panel]'));
     if (!tabs.length || !panels.length) return;
 
+    const onTabActivate = typeof options.onTabActivate === 'function' ? options.onTabActivate : null;
+
     const activate = (key) => {
         tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-dpx-tab') === key));
         panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
+        if (onTabActivate) {
+            try { onTabActivate(key, container); } catch (e) { console.error('bindDpxTabs onTabActivate', e); }
+        }
     };
 
     tabs.forEach((tab) => {
@@ -4300,6 +4326,7 @@ function dpxIcon(name = '', className = 'dpx-icon') {
         image: '<rect x="2.5" y="3.5" width="15" height="13" rx="2"/><circle cx="7.5" cy="8" r="1.5"/><path d="M2.5 13.5L7 10l4 4 3-2 3.5 3"/>',
         ban: '<circle cx="10" cy="10" r="7.5"/><path d="M4.7 4.7l10.6 10.6"/>',
         sparkles: '<path d="M10 2v4M10 14v4M2 10h4M14 10h4M4.8 4.8l2.5 2.5M12.7 12.7l2.5 2.5M4.8 15.2l2.5-2.5M12.7 7.3l2.5-2.5"/>',
+        layout: '<rect x="3" y="3" width="6.5" height="14" rx="1.2"/><rect x="11.5" y="3" width="6.5" height="9" rx="1.2"/><path d="M11.5 13.5h6.5"/><path d="M11.5 17h6.5"/>',
         broadcast: '<circle cx="10" cy="10" r="2.5"/><path d="M5.7 5.7a6 6 0 000 8.6M14.3 14.3a6 6 0 000-8.6M2.8 2.8a10 10 0 000 14.4M17.2 17.2a10 10 0 000-14.4"/>',
         antenna: '<path d="M10 11v8M6 19h8M10 3v5"/><circle cx="10" cy="8" r="1.5"/><path d="M5 7.5A6 6 0 0110 3.5M15 7.5A6 6 0 0010 3.5"/>',
         leaf: '<path d="M3 17c0-8 5-13 14-13 0 9-5 14-13 14L3 17zM7 17L13 9"/>',
@@ -4721,7 +4748,8 @@ async function loadAutomationPanel(guildId) {
     const tabsHtml = dpxRenderTabs([
         { key: 'antispam', label: 'Anti-spam', iconName: 'ban' },
         { key: 'content', label: 'Contenido', iconName: 'sparkles' },
-        { key: 'raid', label: 'Modo anti-raid', iconName: 'shield' }
+        { key: 'raid', label: 'Modo anti-raid', iconName: 'shield' },
+        { key: 'channelsetup', label: 'Generador de canales', iconName: 'layout' }
     ], 'antispam');
 
     container.innerHTML = `
@@ -4814,10 +4842,28 @@ async function loadAutomationPanel(guildId) {
                     </div>
                 </div>
             </section>
+
+            <section class="dpx-tab-panel" data-dpx-panel="channelsetup">
+                <div class="dpx-section">
+                    <div class="dpx-section-head">
+                        <div class="dpx-section-head-text">
+                            <h4>Generador de canales</h4>
+                            <p>Crea categorías y canales de texto y voz con plantillas. Ideal para servidores nuevos. El bot necesita permiso de gestionar canales; no borra canales existentes.</p>
+                        </div>
+                    </div>
+                    <div id="channelSetupContainer" class="moderation-container"></div>
+                </div>
+            </section>
         </div>
     `;
 
-    bindDpxTabs(container);
+    bindDpxTabs(container, {
+        onTabActivate: (key) => {
+            if (key === 'channelsetup') {
+                void openChannelSetupPane();
+            }
+        }
+    });
 
     const presetSoftBtn = document.getElementById('presetSoftAutomationBtn');
     const presetStrictBtn = document.getElementById('presetStrictAutomationBtn');
@@ -10889,8 +10935,10 @@ function renderTicketsManage(data) {
     const tab = _ticketsManageState.tab;
     const histLoaded = Array.isArray(data?.history) ? data.history.length : 0;
     const histOverflowNote =
-        tab === 'history' && closedCount > histLoaded && histLoaded > 0
-            ? `<p class="tm-history-toolbar-note">Total guardados: <strong>${closedCount}</strong>. Mostrando los <strong>${histLoaded}</strong> más recientes.</p>`
+        tab === 'history' && closedCount > histLoaded
+            ? histLoaded > 0
+                ? `<p class="tm-history-toolbar-note">Total guardados: <strong>${closedCount}</strong>. Mostrando los <strong>${histLoaded}</strong> más recientes.</p>`
+                : `<p class="tm-history-toolbar-note tm-history-toolbar-note--warn">Hay <strong>${closedCount}</strong> informes en la base pero la lista llegó vacía. Reinicia el bot y pulsa Actualizar; si sigue igual, revisa los logs del servidor.</p>`
             : '';
 
     container.innerHTML = `
