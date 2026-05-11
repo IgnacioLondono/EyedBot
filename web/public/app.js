@@ -10848,17 +10848,32 @@ function renderTicketsManage(data) {
     const settingsMenu = document.getElementById('ticketManageSettingsMenu');
     
     if (settingsBtn && settingsMenu) {
+        // Abrir/cerrar dropdown al hacer click en el botón
         settingsBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            settingsMenu.style.display = settingsMenu.style.display === 'none' ? 'block' : 'none';
+            const isOpen = settingsMenu.style.display === 'block';
+            settingsMenu.style.display = isOpen ? 'none' : 'block';
         });
         
-        document.addEventListener('click', () => {
-            settingsMenu.style.display = 'none';
-        });
+        // Cerrar dropdown cuando se hace click afuera
+        const closeMenuListener = (e) => {
+            const isClickInsideBtn = settingsBtn.contains(e.target);
+            const isClickInsideMenu = settingsMenu.contains(e.target);
+            if (!isClickInsideBtn && !isClickInsideMenu) {
+                settingsMenu.style.display = 'none';
+            }
+        };
         
+        // No reasignar el listener cada vez - hacerlo solo una vez
+        if (!document._ticketSettingsMenuListenerAdded) {
+            document.addEventListener('click', closeMenuListener);
+            document._ticketSettingsMenuListenerAdded = true;
+        }
+        
+        // Manejar clicks en los items del menú
         settingsMenu.querySelectorAll('.tm-settings-menu-item').forEach((item) => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const newTab = item.dataset.tmTab;
                 const guildId = _ticketsManageState.guildId || currentServerGuildId;
                 if (_ticketsManageState.tab === 'config' && newTab !== 'config' && hasTicketConfigChanges(guildId)) {
