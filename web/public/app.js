@@ -10917,112 +10917,163 @@ function renderTicketManageConfig(cfg, guildId) {
     container.innerHTML = `
         <div class="dpx-section">
             <h4>Configuración de tickets</h4>
-            <div class="dpx-field-grid" style="margin-top:1rem;">
-                <div class="dpx-field">
-                    <label>Activo</label>
-                    <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
-                </div>
-                <div class="dpx-field">
-                    <label>Canal panel</label>
-                    <select id="tm_ticketChannelSelect" class="form-control">
-                        <option value="">Selecciona un canal</option>
-                        ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.panelChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="dpx-field">
-                    <label>Canal peticiones</label>
-                    <select id="tm_ticketRequestChannelSelect" class="form-control">
-                        <option value="">Usar canal del panel</option>
-                        ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.requestChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="dpx-field is-full">
-                    <label>Título</label>
-                    <input id="tm_ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
-                </div>
-                <div class="dpx-field is-full">
-                    <label>Mensaje</label>
-                    <textarea id="tm_ticketMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '')}</textarea>
-                </div>
-                <div class="dpx-field">
-                    <label>Texto botón</label>
-                    <input id="tm_ticketButtonLabel" class="form-control" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}">
-                </div>
-                <div class="dpx-field">
-                    <label>Footer</label>
-                    <input id="tm_ticketFooter" class="form-control" value="${escapeHtmlForValue(cfg.footer || '')}">
-                </div>
-                <div class="dpx-field is-full">
-                    <label>Roles que gestionan</label>
-                    <select id="tm_ticketAdminRoles" class="form-control" multiple size="6">
-                        ${(roles || []).map((r) => `<option value="${r.id}" ${Array.isArray(cfg.adminRoleIds) && cfg.adminRoleIds.map(String).includes(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="dpx-field is-full">
-                    <label>Opciones - Categorías</label>
-                    <div id="tm_ticketCategoriesEditor" class="options-editor"></div>
-                </div>
-                <div class="dpx-field is-full">
-                    <label>Opciones - Problemas comunes</label>
-                    <div id="tm_ticketCommonProblemsEditor" class="options-editor"></div>
-                </div>
-                <div class="dpx-field is-full">
-                    <label>Opciones - Servidores Minecraft</label>
-                    <div id="tm_ticketMinecraftServersEditor" class="options-editor"></div>
+            
+            <!-- SECCIÓN: Configuración básica -->
+            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <h5 style="margin-top: 0;">📋 Configuración básica</h5>
+                <div class="dpx-field-grid">
+                    <div class="dpx-field">
+                        <label>Activo</label>
+                        <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
+                    </div>
+                    <div class="dpx-field">
+                        <label>Canal donde mostrar el panel</label>
+                        <select id="tm_ticketChannelSelect" class="form-control">
+                            <option value="">Selecciona un canal</option>
+                            ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.panelChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="dpx-field">
+                        <label>Canal donde recibir peticiones</label>
+                        <select id="tm_ticketRequestChannelSelect" class="form-control">
+                            <option value="">Usar el mismo canal del panel</option>
+                            ${(channels || []).map((c) => `<option value="${c.id}" ${String(cfg.requestChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="dpx-field is-full">
+                        <label>Título del panel</label>
+                        <input id="tm_ticketTitle" class="form-control" value="${escapeHtmlForValue(cfg.title || 'Soporte')}">
+                    </div>
+                    <div class="dpx-field is-full">
+                        <label>Descripción/Mensaje del panel</label>
+                        <textarea id="tm_ticketMessage" class="form-control" rows="3" placeholder="Explicación sobre cómo usar los tickets...">${escapeHtmlForValue(cfg.message || '')}</textarea>
+                    </div>
+                    <div class="dpx-field">
+                        <label>Texto del botón</label>
+                        <input id="tm_ticketButtonLabel" class="form-control" placeholder="Ej: Crear ticket" value="${escapeHtmlForValue(cfg.buttonLabel || 'Solicitar ticket')}">
+                    </div>
+                    <div class="dpx-field">
+                        <label>Pie de página</label>
+                        <input id="tm_ticketFooter" class="form-control" placeholder="Ej: © 2024 Tu servidor" value="${escapeHtmlForValue(cfg.footer || '')}">
+                    </div>
+                    <div class="dpx-field is-full">
+                        <label>Roles que pueden gestionar tickets</label>
+                        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); margin: 0.25rem 0 0.5rem 0;">Selecciona múltiples roles (Ctrl+Click)</p>
+                        <select id="tm_ticketAdminRoles" class="form-control" multiple size="6">
+                            ${(roles || []).map((r) => `<option value="${r.id}" ${Array.isArray(cfg.adminRoleIds) && cfg.adminRoleIds.map(String).includes(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                        </select>
+                    </div>
                 </div>
             </div>
-            <div style="margin-top:1rem;display:flex;gap:0.5rem;">
-                <button class="btn btn-secondary" id="tm_saveTicketBtn">Guardar</button>
-                <button class="btn btn-primary" id="tm_publishTicketBtn">Publicar panel</button>
+
+            <!-- SECCIÓN: Categorías de tickets -->
+            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <h5 style="margin-top: 0;">🏷️ Tipos de tickets</h5>
+                <p style="font-size: 0.9rem; color: rgba(255,255,255,0.7); margin: 0 0 1rem 0;">Opciones que verá el usuario al crear un ticket (ej: Soporte Técnico, Reporte de Bug, Sugerencia)</p>
+                <div id="tm_ticketCategoriesEditor" class="options-editor"></div>
+            </div>
+
+            <!-- SECCIÓN: Problemas comunes -->
+            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <h5 style="margin-top: 0;">❓ Problemas comunes</h5>
+                <p style="font-size: 0.9rem; color: rgba(255,255,255,0.7); margin: 0 0 1rem 0;">Preguntas frecuentes que el usuario puede seleccionar (ej: "¿Cómo pago?", "¿Dónde están mis items?")</p>
+                <div id="tm_ticketCommonProblemsEditor" class="options-editor"></div>
+            </div>
+
+            <!-- SECCIÓN: Servidores (opcional) -->
+            <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <h5 style="margin-top: 0;">⛏️ Servidores (opcional)</h5>
+                <p style="font-size: 0.9rem; color: rgba(255,255,255,0.7); margin: 0 0 1rem 0;">Si tienes múltiples servidores, agrega las opciones aquí (ej: "Survival", "Creative", "PvP")</p>
+                <div id="tm_ticketMinecraftServersEditor" class="options-editor"></div>
+            </div>
+
+            <div style="margin-top:2rem;display:flex;gap:0.5rem;">
+                <button class="btn btn-secondary" id="tm_saveTicketBtn">💾 Guardar cambios</button>
+                <button class="btn btn-primary" id="tm_publishTicketBtn">🚀 Publicar panel en Discord</button>
             </div>
         </div>
     `;
 
-    // Render option editors
+    // Render option editors - IMPROVED VERSION
     function renderTmOptionsEditor(editorId, items) {
         const container = document.getElementById(editorId);
         if (!container) return;
         container.innerHTML = '';
-        const list = document.createElement('div'); list.className = 'options-list';
+        
+        const list = document.createElement('div');
+        list.className = 'options-list';
+        
+        // Renderizar items existentes
         (Array.isArray(items) ? items : []).forEach((it) => {
-            const row = document.createElement('div'); row.className = 'option-row';
+            const row = document.createElement('div');
+            row.className = 'option-row';
             row.innerHTML = `
                 <div class="option-fields">
-                    <input type="text" class="form-control option-label" placeholder="Etiqueta" value="${escapeHtmlForValue(it.label || '')}">
-                    <input type="text" class="form-control option-desc" placeholder="Descripción (opcional)" value="${escapeHtmlForValue(it.description || '')}">
+                    <input type="text" class="form-control option-label" placeholder="Nombre/Título" value="${escapeHtmlForValue(it.label || '')}" style="font-weight: 500;">
+                    <input type="text" class="form-control option-desc" placeholder="Descripción (mostrada cuando selecciona)" value="${escapeHtmlForValue(it.description || '')}" style="font-size: 0.9rem; opacity: 0.8;">
                 </div>
                 <div class="option-actions">
-                    <button type="button" class="btn btn-tertiary option-move-up">▲</button>
-                    <button type="button" class="btn btn-tertiary option-move-down">▼</button>
-                    <button type="button" class="btn btn-danger option-remove">✖</button>
+                    <button type="button" class="btn btn-sm option-move-up" title="Subir">▲</button>
+                    <button type="button" class="btn btn-sm option-move-down" title="Bajar">▼</button>
+                    <button type="button" class="btn btn-sm btn-danger option-remove" title="Eliminar">✖</button>
                 </div>
             `;
             list.appendChild(row);
         });
-        const footer = document.createElement('div'); footer.className = 'options-editor-footer'; footer.innerHTML = `<button type="button" class="btn btn-primary option-add">Agregar opción</button>`;
-        container.appendChild(list); container.appendChild(footer);
+        
+        // Footer con botón agregar
+        const footer = document.createElement('div');
+        footer.className = 'options-editor-footer';
+        footer.innerHTML = `<button type="button" class="btn btn-primary option-add">+ Agregar opción</button>`;
+        
+        container.appendChild(list);
+        container.appendChild(footer);
+        
+        // Evento para agregar nueva opción
         footer.querySelector('.option-add')?.addEventListener('click', () => {
-            const row = document.createElement('div'); row.className = 'option-row';
+            const row = document.createElement('div');
+            row.className = 'option-row';
             row.innerHTML = `
                 <div class="option-fields">
-                    <input type="text" class="form-control option-label" placeholder="Etiqueta">
-                    <input type="text" class="form-control option-desc" placeholder="Descripción (opcional)">
+                    <input type="text" class="form-control option-label" placeholder="Nombre/Título" style="font-weight: 500;">
+                    <input type="text" class="form-control option-desc" placeholder="Descripción (mostrada cuando selecciona)" style="font-size: 0.9rem; opacity: 0.8;">
                 </div>
                 <div class="option-actions">
-                    <button type="button" class="btn btn-tertiary option-move-up">▲</button>
-                    <button type="button" class="btn btn-tertiary option-move-down">▼</button>
-                    <button type="button" class="btn btn-danger option-remove">✖</button>
+                    <button type="button" class="btn btn-sm option-move-up" title="Subir">▲</button>
+                    <button type="button" class="btn btn-sm option-move-down" title="Bajar">▼</button>
+                    <button type="button" class="btn btn-sm btn-danger option-remove" title="Eliminar">✖</button>
                 </div>
             `;
             list.appendChild(row);
+            row.querySelector('.option-label').focus();
         });
+        
+        // Eventos para mover/eliminar opciones
         list.addEventListener('click', (ev) => {
-            const t = ev.target; const row = t.closest('.option-row'); if (!row) return;
-            if (t.classList.contains('option-remove')) { row.remove(); return; }
-            if (t.classList.contains('option-move-up')) { const prev = row.previousElementSibling; if (prev) row.parentNode.insertBefore(row, prev); return; }
-            if (t.classList.contains('option-move-down')) { const next = row.nextElementSibling; if (next) row.parentNode.insertBefore(next, row); return; }
+            const t = ev.target;
+            const row = t.closest('.option-row');
+            if (!row) return;
+            
+            if (t.classList.contains('option-remove')) {
+                row.remove();
+                return;
+            }
+            
+            if (t.classList.contains('option-move-up')) {
+                const prev = row.previousElementSibling;
+                if (prev) row.parentNode.insertBefore(row, prev);
+                return;
+            }
+            
+            if (t.classList.contains('option-move-down')) {
+                const next = row.nextElementSibling;
+                if (next) row.parentNode.insertBefore(next, row);
+                return;
+            }
         });
     }
+    
+    // Inicializar los tres editores
     renderTmOptionsEditor('tm_ticketCategoriesEditor', cfg.ticketCategories || []);
     renderTmOptionsEditor('tm_ticketCommonProblemsEditor', cfg.commonProblems || []);
     renderTmOptionsEditor('tm_ticketMinecraftServersEditor', cfg.minecraftServers || []);
