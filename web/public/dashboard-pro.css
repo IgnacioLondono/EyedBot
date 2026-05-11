@@ -2552,26 +2552,43 @@ label { color: var(--text-secondary); font-weight: 500; }
     gap: 0.35rem;
 }
 .tm-history-scope-btn {
-    font-family: inherit;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.3rem 0.62rem;
-    border-radius: 999px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.35);
     background: rgba(var(--bg-primary-rgb, 12, 7, 24), 0.65);
     color: var(--text-muted, #a48fd0);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 .tm-history-scope-btn:hover {
     color: var(--text-secondary, #cbb7f6);
     border-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.45);
+    transform: translateY(-1px);
 }
 .tm-history-scope-btn.active {
     color: var(--text-primary, #f4eeff);
     border-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.65);
     background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22);
     box-shadow: 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.15);
+}
+.tm-history-scope-icon,
+.tm-history-action-icon,
+.tm-history-search-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.tm-history-scope-icon svg,
+.tm-history-action-icon svg,
+.tm-history-search-icon svg {
+    width: 16px;
+    height: 16px;
+    display: block;
 }
 .tm-history-toolbar-actions {
     display: flex;
@@ -2590,9 +2607,7 @@ label { color: var(--text-secondary); font-weight: 500; }
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.25);
     background: rgba(var(--bg-primary-rgb, 12, 7, 24), 0.85);
 }
-.tm-history-search-field svg {
-    width: 16px;
-    height: 16px;
+.tm-history-search-icon {
     color: var(--text-muted, #a48fd0);
     flex-shrink: 0;
 }
@@ -2613,8 +2628,13 @@ label { color: var(--text-secondary); font-weight: 500; }
     color: var(--text-muted, #a48fd0);
 }
 .tm-history-toolbar-actions .tm-btn {
+    width: 38px;
+    min-width: 38px;
     min-height: 38px;
-    padding-inline: 0.9rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 .tm-history-filter-hint {
     font-size: 0.78rem;

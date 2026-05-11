@@ -11210,18 +11210,22 @@ function renderTicketsManage(data) {
             ${histOverflowNote}
             <div class="tm-history-toolbar-scopes" role="group" aria-label="Ámbito de búsqueda">
                 ${TM_HISTORY_FILTER_SCOPES.map((scope) => `
-                    <button type="button" class="tm-history-scope-btn ${(_ticketsManageState.historyScope || 'all') === scope.id ? 'active' : ''}" data-tm-history-scope="${scope.id}">
-                        ${escapeHtml(scope.label)}
+                    <button type="button" class="tm-history-scope-btn ${(_ticketsManageState.historyScope || 'all') === scope.id ? 'active' : ''}" data-tm-history-scope="${scope.id}" aria-label="${escapeHtml(scope.label)}" title="${escapeHtml(scope.label)}">
+                        <span class="tm-history-scope-icon" aria-hidden="true">${tmHistoryScopeIcon(scope.id)}</span>
                     </button>
                 `).join('')}
             </div>
             <div class="tm-history-toolbar-actions">
                 <label class="tm-history-search-field" for="tmHistorySearch">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                    <span class="tm-history-search-icon" aria-hidden="true">${tmIconSearch()}</span>
                     <input type="search" id="tmHistorySearch" class="tm-history-search" placeholder="Buscar en el historial…" autocomplete="off" value="${escapeHtml(_ticketsManageState.historyFilter || '')}" />
                 </label>
-                <button type="button" class="tm-btn tm-btn-primary tm-history-apply" id="tmHistoryApplyFilter">Buscar</button>
-                <button type="button" class="tm-btn tm-btn-ghost tm-history-reset" id="tmHistoryResetFilter">Limpiar</button>
+                <button type="button" class="tm-btn tm-btn-primary tm-history-apply" id="tmHistoryApplyFilter" aria-label="Buscar" title="Buscar">
+                    <span class="tm-history-action-icon" aria-hidden="true">${tmIconSearch()}</span>
+                </button>
+                <button type="button" class="tm-btn tm-btn-ghost tm-history-reset" id="tmHistoryResetFilter" aria-label="Limpiar filtros" title="Limpiar filtros">
+                    <span class="tm-history-action-icon" aria-hidden="true">${tmIconReset()}</span>
+                </button>
             </div>
         </div>
 
@@ -13148,6 +13152,27 @@ function tmIconShield()    {
 function tmIconBell()      {
     const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
     return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8z"></path><path d="M10 21a2 2 0 0 0 4 0"></path><circle cx="18" cy="5" r="2.5" fill="currentColor" opacity="0.3"></circle></svg>`;
+}
+function tmIconSearch() {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>`;
+}
+function tmIconReset() {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 7v4h4"></path><path d="M20 17v-4h-4"></path><path d="M5.6 9.4A7 7 0 0 1 18.4 14.6"></path><path d="M18.4 14.6A7 7 0 0 1 5.6 9.4"></path></svg>`;
+}
+function tmHistoryScopeIcon(scopeId = 'all') {
+    const s = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+    const icons = {
+        all: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 6h7"></path><path d="M4 12h16"></path><path d="M4 18h11"></path><circle cx="18" cy="6" r="2"></circle><circle cx="20" cy="18" r="2"></circle></svg>`,
+        user: `<svg viewBox="0 0 24 24" fill="none" ${s}><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg>`,
+        staff: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M12 2l8 4v6c0 4.8-3.4 9-8 10-4.6-1-8-5.2-8-10V6l8-4z"></path><path d="M9 12l2.2 2.2L15 10.5"></path></svg>`,
+        report: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M8 9h3"></path></svg>`,
+        channel: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 1 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 1 0 0-4V7z"></path><path d="M13 6v3"></path><path d="M13 13v3"></path></svg>`,
+        category: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 7h16"></path><path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"></path><path d="M9 11h6"></path><path d="M9 15h4"></path></svg>`,
+        reason: `<svg viewBox="0 0 24 24" fill="none" ${s}><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>`
+    };
+    return icons[scopeId] || icons.all;
 }
 
 // ============================================================
