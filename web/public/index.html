@@ -1322,15 +1322,26 @@
                                         <h3>Gestión de tickets</h3>
                                         <p>Monitorea la actividad, acepta solicitudes y consulta el historial desde la web.</p>
                                     </div>
-                                    <div class="ticket-manage-actions">
+                                    <div class="ticket-manage-actions" style="display: flex; gap: 0.5rem; align-items: center;">
                                         <button type="button" id="ticketManageRefreshBtn" class="btn btn-ghost">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>
                                             <span>Actualizar</span>
                                         </button>
-                                        <label class="ticket-manage-autorefresh">
-                                            <input type="checkbox" id="ticketManageAutoRefresh" checked>
-                                            <span>Auto</span>
-                                        </label>
+                                        <div class="ticket-manage-settings-dropdown" style="position: relative;">
+                                            <button type="button" id="ticketManageSettingsBtn" class="btn btn-ghost" title="Configuración y Categorías">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                                            </button>
+                                            <div id="ticketManageSettingsMenu" class="ticket-manage-settings-menu" style="display: none; position: absolute; top: 100%; right: 0; background: rgba(15, 12, 30, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; min-width: 180px; z-index: 1000; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);">
+                                                <button type="button" class="tm-settings-menu-item" data-tm-tab="config" style="display: block; width: 100%; text-align: left; padding: 0.8rem 1rem; border: none; background: none; color: rgba(255, 255, 255, 0.8); font-size: 0.9rem; cursor: pointer; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; width: 14px; height: 14px; margin-right: 0.5rem; vertical-align: -2px;"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path></svg>
+                                                    Configuración
+                                                </button>
+                                                <button type="button" class="tm-settings-menu-item" data-tm-tab="categories" style="display: block; width: 100%; text-align: left; padding: 0.8rem 1rem; border: none; background: none; color: rgba(255, 255, 255, 0.8); font-size: 0.9rem; cursor: pointer;">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; width: 14px; height: 14px; margin-right: 0.5rem; vertical-align: -2px;"><path d="M9 3H5a2 2 0 0 0-2 2v4m0 0H3m2 0v4m0 0H5m-2 0a2 2 0 0 0 2 2h4m0 0v4m0 0h4m0 0a2 2 0 0 0 2-2v-4m0 0h2m-2 0v-4m0 0h2m0 0a2 2 0 0 0-2-2h-4"></path></svg>
+                                                    Categorías
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
