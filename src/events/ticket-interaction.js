@@ -288,7 +288,7 @@ function buildTranscriptEntries(messages = []) {
     });
 }
 
-async function generateAndSendCloseReport({ interaction, channel, guild, ownerId, closerTag }) {
+async function generateAndSendCloseReport({ client, channel, guild, ownerId, closerTag, closedById }) {
     const reportId = await nextCloseReportId(guild.id).catch(() => `TK-${guild.id}-${Date.now()}`);
 
     const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
@@ -307,8 +307,9 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
         guildId: guild.id,
         channelId: channel.id,
         channelName: channel.name,
+        channelCreatedAt: new Date(Number(channel.createdTimestamp || Date.now())).toISOString(),
         ownerId: ownerId || '',
-        closedById: interaction.user.id,
+        closedById: String(closedById || ''),
         closedByTag: closerTag,
         category,
         common,
@@ -366,7 +367,7 @@ async function generateAndSendCloseReport({ interaction, channel, guild, ownerId
 
     let dmSent = false;
     if (sendDmReceipt && ownerId) {
-        const ownerUser = await interaction.client.users.fetch(ownerId).catch(() => null);
+        const ownerUser = await client.users.fetch(ownerId).catch(() => null);
         if (ownerUser) {
             await ownerUser.send({ embeds: [buildReportEmbed()], files: [createTranscriptFile()] }).then(() => {
                 dmSent = true;
@@ -1012,11 +1013,12 @@ async function closeTicket(interaction) {
 
     await interaction.deferReply({ flags: 64 }).catch(() => null);
     const report = await generateAndSendCloseReport({
-        interaction,
+        client: interaction.client,
         channel,
         guild,
         ownerId,
-        closerTag: interaction.user.tag
+        closerTag: interaction.user.tag,
+        closedById: interaction.user.id
     }).catch(() => ({ reportId: `TK-${guild.id}-${Date.now()}`, dmSent: false }));
 
     await interaction.editReply({
@@ -1627,6 +1629,53 @@ async function listPendingRequests(guildId) {
     }
 }
 
+function parseStoredReportValue(raw) {
+    if (raw == null) return null;
+    try {
+        const text = Buffer.isBuffer(raw) ? raw.toString('utf8') : raw;
+        if (typeof text === 'string') {
+            const trimmed = text.trim();
+            if (!trimmed.startsWith('{')) return null;
+            return JSON.parse(trimmed);
+        }
+        if (typeof text === 'object') return text;
+    } catch {
+        return null;
+    }
+    return null;
+}
+
+async function countTicketReports(guildId) {
+    const safeGuildId = String(guildId || '');
+    if (!safeGuildId) return 0;
+
+    const keyLike = `ticket_report_TK-${safeGuildId}-%`;
+    try {
+        const rows = await db.query(
+            'SELECT COUNT(*) AS c FROM key_value_store WHERE `key` LIKE ?',
+            [keyLike]
+        );
+        const row = rows?.[0];
+        const rawC = row?.c ?? row?.C ?? 0;
+        const n = typeof rawC === 'bigint' ? Number(rawC) : Number(rawC);
+        if (Number.isFinite(n) && n > 0) return n;
+
+        const altRows = await db.query(
+            'SELECT `value` FROM key_value_store WHERE `key` LIKE ? LIMIT 500',
+            [`ticket_report_%${safeGuildId}%`]
+        ).catch(() => []);
+        let cnt = 0;
+        for (const rowAlt of altRows || []) {
+            const parsed = parseStoredReportValue(rowAlt?.value);
+            if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) cnt++;
+        }
+        return cnt;
+    } catch (error) {
+        console.warn('countTicketReports:', error?.message || error);
+        return 0;
+    }
+}
+
 async function listTicketReports(guildId, limit = 50) {
     const safeGuildId = String(guildId || '');
     if (!safeGuildId) return [];
@@ -1644,8 +1693,7 @@ async function listTicketReports(guildId, limit = 50) {
         const out = [];
         for (const row of rows || []) {
             try {
-                const raw = row?.value;
-                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                const parsed = parseStoredReportValue(row?.value);
                 if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) {
                     out.push(parsed);
                 }
@@ -1680,8 +1728,7 @@ async function listTicketReportsWithFallback(guildId, limit = 50) {
         const out = [];
         for (const row of altRows || []) {
             try {
-                const raw = row?.value;
-                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                const parsed = parseStoredReportValue(row?.value);
                 if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) {
                     out.push(parsed);
                 }
@@ -1793,6 +1840,52 @@ async function claimTicketFromWeb(botClient, guildId, channelId, claimerUserId) 
         channelId: channel.id,
         claimedBy: newClaim || ''
     };
+}
+
+async function closeTicketFromWeb(botClient, guildId, channelId, closerUserId) {
+    if (!botClient) return { ok: false, code: 'BOT_OFFLINE', error: 'Bot no disponible' };
+
+    const guild = botClient.guilds.cache.get(String(guildId));
+    if (!guild) return { ok: false, code: 'GUILD_NOT_FOUND', error: 'Servidor no encontrado' };
+
+    const channel = guild.channels.cache.get(String(channelId)) || await guild.channels.fetch(String(channelId)).catch(() => null);
+    if (!channel || channel.type !== ChannelType.GuildText) {
+        return { ok: false, code: 'CHANNEL_NOT_FOUND', error: 'Canal no encontrado' };
+    }
+
+    const ownerId = parseTicketOwner(String(channel.topic || ''));
+    if (!ownerId) {
+        return { ok: false, code: 'NOT_A_TICKET', error: 'El canal no parece un ticket' };
+    }
+
+    const cfg = await ticketStore.getTicketConfig(guild.id);
+    const adminRoleSet = buildAdminRoleSet(cfg);
+    const staffRoleSet = new Set(parseTopicRoleIds(channel.topic, 'staff'));
+    const closerRoleSet = new Set([...adminRoleSet, ...staffRoleSet]);
+
+    const member = await guild.members.fetch(String(closerUserId)).catch(() => null);
+    if (!member) {
+        return { ok: false, code: 'MEMBER_NOT_FOUND', error: 'No se encontro tu miembro en este servidor' };
+    }
+
+    if (!memberCanCloseTicket(member, closerRoleSet)) {
+        return { ok: false, code: 'FORBIDDEN', error: 'No tienes permisos para cerrar este ticket' };
+    }
+
+    const closerTag = member.user?.tag || member.user?.username || String(closerUserId);
+
+    const report = await generateAndSendCloseReport({
+        client: botClient,
+        channel,
+        guild,
+        ownerId,
+        closerTag,
+        closedById: String(closerUserId)
+    }).catch(() => ({ reportId: `TK-${guild.id}-${Date.now()}`, dmSent: false }));
+
+    await channel.delete(`Ticket cerrado desde panel (${closerTag}) | Informe ${report.reportId}`).catch(() => null);
+
+    return { ok: true, reportId: report.reportId, dmSent: !!report.dmSent };
 }
 
 // =====================================================================
@@ -1996,9 +2089,11 @@ module.exports = {
     // Helpers web
     acceptPendingFromWeb,
     claimTicketFromWeb,
+    closeTicketFromWeb,
     listPendingRequests,
     listTicketReports,
     listTicketReportsWithFallback,
+    countTicketReports,
     getTicketReport,
     listActiveTicketChannels,
     listTicketChannelMessages,
