@@ -3189,6 +3189,9 @@ label { color: var(--text-secondary); font-weight: 500; }
 .receipt-modal-dialog {
     position: relative;
     width: min(1080px, 100%);
+    /* Altura explícita: los .receipt-pane son position:absolute y no aportan altura al flex;
+       sin esto el body colapsa a ~0px y el contenido parece “vacío”. */
+    height: min(92vh, calc(100vh - 4rem));
     max-height: calc(100vh - 4rem);
     display: flex;
     flex-direction: column;
@@ -3324,6 +3327,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 
 .receipt-modal-body {
     flex: 1 1 auto;
+    min-height: 0;
     overflow: hidden;
     position: relative;
     background: linear-gradient(180deg, rgba(var(--bg-primary-rgb, 14, 8, 34), 0.6), rgba(var(--bg-primary-rgb, 9, 5, 22), 0.85));
