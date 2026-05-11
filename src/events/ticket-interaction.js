@@ -1662,85 +1662,70 @@ function parseStoredReportValue(raw) {
 }
 
 /**
- * Metadatos del informe sin transcript (evita SELECT gigante que vacía la lista por max_allowed_packet / memoria).
+ * Metadatos del informe para el panel web: solo claves en una consulta y luego `db.get` fila a fila.
+ * Evita dos problemas: (1) SELECT masivo de valores LONGTEXT (packet / memoria) y (2) JSON_EXTRACT
+ * que en algunos MariaDB/MySQL no devuelve filas útiles sobre TEXT.
  */
 async function listTicketReportSummaries(guildId, limit = 50) {
     const safeGuildId = String(guildId || '');
     if (!safeGuildId) return [];
 
     const lim = Math.max(1, Math.min(500, Number(limit) || 50));
-    const keyLike = `ticket_report_TK-${safeGuildId}-%`;
+    const primaryLike = `ticket_report_TK-${safeGuildId}-%`;
 
-    const sql = `
-        SELECT
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.reportId')) AS report_id,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.guildId')) AS guild_id,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.channelId')) AS channel_id,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.channelName')) AS channel_name,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.channelCreatedAt')) AS channel_created_at,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.ownerId')) AS owner_id,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.closedById')) AS closed_by_id,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.closedByTag')) AS closed_by_tag,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.category')) AS category,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.common')) AS common,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.reason')) AS reason,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.messagesCount')) AS messages_count,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.createdAt')) AS created_at,
-            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.transcriptFileName')) AS transcript_file_name,
-            JSON_EXTRACT(\`value\`, '$.participants') AS participants_json
-        FROM key_value_store
-        WHERE \`key\` LIKE ?
-        ORDER BY updated_at DESC
-        LIMIT ?
-    `;
-
-    try {
-        const rows = await db.query(sql, [keyLike, lim]);
-        const out = [];
-        for (const row of rows || []) {
-            const gid = row.guild_id ?? row.GUILD_ID;
-            if (String(gid || '') !== safeGuildId) continue;
-
-            let participants = [];
-            try {
-                const pj = row.participants_json ?? row.participantsJson ?? row.PARTICIPANTS_JSON;
-                if (pj != null && pj !== '') {
-                    const raw = Buffer.isBuffer(pj) ? pj.toString('utf8') : pj;
-                    participants = typeof raw === 'string' ? JSON.parse(raw) : raw;
-                }
-            } catch {
-                participants = [];
-            }
-            if (!Array.isArray(participants)) participants = [];
-
-            const mcRaw = row.messages_count ?? row.messagesCount ?? row.MESSAGES_COUNT;
-            const mc = Number.parseInt(String(mcRaw ?? '0'), 10);
-
-            out.push({
-                reportId: String(row.report_id ?? row.reportId ?? ''),
-                guildId: safeGuildId,
-                channelId: String(row.channel_id ?? row.channelId ?? ''),
-                channelName: String(row.channel_name ?? row.channelName ?? ''),
-                channelCreatedAt: row.channel_created_at ?? row.channelCreatedAt ?? null,
-                ownerId: String(row.owner_id ?? row.ownerId ?? ''),
-                closedById: String(row.closed_by_id ?? row.closedById ?? ''),
-                closedByTag: String(row.closed_by_tag ?? row.closedByTag ?? ''),
-                category: String(row.category ?? row.CATEGORY ?? ''),
-                common: String(row.common ?? row.COMMON ?? ''),
-                reason: String(row.reason ?? row.REASON ?? ''),
-                messagesCount: Number.isFinite(mc) ? mc : 0,
-                participants,
-                createdAt: String(row.created_at ?? row.createdAt ?? ''),
-                transcriptFileName: String(row.transcript_file_name ?? row.transcriptFileName ?? '')
-            });
+    const fetchKeys = async (pattern) => {
+        try {
+            const rows = await db.query(
+                'SELECT `key` FROM key_value_store WHERE `key` LIKE ? ORDER BY updated_at DESC LIMIT ?',
+                [pattern, lim]
+            );
+            return (rows || []).map((r) => String(r.key ?? r.KEY ?? '')).filter(Boolean);
+        } catch (error) {
+            console.warn('listTicketReportSummaries keys:', error?.message || error);
+            return [];
         }
+    };
 
-        out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-        return out;
-    } catch (error) {
-        console.warn('listTicketReportSummaries (fallback a lista completa):', error?.message || error);
-        return [];
+    let keys = await fetchKeys(primaryLike);
+    if (!keys.length) {
+        keys = await fetchKeys(`ticket_report_%${safeGuildId}%`);
     }
+
+    const out = [];
+    for (const key of keys) {
+        if (!key.startsWith('ticket_report_')) continue;
+        let full = null;
+        try {
+            full = await db.get(key);
+        } catch (err) {
+            console.warn(`listTicketReportSummaries db.get(${key}):`, err?.message || err);
+            continue;
+        }
+        if (!full || typeof full !== 'object') continue;
+        if (String(full.guildId) !== safeGuildId) continue;
+
+        const mc = Number.parseInt(String(full.messagesCount ?? '0'), 10);
+        out.push({
+            reportId: String(full.reportId || ''),
+            guildId: String(full.guildId || safeGuildId),
+            channelId: String(full.channelId || ''),
+            channelName: String(full.channelName || ''),
+            channelCreatedAt: full.channelCreatedAt || null,
+            ownerId: String(full.ownerId || ''),
+            closedById: String(full.closedById || ''),
+            closedByTag: String(full.closedByTag || ''),
+            category: String(full.category || ''),
+            common: String(full.common || ''),
+            reason: String(full.reason || ''),
+            messagesCount: Number.isFinite(mc) ? mc : 0,
+            participants: Array.isArray(full.participants) ? full.participants : [],
+            createdAt: String(full.createdAt || ''),
+            transcriptFileName: String(full.transcriptFileName || '')
+        });
+    }
+
+    out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return out;
 }
 
 async function deleteTicketReportFromGuild(guildId, reportId) {
@@ -1798,76 +1783,12 @@ async function countTicketReports(guildId) {
 }
 
 async function listTicketReports(guildId, limit = 50) {
-    const safeGuildId = String(guildId || '');
-    if (!safeGuildId) return [];
-
-    const lim = Math.max(1, Math.min(500, Number(limit) || 50));
-    /** Las claves de informe son `ticket_report_${reportId}` con reportId tipo TK-{guildId}-00001 (no mezclar con ticket_report_counter_…). */
-    const keyLike = `ticket_report_TK-${safeGuildId}-%`;
-
-    try {
-        const rows = await db.query(
-            'SELECT `value` FROM key_value_store WHERE `key` LIKE ? ORDER BY updated_at DESC LIMIT ?',
-            [keyLike, lim]
-        );
-
-        const out = [];
-        for (const row of rows || []) {
-            try {
-                const parsed = parseStoredReportValue(row?.value);
-                if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) {
-                    out.push(parsed);
-                }
-            } catch {
-                // ignorar
-            }
-        }
-
-        out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-        return out;
-    } catch (error) {
-        console.error('Error listando reports de tickets:', error.message);
-        return [];
-    }
+    return listTicketReportSummaries(guildId, limit);
 }
 
-// Fallback amplio: intenta buscar claves con distintos formatos si no se encontraron informes
+/** Alias; la logica robusta vive en listTicketReportSummaries (claves + db.get por fila). */
 async function listTicketReportsWithFallback(guildId, limit = 50) {
-    const primary = await listTicketReports(guildId, limit).catch(() => []);
-    if (primary && primary.length) return primary;
-
-    // Intentar patron mas amplio: ticket_report_%{guildId}%
-    try {
-        const safeGuildId = String(guildId || '');
-        const lim = Math.max(1, Math.min(500, Number(limit) || 50));
-        const altLike = `ticket_report_%${safeGuildId}%`;
-        const altRows = await db.query(
-            'SELECT `value` FROM key_value_store WHERE `key` LIKE ? ORDER BY updated_at DESC LIMIT ?',
-            [altLike, lim]
-        ).catch(() => []);
-
-        const out = [];
-        for (const row of altRows || []) {
-            try {
-                const parsed = parseStoredReportValue(row?.value);
-                if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) {
-                    out.push(parsed);
-                }
-            } catch (e) {
-                // ignorar parse errors
-            }
-        }
-
-        if (out.length) {
-            out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-            console.warn(`⚠️ Se recuperaron informes de tickets con un patron alternativo para guild ${guildId}: encontrados ${out.length}`);
-            return out;
-        }
-    } catch (err) {
-        console.warn('⚠️ Fallback listTicketReports fallo:', err?.message || err);
-    }
-
-    return [];
+    return listTicketReportSummaries(guildId, limit);
 }
 
 async function getTicketReport(guildId, reportId) {
