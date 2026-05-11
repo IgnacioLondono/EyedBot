@@ -1581,6 +1581,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
                 panelChannelId: '',
                 requestChannelId: '',
                 receiptHistoryChannelId: '',
+                sendDmReceipt: true,
                 adminRoleIds: [],
                 title: 'Soporte',
                 message: 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.',
@@ -1598,6 +1599,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
         res.json({
             ...cfg,
             receiptHistoryChannelId: String(cfg.receiptHistoryChannelId || '').trim(),
+            sendDmReceipt: cfg.sendDmReceipt !== false,
             ticketCategories: Array.isArray(cfg.ticketCategories) && cfg.ticketCategories.length ? cfg.ticketCategories : defaultTicketCategories,
             commonProblems: Array.isArray(cfg.commonProblems) && cfg.commonProblems.length ? cfg.commonProblems : defaultCommonProblems,
             minecraftServers: Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultMinecraftServers,
@@ -1727,11 +1729,18 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             minecraftServers.unshift(defaultMinecraftServers[0]);
         }
 
+        const incomingMessageId = String(body.messageId || '').trim();
+        const preservedMessageId = incomingMessageId || String(currentCfg?.messageId || '').trim();
+
         const config = {
             enabled: body.enabled === true,
             panelChannelId: String(body.panelChannelId || '').trim(),
             requestChannelId: String(body.requestChannelId || '').trim(),
             receiptHistoryChannelId: String(body.receiptHistoryChannelId || '').trim(),
+            sendDmReceipt:
+                typeof body.sendDmReceipt === 'boolean'
+                    ? body.sendDmReceipt
+                    : currentCfg?.sendDmReceipt !== false,
             adminRoleIds,
             title: String(body.title || 'Soporte').slice(0, 256),
             message: String(body.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.').slice(0, 2000),
@@ -1742,7 +1751,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
             commonProblems,
             minecraftServers,
             caseRoleMap,
-            messageId: String(body.messageId || '').trim(),
+            messageId: preservedMessageId,
             updatedAt: new Date().toISOString(),
             updatedBy: req.session.user?.id || 'unknown'
         };
