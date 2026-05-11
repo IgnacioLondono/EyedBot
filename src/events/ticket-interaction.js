@@ -1663,51 +1663,83 @@ function parseStoredReportValue(raw) {
 
 /**
  * Metadatos del informe para el panel web: solo claves en una consulta y luego `db.get` fila a fila.
- * Evita dos problemas: (1) SELECT masivo de valores LONGTEXT (packet / memoria) y (2) JSON_EXTRACT
- * que en algunos MariaDB/MySQL no devuelve filas útiles sobre TEXT.
+ * Evita SELECT masivo de LONGTEXT. Si ORDER BY updated_at falla (tablas viejas sin esa columna),
+ * se usa ORDER BY id DESC o un LIMIT sin orden para no devolver lista vacía con COUNT > 0.
  */
+async function fetchTicketReportKeys(pattern, limit) {
+    // LIMIT como literal entero: mysqld_stmt_execute falla en algunos entornos con `LIMIT ?` preparado.
+    const lim = Math.max(1, Math.min(500, Math.floor(Number(limit) || 50)));
+    const counterGuard = "`key` NOT LIKE 'ticket_report_counter_%'";
+    const variants = [
+        `SELECT \`key\` FROM key_value_store WHERE ${counterGuard} AND \`key\` LIKE ? ORDER BY updated_at DESC LIMIT ${lim}`,
+        `SELECT \`key\` FROM key_value_store WHERE ${counterGuard} AND \`key\` LIKE ? ORDER BY id DESC LIMIT ${lim}`,
+        `SELECT \`key\` FROM key_value_store WHERE ${counterGuard} AND \`key\` LIKE ? LIMIT ${lim}`
+    ];
+
+    for (const sql of variants) {
+        try {
+            const rows = await db.query(sql, [pattern]);
+            const keys = (rows || []).map((r) => String(r.key ?? r.KEY ?? '')).filter(Boolean);
+            if (keys.length) return keys;
+        } catch (err) {
+            /* siguiente variante */
+        }
+    }
+
+    console.warn('fetchTicketReportKeys: sin filas para patron', pattern);
+    return [];
+}
+
+async function loadReportObjectFromStore(key) {
+    let full = null;
+    try {
+        full = await db.get(key);
+    } catch (err) {
+        console.warn(`loadReportObjectFromStore("${key}"):`, err?.message || err);
+        return null;
+    }
+    if (full != null && typeof full !== 'object') {
+        full = parseStoredReportValue(full);
+    }
+    return full && typeof full === 'object' ? full : null;
+}
+
 async function listTicketReportSummaries(guildId, limit = 50) {
-    const safeGuildId = String(guildId || '');
+    const safeGuildId = String(guildId || '').trim();
     if (!safeGuildId) return [];
 
     const lim = Math.max(1, Math.min(500, Number(limit) || 50));
     const primaryLike = `ticket_report_TK-${safeGuildId}-%`;
+    const broadLike = `ticket_report_%${safeGuildId}%`;
 
-    const fetchKeys = async (pattern) => {
-        try {
-            const rows = await db.query(
-                'SELECT `key` FROM key_value_store WHERE `key` LIKE ? ORDER BY updated_at DESC LIMIT ?',
-                [pattern, lim]
-            );
-            return (rows || []).map((r) => String(r.key ?? r.KEY ?? '')).filter(Boolean);
-        } catch (error) {
-            console.warn('listTicketReportSummaries keys:', error?.message || error);
-            return [];
-        }
-    };
-
-    let keys = await fetchKeys(primaryLike);
+    let keys = await fetchTicketReportKeys(primaryLike, lim);
     if (!keys.length) {
-        keys = await fetchKeys(`ticket_report_%${safeGuildId}%`);
+        keys = await fetchTicketReportKeys(broadLike, Math.min(lim * 3, 500));
+    }
+
+    const seen = new Set();
+    const deduped = [];
+    for (const k of keys) {
+        if (seen.has(k)) continue;
+        seen.add(k);
+        deduped.push(k);
+        if (deduped.length >= lim) break;
     }
 
     const out = [];
-    for (const key of keys) {
+    for (const key of deduped) {
         if (!key.startsWith('ticket_report_')) continue;
-        let full = null;
-        try {
-            full = await db.get(key);
-        } catch (err) {
-            console.warn(`listTicketReportSummaries db.get(${key}):`, err?.message || err);
-            continue;
-        }
-        if (!full || typeof full !== 'object') continue;
-        if (String(full.guildId) !== safeGuildId) continue;
+
+        const full = await loadReportObjectFromStore(key);
+        if (!full) continue;
+
+        const gid = String(full.guildId ?? '').trim();
+        if (gid !== safeGuildId) continue;
 
         const mc = Number.parseInt(String(full.messagesCount ?? '0'), 10);
         out.push({
             reportId: String(full.reportId || ''),
-            guildId: String(full.guildId || safeGuildId),
+            guildId: gid,
             channelId: String(full.channelId || ''),
             channelName: String(full.channelName || ''),
             channelCreatedAt: full.channelCreatedAt || null,
@@ -1729,7 +1761,7 @@ async function listTicketReportSummaries(guildId, limit = 50) {
 }
 
 async function deleteTicketReportFromGuild(guildId, reportId) {
-    const safeGuildId = String(guildId || '');
+    const safeGuildId = String(guildId || '').trim();
     const safeReportId = String(reportId || '').trim();
     if (!safeGuildId || !safeReportId) {
         return { ok: false, code: 'INVALID', error: 'Parametros invalidos' };
@@ -1739,11 +1771,11 @@ async function deleteTicketReportFromGuild(guildId, reportId) {
     }
 
     const key = `ticket_report_${safeReportId}`;
-    const existing = await db.get(key);
-    if (!existing || typeof existing !== 'object') {
+    const existing = await loadReportObjectFromStore(key);
+    if (!existing) {
         return { ok: false, code: 'NOT_FOUND', error: 'Informe no encontrado' };
     }
-    if (String(existing.guildId) !== safeGuildId) {
+    if (String(existing.guildId ?? '').trim() !== safeGuildId) {
         return { ok: false, code: 'NOT_FOUND', error: 'Informe no encontrado' };
     }
 
@@ -1752,7 +1784,7 @@ async function deleteTicketReportFromGuild(guildId, reportId) {
 }
 
 async function countTicketReports(guildId) {
-    const safeGuildId = String(guildId || '');
+    const safeGuildId = String(guildId || '').trim();
     if (!safeGuildId) return 0;
 
     const keyLike = `ticket_report_TK-${safeGuildId}-%`;
@@ -1773,7 +1805,7 @@ async function countTicketReports(guildId) {
         let cnt = 0;
         for (const rowAlt of altRows || []) {
             const parsed = parseStoredReportValue(rowAlt?.value);
-            if (parsed && typeof parsed === 'object' && String(parsed.guildId) === safeGuildId) cnt++;
+            if (parsed && typeof parsed === 'object' && String(parsed.guildId ?? '').trim() === safeGuildId) cnt++;
         }
         return cnt;
     } catch (error) {
@@ -1792,14 +1824,14 @@ async function listTicketReportsWithFallback(guildId, limit = 50) {
 }
 
 async function getTicketReport(guildId, reportId) {
-    const safeGuildId = String(guildId || '');
+    const safeGuildId = String(guildId || '').trim();
     const safeReportId = String(reportId || '');
     if (!safeGuildId || !safeReportId) return null;
 
     try {
-        const data = await db.get(`ticket_report_${safeReportId}`);
-        if (!data || typeof data !== 'object') return null;
-        if (String(data.guildId) !== safeGuildId) return null;
+        const data = await loadReportObjectFromStore(`ticket_report_${safeReportId}`);
+        if (!data) return null;
+        if (String(data.guildId ?? '').trim() !== safeGuildId) return null;
         return data;
     } catch (error) {
         console.error('Error obteniendo report:', error.message);
