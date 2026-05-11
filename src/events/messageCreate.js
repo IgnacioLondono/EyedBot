@@ -1,23 +1,27 @@
 const config = require('../config');
-const logger = require('../utils/logger');
 const { EmbedBuilder } = require('discord.js');
 const afkStore = require('../utils/afk-store');
+const { buildAfkRemovedEmbed } = require('../utils/afk-announcements');
 
-async function handleAFKMentions(message) {
-    // No procesar bots ni mensajes vacíos
-    if (message.author.bot || !message.mentions || message.mentions.size === 0) return;
+async function handleAFKAuthorReturn(message) {
+    if (!message.guild || message.author.bot) return;
 
-    // No procesar si el usuario que escribe está AFK (presumiblemente se despidió)
     try {
-        const isAuthorAFK = await afkStore.isAFK(message.guildId, message.author.id);
-        if (isAuthorAFK) {
-            await afkStore.removeAFK(message.guildId, message.author.id);
-        }
+        const afkData = await afkStore.getAFK(message.guildId, message.author.id);
+        if (!afkData) return;
+
+        await afkStore.removeAFK(message.guildId, message.author.id);
+
+        const embed = buildAfkRemovedEmbed(message.author, afkData);
+        await message.channel.send({ embeds: [embed] }).catch(() => null);
     } catch (err) {
         console.warn('Error removiendo AFK del autor:', err?.message || err);
     }
+}
 
-    // Iterar menciones y notificar si está AFK
+async function handleAFKMentions(message) {
+    if (message.author.bot || !message.mentions || message.mentions.size === 0) return;
+
     for (const mentioned of message.mentions.users.values()) {
         if (mentioned.bot) continue;
 
@@ -52,17 +56,14 @@ async function handleAFKMentions(message) {
 module.exports = {
     name: 'messageCreate',
     handleAFKMentions,
+    handleAFKAuthorReturn,
     async execute(message) {
-        // Procesar menciones AFK
+        await handleAFKAuthorReturn(message).catch(console.error);
         await handleAFKMentions(message).catch(console.error);
 
-        // Ignorar bots y mensajes sin prefijo
         if (message.author.bot || !message.content.startsWith(config.prefix)) return;
 
         const args = message.content.slice(config.prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
-
-        // Sistema de comandos legacy (opcional)
-        // Puedes mantener esto para compatibilidad o eliminarlo si solo usas slash commands
+        args.shift();
     }
 };

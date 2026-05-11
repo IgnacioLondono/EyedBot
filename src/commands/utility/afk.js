@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const afkStore = require('../../utils/afk-store');
+const { buildAfkActivatedEmbed } = require('../../utils/afk-announcements');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,28 +18,13 @@ module.exports = {
         const reason = interaction.options.getString('motivo') || 'Sin especificar';
         const userId = interaction.user.id;
         const guildId = interaction.guildId;
-        const memberTag = interaction.user.tag;
 
-        // Guardar en store
         await afkStore.setAFK(guildId, userId, reason);
 
-        // Embed de confirmación
-        const embed = new EmbedBuilder()
-            .setColor('f5a623')
-            .setTitle('⏳ Estado AFK activado')
-            .setDescription(`${interaction.user.username} está ausente.`)
-            .addFields(
-                { name: 'Motivo', value: reason, inline: false }
-            )
-            .setAuthor({
-                name: memberTag,
-                iconURL: interaction.user.displayAvatarURL({ size: 64 })
-            })
-            .setTimestamp();
+        const embed = buildAfkActivatedEmbed(interaction.user, reason);
 
         await interaction.reply({
-            embeds: [embed],
-            flags: 64 // Privado
+            embeds: [embed]
         }).catch(() => null);
     }
 };
