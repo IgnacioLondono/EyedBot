@@ -10751,12 +10751,15 @@ function wireTicketsManageControls() {
                 e.preventDefault();
                 e.stopPropagation();
                 const open = settingsMenu.style.display === 'block';
-                settingsMenu.style.display = open ? 'none' : 'block';
+                const nextOpen = !open;
+                settingsMenu.style.display = nextOpen ? 'block' : 'none';
+                settingsBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
             });
             document.addEventListener('click', (e) => {
                 if (settingsMenu.style.display !== 'block') return;
                 if (settingsBtn.contains(e.target) || settingsMenu.contains(e.target)) return;
                 settingsMenu.style.display = 'none';
+                settingsBtn.setAttribute('aria-expanded', 'false');
             });
             settingsMenu.querySelectorAll('.tm-settings-menu-item').forEach((item) => {
                 item.addEventListener('click', (e) => {
@@ -10772,6 +10775,7 @@ function wireTicketsManageControls() {
                     }
                     _ticketsManageState.tab = newTab;
                     settingsMenu.style.display = 'none';
+                    settingsBtn.setAttribute('aria-expanded', 'false');
                     saveTicketsManageScrollPosition();
                     if (_ticketsManageState.lastData) {
                         renderTicketsManage(_ticketsManageState.lastData);
