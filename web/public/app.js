@@ -11054,16 +11054,38 @@ function renderTicketManageConfig(cfg, guildId) {
             <h4>Configuración de tickets</h4>
             <input type="hidden" id="tm_ticketMessageId" value="${escapeHtmlForValue(cfg.messageId || '')}">
             <input type="hidden" id="tm_ticketColor" value="#${escapeHtmlForValue(String(cfg.color || '7c4dff').replace(/#/g, ''))}">
-            <div class="dpx-field-grid" style="margin-top:1rem; gap: 0.8rem;">
-                <div class="dpx-field is-full tm-switch-field tm-switch-field--compact tm-switch-field--hero">
-                    <div class="tm-switch-copy">
-                        <span class="tm-switch-title">Sistema activo</span>
-                        <span class="tm-switch-desc">Pausa tickets sin borrar la configuración.</span>
+            <div class="dpx-field-grid tm-ticket-cfg-grid">
+                <div class="tm-switch-strip">
+                    <div class="tm-switch-field tm-switch-field--compact tm-switch-field--hero">
+                        <div class="tm-switch-copy">
+                            <span class="tm-switch-title">Sistema activo</span>
+                            <span class="tm-switch-desc">Pausa sin borrar la config.</span>
+                        </div>
+                        <label class="tm-switch tm-switch--accent tm-switch--xs" title="Activar o pausar tickets">
+                            <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
+                            <span class="tm-switch-slider"></span>
+                        </label>
                     </div>
-                    <label class="tm-switch tm-switch--accent tm-switch--sm" title="Activar o pausar tickets">
-                        <input type="checkbox" id="tm_ticketEnabled" ${cfg.enabled ? 'checked' : ''}>
-                        <span class="tm-switch-slider"></span>
-                    </label>
+                    <div class="tm-switch-field tm-switch-field--compact">
+                        <div class="tm-switch-copy">
+                            <span class="tm-switch-title">MD al cerrar</span>
+                            <span class="tm-switch-desc">Transcripción al usuario.</span>
+                        </div>
+                        <label class="tm-switch tm-switch--mint tm-switch--xs" title="MD comprobante al cerrar">
+                            <input type="checkbox" id="tm_ticketSendDmReceipt" ${sendDmDefault ? 'checked' : ''}>
+                            <span class="tm-switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="tm-switch-field tm-switch-field--compact">
+                        <div class="tm-switch-copy">
+                            <span class="tm-switch-title">MD solicitud</span>
+                            <span class="tm-switch-desc">Aviso al crear pendiente.</span>
+                        </div>
+                        <label class="tm-switch tm-switch--sky tm-switch--xs" title="MD estado solicitud pendiente">
+                            <input type="checkbox" id="tm_ticketSendDmPendingStatus" ${sendDmPendingDefault ? 'checked' : ''}>
+                            <span class="tm-switch-slider"></span>
+                        </label>
+                    </div>
                 </div>
                 <div class="dpx-field">
                     <label for="tm_ticketChannelSelect">Canal del panel</label>
@@ -11080,34 +11102,11 @@ function renderTicketManageConfig(cfg, guildId) {
                     </select>
                 </div>
                 <div class="dpx-field is-full">
-                    <label for="tm_ticketReceiptChannelSelect">Canal de historial de comprobantes</label>
-                    <p class="tm-field-hint">Copia del informe al cerrar (visible para staff con acceso al canal).</p>
+                    <label for="tm_ticketReceiptChannelSelect">Historial comprobantes <span class="tm-field-hint-inline">al cerrar, solo staff</span></label>
                     <select id="tm_ticketReceiptChannelSelect" class="form-control">
                         <option value="">Sin canal dedicado</option>
                         ${(channels || []).filter((c) => c.type === 0).map((c) => `<option value="${c.id}" ${String(cfg.receiptHistoryChannelId || '') === String(c.id) ? 'selected' : ''}># ${escapeHtml(c.name)}</option>`).join('')}
                     </select>
-                </div>
-                <div class="tm-switch-pair-row">
-                    <div class="dpx-field is-full tm-switch-field tm-switch-field--compact">
-                        <div class="tm-switch-copy">
-                            <span class="tm-switch-title">MD al cerrar</span>
-                            <span class="tm-switch-desc">Comprobante (.txt) al usuario que abrió el ticket.</span>
-                        </div>
-                        <label class="tm-switch tm-switch--mint tm-switch--sm" title="Enviar copia del cierre por MD">
-                            <input type="checkbox" id="tm_ticketSendDmReceipt" ${sendDmDefault ? 'checked' : ''}>
-                            <span class="tm-switch-slider"></span>
-                        </label>
-                    </div>
-                    <div class="dpx-field is-full tm-switch-field tm-switch-field--compact">
-                        <div class="tm-switch-copy">
-                            <span class="tm-switch-title">MD estado de solicitud</span>
-                            <span class="tm-switch-desc">Al enviar solicitud pendiente, copia del estado por MD.</span>
-                        </div>
-                        <label class="tm-switch tm-switch--sky tm-switch--sm" title="Notificar solicitud pendiente por MD">
-                            <input type="checkbox" id="tm_ticketSendDmPendingStatus" ${sendDmPendingDefault ? 'checked' : ''}>
-                            <span class="tm-switch-slider"></span>
-                        </label>
-                    </div>
                 </div>
                 <div class="dpx-field is-full">
                     <label>Título</label>
@@ -11128,7 +11127,7 @@ function renderTicketManageConfig(cfg, guildId) {
                 <div class="dpx-field is-full">
                     <label>Roles gestores</label>
                     <p style="font-size: 0.8rem; color: rgba(255,255,255,0.6); margin: 0.25rem 0 0.5rem 0;">Ctrl+Click para múltiples</p>
-                    <select id="tm_ticketAdminRoles" class="form-control" multiple size="4">
+                    <select id="tm_ticketAdminRoles" class="form-control tm-multi-select-compact" multiple size="3">
                         ${(roles || []).map((r) => `<option value="${r.id}" ${Array.isArray(cfg.adminRoleIds) && cfg.adminRoleIds.map(String).includes(String(r.id)) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
                     </select>
                 </div>
