@@ -132,6 +132,13 @@ async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
         `• /coinflip: **${Number(config.minigameCoinflipReward || 0)}**`,
         `• /dice: **${Number(config.minigameDiceReward || 0)}**`,
         `• /trivia (acierto): **${Number(config.minigameTriviaReward || 0)}**`,
+        `• /minijuego rps: **${Number(config.minigameRpsReward || 0)}**`,
+        `• /minijuego puertas: **${Number(config.minigameDoorsReward || 0)}**`,
+        `• /minijuego colores: **${Number(config.minigameColorReward || 0)}**`,
+        '',
+        'PvP y tradeo:',
+        '• /trade para intercambiar monedas u objetos con botones',
+        '• /versus para duelos de dados por monedas',
         '',
         `Cooldown de minijuegos: **${Number(config.minigameCooldownSec || 45)}s**`
     ].join('\n'));

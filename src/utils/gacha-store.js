@@ -243,6 +243,9 @@ function defaultConfig() {
         minigameCoinflipReward: 8,
         minigameDiceReward: 6,
         minigameTriviaReward: 18,
+        minigameRpsReward: 10,
+        minigameDoorsReward: 12,
+        minigameColorReward: 9,
         minigameCooldownSec: 45,
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
@@ -267,6 +270,9 @@ function normalizeConfig(raw = {}) {
         minigameCoinflipReward: Math.max(0, Math.min(1000, Number.parseInt(`${raw.minigameCoinflipReward ?? 8}`, 10) || 0)),
         minigameDiceReward: Math.max(0, Math.min(1000, Number.parseInt(`${raw.minigameDiceReward ?? 6}`, 10) || 0)),
         minigameTriviaReward: Math.max(0, Math.min(5000, Number.parseInt(`${raw.minigameTriviaReward ?? 18}`, 10) || 0)),
+        minigameRpsReward: Math.max(0, Math.min(1000, Number.parseInt(`${raw.minigameRpsReward ?? 10}`, 10) || 0)),
+        minigameDoorsReward: Math.max(0, Math.min(1000, Number.parseInt(`${raw.minigameDoorsReward ?? 12}`, 10) || 0)),
+        minigameColorReward: Math.max(0, Math.min(1000, Number.parseInt(`${raw.minigameColorReward ?? 9}`, 10) || 0)),
         minigameCooldownSec: Math.max(5, Math.min(3600, Number.parseInt(`${raw.minigameCooldownSec ?? 45}`, 10) || 45)),
         updatedAt: String(raw.updatedAt || new Date().toISOString()),
         updatedBy: String(raw.updatedBy || 'system')

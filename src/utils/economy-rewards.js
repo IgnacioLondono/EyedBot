@@ -7,6 +7,9 @@ function getMinigameReward(config, gameKey = '') {
     if (key === 'coinflip') return Math.max(0, Number(config.minigameCoinflipReward || 0));
     if (key === 'dice') return Math.max(0, Number(config.minigameDiceReward || 0));
     if (key === 'trivia') return Math.max(0, Number(config.minigameTriviaReward || 0));
+    if (key === 'rps') return Math.max(0, Number(config.minigameRpsReward || 0));
+    if (key === 'doors') return Math.max(0, Number(config.minigameDoorsReward || 0));
+    if (key === 'color') return Math.max(0, Number(config.minigameColorReward || 0));
     return 0;
 }
 
