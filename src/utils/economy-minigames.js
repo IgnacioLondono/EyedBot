@@ -138,8 +138,8 @@ async function startColor(interaction) {
 
 async function handleRpsButton(interaction) {
     const parts = interaction.customId.split(':');
-    const ownerId = parts[2];
-    const choice = parts[3];
+    const ownerId = parts[1];
+    const choice = parts[2];
     if (!ownerId || ownerId !== interaction.user.id) {
         await safeReply(interaction, { content: 'Solo quien inició el minijuego puede usar estos botones.', flags: 64 });
         return true;
@@ -179,8 +179,8 @@ async function handleRpsButton(interaction) {
 
 async function handleDoorButton(interaction) {
     const parts = interaction.customId.split(':');
-    const ownerId = parts[2];
-    const pick = Number.parseInt(parts[3], 10);
+    const ownerId = parts[1];
+    const pick = Number.parseInt(parts[2], 10);
     if (!ownerId || ownerId !== interaction.user.id) {
         await safeReply(interaction, { content: 'Solo quien inició el minijuego puede usar estos botones.', flags: 64 });
         return true;
@@ -209,8 +209,8 @@ async function handleDoorButton(interaction) {
 
 async function handleColorButton(interaction) {
     const parts = interaction.customId.split(':');
-    const ownerId = parts[2];
-    const choice = parts[3];
+    const ownerId = parts[1];
+    const choice = parts[2];
     if (!ownerId || ownerId !== interaction.user.id) {
         await safeReply(interaction, { content: 'Solo quien inició el minijuego puede usar estos botones.', flags: 64 });
         return true;
