@@ -1001,6 +1001,7 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
 app.get('/api/guilds', requireAuth, async (req, res) => {
     try {
         const guilds = filterTrackableGuilds(await syncSessionGuilds(req, { force: true }));
+        console.log('📋 GET /api/guilds - User:', req.session.user?.username, '| Session guilds:', guilds.length, '| botClient available:', !!botClient, '| bot cache size:', botClient?.guilds?.cache?.size || 0);
         
         // Filtrar solo servidores donde el bot está presente
         const botGuilds = [];
@@ -1024,11 +1025,14 @@ app.get('/api/guilds', requireAuth, async (req, res) => {
                     });
                 }
             }
+        } else {
+            console.warn('⚠️ botClient not available - returning empty guilds list');
         }
         
+        console.log('✅ Returning', botGuilds.length, 'guilds to user');
         res.json(botGuilds);
     } catch (error) {
-        console.error('Error obteniendo servidores:', error);
+        console.error('❌ Error obteniendo servidores:', error);
         res.status(500).json({ error: 'Error al obtener servidores' });
     }
 });
