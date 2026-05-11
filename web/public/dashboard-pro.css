@@ -12307,3 +12307,63 @@ body {
         padding: 0 0.85rem 1.1rem !important;
     }
 }
+
+/* =====================================================================
+   Panel servidor: sin franja ni corte en la base (sidebar + contenido)
+   ===================================================================== */
+.main-content:has(#serverSection.active) {
+    padding: 0 !important;
+    height: calc(100vh - 70px) !important;
+    max-height: calc(100vh - 70px) !important;
+    overflow: hidden !important;
+}
+
+#serverSection.section {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+}
+
+#serverSection.section > .container {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+}
+
+#serverSection .server-shell {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    align-items: stretch !important;
+}
+
+#serverSection .server-side-menu,
+#serverSection .server-content-area {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    align-self: stretch !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin;
+}
+
+#serverSection .server-side-menu {
+    overflow-y: auto !important;
+}
+
+#serverSection .server-content-area {
+    overflow-y: auto !important;
+}
+
+#serverSection .server-side-menu::-webkit-scrollbar:horizontal,
+#serverSection .server-content-area::-webkit-scrollbar:horizontal {
+    display: none;
+    height: 0;
+}
