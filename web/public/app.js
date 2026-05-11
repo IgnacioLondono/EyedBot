@@ -98,7 +98,7 @@ function wallpaperIdbPut(blob, mime, kind) {
                 tx.objectStore(WALLPAPER_IDB_STORE).put({
                     id: WALLPAPER_IDB_RECORD_ID,
                     blob,
-    const formInputs = container.querySelectorAll('input[id^="tm_"], textarea[id^="tm_"], select[id^="tm_"]');
+                    mime: mime || '',
                     kind: kind === 'video' ? 'video' : 'image',
                     updatedAt: Date.now()
                 });
@@ -112,12 +112,10 @@ function wallpaperIdbGet() {
         (db) =>
             new Promise((resolve, reject) => {
                 const tx = db.transaction(WALLPAPER_IDB_STORE, 'readonly');
-               document.getElementById('tm_ticketReceiptChannelSelect').value = draft.receiptHistoryChannelId;
                 const req = tx.objectStore(WALLPAPER_IDB_STORE).get(WALLPAPER_IDB_RECORD_ID);
                 req.onsuccess = () => resolve(req.result || null);
                 req.onerror = () => reject(req.error || new Error('IndexedDB read'));
             })
-               document.getElementById('tm_ticketSendDmReceipt').checked = draft.sendDmReceipt;
     );
 }
 
