@@ -457,6 +457,14 @@ client.on('interactionCreate', async interaction => {
                 }
             }
 
+            if (interaction.customId.startsWith('mg_')
+                || interaction.customId.startsWith('trade:')
+                || interaction.customId.startsWith('versus:')) {
+                const { handleEconomyButton } = require('./utils/economy-minigames');
+                const handled = await handleEconomyButton(interaction);
+                if (handled) return;
+            }
+
             if (interaction.customId.startsWith('trivia_')) {
                 const triviaData = interaction.client.triviaAnswers?.[interaction.message.interaction?.id];
                 if (!triviaData) {
