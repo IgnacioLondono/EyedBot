@@ -2014,7 +2014,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadGuilds();
     await loadStats();
     await loadAboutOverview();
-    setupServerSummaryAutoRefresh();
+    // setupServerSummaryAutoRefresh(); // Deshabilitado: no cargar automáticamente, solo al actualizar página
     
     const initialSection = savedState?.activeSection || 'dashboard';
     showSection(initialSection, { skipHistory: true });
