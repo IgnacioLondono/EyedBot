@@ -2195,14 +2195,14 @@ body {
 }
 
 .section#serverSection {
-    min-height: calc(100vh - 110px);
+    min-height: calc(100vh - 70px);
 }
 
 .section#serverSection .container {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    min-height: calc(100vh - 140px);
+    min-height: calc(100vh - 70px);
     overflow: hidden;
     padding-right: 0;
 }
