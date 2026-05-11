@@ -33,6 +33,8 @@ const {
     listPendingRequests,
     listTicketReports,
     listTicketReportsWithFallback,
+    listTicketReportSummaries,
+    deleteTicketReportFromGuild,
     countTicketReports,
     getTicketReport,
     listActiveTicketChannels,
@@ -2079,10 +2081,9 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) =>
         const rawPending = await listPendingRequests(guildId);
         const closedReportsTotal = await countTicketReports(guildId).catch(() => 0);
 
-        let rawReports = await listTicketReports(guildId, historyLimit);
-        if (!rawReports || !rawReports.length) {
+        let rawReports = await listTicketReportSummaries(guildId, historyLimit);
+        if (!rawReports?.length) {
             try {
-                // Intentar una consulta alternativa si por alguna razon no hay reports con el patron esperado
                 if (typeof listTicketReportsWithFallback === 'function') {
                     rawReports = await listTicketReportsWithFallback(guildId, historyLimit);
                 }
@@ -2224,6 +2225,28 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/close', requireAuth, asy
     } catch (error) {
         console.error('Error cerrando ticket desde web:', error);
         res.status(500).json({ error: 'Error al cerrar el ticket' });
+    }
+});
+
+app.delete('/api/guild/:guildId/tickets/reports/:reportId', requireAuth, async (req, res) => {
+    try {
+        const { guildId, reportId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const result = await deleteTicketReportFromGuild(guildId, reportId);
+        if (!result?.ok) {
+            const status =
+                result?.code === 'NOT_FOUND' ? 404
+                    : result?.code === 'INVALID' ? 400
+                        : 500;
+            return res.status(status).json({ error: result?.error || 'No se pudo eliminar el informe', code: result?.code || 'UNKNOWN' });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error eliminando informe de ticket:', error);
+        res.status(500).json({ error: 'Error al eliminar el informe' });
     }
 });
 

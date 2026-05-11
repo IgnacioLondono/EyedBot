@@ -729,15 +729,31 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
         )
         .setTimestamp();
 
+    let dmSent = false;
     if (cfg.sendDmPendingStatus === true) {
-        await interaction.user.send({ embeds: [userPendingEmbed] }).catch(() => null);
+        dmSent = !!(await interaction.user.send({ embeds: [userPendingEmbed] }).catch(() => null));
     }
 
-    await interaction.editReply({
-        content: '\u200b',
-        embeds: [userPendingEmbed],
-        components: []
-    }).catch(() => null);
+    // No mostrar este embed en el canal panel/hilo (ephemeral): solo MD cuando está activo en config.
+    if (cfg.sendDmPendingStatus === true && dmSent) {
+        await interaction.deleteReply().catch(() =>
+            interaction.editReply({ content: '\u200b', embeds: [], components: [] }).catch(() => null)
+        );
+    } else if (cfg.sendDmPendingStatus === true && !dmSent) {
+        await interaction.editReply({
+            content:
+                '**Solicitud registrada.** No pude enviarte el resumen por mensajes directos (¿los tienes cerrados o bloqueados?). Los moderadores verán tu petición en el canal de solicitudes.',
+            embeds: [],
+            components: []
+        }).catch(() => null);
+    } else {
+        await interaction.editReply({
+            content:
+                `**Solicitud registrada** (ID \`${requestId}\`). Los moderadores revisarán tu petición. Activa **MD estado solicitud pendiente** en el panel web del bot si quieres recibir este resumen por privado.`,
+            embeds: [],
+            components: []
+        }).catch(() => null);
+    }
 }
 
 async function updateTicketPresetSelector(interaction, guildId, updater) {
@@ -1645,6 +1661,111 @@ function parseStoredReportValue(raw) {
     return null;
 }
 
+/**
+ * Metadatos del informe sin transcript (evita SELECT gigante que vacía la lista por max_allowed_packet / memoria).
+ */
+async function listTicketReportSummaries(guildId, limit = 50) {
+    const safeGuildId = String(guildId || '');
+    if (!safeGuildId) return [];
+
+    const lim = Math.max(1, Math.min(500, Number(limit) || 50));
+    const keyLike = `ticket_report_TK-${safeGuildId}-%`;
+
+    const sql = `
+        SELECT
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.reportId')) AS report_id,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.guildId')) AS guild_id,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.channelId')) AS channel_id,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.channelName')) AS channel_name,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.channelCreatedAt')) AS channel_created_at,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.ownerId')) AS owner_id,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.closedById')) AS closed_by_id,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.closedByTag')) AS closed_by_tag,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.category')) AS category,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.common')) AS common,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.reason')) AS reason,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.messagesCount')) AS messages_count,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.createdAt')) AS created_at,
+            JSON_UNQUOTE(JSON_EXTRACT(\`value\`, '$.transcriptFileName')) AS transcript_file_name,
+            JSON_EXTRACT(\`value\`, '$.participants') AS participants_json
+        FROM key_value_store
+        WHERE \`key\` LIKE ?
+        ORDER BY updated_at DESC
+        LIMIT ?
+    `;
+
+    try {
+        const rows = await db.query(sql, [keyLike, lim]);
+        const out = [];
+        for (const row of rows || []) {
+            const gid = row.guild_id ?? row.GUILD_ID;
+            if (String(gid || '') !== safeGuildId) continue;
+
+            let participants = [];
+            try {
+                const pj = row.participants_json ?? row.participantsJson ?? row.PARTICIPANTS_JSON;
+                if (pj != null && pj !== '') {
+                    const raw = Buffer.isBuffer(pj) ? pj.toString('utf8') : pj;
+                    participants = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                }
+            } catch {
+                participants = [];
+            }
+            if (!Array.isArray(participants)) participants = [];
+
+            const mcRaw = row.messages_count ?? row.messagesCount ?? row.MESSAGES_COUNT;
+            const mc = Number.parseInt(String(mcRaw ?? '0'), 10);
+
+            out.push({
+                reportId: String(row.report_id ?? row.reportId ?? ''),
+                guildId: safeGuildId,
+                channelId: String(row.channel_id ?? row.channelId ?? ''),
+                channelName: String(row.channel_name ?? row.channelName ?? ''),
+                channelCreatedAt: row.channel_created_at ?? row.channelCreatedAt ?? null,
+                ownerId: String(row.owner_id ?? row.ownerId ?? ''),
+                closedById: String(row.closed_by_id ?? row.closedById ?? ''),
+                closedByTag: String(row.closed_by_tag ?? row.closedByTag ?? ''),
+                category: String(row.category ?? row.CATEGORY ?? ''),
+                common: String(row.common ?? row.COMMON ?? ''),
+                reason: String(row.reason ?? row.REASON ?? ''),
+                messagesCount: Number.isFinite(mc) ? mc : 0,
+                participants,
+                createdAt: String(row.created_at ?? row.createdAt ?? ''),
+                transcriptFileName: String(row.transcript_file_name ?? row.transcriptFileName ?? '')
+            });
+        }
+
+        out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        return out;
+    } catch (error) {
+        console.warn('listTicketReportSummaries (fallback a lista completa):', error?.message || error);
+        return [];
+    }
+}
+
+async function deleteTicketReportFromGuild(guildId, reportId) {
+    const safeGuildId = String(guildId || '');
+    const safeReportId = String(reportId || '').trim();
+    if (!safeGuildId || !safeReportId) {
+        return { ok: false, code: 'INVALID', error: 'Parametros invalidos' };
+    }
+    if (!/^TK-[\d-]+$/.test(safeReportId)) {
+        return { ok: false, code: 'INVALID', error: 'ID de informe invalido' };
+    }
+
+    const key = `ticket_report_${safeReportId}`;
+    const existing = await db.get(key);
+    if (!existing || typeof existing !== 'object') {
+        return { ok: false, code: 'NOT_FOUND', error: 'Informe no encontrado' };
+    }
+    if (String(existing.guildId) !== safeGuildId) {
+        return { ok: false, code: 'NOT_FOUND', error: 'Informe no encontrado' };
+    }
+
+    await db.delete(key);
+    return { ok: true };
+}
+
 async function countTicketReports(guildId) {
     const safeGuildId = String(guildId || '');
     if (!safeGuildId) return 0;
@@ -2093,6 +2214,8 @@ module.exports = {
     listPendingRequests,
     listTicketReports,
     listTicketReportsWithFallback,
+    listTicketReportSummaries,
+    deleteTicketReportFromGuild,
     countTicketReports,
     getTicketReport,
     listActiveTicketChannels,
