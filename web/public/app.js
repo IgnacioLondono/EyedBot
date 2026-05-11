@@ -10690,7 +10690,10 @@ function wireTicketsManageControls() {
     const refreshBtn = document.getElementById('ticketManageRefreshBtn');
     if (refreshBtn && !refreshBtn._wired) {
         refreshBtn._wired = true;
-        refreshBtn.addEventListener('click', () => loadTicketsManage({ showLoader: false, force: true }));
+        refreshBtn.addEventListener('click', () => {
+            saveTicketsManageScrollPosition();
+            loadTicketsManage({ showLoader: false, force: true });
+        });
     }
 
     // DESHABILITADO: Auto-refresh completamente desactivado
@@ -10818,12 +10821,6 @@ function renderTicketsManage(data) {
                 <span>Historial</span>
                 <span class="tm-tab-count">${closedCount}</span>
             </button>
-            <button type="button" class="tm-tab-btn ${tab === 'config' ? 'active' : ''}" data-tm-tab="config">
-                <span>Configuración</span>
-            </button>
-            <button type="button" class="tm-tab-btn ${tab === 'categories' ? 'active' : ''}" data-tm-tab="categories">
-                <span>Categorías</span>
-            </button>
         </div>
 
         <div id="tmListContainer" class="tm-list-container"></div>
@@ -10841,9 +10838,45 @@ function renderTicketsManage(data) {
                 clearDraftTicketConfig(guildId);
             }
             _ticketsManageState.tab = newTab;
+            saveTicketsManageScrollPosition();
             renderTicketsManage(_ticketsManageState.lastData);
         });
     });
+
+    // Manejar dropdown menu de configuración y categorías
+    const settingsBtn = document.getElementById('ticketManageSettingsBtn');
+    const settingsMenu = document.getElementById('ticketManageSettingsMenu');
+    
+    if (settingsBtn && settingsMenu) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsMenu.style.display = settingsMenu.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        document.addEventListener('click', () => {
+            settingsMenu.style.display = 'none';
+        });
+        
+        settingsMenu.querySelectorAll('.tm-settings-menu-item').forEach((item) => {
+            item.addEventListener('click', () => {
+                const newTab = item.dataset.tmTab;
+                const guildId = _ticketsManageState.guildId || currentServerGuildId;
+                if (_ticketsManageState.tab === 'config' && newTab !== 'config' && hasTicketConfigChanges(guildId)) {
+                    if (!confirm('Hay cambios no guardados en la configuración. ¿Descartar cambios?')) {
+                        return;
+                    }
+                    clearDraftTicketConfig(guildId);
+                }
+                _ticketsManageState.tab = newTab;
+                settingsMenu.style.display = 'none';
+                saveTicketsManageScrollPosition();
+                renderTicketsManage(_ticketsManageState.lastData);
+            });
+        });
+    }
+
+    // Restaurar scroll position
+    restoreTicketsManageScrollPosition();
 
     if (tab === 'config') {
         loadTicketManageConfig();
@@ -10889,6 +10922,36 @@ function hasTicketConfigChanges(guildId) {
     if (!draft) return false;
     // Si hay draft y más de 30 segundos sin guardar, hay cambios
     return (Date.now() - draft.timestamp) < 30000;
+}
+
+// Persistencia de scroll position para gestión de tickets
+function saveTicketsManageScrollPosition() {
+    const container = document.getElementById('ticketManageContainer');
+    if (container) {
+        const scrollPos = container.scrollTop || 0;
+        const guildId = _ticketsManageState.guildId || currentServerGuildId;
+        sessionStorage.setItem(`ticketsManageScroll_${guildId}`, JSON.stringify({ scrollPos, tab: _ticketsManageState.tab }));
+    }
+}
+
+function restoreTicketsManageScrollPosition() {
+    const container = document.getElementById('ticketManageContainer');
+    if (container) {
+        const guildId = _ticketsManageState.guildId || currentServerGuildId;
+        const stored = sessionStorage.getItem(`ticketsManageScroll_${guildId}`);
+        if (stored) {
+            try {
+                const data = JSON.parse(stored);
+                if (data.tab === _ticketsManageState.tab) {
+                    setTimeout(() => {
+                        container.scrollTop = data.scrollPos || 0;
+                    }, 50);
+                }
+            } catch (e) {
+                console.warn('Error restaurando scroll position:', e);
+            }
+        }
+    }
 }
 
 async function loadTicketManageConfig() {
