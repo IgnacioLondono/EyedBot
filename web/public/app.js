@@ -10704,6 +10704,7 @@ let _ticketsManageState = {
     guildId: '',
     tab: 'pending', // 'pending' | 'active' | 'history'
     activityRange: '7d', // '7d' | 'all'
+    historyFilter: '',
     timer: null,
     lastData: null,
     loading: false
@@ -10886,6 +10887,11 @@ function renderTicketsManage(data) {
     const totalCount = Number(stats.total || (activeCount + pendingCount + closedCount));
 
     const tab = _ticketsManageState.tab;
+    const histLoaded = Array.isArray(data?.history) ? data.history.length : 0;
+    const histOverflowNote =
+        tab === 'history' && closedCount > histLoaded && histLoaded > 0
+            ? `<p class="tm-history-toolbar-note">Total guardados: <strong>${closedCount}</strong>. Mostrando los <strong>${histLoaded}</strong> más recientes.</p>`
+            : '';
 
     container.innerHTML = `
         <div class="tm-stats-grid">
@@ -10912,6 +10918,15 @@ function renderTicketsManage(data) {
                 <span>Historial</span>
                 <span class="tm-tab-count">${closedCount}</span>
             </button>
+        </div>
+
+        <div id="tmHistoryToolbar" class="tm-history-toolbar ${tab === 'history' ? '' : 'is-hidden'}">
+            ${histOverflowNote}
+            <p class="tm-history-toolbar-hint">Filtra por usuario, staff que cerró, ID del informe, nombre del canal, categoría o motivo.</p>
+            <div class="tm-history-toolbar-row">
+                <input type="search" id="tmHistorySearch" class="tm-history-search" placeholder="Ej.: usuario, TK-123…, ticket-soporte…" autocomplete="off" value="${escapeHtml(_ticketsManageState.historyFilter || '')}" />
+                <button type="button" class="tm-btn tm-btn-ghost tm-history-clear" id="tmHistoryClearFilter">Limpiar</button>
+            </div>
         </div>
 
         <div id="tmListContainer" class="tm-list-container"></div>
@@ -10943,6 +10958,20 @@ function renderTicketsManage(data) {
             renderTicketsManage(_ticketsManageState.lastData);
         });
     });
+
+    const tmHistorySearch = container.querySelector('#tmHistorySearch');
+    const tmHistoryClear = container.querySelector('#tmHistoryClearFilter');
+    if (tmHistorySearch && tmHistoryClear) {
+        tmHistorySearch.addEventListener('input', () => {
+            _ticketsManageState.historyFilter = tmHistorySearch.value || '';
+            if (_ticketsManageState.tab === 'history') refreshTmHistoryListFromState();
+        });
+        tmHistoryClear.addEventListener('click', () => {
+            _ticketsManageState.historyFilter = '';
+            tmHistorySearch.value = '';
+            if (_ticketsManageState.tab === 'history') refreshTmHistoryListFromState();
+        });
+    }
 
     // Restaurar scroll position
     restoreTicketsManageScrollPosition();
@@ -11476,6 +11505,38 @@ function renderTmTrendCard(last7, byMonth) {
         </div>`;
 }
 
+function filterTmHistoryItems(items, queryRaw) {
+    const q = String(queryRaw || '').trim().toLowerCase();
+    if (!q) return Array.isArray(items) ? items : [];
+    const needles = q.split(/\s+/).filter(Boolean);
+    return (items || []).filter((item) => {
+        const o = item.owner || {};
+        const c = item.closer || {};
+        const hay = [
+            item.reportId,
+            item.channelName,
+            item.category,
+            item.reason,
+            item.common,
+            item.ownerId,
+            item.closedById,
+            item.closedByTag,
+            o.username,
+            o.tag,
+            c.username,
+            c.tag,
+            Array.isArray(item.participants) ? item.participants.join(' ') : ''
+        ].filter(Boolean).join(' ').toLowerCase();
+        return needles.every((n) => hay.includes(n));
+    });
+}
+
+function refreshTmHistoryListFromState() {
+    const payload = _ticketsManageState.lastData;
+    if (!payload || _ticketsManageState.tab !== 'history') return;
+    renderTmList(payload, 'history');
+}
+
 function renderTmList(data, tab) {
     const container = document.getElementById('tmListContainer');
     if (!container) return;
@@ -11487,7 +11548,13 @@ function renderTmList(data, tab) {
         container.innerHTML = renderTmActiveList(data?.active || []);
         wireTmActiveActions();
     } else {
-        container.innerHTML = renderTmHistoryList(data?.history || []);
+        const raw = data?.history || [];
+        const filtered = filterTmHistoryItems(raw, _ticketsManageState.historyFilter);
+        const filterActive = !!String(_ticketsManageState.historyFilter || '').trim();
+        container.innerHTML = renderTmHistoryList(filtered, {
+            filterActive,
+            totalSourceCount: raw.length
+        });
         wireTmHistoryActions();
     }
 }
@@ -11587,9 +11654,17 @@ function renderTmActiveCard(item) {
         </div>`;
 }
 
-function renderTmHistoryList(items) {
-    if (!items?.length) return renderTmEmpty('history');
-    return `<div class="tm-list">${items.map(renderTmHistoryCard).join('')}</div>`;
+function renderTmHistoryList(items, meta = {}) {
+    const { filterActive, totalSourceCount } = meta;
+    if (!items?.length) {
+        if (filterActive && totalSourceCount > 0) return renderTmEmpty('historyFiltered');
+        return renderTmEmpty('history');
+    }
+    const hint =
+        filterActive && typeof totalSourceCount === 'number'
+            ? `<div class="tm-history-filter-hint">Coincidencias: <strong>${items.length}</strong> de <strong>${totalSourceCount}</strong> en esta carga</div>`
+            : '';
+    return `${hint}<div class="tm-list">${items.map(renderTmHistoryCard).join('')}</div>`;
 }
 
 function renderTmHistoryCard(item) {
@@ -11626,6 +11701,10 @@ function renderTmHistoryCard(item) {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
                     <span>Detalles</span>
                 </button>
+                <button type="button" class="tm-btn tm-btn-delete-report" data-tm-delete-report="${escapeHtml(item.reportId || '')}" title="Quitar del historial en la base de datos">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path></svg>
+                    <span>Eliminar</span>
+                </button>
             </div>
             <div class="tm-history-detail">
                 <dl>
@@ -11647,7 +11726,8 @@ function renderTmEmpty(tab) {
     const copy = {
         pending: { icon: tmIconHourglass(), title: 'Sin solicitudes pendientes', desc: 'Cuando alguien solicite un ticket aparecerá aquí.' },
         active: { icon: tmIconActivity(), title: 'Sin tickets activos', desc: 'No hay canales de tickets abiertos en este momento.' },
-        history: { icon: tmIconCheck(), title: 'Historial vacío', desc: 'Cuando se cierren tickets los verás aquí con todos sus detalles.' }
+        history: { icon: tmIconCheck(), title: 'Historial vacío', desc: 'Cuando se cierren tickets los verás aquí con todos sus detalles.' },
+        historyFiltered: { icon: tmIconCheck(), title: 'Sin coincidencias', desc: 'Prueba otro texto o pulsa Limpiar para ver todo el historial cargado.' }
     }[tab] || { icon: '', title: 'Sin datos', desc: '' };
 
     return `
@@ -11715,6 +11795,13 @@ function wireTmHistoryActions() {
             e.stopPropagation();
             const reportId = btn.getAttribute('data-tm-view-receipt');
             if (reportId) openReceiptModal(reportId);
+        });
+    });
+    document.querySelectorAll('[data-tm-delete-report]').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const reportId = btn.getAttribute('data-tm-delete-report');
+            if (reportId) await deleteTicketHistoryReportFromPanel(reportId, btn);
         });
     });
 }
@@ -12600,6 +12687,38 @@ async function unclaimTicket(channelId, button) {
     } catch (error) {
         console.error('Error liberando ticket:', error);
         showToast('Error de red al liberar el ticket', 'error');
+        if (button) button.disabled = false;
+    }
+}
+
+async function deleteTicketHistoryReportFromPanel(reportId, button) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId || !reportId) return;
+
+    if (!confirm(`¿Eliminar el informe ${reportId} del historial? Esto borra el registro en la base de datos (no afecta al canal en Discord, ya cerrado).`)) {
+        return;
+    }
+
+    if (button) button.disabled = true;
+    try {
+        const response = await fetchWithCredentials(
+            `/api/guild/${guildId}/tickets/reports/${encodeURIComponent(reportId)}`,
+            { method: 'DELETE' }
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success !== true) {
+            showToast(result?.error || 'No se pudo eliminar el informe', 'error');
+            if (button) button.disabled = false;
+            return;
+        }
+        showToast('Informe eliminado del historial', 'success');
+        if (_receiptModalState.reportId === reportId) {
+            closeReceiptModal();
+        }
+        await loadTicketsManage({ force: true });
+    } catch (error) {
+        console.error('Error eliminando informe:', error);
+        showToast('Error de red al eliminar el informe', 'error');
         if (button) button.disabled = false;
     }
 }

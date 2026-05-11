@@ -2522,6 +2522,53 @@ label { color: var(--text-secondary); font-weight: 500; }
     padding: 1.25rem 0 0.5rem;
 }
 
+.tm-history-toolbar {
+    margin: 0.35rem 0 0.85rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 14px;
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.55);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.14);
+}
+.tm-history-toolbar.is-hidden {
+    display: none !important;
+}
+.tm-history-toolbar-hint {
+    margin: 0 0 0.45rem;
+    font-size: 0.78rem;
+    color: var(--text-muted, #a48fd0);
+    line-height: 1.35;
+}
+.tm-history-toolbar-note {
+    margin: 0 0 0.5rem;
+    font-size: 0.76rem;
+    color: var(--text-secondary, #cbb7f6);
+}
+.tm-history-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    align-items: center;
+}
+.tm-history-search {
+    flex: 1 1 220px;
+    min-width: 160px;
+    padding: 0.45rem 0.65rem;
+    border-radius: 10px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.25);
+    background: rgba(var(--bg-primary-rgb, 12, 7, 24), 0.85);
+    color: var(--text-primary, #f4eeff);
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+.tm-history-search::placeholder {
+    color: var(--text-muted, #a48fd0);
+}
+.tm-history-filter-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted, #a48fd0);
+    margin-bottom: 0.5rem;
+}
+
 /* ---------- Tabs ---------- */
 .tm-tabs {
     display: flex;
@@ -2991,6 +3038,8 @@ label { color: var(--text-secondary); font-weight: 500; }
     align-items: center;
     gap: 0.45rem;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 .tm-btn {
     display: inline-flex;
@@ -3032,6 +3081,15 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .tm-btn-close-ticket:hover {
     filter: brightness(1.06);
+}
+.tm-btn-delete-report {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.38);
+}
+.tm-btn-delete-report:hover {
+    background: rgba(239, 68, 68, 0.22);
+    color: #fecaca;
 }
 .tm-btn-ghost {
     background: rgba(255, 255, 255, 0.04);
