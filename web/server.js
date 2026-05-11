@@ -2916,10 +2916,65 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
 
         const config = await gachaStore.getConfig(guildId);
         const items = gachaStore.getShopCatalog(config).slice(0, 250);
-        res.json({ success: true, items, config });
+        res.json({
+            success: true,
+            items,
+            totalItems: items.length,
+            config
+        });
     } catch (error) {
         console.error('Error obteniendo tienda gacha:', error);
         res.status(500).json({ error: 'Error al obtener catálogo de tienda' });
+    }
+});
+
+app.get('/api/guild/:guildId/gacha-leaderboard', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        const config = await gachaStore.getConfig(guildId);
+        const profiles = await gachaStore.listGuildProfiles(guildId);
+        const sorted = profiles.slice().sort((left, right) => {
+            const coinsDelta = (right.coins || 0) - (left.coins || 0);
+            if (coinsDelta !== 0) return coinsDelta;
+            const claimsDelta = (right.totalClaims || 0) - (left.totalClaims || 0);
+            if (claimsDelta !== 0) return claimsDelta;
+            return (right.collectionCount || 0) - (left.collectionCount || 0);
+        });
+        const topCoins = Math.max(1, sorted[0]?.coins || 0);
+
+        const leaderboard = await Promise.all(sorted.slice(0, 25).map(async (entry) => {
+            const member = guild?.members?.cache?.get(entry.userId)
+                || await guild?.members?.fetch?.(entry.userId).catch(() => null);
+            const user = member?.user || botClient.users.cache.get(entry.userId) || null;
+            const coins = Number(entry.coins || 0);
+            return {
+                userId: entry.userId,
+                username: user?.username || 'Usuario',
+                tag: user?.tag || `ID ${entry.userId}`,
+                avatar: user?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null,
+                coins,
+                totalClaims: Number(entry.totalClaims || 0),
+                totalRolls: Number(entry.totalRolls || 0),
+                collectionCount: Number(entry.collectionCount || 0),
+                bestRarity: String(entry.bestRarity || 'N').toUpperCase(),
+                progressPercent: Math.max(0, Math.min(100, Math.round((coins / topCoins) * 100)))
+            };
+        }));
+
+        res.json({
+            success: true,
+            enabled: config?.economyEnabled === true || config?.enabled === true,
+            totalTrackedUsers: profiles.length,
+            leaderboard
+        });
+    } catch (error) {
+        console.error('Error obteniendo leaderboard gacha:', error);
+        res.status(500).json({ error: 'Error al obtener leaderboard gacha' });
     }
 });
 

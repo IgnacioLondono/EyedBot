@@ -72,7 +72,31 @@ function loadCharacterPool() {
     }
 }
 
-const CHARACTER_POOL = loadCharacterPool();
+let characterPoolCache = {
+    mtimeMs: 0,
+    items: []
+};
+
+function getCharacterPool() {
+    try {
+        const stat = fs.statSync(CHARACTERS_PATH);
+        if (stat.mtimeMs !== characterPoolCache.mtimeMs || !characterPoolCache.items.length) {
+            characterPoolCache = {
+                mtimeMs: stat.mtimeMs,
+                items: loadCharacterPool()
+            };
+        }
+    } catch {
+        if (!characterPoolCache.items.length) {
+            characterPoolCache = {
+                mtimeMs: 0,
+                items: loadCharacterPool()
+            };
+        }
+    }
+
+    return characterPoolCache.items;
+}
 
 function defaultConfig() {
     return {
@@ -208,8 +232,9 @@ function pickRarityWithPity(pityCounter = 0, pityThreshold = 30) {
 }
 
 function pickCharacterForRarity(rarity) {
-    const list = CHARACTER_POOL.filter((item) => item.rarity === rarity);
-    const source = list.length ? list : CHARACTER_POOL;
+    const pool = getCharacterPool();
+    const list = pool.filter((item) => item.rarity === rarity);
+    const source = list.length ? list : pool;
     if (!source.length) return null;
     return source[Math.floor(Math.random() * source.length)];
 }
@@ -576,7 +601,7 @@ function getShopPrice(character = {}, config = {}) {
 }
 
 function getShopCatalog(config = {}) {
-    return CHARACTER_POOL.map((character) => ({
+    return getCharacterPool().map((character) => ({
         ...character,
         price: getShopPrice(character, config)
     })).sort((left, right) => getShopPrice(right, config) - getShopPrice(left, config));
@@ -609,7 +634,7 @@ async function purchaseShopCharacter(guildId, userId, characterId = '') {
         return { ok: false, reason: 'shop_disabled' };
     }
 
-    const character = CHARACTER_POOL.find((item) => item.id === String(characterId || ''));
+    const character = getCharacterPool().find((item) => item.id === String(characterId || ''));
     if (!character) return { ok: false, reason: 'item_not_found' };
 
     const price = getShopPrice(character, config);
@@ -647,7 +672,10 @@ async function getGuildStats(guildId) {
 }
 
 module.exports = {
-    CHARACTER_POOL,
+    getCharacterPool,
+    get CHARACTER_POOL() {
+        return getCharacterPool();
+    },
     RARITY_WEIGHTS,
     rarityMeta,
     defaultConfig,
