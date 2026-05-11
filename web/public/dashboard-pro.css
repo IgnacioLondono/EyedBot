@@ -11875,30 +11875,7 @@ body,
     box-shadow: none !important;
 }
 
-#serverSection.section {
-    height: auto !important;
-    min-height: calc(100vh - 70px) !important;
-    overflow: visible !important;
-}
-
-#serverSection.section > .container {
-    height: auto !important;
-    min-height: calc(100vh - 70px) !important;
-}
-
-.server-shell,
-.server-pane,
-.server-pane.active,
-.server-pane-surface,
-.server-content-area {
-    height: auto !important;
-    min-height: 0 !important;
-}
-
-/* Quita la barra interna del panel derecho; usa scroll de página */
-.server-content-area {
-    overflow: visible !important;
-}
+/* (altura del panel servidor: ver bloque final «Panel servidor: sin franja…») */
 
 /* =====================================================================
    Fix solicitado: quitar capa negra general + restaurar scrollbars
@@ -12338,28 +12315,68 @@ body {
 }
 
 #serverSection .server-shell {
+    display: grid !important;
+    grid-template-columns: 260px minmax(0, 1fr) !important;
     height: 100% !important;
-    min-height: 0 !important;
+    min-height: 100% !important;
     max-height: 100% !important;
     align-items: stretch !important;
+    gap: 0 !important;
+    overflow: hidden !important;
 }
 
 #serverSection .server-side-menu,
 #serverSection .server-content-area {
     height: 100% !important;
-    min-height: 0 !important;
+    min-height: 100% !important;
     max-height: none !important;
     align-self: stretch !important;
     overflow-x: hidden !important;
     scrollbar-width: thin;
+    box-sizing: border-box !important;
 }
 
 #serverSection .server-side-menu {
     overflow-y: auto !important;
+    border-bottom: none !important;
 }
 
 #serverSection .server-content-area {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding: 0.55rem 0.7rem 0 !important;
     overflow-y: auto !important;
+}
+
+#serverSection .server-pane.active {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-height: 100% !important;
+}
+
+#serverSection .server-pane-surface {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 100% !important;
+}
+
+#serverSection .moderation-container,
+#serverSection .server-info-container {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+}
+
+#serverPaneWelcome .greeting-page,
+#serverPaneWelcome .welcome-dpx-panel {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
 }
 
 #serverSection .server-side-menu::-webkit-scrollbar:horizontal,
