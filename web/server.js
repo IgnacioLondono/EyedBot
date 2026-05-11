@@ -29,9 +29,11 @@ const {
     ticketButtonCustomIdForGuild,
     acceptPendingFromWeb,
     claimTicketFromWeb,
+    closeTicketFromWeb,
     listPendingRequests,
     listTicketReports,
     listTicketReportsWithFallback,
+    countTicketReports,
     getTicketReport,
     listActiveTicketChannels,
     listTicketChannelMessages,
@@ -1879,38 +1881,69 @@ app.post('/api/guild/:guildId/panel-embeds-refresh', requireAuth, async (req, re
 
 // ===== GESTION DE TICKETS (WEB) =====
 
-function buildTicketStats(activeList, pendingList, reportsList) {
+function utcDayStartMs(ts) {
+    const d = new Date(ts);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+function utcMonthKeyFromIso(iso) {
+    const t = new Date(iso || 0).getTime();
+    if (!Number.isFinite(t) || t <= 0) return null;
+    const d = new Date(t);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function enumerateUtcMonthKeys(startTs, endTs) {
+    const keys = [];
+    const start = new Date(Math.min(startTs, endTs));
+    let y = start.getUTCFullYear();
+    let m = start.getUTCMonth();
+    const end = new Date(endTs);
+    const ey = end.getUTCFullYear();
+    const em = end.getUTCMonth();
+    while (y < ey || (y === ey && m <= em)) {
+        keys.push(`${y}-${String(m + 1).padStart(2, '0')}`);
+        m++;
+        if (m > 11) {
+            m = 0;
+            y++;
+        }
+    }
+    return keys;
+}
+
+function buildTicketStats(activeList, pendingList, reportsList, guildCreatedTimestamp, closedTotalCount) {
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
+    const utcToday = utcDayStartMs(now);
+
     const days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(now - (6 - i) * oneDay);
-        d.setHours(0, 0, 0, 0);
-        return { ts: d.getTime(), opened: 0, closed: 0 };
+        const ts = utcToday - (6 - i) * oneDay;
+        return { ts, opened: 0, closed: 0 };
     });
 
-    const bucketIndex = (iso) => {
+    const bucketIndexDay = (iso) => {
         const t = new Date(iso || 0).getTime();
         if (!Number.isFinite(t) || t <= 0) return -1;
+        const dayStart = utcDayStartMs(t);
         for (let i = 0; i < days.length; i++) {
-            const start = days[i].ts;
-            const end = start + oneDay;
-            if (t >= start && t < end) return i;
+            if (dayStart === days[i].ts) return i;
         }
         return -1;
     };
 
     (pendingList || []).forEach((p) => {
-        const idx = bucketIndex(p.createdAt);
+        const idx = bucketIndexDay(p.createdAt);
         if (idx >= 0) days[idx].opened += 1;
     });
 
     (activeList || []).forEach((a) => {
-        const idx = bucketIndex(a.createdAt);
+        const idx = bucketIndexDay(a.createdAt);
         if (idx >= 0) days[idx].opened += 1;
     });
 
     (reportsList || []).forEach((r) => {
-        const idx = bucketIndex(r.createdAt);
+        const idx = bucketIndexDay(r.createdAt);
         if (idx >= 0) days[idx].closed += 1;
     });
 
@@ -1920,16 +1953,44 @@ function buildTicketStats(activeList, pendingList, reportsList) {
         closed: d.closed
     }));
 
+    const guildTs = Number(guildCreatedTimestamp || now);
+    const safeGuildStart = Math.min(Math.max(guildTs, 0), now);
+    const monthKeys = enumerateUtcMonthKeys(safeGuildStart, now);
+    const monthBuckets = new Map(monthKeys.map((k) => [k, { opened: 0, closed: 0 }]));
+
+    const bumpMonth = (iso, field) => {
+        const k = utcMonthKeyFromIso(iso);
+        if (!k || !monthBuckets.has(k)) return;
+        monthBuckets.get(k)[field] += 1;
+    };
+
+    (activeList || []).forEach((a) => bumpMonth(a.createdAt, 'opened'));
+    (reportsList || []).forEach((r) => {
+        bumpMonth(r.channelCreatedAt || r.createdAt, 'opened');
+        bumpMonth(r.createdAt, 'closed');
+    });
+
+    const activityByMonth = monthKeys.map((month) => {
+        const b = monthBuckets.get(month) || { opened: 0, closed: 0 };
+        return { month, opened: b.opened, closed: b.closed };
+    });
+
+    const closedReportsTotal =
+        closedTotalCount != null && Number.isFinite(Number(closedTotalCount))
+            ? Number(closedTotalCount)
+            : (reportsList || []).length;
+
     const claimedCount = (activeList || []).filter((a) => a.claimedBy).length;
 
     return {
         active: (activeList || []).length,
         pending: (pendingList || []).length,
-        closed: (reportsList || []).length,
-        total: (activeList || []).length + (pendingList || []).length + (reportsList || []).length,
+        closed: closedReportsTotal,
+        total: (activeList || []).length + (pendingList || []).length + closedReportsTotal,
         claimed: claimedCount,
         unclaimed: Math.max(0, (activeList || []).length - claimedCount),
-        last7Days: last7
+        last7Days: last7,
+        activityByMonth
     };
 }
 
@@ -2016,6 +2077,8 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) =>
 
         const rawActive = listActiveTicketChannels(guild);
         const rawPending = await listPendingRequests(guildId);
+        const closedReportsTotal = await countTicketReports(guildId).catch(() => 0);
+
         let rawReports = await listTicketReports(guildId, historyLimit);
         if (!rawReports || !rawReports.length) {
             try {
@@ -2034,7 +2097,13 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) =>
             enrichReports(botClient, rawReports)
         ]);
 
-        const stats = buildTicketStats(rawActive, rawPending, rawReports);
+        const stats = buildTicketStats(
+            rawActive,
+            rawPending,
+            rawReports,
+            guild.createdTimestamp,
+            closedReportsTotal
+        );
 
         res.json({
             success: true,
@@ -2042,6 +2111,7 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) =>
             active,
             pending,
             history,
+            guildCreatedAt: new Date(Number(guild.createdTimestamp || Date.now())).toISOString(),
             updatedAt: new Date().toISOString()
         });
     } catch (error) {
@@ -2125,6 +2195,35 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/unclaim', requireAuth, a
     } catch (error) {
         console.error('Error liberando ticket:', error);
         res.status(500).json({ error: 'Error al liberar el ticket' });
+    }
+});
+
+app.post('/api/guild/:guildId/tickets/active/:channelId/close', requireAuth, async (req, res) => {
+    try {
+        const { guildId, channelId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const closerId = req.session.user?.id || '';
+        if (!closerId) return res.status(401).json({ error: 'Sesion invalida' });
+
+        const result = await closeTicketFromWeb(botClient, guildId, channelId, closerId);
+
+        if (!result?.ok) {
+            const code = result?.code || 'UNKNOWN';
+            const status =
+                code === 'CHANNEL_NOT_FOUND' || code === 'GUILD_NOT_FOUND' ? 404
+                    : code === 'NOT_A_TICKET' ? 400
+                        : code === 'FORBIDDEN' || code === 'MEMBER_NOT_FOUND' ? 403
+                            : 500;
+            return res.status(status).json({ error: result?.error || 'No se pudo cerrar el ticket', code });
+        }
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error cerrando ticket desde web:', error);
+        res.status(500).json({ error: 'Error al cerrar el ticket' });
     }
 });
 

@@ -2392,10 +2392,44 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .tm-trend-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 0.6rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
     margin-bottom: 0.85rem;
+}
+.tm-trend-head-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+.tm-trend-range {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+.tm-trend-range-btn {
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.28rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.35);
+    background: rgba(var(--bg-primary-rgb, 12, 7, 24), 0.65);
+    color: var(--text-muted, #a48fd0);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.tm-trend-range-btn:hover {
+    color: var(--text-secondary, #cbb7f6);
+    border-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.45);
+}
+.tm-trend-range-btn.active {
+    color: var(--text-primary, #f4eeff);
+    border-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.65);
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22);
+    box-shadow: 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.15);
 }
 .tm-trend-head h4 {
     font-family: 'Sora', sans-serif;
@@ -2461,6 +2495,31 @@ label { color: var(--text-secondary); font-weight: 500; }
     font-size: 0.7rem;
     color: var(--text-muted, #a48fd0);
     letter-spacing: 0.04em;
+}
+
+.tm-trend-bars--months {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 0.45rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 140px;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px dashed rgba(var(--border-rgb, 190, 155, 255), 0.16);
+    -webkit-overflow-scrolling: touch;
+}
+.tm-trend-bars--months .tm-trend-day {
+    flex: 0 0 40px;
+    width: 40px;
+    min-width: 40px;
+}
+.tm-trend-empty {
+    width: 100%;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--text-muted, #a48fd0);
+    padding: 1.25rem 0 0.5rem;
 }
 
 /* ---------- Tabs ---------- */
@@ -2964,6 +3023,15 @@ label { color: var(--text-secondary); font-weight: 500; }
     background: rgba(245, 158, 11, 0.12);
     color: #f59e0b;
     border-color: rgba(245, 158, 11, 0.35);
+}
+.tm-btn-close-ticket {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.92), rgba(185, 28, 28, 0.95));
+    color: #fff;
+    border-color: rgba(248, 113, 113, 0.45);
+    box-shadow: 0 8px 22px rgba(239, 68, 68, 0.28);
+}
+.tm-btn-close-ticket:hover {
+    filter: brightness(1.06);
 }
 .tm-btn-ghost {
     background: rgba(255, 255, 255, 0.04);

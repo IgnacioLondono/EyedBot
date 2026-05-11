@@ -10703,6 +10703,7 @@ const TICKETS_MANAGE_AUTO_REFRESH_MS = 20000;
 let _ticketsManageState = {
     guildId: '',
     tab: 'pending', // 'pending' | 'active' | 'history'
+    activityRange: '7d', // '7d' | 'all'
     timer: null,
     lastData: null,
     loading: false
@@ -10878,7 +10879,7 @@ function renderTicketsManage(data) {
     const container = document.getElementById('ticketManageContainer');
     if (!container) return;
 
-    const stats = data?.stats || { active: 0, pending: 0, closed: 0, total: 0, claimed: 0, unclaimed: 0, last7Days: [] };
+    const stats = data?.stats || { active: 0, pending: 0, closed: 0, total: 0, claimed: 0, unclaimed: 0, last7Days: [], activityByMonth: [] };
     const activeCount = Number(stats.active || 0);
     const pendingCount = Number(stats.pending || 0);
     const closedCount = Number(stats.closed || 0);
@@ -10896,7 +10897,7 @@ function renderTicketsManage(data) {
             ${renderTmStatCard('unclaimed', 'Sin asignar', stats.unclaimed || 0, 'Requieren atencion', tmIconBell())}
         </div>
 
-        ${renderTmTrendCard(stats.last7Days || [])}
+        ${renderTmTrendCard(stats.last7Days || [], stats.activityByMonth || [])}
 
         <div class="tm-tabs" role="tablist">
             <button type="button" class="tm-tab-btn ${tab === 'pending' ? 'active' : ''}" data-tm-tab="pending">
@@ -10928,6 +10929,16 @@ function renderTicketsManage(data) {
                 clearDraftTicketConfig(guildId);
             }
             _ticketsManageState.tab = newTab;
+            saveTicketsManageScrollPosition();
+            renderTicketsManage(_ticketsManageState.lastData);
+        });
+    });
+
+    container.querySelectorAll('[data-tm-activity-range]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const v = btn.getAttribute('data-tm-activity-range');
+            if (v !== '7d' && v !== 'all') return;
+            _ticketsManageState.activityRange = v;
             saveTicketsManageScrollPosition();
             renderTicketsManage(_ticketsManageState.lastData);
         });
@@ -11404,17 +11415,33 @@ function renderTmStatCard(type, label, value, sub, iconSvg) {
         </div>`;
 }
 
-function renderTmTrendCard(last7) {
-    const arr = Array.isArray(last7) ? last7 : [];
+function renderTmTrendCard(last7, byMonth) {
+    const mode = _ticketsManageState.activityRange || '7d';
+    const isMonth = mode === 'all';
+    const arr = isMonth ? (Array.isArray(byMonth) ? byMonth : []) : (Array.isArray(last7) ? last7 : []);
+    const title = isMonth
+        ? 'Actividad desde la creación del servidor'
+        : 'Actividad de los últimos 7 días';
     const maxVal = Math.max(1, ...arr.map((d) => Math.max(d.opened || 0, d.closed || 0)));
     const dayNames = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 
     const bars = arr.map((d) => {
         const openH = Math.max(2, Math.round(((d.opened || 0) / maxVal) * 100));
         const closedH = Math.max(2, Math.round(((d.closed || 0) / maxVal) * 100));
-        const dt = d.date ? new Date(d.date) : null;
-        const label = dt && !Number.isNaN(dt.getTime()) ? dayNames[dt.getUTCDay()] : '';
-        const tip = `${d.date || ''} · Abiertos: ${d.opened || 0} · Cerrados: ${d.closed || 0}`;
+        let label = '';
+        let tip = '';
+        if (isMonth) {
+            const mk = d.month || '';
+            const dt = mk ? new Date(`${mk}-01T12:00:00.000Z`) : null;
+            label = dt && !Number.isNaN(dt.getTime())
+                ? dt.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }).replace(/\./g, '')
+                : '';
+            tip = `${mk || ''} · Abiertos: ${d.opened || 0} · Cerrados: ${d.closed || 0}`;
+        } else {
+            const dt = d.date ? new Date(`${d.date}T12:00:00.000Z`) : null;
+            label = dt && !Number.isNaN(dt.getTime()) ? dayNames[dt.getUTCDay()] : '';
+            tip = `${d.date || ''} · Abiertos: ${d.opened || 0} · Cerrados: ${d.closed || 0}`;
+        }
         return `
             <div class="tm-trend-day" title="${escapeHtml(tip)}">
                 <div class="tm-trend-day-bars">
@@ -11425,16 +11452,27 @@ function renderTmTrendCard(last7) {
             </div>`;
     }).join('');
 
+    const barsWrapClass = isMonth ? 'tm-trend-bars tm-trend-bars--months' : 'tm-trend-bars';
+    const emptyMsg = isMonth
+        ? 'Sin datos en este periodo'
+        : 'Sin datos recientes';
+
     return `
         <div class="tm-trend-card">
             <div class="tm-trend-head">
-                <h4>Actividad de los últimos 7 días</h4>
+                <div class="tm-trend-head-left">
+                    <h4>${escapeHtml(title)}</h4>
+                    <div class="tm-trend-range" role="group" aria-label="Rango de actividad">
+                        <button type="button" class="tm-trend-range-btn ${mode === '7d' ? 'active' : ''}" data-tm-activity-range="7d">Últimos 7 días</button>
+                        <button type="button" class="tm-trend-range-btn ${mode === 'all' ? 'active' : ''}" data-tm-activity-range="all">Desde creación</button>
+                    </div>
+                </div>
                 <div class="tm-trend-legend">
                     <span class="lg-open">Abiertos</span>
                     <span class="lg-closed">Cerrados</span>
                 </div>
             </div>
-            <div class="tm-trend-bars">${bars || '<div class="tm-list-empty" style="grid-column:1/-1">Sin datos recientes</div>'}</div>
+            <div class="${barsWrapClass}">${bars || `<div class="tm-trend-empty">${escapeHtml(emptyMsg)}</div>`}</div>
         </div>`;
 }
 
@@ -11541,6 +11579,10 @@ function renderTmActiveCard(item) {
                     <span>Chat</span>
                 </button>
                 ${claimBtn}
+                <button type="button" class="tm-btn tm-btn-close-ticket" data-tm-close="${escapeHtml(item.channelId || '')}">
+                    <svg viewBox="0 0 24 24" fill="none" ${sSmall}><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                    <span>Cerrar ticket</span>
+                </button>
             </div>
         </div>`;
 }
@@ -11649,6 +11691,13 @@ function wireTmActiveActions() {
             const ownerAvatar = btn.getAttribute('data-tm-chat-owner-avatar') || '';
             if (!channelId) return;
             openTicketChat(channelId, { channelName, ownerName, ownerAvatar });
+        });
+    });
+    document.querySelectorAll('[data-tm-close]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const channelId = btn.getAttribute('data-tm-close');
+            if (!channelId) return;
+            await closeActiveTicketFromPanel(channelId, btn);
         });
     });
 }
@@ -12551,6 +12600,38 @@ async function unclaimTicket(channelId, button) {
     } catch (error) {
         console.error('Error liberando ticket:', error);
         showToast('Error de red al liberar el ticket', 'error');
+        if (button) button.disabled = false;
+    }
+}
+
+async function closeActiveTicketFromPanel(channelId, button) {
+    const guildId = _ticketsManageState.guildId || currentServerGuildId;
+    if (!guildId || !channelId) return;
+
+    if (!confirm('¿Cerrar este ticket? Se generará el comprobante (historial / MD según configuración) y se eliminará el canal en Discord.')) {
+        return;
+    }
+
+    if (button) button.disabled = true;
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/active/${encodeURIComponent(channelId)}/close`, {
+            method: 'POST'
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+            showToast(result?.error || 'No se pudo cerrar el ticket', 'error');
+            if (button) button.disabled = false;
+            return;
+        }
+        const rid = result.reportId ? ` · ${result.reportId}` : '';
+        showToast(`Ticket cerrado${rid}`, 'success');
+        if (_ticketChatState.isOpen && String(_ticketChatState.channelId) === String(channelId)) {
+            closeTicketChat();
+        }
+        await loadTicketsManage({ force: true });
+    } catch (error) {
+        console.error('Error cerrando ticket:', error);
+        showToast('Error de red al cerrar el ticket', 'error');
         if (button) button.disabled = false;
     }
 }

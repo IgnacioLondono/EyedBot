@@ -136,6 +136,17 @@ async function ensureSchema(connection) {
     }
 }
 
+/** Informes de tickets pueden superar el limite TEXT (~64KB); ampliar a LONGTEXT si hace falta. */
+async function ensureKeyValueStoreLongValue(connection) {
+    try {
+        await connection.execute(
+            'ALTER TABLE key_value_store MODIFY COLUMN `value` LONGTEXT'
+        );
+    } catch {
+        // Ya LONGTEXT, permisos, o motor distinto: ignorar
+    }
+}
+
 async function executeWithSchemaRecovery(connection, sql, params = [], context = 'query') {
     try {
         return await connection.execute(sql, params);
@@ -188,6 +199,7 @@ const database = {
             const connection = await initPool().getConnection();
             await connection.ping();
             await ensureSchema(connection);
+            await ensureKeyValueStoreLongValue(connection);
             connection.release();
             console.log('✅ Conexión a MySQL establecida correctamente');
             dbUnavailableUntil = 0;
