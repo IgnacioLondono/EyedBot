@@ -22,11 +22,9 @@ RUN npm install --no-audit --no-fund && \
     npm prune --production && \
     npm cache clean --force
 
-# Copiar código fuente
+# Copiar código fuente (el catálogo va en src/bundled; data/ se monta en runtime)
 COPY src/ ./src/
 COPY web/ ./web/
-COPY data/ ./data/
-COPY data/gacha-characters.json ./src/bundled/gacha-characters.json
 COPY verificar-*.js ./
 
 # Crear directorios necesarios
