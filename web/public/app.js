@@ -2830,7 +2830,13 @@ async function loadGuilds() {
         displayGuilds(getFilteredDashboardGuilds());
     } catch (error) {
         console.error('Error cargando servidores:', error);
-        showToast('Error al cargar servidores', 'error');
+        const container = document.getElementById('guildsList');
+        const isAuth = error && (error.status === 401 || (error.message && error.message.toLowerCase().includes('401')));
+        const msg = isAuth ? 'No autenticado. Por favor inicia sesión.' : 'Error al cargar servidores';
+        if (container) {
+            container.innerHTML = `<div class="loading"><p>${escapeHtml(String(msg))}</p></div>`;
+        }
+        showToast(msg, 'error');
     }
 }
 
