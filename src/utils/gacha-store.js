@@ -4,6 +4,20 @@ const db = require('./database');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'gacha-store.json');
 const CHARACTERS_PATH = path.join(__dirname, '..', '..', 'data', 'gacha-characters.json');
+const BUNDLED_CHARACTERS_PATH = path.join(__dirname, '..', 'bundled', 'gacha-characters.json');
+const SYSTEM_MARKET_SELLER_ID = 'system';
+const DEFAULT_MARKET_LISTING_COUNT = 16;
+
+const FALLBACK_CHARACTERS = [
+    { id: 'ch_fb_001', name: 'Aira Nova', series: 'Celestial Archive', rarity: 'SSR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=aira-nova', baseValue: 500 },
+    { id: 'ch_fb_002', name: 'Kael Draven', series: 'Celestial Archive', rarity: 'SR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=kael-draven', baseValue: 180 },
+    { id: 'ch_fb_003', name: 'Mira Elowen', series: 'Moonlit Engine', rarity: 'R', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=mira-elowen', baseValue: 70 },
+    { id: 'ch_fb_004', name: 'Ren Azuki', series: 'Moonlit Engine', rarity: 'N', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=ren-azuki', baseValue: 25 },
+    { id: 'ch_fb_005', name: 'Eyed Sentinel', series: 'EyedBot Collection', rarity: 'SSR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-sentinel', baseValue: 640 },
+    { id: 'ch_fb_006', name: 'Eyed Courier', series: 'EyedBot Collection', rarity: 'SR', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-courier', baseValue: 195 },
+    { id: 'ch_fb_007', name: 'Eyed Scout', series: 'EyedBot Collection', rarity: 'R', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-scout', baseValue: 88 },
+    { id: 'ch_fb_008', name: 'Eyed Spark', series: 'EyedBot Collection', rarity: 'N', imageUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=eyed-spark', baseValue: 28 }
+];
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
 const cache = new Map();
 
@@ -54,22 +68,80 @@ function writeStore(data) {
     fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
 }
 
-function loadCharacterPool() {
+function resolveCharactersPath() {
+    const candidates = [
+        CHARACTERS_PATH,
+        BUNDLED_CHARACTERS_PATH,
+        path.join(process.cwd(), 'data', 'gacha-characters.json'),
+        path.join(__dirname, '..', 'data', 'gacha-characters.json'),
+        path.join(process.cwd(), '..', 'data', 'gacha-characters.json')
+    ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) return candidate;
+    }
+
+    return CHARACTERS_PATH;
+}
+
+function normalizeCharacterRecord(item = {}) {
+    return {
+        id: String(item.id || `ch_${Date.now()}`),
+        name: String(item.name || 'Unknown'),
+        series: String(item.series || 'Original'),
+        rarity: ['SSR', 'SR', 'R', 'N'].includes(String(item.rarity || 'N').toUpperCase()) ? String(item.rarity).toUpperCase() : 'N',
+        imageUrl: String(item.imageUrl || '').trim(),
+        baseValue: Math.max(1, Number.parseInt(`${item.baseValue || 10}`, 10) || 10)
+    };
+}
+
+function ensureCharacterCatalogFile() {
+    const filePath = resolveCharactersPath();
+
     try {
-        const raw = fs.readFileSync(CHARACTERS_PATH, 'utf8');
+        if (fs.existsSync(filePath)) {
+            const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8') || '{}');
+            if (Array.isArray(parsed.characters) && parsed.characters.length) return;
+        }
+    } catch {}
+
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    for (const sourcePath of [CHARACTERS_PATH, BUNDLED_CHARACTERS_PATH]) {
+        if (sourcePath === filePath || !fs.existsSync(sourcePath)) continue;
+        try {
+            fs.copyFileSync(sourcePath, filePath);
+            return;
+        } catch {}
+    }
+
+    try {
+        fs.writeFileSync(
+            filePath,
+            JSON.stringify({ characters: FALLBACK_CHARACTERS }, null, 2),
+            'utf8'
+        );
+    } catch (error) {
+        console.warn('[gacha-store] No se pudo crear el catálogo local:', error?.message || error);
+    }
+}
+
+function loadCharacterPool() {
+    ensureCharacterCatalogFile();
+    const filePath = resolveCharactersPath();
+
+    try {
+        const raw = fs.readFileSync(filePath, 'utf8');
         const parsed = JSON.parse(raw || '{}');
         const list = Array.isArray(parsed.characters) ? parsed.characters : [];
-        return list.map((item) => ({
-            id: String(item.id || `ch_${Date.now()}`),
-            name: String(item.name || 'Unknown'),
-            series: String(item.series || 'Original'),
-            rarity: ['SSR', 'SR', 'R', 'N'].includes(String(item.rarity || 'N').toUpperCase()) ? String(item.rarity).toUpperCase() : 'N',
-            imageUrl: String(item.imageUrl || '').trim(),
-            baseValue: Math.max(1, Number.parseInt(`${item.baseValue || 10}`, 10) || 10)
-        }));
-    } catch {
-        return [];
+        const normalized = list.map(normalizeCharacterRecord).filter((item) => item.id && item.name);
+        if (normalized.length) return normalized;
+    } catch (error) {
+        console.warn('[gacha-store] No se pudo leer el catálogo de personajes:', error?.message || error);
     }
+
+    return FALLBACK_CHARACTERS.map(normalizeCharacterRecord);
 }
 
 let characterPoolCache = {
@@ -78,8 +150,10 @@ let characterPoolCache = {
 };
 
 function getCharacterPool() {
+    const filePath = resolveCharactersPath();
+
     try {
-        const stat = fs.statSync(CHARACTERS_PATH);
+        const stat = fs.statSync(filePath);
         if (stat.mtimeMs !== characterPoolCache.mtimeMs || !characterPoolCache.items.length) {
             characterPoolCache = {
                 mtimeMs: stat.mtimeMs,
@@ -93,6 +167,13 @@ function getCharacterPool() {
                 items: loadCharacterPool()
             };
         }
+    }
+
+    if (!characterPoolCache.items.length) {
+        characterPoolCache = {
+            mtimeMs: 0,
+            items: FALLBACK_CHARACTERS.map(normalizeCharacterRecord)
+        };
     }
 
     return characterPoolCache.items;
@@ -476,6 +557,7 @@ async function getGuildMarket(guildId) {
         .map((row) => ({
             id: String(row.id || `mk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
             sellerId: String(row.sellerId || ''),
+            source: String(row.source || ''),
             item: normalizeInventoryItem(row.item || {}),
             price: Math.max(1, Number.parseInt(`${row.price || 1}`, 10) || 1),
             createdAt: Number.parseInt(`${row.createdAt || Date.now()}`, 10) || Date.now()
@@ -574,7 +656,8 @@ async function buyMarketListing(guildId, buyerId, listingId) {
 
     const buyer = await getProfile(guildId, buyerId);
     if ((buyer.coins || 0) < listing.price) return { ok: false, reason: 'insufficient_funds' };
-    const seller = await getProfile(guildId, listing.sellerId);
+    const isSystemListing = listing.sellerId === SYSTEM_MARKET_SELLER_ID;
+    const seller = isSystemListing ? null : await getProfile(guildId, listing.sellerId);
 
     buyer.coins -= listing.price;
     buyer.inventory.unshift(normalizeInventoryItem(listing.item));
@@ -583,9 +666,11 @@ async function buyMarketListing(guildId, buyerId, listingId) {
         buyer.bestRarity = listing.item.rarity;
     }
 
-    seller.coins += listing.price;
     await setProfile(guildId, buyerId, buyer);
-    await setProfile(guildId, listing.sellerId, seller);
+    if (seller) {
+        seller.coins += listing.price;
+        await setProfile(guildId, listing.sellerId, seller);
+    }
 
     market.splice(idx, 1);
     await setGuildMarket(guildId, market);
@@ -605,6 +690,51 @@ function getShopCatalog(config = {}) {
         ...character,
         price: getShopPrice(character, config)
     })).sort((left, right) => getShopPrice(right, config) - getShopPrice(left, config));
+}
+
+function buildCatalogMarketItem(character = {}) {
+    return normalizeInventoryItem({
+        uid: `seed_${character.id}`,
+        characterId: character.id,
+        name: character.name,
+        series: character.series,
+        rarity: character.rarity,
+        value: character.baseValue,
+        imageUrl: character.imageUrl,
+        obtainedAt: Date.now()
+    });
+}
+
+async function ensureGuildEconomyContent(guildId) {
+    const config = await getConfig(guildId);
+    const catalog = getShopCatalog(config);
+    if (!catalog.length) return;
+
+    const market = await getGuildMarket(guildId);
+    const systemListings = market.filter((row) => row.sellerId === SYSTEM_MARKET_SELLER_ID);
+    if (systemListings.length >= 8) return;
+
+    const listedCharacterIds = new Set(
+        market
+            .map((row) => row.item?.characterId)
+            .filter(Boolean)
+    );
+
+    const seeded = catalog
+        .filter((character) => !listedCharacterIds.has(character.id))
+        .slice(0, DEFAULT_MARKET_LISTING_COUNT)
+        .map((character, index) => ({
+            id: `mk_seed_${character.id}`,
+            sellerId: SYSTEM_MARKET_SELLER_ID,
+            source: 'catalog',
+            item: buildCatalogMarketItem(character),
+            price: Math.max(1, Math.round((character.price || getShopPrice(character, config)) * 0.9)),
+            createdAt: Date.now() - index * 120000
+        }));
+
+    if (!seeded.length) return;
+
+    await setGuildMarket(guildId, [...seeded, ...market]);
 }
 
 async function addCoins(guildId, userId, amount = 0) {
@@ -697,6 +827,7 @@ module.exports = {
     getGuildStats,
     getShopPrice,
     getShopCatalog,
+    ensureGuildEconomyContent,
     addCoins,
     trySpendCoins,
     purchaseShopCharacter

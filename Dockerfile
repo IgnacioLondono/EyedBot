@@ -25,6 +25,8 @@ RUN npm install --no-audit --no-fund && \
 # Copiar código fuente
 COPY src/ ./src/
 COPY web/ ./web/
+COPY data/ ./data/
+COPY data/gacha-characters.json ./src/bundled/gacha-characters.json
 COPY verificar-*.js ./
 
 # Crear directorios necesarios
