@@ -1,6 +1,6 @@
-const fs = require('fs');
 const path = require('path');
 const welcomeStore = require('../utils/welcome-config-store');
+const { resolveWelcomeUploadFile } = require('../utils/welcome-upload-resolve');
 
 function applyTemplate(text, member) {
     const uid = member?.user?.id ?? member?.id;
@@ -12,28 +12,6 @@ function applyTemplate(text, member) {
         .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
         .replace(/\{server\}|\{guild\}/gi, member.guild?.name || 'Servidor')
         .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, String(member.guild?.memberCount || 0));
-}
-
-function resolveLocalUploadFile(rawUrl = '') {
-    const raw = String(rawUrl || '').trim();
-    if (!raw) return null;
-
-    let uploadPath = '';
-    if (raw.startsWith('/uploads/')) {
-        uploadPath = raw;
-    } else {
-        try {
-            const parsed = new URL(raw);
-            if (String(parsed.pathname || '').startsWith('/uploads/')) uploadPath = parsed.pathname;
-        } catch {
-            uploadPath = '';
-        }
-    }
-
-    if (!uploadPath) return null;
-    const absolute = path.join(__dirname, '..', '..', 'web', 'public', uploadPath.replace(/^\/+/, ''));
-    if (!fs.existsSync(absolute)) return null;
-    return absolute;
 }
 
 module.exports = {
@@ -61,20 +39,29 @@ module.exports = {
 
         const files = [];
         if (goodbyeConfig?.imageUrl) {
-            const localImagePath = resolveLocalUploadFile(goodbyeConfig.imageUrl);
+            const localImagePath = resolveWelcomeUploadFile(goodbyeConfig.imageUrl);
             if (localImagePath) {
                 const attachmentName = path.basename(localImagePath);
                 embed.setImage(`attachment://${attachmentName}`);
                 files.push({ attachment: localImagePath, name: attachmentName });
             } else {
-                embed.setImage(goodbyeConfig.imageUrl);
+                const imgUrl = String(goodbyeConfig.imageUrl || '').trim();
+                if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
             }
         }
 
         if (goodbyeConfig?.thumbnailMode === 'avatar') {
             embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         } else if (goodbyeConfig?.thumbnailMode === 'url' && goodbyeConfig?.thumbnailUrl) {
-            embed.setThumbnail(goodbyeConfig.thumbnailUrl);
+            const thumbLocal = resolveWelcomeUploadFile(goodbyeConfig.thumbnailUrl);
+            if (thumbLocal) {
+                const tn = path.basename(thumbLocal);
+                embed.setThumbnail(`attachment://thumb_${tn}`);
+                files.push({ attachment: thumbLocal, name: `thumb_${tn}` });
+            } else {
+                const u = String(goodbyeConfig.thumbnailUrl || '').trim();
+                if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
+            }
         }
 
         await channel.send({ embeds: [embed], files }).catch(() => null);
