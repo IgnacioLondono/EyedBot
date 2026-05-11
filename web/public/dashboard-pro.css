@@ -2543,6 +2543,13 @@ label { color: var(--text-secondary); font-weight: 500; }
     font-size: 0.76rem;
     color: var(--text-secondary, #cbb7f6);
 }
+.tm-history-toolbar-note--warn {
+    color: #fcd34d;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 10px;
+    padding: 0.45rem 0.6rem;
+    background: rgba(251, 191, 36, 0.08);
+}
 .tm-history-toolbar-row {
     display: flex;
     flex-wrap: wrap;
@@ -9821,13 +9828,13 @@ mark.receipt-highlight {
    GENERADOR DE CANALES
    ========================================================== */
 
-#serverPaneChannelSetup {
+#channelSetupContainer {
     --pane-accent: #c4b5fd;
     --pane-accent-2: #818cf8;
     --pane-ink: #e0e7ff;
 }
 
-#serverPaneChannelSetup .moderation-container > .welcome-panel-title::after {
+#channelSetupContainer > .welcome-panel-title::after {
     content: "ESTRUCTURA";
 }
 
@@ -9981,12 +9988,12 @@ mark.receipt-highlight {
     border-color: rgba(248, 113, 113, 0.35);
 }
 
-#serverPaneChannelSetup .btn.is-loading {
+#channelSetupContainer .btn.is-loading {
     position: relative;
     color: transparent !important;
     pointer-events: none;
 }
-#serverPaneChannelSetup .btn.is-loading::after {
+#channelSetupContainer .btn.is-loading::after {
     content: "";
     position: absolute;
     top: 50%;
