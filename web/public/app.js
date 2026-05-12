@@ -2781,25 +2781,72 @@ async function loadAboutOverview() {
     }
 }
 
+const COMMAND_CATEGORY_LABELS = {
+    all: 'Todos',
+    config: 'Configuración',
+    fun: 'Diversión',
+    moderation: 'Moderación',
+    music: 'Música',
+    utility: 'Utilidad',
+    other: 'Otros'
+};
+
+const COMMAND_CATEGORY_TONES = {
+    all: 'all',
+    config: 'violet',
+    fun: 'rose',
+    moderation: 'amber',
+    music: 'cyan',
+    utility: 'sky',
+    other: 'slate'
+};
+
+function getCommandCategoryKey(category) {
+    return String(category || 'other').toLowerCase();
+}
+
+function getCommandCategoryLabel(category) {
+    const key = getCommandCategoryKey(category);
+    return COMMAND_CATEGORY_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function getCommandCategoryTone(category) {
+    const key = getCommandCategoryKey(category);
+    return COMMAND_CATEGORY_TONES[key] || COMMAND_CATEGORY_TONES.other;
+}
+
+function getCommandCategoryIcon(category) {
+    const key = getCommandCategoryKey(category);
+    const icons = {
+        all: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>',
+        config: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v2.2"></path><path d="M12 18.8V21"></path><path d="M4.2 12H7"></path><path d="M17 12h2.8"></path><circle cx="12" cy="12" r="3.2"></circle><path d="M5.6 5.6l1.6 1.6"></path><path d="M16.8 16.8l1.6 1.6"></path><path d="M18.4 5.6l-1.6 1.6"></path><path d="M7.2 16.8l-1.6 1.6"></path></svg>',
+        fun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M9 10h.01"></path><path d="M15 10h.01"></path><path d="M9.5 15a3 3 0 0 0 5 0"></path></svg>',
+        moderation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4 6.5V11c0 4.4 3.1 8.5 8 9.5 4.9-1 8-5.1 8-9.5V6.5L12 3Z"></path><path d="m9.5 12 1.8 1.8L15.5 9.6"></path></svg>',
+        music: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 18V7l10-2v11"></path><circle cx="7" cy="18" r="2.5"></circle><circle cx="17" cy="16" r="2.5"></circle></svg>',
+        utility: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-1.4-1.4 2.1-2.1Z"></path></svg>',
+        other: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4 6.5V11c0 4.4 3.1 8.5 8 9.5 4.9-1 8-5.1 8-9.5V6.5L12 3Z"></path><path d="M12 11v4"></path><path d="M12 8h.01"></path></svg>'
+    };
+    return icons[key] || icons.other;
+}
+
+function updateCommandsSummary(visible = 0, total = 0) {
+    const visibleEl = document.getElementById('commandsVisibleCount');
+    const totalEl = document.getElementById('commandsTotalCount');
+    const formatter = new Intl.NumberFormat('es-ES');
+
+    if (visibleEl) visibleEl.textContent = formatter.format(visible);
+    if (totalEl) totalEl.textContent = formatter.format(total);
+}
+
 function buildCommandsCategoryFilters(commands = []) {
     const container = document.getElementById('commandsCategoryFilters');
     if (!container) return;
 
     const counts = new Map();
     commands.forEach((command) => {
-        const key = String(command.category || 'other').toLowerCase();
+        const key = getCommandCategoryKey(command.category);
         counts.set(key, (counts.get(key) || 0) + 1);
     });
-
-    const categoryNames = {
-        all: 'Todos',
-        config: 'Configuración',
-        fun: 'Diversión',
-        moderation: 'Moderación',
-        music: 'Música',
-        utility: 'Utilidad',
-        other: 'Otros'
-    };
 
     const orderedCategories = ['all', ...Array.from(counts.keys()).sort()];
     container.innerHTML = orderedCategories
@@ -2807,9 +2854,11 @@ function buildCommandsCategoryFilters(commands = []) {
         .map((category) => {
             const count = category === 'all' ? commands.length : counts.get(category) || 0;
             const active = category === commandsFilterCategory ? 'active' : '';
+            const tone = getCommandCategoryTone(category);
             return `
-                <button type="button" class="commands-filter-btn ${active}" data-commands-category="${category}">
-                    <span>${categoryNames[category] || category}</span>
+                <button type="button" class="commands-filter-btn commands-filter-btn--${tone} ${active}" data-commands-category="${category}">
+                    <span class="commands-filter-icon" aria-hidden="true">${getCommandCategoryIcon(category)}</span>
+                    <span class="commands-filter-label">${getCommandCategoryLabel(category)}</span>
                     <strong>${count}</strong>
                 </button>
             `;
@@ -2839,6 +2888,7 @@ function renderFilteredCommands() {
     });
 
     displayCommands(filtered, { total: commandsCatalog.length });
+    updateCommandsSummary(filtered.length, commandsCatalog.length);
 }
 
 // Mostrar sección
@@ -4137,7 +4187,9 @@ async function loadCommands() {
 function displayCommands(commands, meta = {}) {
     const container = document.getElementById('commandsContainer');
     const totalCommands = Number(meta.total) || commandsCatalog.length || 0;
-    
+
+    updateCommandsSummary(commands?.length || 0, totalCommands);
+
     if (!commands || commands.length === 0) {
         const message = totalCommands > 0
             ? 'No hay resultados para ese filtro.'
@@ -4146,55 +4198,37 @@ function displayCommands(commands, meta = {}) {
         return;
     }
     
-    // Agrupar por categoría (extraer de la ruta del archivo o usar 'other')
     const categories = {};
-    commands.forEach(cmd => {
-        // Intentar obtener la categoría del nombre del comando o usar 'other'
-        let cat = 'other';
-        if (cmd.category) {
-            cat = cmd.category;
-        } else {
-            // Intentar inferir de la estructura
-            cat = 'other';
-        }
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(cmd);
+    commands.forEach((cmd) => {
+        const category = getCommandCategoryKey(cmd.category);
+        if (!categories[category]) categories[category] = [];
+        categories[category].push(cmd);
     });
     
-    const categoryNames = {
-        'config': 'Configuración',
-        'fun': 'Diversión',
-        'moderation': 'Moderación',
-        'music': 'Música',
-        'utility': 'Utilidad',
-        'other': 'Otros'
-    };
-    
-    container.innerHTML = Object.entries(categories).map(([category, cmds]) => `
-        <section class="command-card reveal-on-scroll" data-reveal="up">
-            <div class="command-group-head">
-                <h3>${categoryNames[category] || category.charAt(0).toUpperCase() + category.slice(1)}</h3>
-                <span class="command-group-count">${cmds.length}</span>
-            </div>
-            ${cmds.map(cmd => `
-                <article class="command-entry">
-                    <div class="command-entry-name">/${escapeHtml(cmd.name || 'comando')}</div>
-                    <div class="command-entry-description">${escapeHtml(cmd.description || 'Sin descripción')}</div>
-                    ${cmd.options && cmd.options.length > 0 ? `
-                        <div class="command-options-wrap">
-                            <strong class="command-options-title">Opciones</strong>
-                            ${cmd.options.map(opt => `
-                                <div class="command-option-item">
-                                    <strong>${escapeHtml(opt.name || 'opción')}</strong>
-                                    <span>${escapeHtml(opt.description || 'Sin descripción')}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-                </article>
-            `).join('')}
-        </section>
-    `).join('');
+    const sortedCategories = Object.entries(categories).sort(([left], [right]) => {
+        return getCommandCategoryLabel(left).localeCompare(getCommandCategoryLabel(right), 'es');
+    });
+
+    container.innerHTML = sortedCategories.map(([category, cmds]) => {
+        const tone = getCommandCategoryTone(category);
+        const categoryLabel = getCommandCategoryLabel(category);
+        const categoryIcon = getCommandCategoryIcon(category);
+        const commandCards = cmds.map((cmd) => {
+            const options = Array.isArray(cmd.options) ? cmd.options : [];
+            const optionCountLabel = options.length
+                ? `${options.length} opción${options.length === 1 ? '' : 'es'}`
+                : 'Sin opciones';
+            const optionsMarkup = options.length > 0
+                ? `<div class="command-catalog-options">${options.map((opt) => {
+                    const requiredBadge = opt.required ? '<span class="command-catalog-option-required">Requerida</span>' : '';
+                    return `<div class="command-catalog-option"><div class="command-catalog-option-top"><strong>${escapeHtml(opt.name || 'opción')}</strong>${requiredBadge}</div><span>${escapeHtml(opt.description || 'Sin descripción')}</span></div>`;
+                }).join('')}</div>`
+                : '';
+            return `<article class="command-catalog-card"><div class="command-catalog-head"><code class="command-catalog-name">/${escapeHtml(cmd.name || 'comando')}</code><span class="command-catalog-option-count">${optionCountLabel}</span></div><p class="command-catalog-desc">${escapeHtml(cmd.description || 'Sin descripción')}</p>${optionsMarkup}</article>`;
+        }).join('');
+
+        return `<section class="commands-category-block commands-category-block--${tone} reveal-on-scroll" data-reveal="up"><header class="commands-category-head"><span class="commands-category-icon" aria-hidden="true">${categoryIcon}</span><div class="commands-category-copy"><h3>${categoryLabel}</h3><p>${cmds.length} comando${cmds.length === 1 ? '' : 's'} en esta categoría</p></div><span class="commands-category-count">${cmds.length}</span></header><div class="commands-category-list">${commandCards}</div></section>`;
+    }).join('');
 
     refreshActiveSectionReveal();
 }
