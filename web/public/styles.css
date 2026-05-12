@@ -6616,7 +6616,8 @@ select:focus {
 
 /* Final commands compact layout (authoritative) */
 #commandsSection .container {
-    max-width: min(1500px, 97vw);
+    max-width: none;
+    width: 100%;
 }
 
 #commandsSection .commands-toolbar {

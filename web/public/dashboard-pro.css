@@ -12667,9 +12667,12 @@ body {
 }
 
 #commandsSection .commands-shell {
-    max-width: min(1320px, 96vw);
-    display: grid;
-    gap: 1.1rem;
+    width: 100%;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+    min-height: 0;
 }
 
 #commandsSection .commands-hero {
@@ -12705,7 +12708,7 @@ body {
 
 #commandsSection .commands-subtitle {
     margin: 0;
-    max-width: 62ch;
+    max-width: none;
     color: var(--text-secondary);
     line-height: 1.55;
 }
@@ -12742,8 +12745,8 @@ body {
 
 #commandsSection .commands-toolbar--catalog {
     display: grid;
-    gap: 0.8rem;
-    padding: 0.85rem;
+    gap: 0.9rem;
+    padding: 1rem 1.05rem;
     border-radius: 16px;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
     background: rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.42);
@@ -12783,7 +12786,10 @@ body {
 
 #commandsSection .commands-catalog {
     display: grid;
-    gap: 1rem;
+    gap: 1.1rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
 }
 
 #commandsSection .commands-category-block {
@@ -12845,9 +12851,9 @@ body {
 
 #commandsSection .commands-category-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 0.8rem;
-    padding: 0.95rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    padding: 1.1rem;
 }
 
 #commandsSection .command-catalog-card {
@@ -12961,5 +12967,64 @@ body {
 
     #commandsSection .commands-hero-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.main-content:has(#commandsSection.active) {
+    padding: 0 !important;
+}
+
+#commandsSection.section {
+    height: calc(100vh - 70px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#commandsSection.section > .container.commands-shell {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 0.85rem 1.1rem 1.15rem !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+}
+
+#commandsSection .commands-hero {
+    padding: 1.25rem 1.35rem;
+}
+
+#commandsSection .commands-filters--catalog {
+    width: 100%;
+}
+
+#commandsSection .commands-filter-btn {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.84rem;
+}
+
+@media (min-width: 1500px) {
+    #commandsSection .commands-category-list {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+}
+
+@media (min-width: 1900px) {
+    #commandsSection .commands-category-list {
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    }
+}
+
+@media (max-width: 1024px) {
+    #commandsSection.section {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #commandsSection.section > .container.commands-shell {
+        height: auto !important;
+        overflow: visible !important;
     }
 }
