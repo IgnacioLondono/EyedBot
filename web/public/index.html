@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260507-bg-bubbles-toggle">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260507-fullbleed-dashboard-about">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260511-dashboard-home">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -139,15 +139,26 @@
     <!-- Main Content -->
     <main class="main-content">
         <!-- Dashboard -->
-        <section id="dashboard" class="section active">
-            <div class="container fullbleed-shell">
-                <div class="section-header section-header--split dashboard-search-header">
-                    <div class="section-heading">
-                        <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13l4-4 4 4 8-8"></path><path d="M3 21h18"></path><path d="M3 3v18"></path></svg>Servidores</h2>
-                        <div class="title-accent"></div>
+        <section id="dashboard" class="section dashboard-home active">
+            <div class="container fullbleed-shell dashboard-home-shell">
+                <header class="dashboard-home-head">
+                    <div class="dashboard-home-head-main">
+                        <p class="dashboard-home-kicker">Panel principal</p>
+                        <h2 class="dashboard-home-title">Servidores</h2>
+                        <p class="dashboard-home-subtitle">Elige un servidor para abrir moderación, automatizaciones y ajustes del bot.</p>
                     </div>
-                    <div class="section-tools">
-                        <div class="search-pill" role="search">
+                    <div class="dashboard-home-tools">
+                        <div class="dashboard-home-stats" aria-live="polite">
+                            <div class="dashboard-home-stat">
+                                <strong id="dashboardGuildCount">-</strong>
+                                <span>Servidores</span>
+                            </div>
+                            <div class="dashboard-home-stat">
+                                <strong id="dashboardMemberCount">-</strong>
+                                <span>Miembros</span>
+                            </div>
+                        </div>
+                        <div class="search-pill dashboard-home-search" role="search">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <circle cx="11" cy="11" r="8"></circle>
                                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -155,9 +166,9 @@
                             <input id="guildSearch" class="search-input" type="search" placeholder="Buscar servidor..." autocomplete="off">
                         </div>
                     </div>
-                </div>
-                <div id="guildsList" class="guilds-grid">
-                    <div class="loading">
+                </header>
+                <div id="guildsList" class="guilds-grid dashboard-guilds-grid">
+                    <div class="loading dashboard-guild-loading">
                         <div class="loading-spinner"></div>
                         <p>Cargando servidores...</p>
                     </div>
