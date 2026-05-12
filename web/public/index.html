@@ -252,7 +252,7 @@
             </div>
         </section>
 
-        <section id="profileSettingsSection" class="section">
+        <section id="profileSettingsSection" class="section profile-settings-shell">
             <div class="container">
                 <header class="section-header settings-page-head">
                     <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"></path></svg>Configuraciones</h2>
@@ -260,15 +260,18 @@
                 </header>
 
                 <div class="settings-layout settings-shell" id="settingsLayout">
-                    <aside class="settings-sidebar" id="settingsSidebar">
-                        <button type="button" class="settings-side-btn active" data-settings-pane="settingsPaneAccount">
-                            <span>Cuenta</span>
+                    <aside class="settings-sidebar" id="settingsSidebar" aria-label="Secciones de configuración">
+                        <button type="button" class="settings-side-btn active" data-settings-pane="settingsPaneAccount" data-settings-tone="sky">
+                            <span class="settings-side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg></span>
+                            <span class="settings-side-label">Cuenta</span>
                         </button>
-                        <button type="button" class="settings-side-btn" data-settings-pane="settingsPaneWeb">
-                            <span>Web</span>
+                        <button type="button" class="settings-side-btn" data-settings-pane="settingsPaneWeb" data-settings-tone="amber">
+                            <span class="settings-side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18"></path><path d="M12 3a14 14 0 0 0 0 18"></path></svg></span>
+                            <span class="settings-side-label">Web</span>
                         </button>
-                        <button type="button" class="settings-side-btn" data-settings-pane="settingsPaneTheme">
-                            <span>Personalización</span>
+                        <button type="button" class="settings-side-btn" data-settings-pane="settingsPaneTheme" data-settings-tone="teal">
+                            <span class="settings-side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 0 0-1 16.5 1.5 1.5 0 0 1 1.5-1.5H12a3 3 0 0 0 0-6h.5A3.5 3.5 0 0 1 12 3z"></path></svg></span>
+                            <span class="settings-side-label">Personalización</span>
                         </button>
                     </aside>
 
@@ -276,29 +279,50 @@
                         <section id="settingsPaneAccount" class="settings-pane active">
                             <div class="settings-pane-shell dpx-panel">
                                 <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#6ec8ff;--dpx-hero-glow-1:rgba(110,200,255,0.22);--dpx-hero-glow-2:rgba(124,77,255,0.18);">
-                                    <div class="dpx-hero-text">
-                                        <div class="dpx-hero-kicker">Datos de sesión</div>
-                                        <h3>Cuenta conectada</h3>
-                                        <p>Información de tu usuario de Discord en esta sesión del panel. No editable desde aquí.</p>
+                                    <div class="dpx-hero-main">
+                                        <span class="dpx-hero-icon-badge settings-pane-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg></span>
+                                        <div class="dpx-hero-text">
+                                            <div class="dpx-hero-kicker">Datos de sesión</div>
+                                            <h3>Cuenta conectada</h3>
+                                            <p>Información de tu usuario de Discord en esta sesión del panel. No editable desde aquí.</p>
+                                        </div>
                                     </div>
                                     <div class="dpx-hero-actions settings-pane-hero-actions">
                                         <span class="dpx-status-chip is-on"><span class="dot"></span>Solo lectura</span>
                                     </div>
                                 </header>
                                 <div class="settings-pane-body">
-                                    <div class="settings-kv-grid">
-                                        <div class="settings-kv-card">
-                                            <span class="settings-kv-card-label">Usuario</span>
-                                            <strong id="settingsAccountName">-</strong>
+                                    <article class="settings-profile-card">
+                                        <img id="settingsAccountAvatarImg" class="settings-profile-avatar" alt="" width="72" height="72" hidden>
+                                        <div class="settings-profile-copy">
+                                            <h4 id="settingsAccountName">-</h4>
+                                            <p class="settings-profile-id">ID <span id="settingsAccountId">-</span></p>
+                                            <p class="settings-profile-meta" id="settingsAccountAvatar">No disponible</p>
                                         </div>
-                                        <div class="settings-kv-card">
-                                            <span class="settings-kv-card-label">ID</span>
-                                            <strong id="settingsAccountId">-</strong>
-                                        </div>
-                                        <div class="settings-kv-card settings-kv-card--wide">
-                                            <span class="settings-kv-card-label">Avatar</span>
-                                            <strong id="settingsAccountAvatar">No disponible</strong>
-                                        </div>
+                                        <span class="settings-profile-badge">Discord</span>
+                                    </article>
+                                    <div class="settings-info-grid">
+                                        <article class="settings-info-card">
+                                            <span class="settings-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg></span>
+                                            <div>
+                                                <span class="settings-info-label">Usuario</span>
+                                                <strong id="settingsAccountHandle">-</strong>
+                                            </div>
+                                        </article>
+                                        <article class="settings-info-card">
+                                            <span class="settings-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M8 9h8M8 13h5"></path></svg></span>
+                                            <div>
+                                                <span class="settings-info-label">ID de Discord</span>
+                                                <strong id="settingsAccountIdCard">-</strong>
+                                            </div>
+                                        </article>
+                                        <article class="settings-info-card settings-info-card--wide">
+                                            <span class="settings-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="14" rx="2"></rect><circle cx="9" cy="11" r="2"></circle><path d="M15 10l3 2-3 2"></path></svg></span>
+                                            <div>
+                                                <span class="settings-info-label">Avatar</span>
+                                                <strong id="settingsAccountAvatarCard">No disponible</strong>
+                                            </div>
+                                        </article>
                                     </div>
                                 </div>
                             </div>
@@ -307,33 +331,48 @@
                         <section id="settingsPaneWeb" class="settings-pane">
                             <div class="settings-pane-shell dpx-panel">
                                 <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#fbbf24;--dpx-hero-glow-1:rgba(251,191,36,0.2);--dpx-hero-glow-2:rgba(124,77,255,0.16);">
-                                    <div class="dpx-hero-text">
-                                        <div class="dpx-hero-kicker">Entorno del navegador</div>
-                                        <h3>Esta instalación web</h3>
-                                        <p>Datos del host y del cliente donde abriste el panel. Útiles para soporte o depuración.</p>
+                                    <div class="dpx-hero-main">
+                                        <span class="dpx-hero-icon-badge settings-pane-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18"></path><path d="M12 3a14 14 0 0 0 0 18"></path></svg></span>
+                                        <div class="dpx-hero-text">
+                                            <div class="dpx-hero-kicker">Entorno del navegador</div>
+                                            <h3>Esta instalación web</h3>
+                                            <p>Datos del host y del cliente donde abriste el panel. Útiles para soporte o depuración.</p>
+                                        </div>
                                     </div>
                                     <div class="dpx-hero-actions settings-pane-hero-actions">
                                         <span class="dpx-status-chip is-on"><span class="dot"></span>Solo lectura</span>
                                     </div>
                                 </header>
                                 <div class="settings-pane-body">
-                                    <div class="settings-kv-grid">
-                                        <div class="settings-kv-card">
-                                            <span class="settings-kv-card-label">Host</span>
-                                            <strong id="settingsWebHost">-</strong>
-                                        </div>
-                                        <div class="settings-kv-card">
-                                            <span class="settings-kv-card-label">Ruta</span>
-                                            <strong id="settingsWebPath">-</strong>
-                                        </div>
-                                        <div class="settings-kv-card">
-                                            <span class="settings-kv-card-label">Navegador</span>
-                                            <strong id="settingsWebBrowser">-</strong>
-                                        </div>
-                                        <div class="settings-kv-card">
-                                            <span class="settings-kv-card-label">Zona horaria</span>
-                                            <strong id="settingsWebTimezone">-</strong>
-                                        </div>
+                                    <div class="settings-info-grid">
+                                        <article class="settings-info-card">
+                                            <span class="settings-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M7 9h10M7 13h6"></path></svg></span>
+                                            <div>
+                                                <span class="settings-info-label">Host</span>
+                                                <strong id="settingsWebHost">-</strong>
+                                            </div>
+                                        </article>
+                                        <article class="settings-info-card">
+                                            <span class="settings-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h10M4 18h16"></path></svg></span>
+                                            <div>
+                                                <span class="settings-info-label">Ruta</span>
+                                                <strong id="settingsWebPath">-</strong>
+                                            </div>
+                                        </article>
+                                        <article class="settings-info-card">
+                                            <span class="settings-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M7 8h10M7 12h6"></path></svg></span>
+                                            <div>
+                                                <span class="settings-info-label">Navegador</span>
+                                                <strong id="settingsWebBrowser">-</strong>
+                                            </div>
+                                        </article>
+                                        <article class="settings-info-card">
+                                            <span class="settings-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4l2.5 2.5"></path></svg></span>
+                                            <div>
+                                                <span class="settings-info-label">Zona horaria</span>
+                                                <strong id="settingsWebTimezone">-</strong>
+                                            </div>
+                                        </article>
                                     </div>
                                 </div>
                             </div>
@@ -342,10 +381,13 @@
                         <section id="settingsPaneTheme" class="settings-pane">
                             <div class="settings-pane-shell dpx-panel" id="themeLab">
                                 <header class="dpx-hero settings-pane-hero" style="--dpx-hero-accent:#6ee7b7;--dpx-hero-glow-1:rgba(110,231,183,0.24);--dpx-hero-glow-2:rgba(124,77,255,0.18);">
-                                    <div class="dpx-hero-text">
-                                        <div class="dpx-hero-kicker">Personalización visual</div>
-                                        <h3>Diseña el panel a tu gusto</h3>
-                                        <p>Elige un preset, ajusta colores y modifica la atmósfera del fondo. Los cambios se aplican al instante y quedan guardados en tu navegador.</p>
+                                    <div class="dpx-hero-main">
+                                        <span class="dpx-hero-icon-badge settings-pane-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 0 0-1 16.5 1.5 1.5 0 0 1 1.5-1.5H12a3 3 0 0 0 0-6h.5A3.5 3.5 0 0 1 12 3z"></path></svg></span>
+                                        <div class="dpx-hero-text">
+                                            <div class="dpx-hero-kicker">Personalización visual</div>
+                                            <h3>Diseña el panel a tu gusto</h3>
+                                            <p>Elige un preset, ajusta colores y modifica la atmósfera del fondo. Los cambios se aplican al instante y quedan guardados en tu navegador.</p>
+                                        </div>
                                     </div>
                                     <div class="dpx-hero-actions settings-pane-hero-actions">
                                         <div class="settings-pane-theme-buttons">
