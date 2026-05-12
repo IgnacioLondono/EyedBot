@@ -12987,9 +12987,109 @@ body {
     height: 100% !important;
     min-height: 0 !important;
     padding: 0.85rem 1.1rem 1.15rem !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+    overflow: hidden !important;
     box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+}
+
+#commandsSection .commands-hero,
+#commandsSection .commands-toolbar--catalog {
+    flex-shrink: 0;
+}
+
+#commandsSection .commands-catalog-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 0.2rem;
+}
+
+#commandsSection .commands-catalog--all {
+    gap: 1.35rem;
+}
+
+#commandsSection .commands-catalog--all .commands-category-block {
+    min-height: auto;
+}
+
+#commandsSection .commands-catalog--all .commands-category-head {
+    min-height: 4.5rem;
+    padding: 1.05rem 1.15rem;
+}
+
+#commandsSection .commands-catalog--all .commands-category-copy h3 {
+    font-size: 1.08rem;
+}
+
+#commandsSection .commands-catalog--all .commands-category-copy p {
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+#commandsSection .commands-catalog--all .commands-category-list {
+    padding: 1.15rem;
+    gap: 1rem;
+}
+
+.server-info-discord-embed {
+    position: relative;
+    border-left-color: var(--saber-blue) !important;
+    background: rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.72) !important;
+    padding: 1.15rem 6.5rem 1rem 1.15rem;
+    margin-bottom: 1rem;
+}
+
+.server-info-embed-thumbnail {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 80px;
+    height: 80px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.server-info-embed-title {
+    margin-bottom: 0.75rem;
+    font-size: 1.08rem;
+}
+
+.server-info-embed-lines {
+    display: grid;
+    gap: 0.42rem;
+}
+
+.server-info-embed-line {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    font-size: 0.95rem;
+}
+
+.server-info-embed-line strong {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.server-info-embed-emoji {
+    display: inline-block;
+    width: 1.35rem;
+    margin-right: 0.2rem;
+}
+
+.server-info-embed-highlight {
+    display: inline-block;
+    padding: 0.08rem 0.35rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.server-info-embed-footer {
+    margin-top: 0.85rem;
 }
 
 #commandsSection .commands-hero {

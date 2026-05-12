@@ -4187,8 +4187,10 @@ async function loadCommands() {
 function displayCommands(commands, meta = {}) {
     const container = document.getElementById('commandsContainer');
     const totalCommands = Number(meta.total) || commandsCatalog.length || 0;
+    const isAllCategories = commandsFilterCategory === 'all';
 
     updateCommandsSummary(commands?.length || 0, totalCommands);
+    container.className = `commands-catalog${isAllCategories ? ' commands-catalog--all' : ''}`;
 
     if (!commands || commands.length === 0) {
         const message = totalCommands > 0
@@ -8347,6 +8349,71 @@ function formatIsoDate(value) {
     return date.toLocaleDateString('es-ES');
 }
 
+function formatServerCreationDate(value) {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+}
+
+function formatVerificationLevelLabel(level) {
+    const labels = {
+        0: 'Ninguna',
+        1: 'Baja',
+        2: 'Media',
+        3: 'Alta',
+        4: 'Muy alta'
+    };
+    const key = Number.parseInt(level, 10);
+    return labels[key] || String(level ?? 'N/A');
+}
+
+function renderServerInfoDiscordEmbed(info) {
+    const serverName = escapeHtml(info?.name || 'Servidor');
+    const serverId = escapeHtml(String(info?.id || 'N/A'));
+    const ownerTag = escapeHtml(info?.owner?.tag || 'Desconocido');
+    const createdDate = formatServerCreationDate(info?.createdAt);
+    const verification = escapeHtml(formatVerificationLevelLabel(info?.verificationLevel));
+    const boostTier = Number.parseInt(info?.premiumTier || 0, 10) || 0;
+    const boostCount = Number.parseInt(info?.premiumSubscriptionCount || 0, 10) || 0;
+    const iconUrl = String(info?.icon || '').trim();
+    const thumbnail = iconUrl
+        ? `<img src="${escapeHtml(iconUrl)}" alt="${serverName}" class="discord-embed-thumbnail server-info-embed-thumbnail" width="80" height="80" loading="lazy" decoding="async">`
+        : '';
+
+    const lines = [
+        { emoji: '🆔', label: 'ID', value: serverId },
+        { emoji: '👑', label: 'Dueño/a', value: `<span class="discord-mention-preview">${ownerTag}</span>` },
+        { emoji: '📅', label: 'Fecha de creación', value: `<span class="server-info-embed-highlight">${createdDate}</span>` },
+        { emoji: '👥', label: 'Miembros', value: formatServerMetric(info?.memberCount || 0) },
+        { emoji: '💬', label: 'Canales', value: formatServerMetric(info?.channelCount || 0) },
+        { emoji: '⚔️', label: 'Roles', value: formatServerMetric(info?.roleCount || 0) },
+        { emoji: '🌵', label: 'Emojis', value: formatServerMetric(info?.emojis || 0) },
+        { emoji: '🚀', label: 'Mejoras', value: `${boostCount} · Nivel ${boostTier}` },
+        { emoji: '🔒', label: 'Verificación', value: verification }
+    ];
+
+    return `
+        <article class="discord-embed server-info-discord-embed" aria-label="Información del servidor">
+            ${thumbnail}
+            <div class="discord-embed-title server-info-embed-title">[${serverName}]</div>
+            <div class="server-info-embed-lines">
+                ${lines.map((line) => `
+                    <p class="server-info-embed-line">
+                        <span class="server-info-embed-emoji" aria-hidden="true">${line.emoji}</span>
+                        <strong>${line.label}:</strong> ${line.value}
+                    </p>
+                `).join('')}
+            </div>
+            <div class="discord-embed-footer server-info-embed-footer">EyedBot · Panel web</div>
+        </article>
+    `.replace(/<motion/g, '<div').replace(/<\/motion>/g, '</div>');
+}
+
 function formatChartShortDate(value) {
     if (!value) return 'N/A';
     const date = new Date(value);
@@ -9298,11 +9365,6 @@ function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar,
         ? `<button type="button" class="summary-link-btn" data-server-insight-more-users>Ver todos los usuarios</button>`
         : '';
 
-    const serverName = escapeHtml(info.name || 'Servidor');
-    const serverIcon = info.icon
-        ? `<img src="${escapeHtml(info.icon)}" alt="${serverName}" class="overview-hero-icon-img">`
-        : `<span class="overview-hero-icon-placeholder">${serverName.charAt(0).toUpperCase()}</span>`;
-
     const humanMembers = Number.parseInt(info.members?.humans || 0, 10) || 0;
     const botMembers = Number.parseInt(info.members?.bots || 0, 10) || 0;
     const verification = escapeHtml(String(info.verificationLevel ?? 'N/A'));
@@ -9323,39 +9385,9 @@ function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar,
     return `
         <div class="server-overview-layout">
 
-            <!-- Hero: identidad del servidor -->
-            <article class="overview-hero">
-                <div class="overview-hero-bg"></div>
-                <div class="overview-hero-content">
-                    <div class="overview-hero-identity">
-                        <div class="overview-hero-icon">${serverIcon}</div>
-                        <div class="overview-hero-meta">
-                            <div class="overview-hero-kicker">Servidor</div>
-                            <h2 class="overview-hero-title">${serverName}</h2>
-                            <div class="overview-hero-sub">Creado el ${escapeHtml(createdDate)} • ${formatServerMetric(ageDays)} días de historia</div>
-                        </div>
-                    </div>
-                    <div class="overview-hero-owner summary-card--interactive" data-server-insight="owner" tabindex="0" role="button" aria-label="Ver propietario">
-                        ${ownerAvatar}
-                        <div>
-                            <div class="overview-hero-owner-label">Propietario</div>
-                            <div class="overview-hero-owner-name">${ownerTag}</div>
-                            <div class="overview-hero-owner-id">ID ${escapeHtml(String(info.owner?.id || 'N/A'))}</div>
-                        </div>
-                        <span class="overview-hero-owner-arrow" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
-                        </span>
-                    </div>
-                </div>
-                <div class="overview-hero-chips">
-                    ${kpiChip('Miembros', formatServerMetric(info.memberCount || 0), 'blue', 'members')}
-                    ${kpiChip('Canales', formatServerMetric(info.channelCount || 0), 'teal', 'channels')}
-                    ${kpiChip('Roles', formatServerMetric(info.roleCount || 0), 'violet', 'roles')}
-                    ${kpiChip('Boosts', `Nivel ${boostTier} · ${boostCount}`, 'gold', 'core')}
-                </div>
-            </article>
+            ${renderServerInfoDiscordEmbed(info)}
 
-            <!-- Seccion: KPIs principales -->
+                        <!-- Seccion: KPIs principales -->
             <section class="overview-section">
                 <header class="overview-section-head">
                     <div class="overview-section-title">
