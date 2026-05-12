@@ -398,11 +398,11 @@
                                 </header>
 
                                 <div class="settings-pane-body settings-theme-body">
-                                    <div class="settings-theme-layout">
-                                        <section class="settings-theme-pane settings-theme-pane--preview" aria-labelledby="settingsThemePreviewHeading">
-                                            <header class="dpx-section-head settings-theme-section-head">
-                                                <div class="dpx-section-head-text">
-                                                    <h4 id="settingsThemePreviewHeading">Vista previa</h4>
+                                    <div class="settings-theme-studio">
+                                        <section class="settings-theme-card settings-theme-card--preview" aria-labelledby="settingsThemePreviewHeading">
+                                            <header class="settings-theme-card-head">
+                                                <div class="settings-theme-card-head-copy">
+                                                    <h4 id="settingsThemePreviewHeading">Vista previa en vivo</h4>
                                                     <p>Acentos, fondos y superficies que verás en el panel.</p>
                                                 </div>
                                                 <div class="settings-theme-head-badges">
@@ -430,14 +430,15 @@
                                             </div>
                                         </section>
 
-                                        <section class="settings-theme-pane settings-theme-pane--controls" aria-labelledby="settingsThemeControlsHeading">
-                                            <header class="dpx-section-head settings-theme-section-head">
-                                                <div class="dpx-section-head-text">
-                                                    <h4 id="settingsThemeControlsHeading">Colores y atmósfera</h4>
-                                                    <p>Presets y ajustes finos; cambios en vivo.</p>
-                                                </div>
-                                            </header>
-                                            <div class="theme-preset-row" id="themePresetRow" aria-label="Presets de tema">
+                                        <div class="settings-theme-grid">
+                                            <section class="settings-theme-card settings-theme-card--presets" aria-labelledby="settingsThemePresetsHeading">
+                                                <header class="settings-theme-card-head">
+                                                    <div class="settings-theme-card-head-copy">
+                                                        <h4 id="settingsThemePresetsHeading">Estilos base</h4>
+                                                        <p>Elige un punto de partida y ajusta después.</p>
+                                                    </div>
+                                                </header>
+                                                <div class="settings-theme-preset-grid theme-preset-row" id="themePresetRow" aria-label="Presets de tema">
                                                 <button type="button" class="theme-preset-btn active" data-theme-preset="midnight">Midnight</button>
                                                 <button type="button" class="theme-preset-btn" data-theme-preset="aurora">Aurora</button>
                                                 <button type="button" class="theme-preset-btn" data-theme-preset="ember">Ember</button>
@@ -449,8 +450,16 @@
                                                 <button type="button" class="theme-preset-btn" data-theme-preset="gold">Oro</button>
                                                 <button type="button" class="theme-preset-btn" data-theme-preset="indigo">Índigo</button>
                                             </div>
+                                            </section>
 
-                                            <div class="theme-form-grid">
+                                            <section class="settings-theme-card settings-theme-card--palette" aria-labelledby="settingsThemePaletteHeading">
+                                                <header class="settings-theme-card-head">
+                                                    <div class="settings-theme-card-head-copy">
+                                                        <h4 id="settingsThemePaletteHeading">Paleta</h4>
+                                                        <p>Colores del panel y tipografía.</p>
+                                                    </div>
+                                                </header>
+                                                <div class="theme-form-grid settings-theme-swatch-grid">
                                                 <div class="form-group">
                                                     <label for="themeAccentPrimary">Acento principal</label>
                                                     <input type="color" id="themeAccentPrimary" class="form-control color-input" value="#9a6dff">
@@ -483,6 +492,17 @@
                                                     <label for="themeBorderColor">Color de bordes</label>
                                                     <input type="color" id="themeBorderColor" class="form-control color-input" value="#be9bff">
                                                 </div>
+                                                </div>
+                                            </section>
+
+                                            <section class="settings-theme-card settings-theme-card--atmosphere" aria-labelledby="settingsThemeAtmosphereHeading">
+                                                <header class="settings-theme-card-head">
+                                                    <div class="settings-theme-card-head-copy">
+                                                        <h4 id="settingsThemeAtmosphereHeading">Atmósfera</h4>
+                                                        <p>Intensidad visual del fondo y los bordes.</p>
+                                                    </div>
+                                                </header>
+                                                <div class="settings-theme-control-stack">
                                                 <div class="form-group theme-slider-group">
                                                     <label for="themeAtmosphere">Intensidad ambiental</label>
                                                     <input type="range" id="themeAtmosphere" class="form-control" min="0" max="100" value="55" step="1">
@@ -501,11 +521,12 @@
                                                     <input type="checkbox" id="themeBackgroundBubbles" checked>
                                                     <span class="theme-toggle-track" aria-hidden="true"></span>
                                                 </label>
-                                            </div>
+                                                </div>
+                                            </section>
 
-                                            <section class="settings-wallpaper-section" aria-labelledby="settingsWallpaperHeading">
-                                                <header class="dpx-section-head settings-theme-section-head">
-                                                    <div class="dpx-section-head-text">
+                                            <section class="settings-theme-card settings-theme-card--wallpaper settings-wallpaper-section" aria-labelledby="settingsWallpaperHeading">
+                                                <header class="settings-theme-card-head">
+                                                    <div class="settings-theme-card-head-copy">
                                                         <h4 id="settingsWallpaperHeading">Fondo de pantalla</h4>
                                                         <p>Imagen nítida con halo suave; el velo usa los colores del tema y la intensidad ambiental.</p>
                                                     </div>
@@ -537,11 +558,12 @@
                                                 </div>
                                             </section>
 
-                                            <div class="theme-status-line">
-                                                <span class="theme-status-dot"></span>
-                                                <span>El panel se guarda automáticamente con tu navegador.</span>
-                                            </div>
-                                        </section>
+                                        </div>
+
+                                        <footer class="settings-theme-footer theme-status-line">
+                                            <span class="theme-status-dot"></span>
+                                            <span>El panel se guarda automáticamente con tu navegador.</span>
+                                        </footer>
                                     </div>
                                 </div>
                             </div>
