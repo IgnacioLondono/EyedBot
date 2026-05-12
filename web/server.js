@@ -33,6 +33,7 @@ const { buildStreamAlertEmbed } = require('../src/utils/stream-alert-scheduler')
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
 const channelSetupTemplates = require('../src/utils/channel-setup-templates');
+const { executeGuildNuke } = require('../src/utils/guild-nuke');
 const gachaStore = require('../src/utils/gacha-store');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const {
@@ -3813,6 +3814,43 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
     } catch (error) {
         console.error('Error enviando embed:', error);
         res.status(500).json({ error: error.message || 'Error al enviar embed' });
+    }
+});
+
+app.post('/api/guild/:guildId/nuke', requireOwner, async (req, res) => {
+    try {
+        const guildId = String(req.params.guildId || '').trim();
+        if (!guildId) {
+            return res.status(400).json({ error: 'Falta el servidor objetivo' });
+        }
+        if (!botClient) {
+            return res.status(500).json({ error: 'Bot no disponible' });
+        }
+
+        let guild = botClient.guilds.cache.get(guildId);
+        if (!guild) {
+            try {
+                guild = await botClient.guilds.fetch(guildId);
+            } catch {
+                return res.status(404).json({ error: 'Servidor no encontrado' });
+            }
+        }
+
+        const actorTag = req.session.user?.username
+            ? `${req.session.user.username} (panel web)`
+            : 'owner (panel web)';
+        const result = await executeGuildNuke(guild, botClient, actorTag);
+
+        console.log(`[Nuke] ${actorTag} ejecutó nuke en ${guild.name} (${guild.id})`);
+        return res.json({
+            success: true,
+            message: 'Nuke completado.',
+            ...result
+        });
+    } catch (error) {
+        const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+        console.error('Error ejecutando nuke desde el panel web:', error);
+        return res.status(statusCode).json({ error: error.message || 'Error al ejecutar nuke' });
     }
 });
 
