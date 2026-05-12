@@ -3127,45 +3127,84 @@ function getFilteredDashboardGuilds() {
     });
 }
 
+function formatDashboardMemberCount(value) {
+    return new Intl.NumberFormat('es-ES').format(Number(value) || 0);
+}
+
+function updateDashboardGuildSummary(guilds = dashboardGuildsCache) {
+    const countEl = document.getElementById('dashboardGuildCount');
+    const membersEl = document.getElementById('dashboardMemberCount');
+    if (!countEl || !membersEl) return;
+
+    const list = Array.isArray(guilds) ? guilds : [];
+    countEl.textContent = String(list.length);
+    const totalMembers = list.reduce((sum, guild) => sum + (Number(guild?.botGuild?.memberCount) || 0), 0);
+    membersEl.textContent = formatDashboardMemberCount(totalMembers);
+}
+
 // Mostrar servidores
 function displayGuilds(guilds) {
     const container = document.getElementById('guildsList');
-    
+    if (!container) return;
+
+    updateDashboardGuildSummary(dashboardGuildsCache);
+
     if (guilds.length === 0) {
-        const emptyLabel = dashboardGuildSearchQuery ? 'No se encontraron servidores' : 'No hay servidores disponibles';
-        container.innerHTML = `<div class="loading">${emptyLabel}</div>`;
+        const emptyTitle = dashboardGuildSearchQuery ? 'Sin coincidencias' : 'Sin servidores todavía';
+        const emptyText = dashboardGuildSearchQuery
+            ? 'Prueba con otro nombre o borra la búsqueda para ver todas las comunidades.'
+            : 'Cuando el bot esté en un servidor con permisos de administración, aparecerá aquí.';
+        container.innerHTML = `
+            <div class="dashboard-guild-empty">
+                <div class="dashboard-guild-empty__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="3" y="6" width="18" height="12" rx="2"></rect>
+                        <path d="M7 10h10"></path>
+                        <path d="M7 14h6"></path>
+                    </svg>
+                </div>
+                <h3>${escapeHtml(emptyTitle)}</h3>
+                <p>${escapeHtml(emptyText)}</p>
+            </div>`;
         return;
     }
 
-    container.innerHTML = guilds.map(guild => `
-        <div class="guild-card" onclick="selectGuild('${guild.id}')">
-            <div class="guild-card-top">
-                <div class="guild-icon">
-                    ${guild.icon ? `<img src="${guild.icon}" alt="${guild.name}" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">` : `
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; color: var(--fate-red);">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                    `}
-                </div>
-                <span class="guild-pill">Listo para configurar</span>
-            </div>
-            <div class="guild-name">${escapeHtml(guild.name)}</div>
-            <div class="guild-info">Espacio principal del servidor en el panel</div>
-            <div class="guild-meta">
+    container.innerHTML = guilds.map((guild) => {
+        const guildId = String(guild.id || '');
+        const guildName = escapeHtml(String(guild.name || 'Servidor'));
+        const memberCount = Number(guild?.botGuild?.memberCount) || 0;
+        const shortId = escapeHtml(String(guild.id || '').slice(-4));
+        const iconHtml = guild.icon
+            ? `<img src="${escapeHtml(String(guild.icon))}" alt="${guildName}" loading="lazy" decoding="async">`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+
+        return `
+        <button type="button" class="guild-card dashboard-guild-card" data-guild-id="${escapeHtml(guildId)}" onclick="selectGuild('${guildId.replace(/'/g, "\\'")}')">
+            <span class="dashboard-guild-card__shine" aria-hidden="true"></span>
+            <span class="guild-card-top dashboard-guild-card__head">
+                <span class="guild-icon dashboard-guild-card__icon">${iconHtml}</span>
+                <span class="guild-pill dashboard-guild-card__status">Listo para configurar</span>
+            </span>
+            <span class="dashboard-guild-card__body">
+                <span class="guild-name dashboard-guild-card__name">${guildName}</span>
+                <span class="guild-info dashboard-guild-card__info">Espacio principal del servidor en el panel</span>
+            </span>
+            <span class="guild-meta dashboard-guild-card__meta">
                 <span class="guild-meta-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                         <circle cx="9" cy="7" r="4"></circle>
                     </svg>
-                    ${(guild.botGuild?.memberCount || 0)} miembros
+                    ${formatDashboardMemberCount(memberCount)} miembros
                 </span>
-                <span class="guild-meta-item guild-meta-item--ghost">ID • ${String(guild.id).slice(-4)}</span>
-            </div>
-        </div>
-    `).join('');
+                <span class="guild-meta-item guild-meta-item--ghost">ID · ${shortId}</span>
+            </span>
+            <span class="dashboard-guild-card__cta" aria-hidden="true">
+                <span>Abrir panel</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+            </span>
+        </button>`;
+    }).join('');
 }
 
 // Cargar servidores para el formulario de embed
