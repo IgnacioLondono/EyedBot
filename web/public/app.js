@@ -845,24 +845,15 @@ function decorateServerConfigNavigation() {
             button.dataset.paneTone = meta.tone;
         }
 
-        const inner = button.querySelector('.side-menu-btn-inner');
         const label = button.querySelector('.side-menu-label');
-        if (!inner || !label || !meta.hint) return;
+        if (!label) return;
 
-        if (!label.querySelector('.side-menu-label-title')) {
-            const title = document.createElement('span');
-            title.className = 'side-menu-label-title';
-            title.textContent = label.textContent.trim();
-            label.textContent = '';
-            label.appendChild(title);
+        const title = label.querySelector('.side-menu-label-title');
+        if (title) {
+            label.textContent = title.textContent.trim();
         }
 
-        if (!label.querySelector('.side-menu-label-hint')) {
-            const hint = document.createElement('span');
-            hint.className = 'side-menu-label-hint';
-            hint.textContent = meta.hint;
-            label.appendChild(hint);
-        }
+        label.querySelectorAll('.side-menu-label-hint').forEach((hint) => hint.remove());
     });
 }
 
@@ -2283,19 +2274,47 @@ function updateProfileSettingsData() {
     const accountName = document.getElementById('settingsAccountName');
     const accountId = document.getElementById('settingsAccountId');
     const accountAvatar = document.getElementById('settingsAccountAvatar');
+    const accountAvatarImg = document.getElementById('settingsAccountAvatarImg');
     const webHost = document.getElementById('settingsWebHost');
     const webPath = document.getElementById('settingsWebPath');
     const webBrowser = document.getElementById('settingsWebBrowser');
     const webTimezone = document.getElementById('settingsWebTimezone');
 
+    const accountHandle = document.getElementById('settingsAccountHandle');
+    const accountIdCard = document.getElementById('settingsAccountIdCard');
+    const accountAvatarCard = document.getElementById('settingsAccountAvatarCard');
+    const username = currentUser?.username || '-';
+    const userId = currentUser?.id || '-';
+    const avatarLabel = currentUser?.avatar ? 'Avatar personalizado en Discord' : 'Avatar predeterminado de Discord';
+
     if (accountName) {
-        accountName.textContent = currentUser?.username || '-';
+        accountName.textContent = username;
     }
     if (accountId) {
-        accountId.textContent = currentUser?.id || '-';
+        accountId.textContent = userId;
+    }
+    if (accountHandle) {
+        accountHandle.textContent = username;
+    }
+    if (accountIdCard) {
+        accountIdCard.textContent = userId;
+    }
+    if (accountAvatarCard) {
+        accountAvatarCard.textContent = avatarLabel;
+    }
+    if (accountAvatarImg) {
+        const avatarUrl = getDashboardUserAvatarUrl();
+        if (avatarUrl) {
+            accountAvatarImg.src = avatarUrl;
+            accountAvatarImg.alt = currentUser?.username ? `Avatar de ${currentUser.username}` : 'Avatar de Discord';
+            accountAvatarImg.hidden = false;
+        } else {
+            accountAvatarImg.removeAttribute('src');
+            accountAvatarImg.hidden = true;
+        }
     }
     if (accountAvatar) {
-        accountAvatar.textContent = currentUser?.avatar ? 'Configurado en Discord' : 'No disponible';
+        accountAvatar.textContent = avatarLabel;
     }
     if (webHost) {
         webHost.textContent = window.location.host || '-';

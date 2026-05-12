@@ -13089,31 +13089,13 @@ body {
 }
 
 #serverSection.server-config-shell .side-menu-btn-inner {
-    align-items: flex-start;
+    align-items: center;
 }
 
 #serverSection.server-config-shell .side-menu-label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.12rem;
-    min-width: 0;
-}
-
-#serverSection.server-config-shell .side-menu-label-title {
     font-weight: 600;
-    color: inherit;
     line-height: 1.25;
-}
-
-#serverSection.server-config-shell .side-menu-label-hint {
-    font-size: 0.72rem;
-    line-height: 1.35;
-    color: var(--text-muted, #9f8fc8);
-    font-weight: 500;
-}
-
-#serverSection.server-config-shell .side-menu-btn.active .side-menu-label-hint {
-    color: rgba(255, 255, 255, 0.72);
+    min-width: 0;
 }
 
 #serverSection.server-config-shell .side-menu-btn[data-pane-tone="sky"] .side-menu-icon { color: #9fd8ff; }
@@ -13274,5 +13256,163 @@ body {
 
     #serverSection.server-config-shell .server-pane-head--structured {
         margin: 0 0 1.15rem;
+    }
+}
+
+/* ---------- Profile settings shell ---------- */
+#profileSettingsSection.profile-settings-shell .settings-side-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-side-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted, #b7a6dc);
+}
+
+#profileSettingsSection.profile-settings-shell .settings-side-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-side-label {
+    font-weight: 600;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="sky"] .settings-side-icon { color: #9fd8ff; }
+#profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="amber"] .settings-side-icon { color: #ffd18a; }
+#profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="teal"] .settings-side-icon { color: #8ce8d8; }
+
+#profileSettingsSection.profile-settings-shell .settings-pane-hero-icon {
+    width: 48px;
+    height: 48px;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-profile-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 1.1rem 1.2rem;
+    border-radius: 18px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12), rgba(var(--bg-card-rgb, 26, 16, 48), 0.72));
+    margin-bottom: 1rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-profile-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    object-fit: cover;
+    border: 2px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45);
+    box-shadow: 0 10px 24px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22);
+}
+
+#profileSettingsSection.profile-settings-shell .settings-profile-copy h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+#profileSettingsSection.profile-settings-shell .settings-profile-id,
+#profileSettingsSection.profile-settings-shell .settings-profile-meta {
+    margin: 0.28rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-profile-badge {
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #d7e8ff;
+    border: 1px solid rgba(110, 200, 255, 0.28);
+    background: rgba(110, 200, 255, 0.12);
+}
+
+#profileSettingsSection.profile-settings-shell .settings-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-info-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: start;
+    padding: 1rem 1.05rem;
+    border-radius: 16px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.58);
+}
+
+#profileSettingsSection.profile-settings-shell .settings-info-card--wide {
+    grid-column: 1 / -1;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-info-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #e8dcff;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+#profileSettingsSection.profile-settings-shell .settings-info-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-info-label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 0.28rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-info-card strong {
+    display: block;
+    font-size: 0.96rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-pane-hero.dpx-hero {
+    margin-bottom: 1rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-layout {
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    #profileSettingsSection.profile-settings-shell .settings-profile-card {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    #profileSettingsSection.profile-settings-shell .settings-profile-badge {
+        grid-column: 1 / -1;
+        justify-self: start;
     }
 }
