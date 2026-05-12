@@ -63,7 +63,6 @@ const MODERATION_COMMAND_NAMES = new Set([
     'lock',
     'mute',
     'nick',
-    'nuke',
     'purge',
     'role',
     'slowmode',

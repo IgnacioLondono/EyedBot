@@ -11947,6 +11947,7 @@ body,
 #embedSection.section > .container,
 #statsSection.section > .container,
 #logsSection.section > .container,
+#nukeSection.section > .container,
 #commandsSection.section > .container {
     background: transparent !important;
     border: none !important;
