@@ -13292,6 +13292,41 @@ body {
 #profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="amber"] .settings-side-icon { color: #ffd18a; }
 #profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="teal"] .settings-side-icon { color: #8ce8d8; }
 
+#profileSettingsSection.profile-settings-shell .settings-pane-hero.dpx-hero {
+    align-items: center;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-pane-hero .dpx-hero-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    min-width: 0;
+    flex: 1;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-pane-hero .dpx-hero-icon-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 14px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.24);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f4eeff;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-pane-hero .dpx-hero-icon-badge svg {
+    width: 22px;
+    height: 22px;
+    max-width: 22px;
+    max-height: 22px;
+    flex-shrink: 0;
+}
+
 #profileSettingsSection.profile-settings-shell .settings-pane-hero-icon {
     width: 48px;
     height: 48px;
@@ -13402,11 +13437,111 @@ body {
     margin-bottom: 1rem;
 }
 
-#profileSettingsSection.profile-settings-shell .settings-theme-layout {
-    gap: 1.5rem;
+#profileSettingsSection.profile-settings-shell .settings-theme-studio {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+    padding: 1.1rem 1.15rem;
+    border-radius: 18px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.72), rgba(var(--bg-primary-rgb, 14, 7, 30), 0.88));
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+    min-width: 0;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-card--preview,
+#profileSettingsSection.profile-settings-shell .settings-theme-card--presets,
+#profileSettingsSection.profile-settings-shell .settings-theme-card--wallpaper {
+    grid-column: 1 / -1;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-card-head-copy h4 {
+    margin: 0;
+    font-size: 1.02rem;
+    color: var(--text-primary);
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-card-head-copy p {
+    margin: 0.28rem 0 0;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-preview-panel.theme-preview-panel {
+    border-radius: 16px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 0.55rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-preset-grid .theme-preset-btn {
+    width: 100%;
+    min-height: 42px;
+    border-radius: 12px;
+    padding: 0.55rem 0.7rem;
+    text-align: center;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-swatch-grid.theme-form-grid {
+    gap: 0.85rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-swatch-grid .color-input {
+    width: 100%;
+    height: 44px;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-control-stack {
+    display: grid;
+    gap: 0.85rem;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-card--wallpaper.settings-wallpaper-section {
+    margin-top: 0;
+    padding-top: 1.1rem;
+    border-top: none;
+}
+
+#profileSettingsSection.profile-settings-shell .settings-theme-footer.theme-status-line {
+    margin-top: 0.15rem;
+    padding: 0.85rem 1rem;
+    border-radius: 14px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.5);
 }
 
 @media (max-width: 900px) {
+    #profileSettingsSection.profile-settings-shell .settings-theme-grid {
+        grid-template-columns: 1fr;
+    }
+
     #profileSettingsSection.profile-settings-shell .settings-profile-card {
         grid-template-columns: auto minmax(0, 1fr);
     }
