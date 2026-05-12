@@ -4229,10 +4229,8 @@ function displayCommands(commands, meta = {}) {
             return `<article class="command-catalog-card"><div class="command-catalog-head"><code class="command-catalog-name">/${escapeHtml(cmd.name || 'comando')}</code><span class="command-catalog-option-count">${optionCountLabel}</span></div><p class="command-catalog-desc">${escapeHtml(cmd.description || 'Sin descripción')}</p>${optionsMarkup}</article>`;
         }).join('');
 
-        return `<section class="commands-category-block commands-category-block--${tone} reveal-on-scroll" data-reveal="up"><header class="commands-category-head"><span class="commands-category-icon" aria-hidden="true">${categoryIcon}</span><div class="commands-category-copy"><h3>${categoryLabel}</h3><p>${cmds.length} comando${cmds.length === 1 ? '' : 's'} en esta categoría</p></div><span class="commands-category-count">${cmds.length}</span></header><div class="commands-category-list">${commandCards}</div></section>`;
+        return `<section class="commands-category-block commands-category-block--${tone}"><header class="commands-category-head"><span class="commands-category-icon" aria-hidden="true">${categoryIcon}</span><div class="commands-category-copy"><h3>${categoryLabel}</h3><p>${cmds.length} comando${cmds.length === 1 ? '' : 's'} en esta categoría</p></div><span class="commands-category-count">${cmds.length}</span></header><div class="commands-category-list">${commandCards}</div></section>`;
     }).join('');
-
-    refreshActiveSectionReveal();
 }
 
 // Cargar servidores para sección de servidor
