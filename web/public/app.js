@@ -785,6 +785,103 @@ function toggleSideMenuGroupCollapsed(groupId) {
     applySideMenuCollapsedState();
 }
 
+function ensureServerPaneHeadStructure(head, meta = {}) {
+    if (!head) return;
+
+    head.classList.add('server-pane-head--structured');
+    if (meta.tone) {
+        head.dataset.paneTone = meta.tone;
+    }
+
+    const actions = head.querySelector('.server-pane-head-actions, .ticket-manage-actions');
+    let main = head.querySelector('.server-pane-head-main');
+    if (!main) {
+        main = document.createElement('div');
+        main.className = 'server-pane-head-main';
+        const firstBlock = head.querySelector(':scope > div:not(.server-pane-head-actions):not(.ticket-manage-actions)');
+        if (firstBlock) {
+            main.appendChild(firstBlock);
+        }
+        head.prepend(main);
+    }
+
+    if (actions && actions.parentElement === main) {
+        head.appendChild(actions);
+    }
+
+    let badge = main.querySelector('.server-pane-icon-badge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'server-pane-icon-badge';
+        badge.setAttribute('aria-hidden', 'true');
+        main.prepend(badge);
+    }
+
+    if (meta.icon) {
+        badge.innerHTML = dpxIcon(meta.icon, 'server-pane-icon-svg');
+    }
+
+    const firstBlock = badge.nextElementSibling;
+    if (firstBlock && !firstBlock.classList.contains('server-pane-head-copy')) {
+        firstBlock.classList.add('server-pane-head-copy');
+    }
+
+    if (actions && !actions.classList.contains('server-pane-head-actions')) {
+        actions.classList.add('server-pane-head-actions');
+    }
+
+    const kicker = head.querySelector('.server-pane-kicker');
+    if (kicker && meta.kicker) {
+        kicker.textContent = meta.kicker;
+    }
+}
+
+function decorateServerConfigNavigation() {
+    Object.entries(SERVER_PANE_META).forEach(([paneId, meta]) => {
+        const button = document.querySelector(`.side-menu-btn[data-server-pane="${paneId}"]`);
+        if (!button) return;
+
+        if (meta.tone) {
+            button.dataset.paneTone = meta.tone;
+        }
+
+        const inner = button.querySelector('.side-menu-btn-inner');
+        const label = button.querySelector('.side-menu-label');
+        if (!inner || !label || !meta.hint) return;
+
+        if (!label.querySelector('.side-menu-label-title')) {
+            const title = document.createElement('span');
+            title.className = 'side-menu-label-title';
+            title.textContent = label.textContent.trim();
+            label.textContent = '';
+            label.appendChild(title);
+        }
+
+        if (!label.querySelector('.side-menu-label-hint')) {
+            const hint = document.createElement('span');
+            hint.className = 'side-menu-label-hint';
+            hint.textContent = meta.hint;
+            label.appendChild(hint);
+        }
+    });
+}
+
+function applyServerConfigPaneMeta() {
+    Object.entries(SERVER_PANE_META).forEach(([paneId, meta]) => {
+        const pane = document.getElementById(paneId);
+        if (!pane) return;
+        ensureServerPaneHeadStructure(pane.querySelector('.server-pane-head'), meta);
+    });
+}
+
+function initializeServerConfigShell() {
+    const section = document.getElementById('serverSection');
+    if (!section) return;
+    section.classList.add('server-config-shell');
+    decorateServerConfigNavigation();
+    applyServerConfigPaneMeta();
+}
+
 function activateServerSideButton(button) {
     const allButtons = document.querySelectorAll('.side-menu-btn');
     allButtons.forEach((btn) => btn.classList.remove('active'));
@@ -2048,6 +2145,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         setupEventListeners();
         console.log('✅ setupEventListeners completado');
+
+        initializeServerConfigShell();
         
         initializeScrollReveal();
         console.log('✅ initializeScrollReveal completado');
@@ -2780,6 +2879,21 @@ async function loadAboutOverview() {
         console.warn('No se pudo cargar el resumen de Acerca de:', error?.message || error);
     }
 }
+
+const SERVER_PANE_META = {
+    serverPaneOverview: { tone: 'sky', kicker: 'Panel del servidor', icon: 'layout', hint: 'Métricas, actividad y accesos rápidos' },
+    serverPaneWelcome: { tone: 'rose', kicker: 'Comunidad', icon: 'door', hint: 'Entrada, salida y tarjetas' },
+    serverPaneVerify: { tone: 'violet', kicker: 'Acceso', icon: 'check', hint: 'Roles, embed y verificación' },
+    serverPaneTicketsManage: { tone: 'cyan', kicker: 'Soporte', icon: 'chat', hint: 'Cola, historial y panel' },
+    serverPaneLevels: { tone: 'amber', kicker: 'Progresión', icon: 'bolt', hint: 'XP, curva y recompensas' },
+    serverPaneVoiceCreator: { tone: 'teal', kicker: 'Voz', icon: 'mic', hint: 'Canales temporales y reglas' },
+    serverPaneAutomation: { tone: 'violet', kicker: 'Automatización', icon: 'gear', hint: 'Anti-spam, raid y canales' },
+    serverPaneGacha: { tone: 'rose', kicker: 'Economía', icon: 'sparkles', hint: 'Rolls, tienda y ranking' },
+    serverPaneModeration: { tone: 'amber', kicker: 'Moderación', icon: 'shield', hint: 'Miembros, acciones y baneos' },
+    serverPaneSecurity: { tone: 'violet', kicker: 'Seguridad', icon: 'shield', hint: 'Entrada, mensajes y confianza' },
+    serverPaneNotifications: { tone: 'sky', kicker: 'Alertas', icon: 'bell', hint: 'Eventos, digest y directos' },
+    serverPaneFreeGames: { tone: 'teal', kicker: 'Avisos', icon: 'leaf', hint: 'Epic Games y Steam gratis' }
+};
 
 const COMMAND_CATEGORY_LABELS = {
     all: 'Todos',
@@ -4599,14 +4713,18 @@ function levelsRenderMainTabs(activeKey = 'config') {
     `;
 }
 
-function dpxRenderHero({ kicker = '', title = '', description = '', actionsHtml = '', accent = '#ff78d1', glow1 = 'rgba(124,77,255,0.18)', glow2 = 'rgba(255,120,209,0.18)' } = {}) {
+function dpxRenderHero({ kicker = '', title = '', description = '', actionsHtml = '', accent = '#ff78d1', glow1 = 'rgba(124,77,255,0.18)', glow2 = 'rgba(255,120,209,0.18)', iconName = '' } = {}) {
     const styleAttr = `style="--dpx-hero-accent:${accent};--dpx-hero-glow-1:${glow1};--dpx-hero-glow-2:${glow2};"`;
+    const iconHtml = iconName ? `<span class="dpx-hero-icon-badge" aria-hidden="true">${dpxIcon(iconName, 'dpx-hero-icon')}</span>` : '';
     return `
         <header class="dpx-hero" ${styleAttr}>
-            <div class="dpx-hero-text">
+            <div class="dpx-hero-main">
+                ${iconHtml}
+                <div class="dpx-hero-text">
                 ${kicker ? `<div class="dpx-hero-kicker">${kicker}</div>` : ''}
                 <h3>${escapeHtml(title)}</h3>
                 <p>${escapeHtml(description)}</p>
+                </div>
             </div>
             <div class="dpx-hero-actions">${actionsHtml}</div>
         </header>
@@ -4674,6 +4792,7 @@ async function loadVoiceCreatorPanel(guildId) {
             title: 'Canales de Voz Temporales',
             description: 'Al entrar al canal creador, el bot genera un canal de voz personal y lo elimina automáticamente cuando queda vacío.',
             accent: '#ff78d1',
+            iconName: 'mic',
             actionsHtml: `
                 <span class="dpx-status-chip ${enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${enabled ? 'Activo' : 'Desactivado'}</span>
                 <button type="button" id="saveTempVoiceBtn" class="btn btn-primary">Guardar cambios</button>
@@ -4865,6 +4984,7 @@ async function loadAutomationPanel(guildId) {
         accent: '#ffb778',
         glow1: 'rgba(255,183,120,0.18)',
         glow2: 'rgba(124,77,255,0.22)',
+        iconName: 'gear',
         actionsHtml: `
             <span class="dpx-status-chip ${prefs.antiSpamEnabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${filtersActive} filtros activos</span>
             <button type="button" class="btn btn-primary" id="saveAutomationBtn">Guardar filtros</button>
@@ -5086,6 +5206,7 @@ async function loadSecurityPanel(guildId) {
             accent: '#ff9c9c',
             glow1: 'rgba(255,99,99,0.18)',
             glow2: 'rgba(124,77,255,0.22)',
+            iconName: 'shield',
             actionsHtml: `
                 <span class="dpx-status-chip ${enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${enabled ? 'Protegido' : 'Sin protección'}</span>
                 <button type="button" id="saveAntiRaidBtn" class="btn btn-primary">Guardar cambios</button>
@@ -5745,6 +5866,7 @@ async function loadNotificationsPanel(guildId) {
         accent: '#7ef0b4',
         glow1: 'rgba(80,230,160,0.18)',
         glow2: 'rgba(124,77,255,0.22)',
+        iconName: 'bell',
         actionsHtml: `
             <span class="dpx-status-chip ${hasChannel ? 'is-on' : 'is-off'}"><span class="dot"></span>${hasChannel ? 'Canal listo' : 'Sin canal'}</span>
             <button type="button" class="btn btn-secondary" id="testNotificationsBtn">Enviar prueba</button>
@@ -6129,6 +6251,7 @@ async function loadGachaPanel(guildId) {
                     accent: '#f6c244',
                     glow1: 'rgba(246,194,68,0.22)',
                     glow2: 'rgba(124,77,255,0.24)',
+                    iconName: 'sparkles',
                     actionsHtml: `
                         <span class="dpx-status-chip ${config.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${config.enabled ? 'Activo' : 'Inactivo'}</span>
                         <button type="button" class="btn btn-secondary" id="refreshGachaPanelBtn">Actualizar</button>
@@ -6720,6 +6843,7 @@ async function loadVerifyPanel(guildId) {
             accent: '#7ef0b4',
             glow1: 'rgba(80,230,160,0.18)',
             glow2: 'rgba(124,77,255,0.18)',
+            iconName: 'check',
             actionsHtml: `
                 <span class="dpx-status-chip ${enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${enabled ? 'Activo' : 'Inactivo'}</span>
                 <button type="button" id="saveVerifyBtn" class="btn btn-secondary">Guardar</button>
@@ -7044,6 +7168,7 @@ async function loadTicketPanel(guildId) {
             accent: '#a070ff',
             glow1: 'rgba(160,112,255,0.22)',
             glow2: 'rgba(255,102,196,0.2)',
+            iconName: 'chat',
             actionsHtml: `
                 <span class="dpx-status-chip ${cfg.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${cfg.enabled ? 'Sistema activo' : 'Sistema inactivo'}</span>
                 <button type="button" id="saveTicketBtn" class="btn btn-secondary">Guardar configuración</button>
@@ -7860,6 +7985,7 @@ async function loadLevelsPanel(guildId) {
             kicker: 'Niveles',
             title: 'Niveles y recompensas',
             description: 'Premia la actividad real de tu servidor con XP por mensajes y por tiempo en voz. Diseñado para que subir de nivel sea un logro, no una rutina.',
+            iconName: 'bolt',
             actionsHtml: `
                 <span id="levelsHeroStatusChip" class="dpx-status-chip ${config.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${config.enabled ? 'Sistema activo' : 'Sistema inactivo'}</span>
                 <div class="levels-hero-buttons">
@@ -9964,6 +10090,7 @@ function displayMembers(members, guildId, initialQuery = '') {
         accent: '#ff8b8b',
         glow1: 'rgba(255,139,139,0.2)',
         glow2: 'rgba(124,77,255,0.2)',
+        iconName: 'shield',
         actionsHtml: `
             <span class="dpx-status-chip is-on"><span class="dot"></span>${totalMembers} miembros cargados</span>
             <button type="button" class="btn btn-secondary" id="modRefreshBtn">${dpxIcon('sparkles')}Actualizar</button>
@@ -10205,6 +10332,7 @@ function renderGreetingPanel(guildId, channels, mode) {
         accent: '#c4b5fd',
         glow1: 'rgba(196,181,253,0.18)',
         glow2: 'rgba(167,139,250,0.22)',
+        iconName: 'door',
         actionsHtml: ''
     });
 
@@ -13645,11 +13773,20 @@ function renderFreeGamesPane() {
         .join('');
 
     const color = String(cfg.color || '4ccb81').replace('#', '');
+    const freeGamesHeroHtml = dpxRenderHero({
+        kicker: 'Avisos',
+        title: 'Juegos gratis — Epic Games & Steam',
+        description: 'Configura un canal para recibir notificaciones automáticas cuando aparezca un juego gratis. Mostramos la imagen, el precio original, el descuento y el tiempo restante.',
+        accent: '#7ef0b4',
+        glow1: 'rgba(80,230,160,0.18)',
+        glow2: 'rgba(124,77,255,0.18)',
+        iconName: 'leaf',
+        actionsHtml: `<span class="dpx-status-chip ${cfg.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${cfg.enabled ? 'Activo' : 'Desactivado'}</span>`
+    });
 
     container.innerHTML = `
-        <h3 class="welcome-panel-title">Juegos gratis — Epic Games &amp; Steam</h3>
-        <p class="welcome-panel-subtitle">Configura un canal para recibir notificaciones automáticas cuando aparezca un juego gratis. Mostramos la imagen, el precio original, el descuento y el tiempo restante.</p>
-
+        <div class="dpx-panel">
+            ${freeGamesHeroHtml}
         <div class="fg-layout">
             <!-- Columna izquierda: Configuracion -->
             <div class="fg-config">
@@ -13759,6 +13896,7 @@ function renderFreeGamesPane() {
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     `;
 

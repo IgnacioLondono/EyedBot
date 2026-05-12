@@ -13070,3 +13070,209 @@ body {
         overflow: visible !important;
     }
 }
+
+/* ---------- Server configuration shell (scoped) ---------- */
+#serverSection.server-config-shell .server-shell {
+    align-items: start;
+}
+
+#serverSection.server-config-shell .server-side-menu {
+    position: sticky;
+    top: 0.75rem;
+    max-height: calc(100vh - 88px);
+    overflow: auto;
+    scrollbar-width: thin;
+}
+
+#serverSection.server-config-shell .side-menu-btn {
+    width: 100%;
+}
+
+#serverSection.server-config-shell .side-menu-btn-inner {
+    align-items: flex-start;
+}
+
+#serverSection.server-config-shell .side-menu-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+#serverSection.server-config-shell .side-menu-label-title {
+    font-weight: 600;
+    color: inherit;
+    line-height: 1.25;
+}
+
+#serverSection.server-config-shell .side-menu-label-hint {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--text-muted, #9f8fc8);
+    font-weight: 500;
+}
+
+#serverSection.server-config-shell .side-menu-btn.active .side-menu-label-hint {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+#serverSection.server-config-shell .side-menu-btn[data-pane-tone="sky"] .side-menu-icon { color: #9fd8ff; }
+#serverSection.server-config-shell .side-menu-btn[data-pane-tone="rose"] .side-menu-icon { color: #ffb8d8; }
+#serverSection.server-config-shell .side-menu-btn[data-pane-tone="violet"] .side-menu-icon { color: #d7c4ff; }
+#serverSection.server-config-shell .side-menu-btn[data-pane-tone="amber"] .side-menu-icon { color: #ffd18a; }
+#serverSection.server-config-shell .side-menu-btn[data-pane-tone="teal"] .side-menu-icon { color: #8ce8d8; }
+#serverSection.server-config-shell .side-menu-btn[data-pane-tone="cyan"] .side-menu-icon { color: #9de8ff; }
+
+#serverSection.server-config-shell .server-content-area {
+    min-height: calc(100vh - 110px);
+}
+
+#serverSection.server-config-shell .server-pane-head--structured {
+    align-items: center;
+    padding: 1rem 1.15rem;
+    margin: -0.35rem -0.35rem 1.35rem;
+    border-radius: 18px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.55), rgba(var(--bg-primary-rgb, 10, 12, 26), 0.72));
+}
+
+#serverSection.server-config-shell .server-pane-head-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.95rem;
+    min-width: 0;
+}
+
+#serverSection.server-config-shell .server-pane-icon-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
+    background: linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14));
+    color: #f4eeff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+#serverSection.server-config-shell .server-pane-icon-svg {
+    width: 22px;
+    height: 22px;
+}
+
+#serverSection.server-config-shell .server-pane-head[data-pane-tone="sky"] .server-pane-icon-badge { color: #bfe6ff; }
+#serverSection.server-config-shell .server-pane-head[data-pane-tone="rose"] .server-pane-icon-badge { color: #ffc4e2; }
+#serverSection.server-config-shell .server-pane-head[data-pane-tone="violet"] .server-pane-icon-badge { color: #e2d0ff; }
+#serverSection.server-config-shell .server-pane-head[data-pane-tone="amber"] .server-pane-icon-badge { color: #ffe0a8; }
+#serverSection.server-config-shell .server-pane-head[data-pane-tone="teal"] .server-pane-icon-badge { color: #a8f0e4; }
+#serverSection.server-config-shell .server-pane-head[data-pane-tone="cyan"] .server-pane-icon-badge { color: #b8ecff; }
+
+#serverSection.server-config-shell .server-pane-head-copy h3 {
+    font-size: 1.55rem;
+}
+
+#serverSection.server-config-shell .server-pane-head-actions {
+    display: flex;
+    gap: 0.55rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#serverSection.server-config-shell .server-pane-surface:has(.moderation-container > .dpx-panel > .dpx-hero:first-child) > .server-pane-head,
+#serverSection.server-config-shell .server-pane-surface:has(#welcomeContainer > .dpx-panel > .dpx-hero:first-child) > .server-pane-head,
+#serverSection.server-config-shell .server-pane-surface:has(#freeGamesContainer > .dpx-panel > .dpx-hero:first-child) > .server-pane-head {
+    display: none;
+}
+
+#serverSection.server-config-shell .dpx-hero-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.95rem;
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+}
+
+#serverSection.server-config-shell .dpx-hero-icon-badge {
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.24);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f4eeff;
+}
+
+#serverSection.server-config-shell .dpx-hero-icon {
+    width: 24px;
+    height: 24px;
+}
+
+#serverSection.server-config-shell .dpx-panel {
+    gap: 1.35rem;
+}
+
+#serverSection.server-config-shell .dpx-tabs {
+    gap: 0.45rem;
+    padding: 0.42rem;
+    border-radius: 16px;
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.62);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.18);
+}
+
+#serverSection.server-config-shell .dpx-tab {
+    min-height: 44px;
+    padding: 0.62rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+}
+
+#serverSection.server-config-shell .dpx-tab-icon {
+    width: 17px;
+    height: 17px;
+}
+
+#serverSection.server-config-shell .dpx-section {
+    padding: 1.35rem 1.45rem;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 21, 12, 38), 0.78), rgba(var(--bg-primary-rgb, 10, 12, 26), 0.82));
+}
+
+#serverSection.server-config-shell .dpx-section-head-text h4 {
+    font-size: 1.08rem;
+}
+
+#serverSection.server-config-shell .dpx-toggle-grid {
+    gap: 0.85rem;
+}
+
+#serverSection.server-config-shell .dpx-toggle {
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
+}
+
+#serverSection.server-config-shell .dpx-stats-grid {
+    gap: 1rem;
+}
+
+#serverSection.server-config-shell .dpx-stat-card {
+    border-radius: 18px;
+    padding: 1.1rem 1.2rem;
+}
+
+@media (max-width: 992px) {
+    #serverSection.server-config-shell .server-side-menu {
+        position: static;
+        max-height: none;
+    }
+
+    #serverSection.server-config-shell .server-pane-head--structured {
+        margin: 0 0 1.15rem;
+    }
+}
