@@ -263,7 +263,7 @@ module.exports = {
                 .setDescription(`**Anime Character**\nObra: **${animeName}**`)
                 .addFields(detailFields);
 
-            if (portraitUrl) embed.setImage(portraitUrl);
+            if (portraitUrl) embed.setThumbnail(portraitUrl);
             if (profileUrl) embed.setURL(profileUrl);
             setInteractionFooter(embed, requester.tag, animeName);
 

@@ -216,7 +216,7 @@ module.exports = {
                 .setDescription(`**Sinopsis**\n${synopsisBlock}`)
                 .addFields(statsFields);
 
-            if (coverUrl) embed.setImage(coverUrl);
+            if (coverUrl) embed.setThumbnail(coverUrl);
             if (anime?.url) embed.setURL(anime.url);
             setInteractionFooter(embed, requester.tag, title);
 
