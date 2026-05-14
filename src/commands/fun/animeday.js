@@ -66,14 +66,6 @@ function formatVoteCount(n) {
     return String(num);
 }
 
-function animedaySearchContext(genreMatch, anio, temporada) {
-    const parts = [];
-    if (genreMatch) parts.push(`Genero **${genreMatch.name}**`);
-    if (anio) parts.push(`Año **${anio}**`);
-    if (temporada && anio) parts.push(`Temporada **${seasonLabel(temporada)}**`);
-    return parts.length ? parts.join(' · ') : 'Lista general ordenada por nota en MAL';
-}
-
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('animeday')
@@ -199,8 +191,6 @@ module.exports = {
             const rankLine = anime?.rank != null ? `#${anime.rank} global` : 'Sin ranking';
             const duration = anime?.duration && anime.duration !== 'Unknown' ? anime.duration : null;
             const rating = anime?.rating || null;
-            const searchCtx = animedaySearchContext(genreMatch, anio, temporada);
-
             const synopsisBlock = synopsisEs || 'Sin resumen disponible.';
 
             const statsFields = [
@@ -215,36 +205,20 @@ module.exports = {
                 { name: '🏢 Estudio', value: studios, inline: false }
             ];
 
-            if (coverUrl) {
-                const hero = new EmbedBuilder()
-                    .setColor(config.embedColor)
-                    .setTitle(`🎌 ${title}`)
-                    .setDescription(`Recomendacion para ${interaction.user}`)
-                    .setImage(coverUrl);
-                if (anime?.url) hero.setURL(anime.url);
-
-                const info = new EmbedBuilder()
-                    .setColor(config.embedColor)
-                    .setTitle('📖 AnimeDay · Ficha')
-                    .setDescription(
-                        [`**Busqueda:** ${searchCtx}`, '', `**Sinopsis**`, synopsisBlock].join('\n')
-                    )
-                    .addFields(statsFields);
-                setInteractionFooter(info, interaction.user.tag, title);
-
-                return interaction.editReply({ embeds: [hero, info] });
-            }
-
+            const requester = interaction.user;
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
-                .setTitle(`🎌 AnimeDay: ${title}`)
-                .setDescription(
-                    [`**Busqueda:** ${searchCtx}`, '', `**Sinopsis**`, synopsisBlock].join('\n')
-                )
+                .setAuthor({
+                    name: requester.displayName || requester.username,
+                    iconURL: requester.displayAvatarURL({ extension: 'png', size: 128 })
+                })
+                .setTitle(`🎌 ${title}`)
+                .setDescription(`**Sinopsis**\n${synopsisBlock}`)
                 .addFields(statsFields);
 
-            setInteractionFooter(embed, interaction.user.tag, title);
+            if (coverUrl) embed.setImage(coverUrl);
             if (anime?.url) embed.setURL(anime.url);
+            setInteractionFooter(embed, requester.tag, title);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {

@@ -246,49 +246,26 @@ module.exports = {
             const trait = pickTrait(result.about);
             const portraitUrl = pickCharacterPortraitUrl(result.character);
             const profileUrl = result.character.url || null;
-            const filterLine = animeFilter
-                ? `Anime buscado: **${animeFilter}**`
-                : 'Modo **global** (cualquier obra en MAL)';
-
             const detailFields = [
                 { name: 'Tipo de salida', value: typeLabel(type), inline: true },
                 { name: 'Rol en la obra (MAL)', value: malRoleLabel(result.role), inline: true },
-                { name: 'Filtro', value: filterLine, inline: false },
                 { name: 'Biografia', value: trait, inline: false }
             ];
 
-            const authorOpts = profileUrl ? { name: characterName, url: profileUrl } : { name: characterName };
-
-            // Dos embeds: portada limpia + ficha con datos ordenados.
-            if (portraitUrl) {
-                const hero = new EmbedBuilder()
-                    .setColor(config.embedColor)
-                    .setAuthor(authorOpts)
-                    .setTitle('🎭 Anime Character')
-                    .setDescription(
-                        [`Resultado para ${interaction.user}`, `Obra: **${animeName}**`].join('\n')
-                    )
-                    .setImage(portraitUrl);
-
-                const details = new EmbedBuilder()
-                    .setColor(config.embedColor)
-                    .setTitle('📋 Ficha del personaje')
-                    .addFields(detailFields);
-                setInteractionFooter(details, interaction.user.tag, animeName);
-
-                return interaction.editReply({ embeds: [hero, details] });
-            }
-
+            const requester = interaction.user;
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
-                .setAuthor(authorOpts)
-                .setTitle('🎭 Anime Character')
-                .setDescription(
-                    [`Resultado para ${interaction.user}`, `Obra: **${animeName}**`].join('\n')
-                )
+                .setAuthor({
+                    name: requester.displayName || requester.username,
+                    iconURL: requester.displayAvatarURL({ extension: 'png', size: 128 })
+                })
+                .setTitle(`🎭 ${characterName}`)
+                .setDescription(`**Anime Character**\nObra: **${animeName}**`)
                 .addFields(detailFields);
-            setInteractionFooter(embed, interaction.user.tag, animeName);
+
+            if (portraitUrl) embed.setImage(portraitUrl);
             if (profileUrl) embed.setURL(profileUrl);
+            setInteractionFooter(embed, requester.tag, animeName);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {

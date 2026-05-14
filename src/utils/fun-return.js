@@ -153,13 +153,19 @@ function setCachedTranslation(cacheKey, value) {
     });
 }
 
-async function translateText(text, langpair = 'en|es', options = {}) {
-    if (!text || typeof text !== 'string') return text;
+/** MyMemory limita la query; dejamos margen por codificacion en la URL. */
+const MYMEMORY_QUERY_MAX = 450;
 
-    const normalizedText = text.trim();
-    if (!normalizedText) return text;
+function isBadTranslationOutput(s) {
+    const lower = String(s || '').toLowerCase();
+    if (!lower) return true;
+    if (lower.includes('invalid source language')) return true;
+    if (lower.includes('example: langpair=')) return true;
+    if (lower.includes('query length limit') || lower.includes('max allowed query')) return true;
+    return false;
+}
 
-    const limited = normalizedText.length > 1000 ? normalizedText.slice(0, 1000) : normalizedText;
+async function translateTextOnce(limited, langpair, options, fallbackOriginal) {
     const cacheKey = `${langpair}:${limited}`;
     const cached = getCachedTranslation(cacheKey);
     if (cached) return cached;
@@ -179,17 +185,17 @@ async function translateText(text, langpair = 'en|es', options = {}) {
             });
 
             const translated = response?.data?.responseData?.translatedText;
-            if (!translated || typeof translated !== 'string') return text;
+            if (!translated || typeof translated !== 'string') return fallbackOriginal;
 
             const cleaned = decodeHtmlEntities(translated);
-            if (!cleaned || cleaned.toLowerCase().includes('invalid source language') || cleaned.toLowerCase().includes('example: langpair=')) {
-                return text;
+            if (!cleaned || isBadTranslationOutput(cleaned)) {
+                return fallbackOriginal;
             }
 
             setCachedTranslation(cacheKey, cleaned);
             return cleaned;
         } catch {
-            return text;
+            return fallbackOriginal;
         }
     })().finally(() => {
         translationInflight.delete(cacheKey);
@@ -197,6 +203,28 @@ async function translateText(text, langpair = 'en|es', options = {}) {
 
     translationInflight.set(cacheKey, request);
     return request;
+}
+
+async function translateText(text, langpair = 'en|es', options = {}) {
+    if (!text || typeof text !== 'string') return text;
+
+    const normalizedText = text.trim();
+    if (!normalizedText) return text;
+
+    if (normalizedText.length <= MYMEMORY_QUERY_MAX) {
+        return translateTextOnce(normalizedText, langpair, options, normalizedText);
+    }
+
+    const chunks = [];
+    for (let i = 0; i < normalizedText.length; i += MYMEMORY_QUERY_MAX) {
+        chunks.push(normalizedText.slice(i, i + MYMEMORY_QUERY_MAX));
+    }
+
+    const parts = [];
+    for (const chunk of chunks) {
+        parts.push(await translateTextOnce(chunk, langpair, options, chunk));
+    }
+    return parts.join('').trim();
 }
 
 async function fetchFromWaifuPics(action) {
