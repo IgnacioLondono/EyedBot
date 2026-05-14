@@ -279,7 +279,7 @@ module.exports = {
                     iconURL: requester.displayAvatarURL({ extension: 'png', size: 128 })
                 })
                 .setTitle(`🎭 ${characterName}`)
-                .setDescription(`**Anime Character**\nObra: **${animeName}**`)
+                .setDescription('**Anime Character**')
                 .addFields(detailFields);
 
             if (portraitUrl) embed.setThumbnail(portraitUrl);
