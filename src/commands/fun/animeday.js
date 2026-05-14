@@ -48,6 +48,32 @@ function seasonLabel(value) {
     return match ? match.name : 'No especificada';
 }
 
+function malStatusEs(status) {
+    const s = String(status || '').trim();
+    const map = {
+        'Finished Airing': 'Finalizado',
+        'Currently Airing': 'En emision',
+        'Not yet aired': 'Proximamente'
+    };
+    return map[s] || s || 'No definido';
+}
+
+function formatVoteCount(n) {
+    const num = Number(n);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+    if (num >= 10_000) return `${Math.round(num / 1000)}k`;
+    return String(num);
+}
+
+function animedaySearchContext(genreMatch, anio, temporada) {
+    const parts = [];
+    if (genreMatch) parts.push(`Genero **${genreMatch.name}**`);
+    if (anio) parts.push(`Año **${anio}**`);
+    if (temporada && anio) parts.push(`Temporada **${seasonLabel(temporada)}**`);
+    return parts.length ? parts.join(' · ') : 'Lista general ordenada por nota en MAL';
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('animeday')
@@ -138,30 +164,87 @@ module.exports = {
             const synopsisEs = truncate(await translateText(synopsisRaw), 750);
 
             const title = anime?.title_spanish || anime?.title || anime?.title_english || 'Anime recomendado';
-            const image = anime?.images?.jpg?.large_image_url || anime?.images?.webp?.large_image_url || null;
-            const genres = (anime?.genres || []).map((g) => g.name).slice(0, 4).join(', ') || 'No especificado';
+
+            let coverUrl =
+                anime?.images?.jpg?.maximum_image_url ||
+                anime?.images?.webp?.maximum_image_url ||
+                anime?.images?.jpg?.large_image_url ||
+                anime?.images?.webp?.large_image_url ||
+                null;
+
+            if (anime?.mal_id && !anime?.images?.jpg?.maximum_image_url && !anime?.images?.webp?.maximum_image_url) {
+                try {
+                    const { data } = await axios.get(`https://api.jikan.moe/v4/anime/${anime.mal_id}`, { timeout: 12000 });
+                    const img = data?.data?.images;
+                    coverUrl =
+                        img?.jpg?.maximum_image_url ||
+                        img?.webp?.maximum_image_url ||
+                        img?.jpg?.large_image_url ||
+                        img?.webp?.large_image_url ||
+                        coverUrl;
+                } catch {
+                    // se queda coverUrl del listado
+                }
+            }
+
+            const genres = (anime?.genres || []).map((g) => g.name).slice(0, 6).join(', ') || 'No especificado';
             const studios = (anime?.studios || []).map((s) => s.name).slice(0, 3).join(', ') || 'No especificado';
             const year = anime?.year || anime?.aired?.prop?.from?.year || 'No definido';
             const season = seasonLabel(anime?.season);
+            const votes = formatVoteCount(anime?.scored_by);
+            const scoreLine =
+                anime?.score != null
+                    ? `**${anime.score}**/10${votes ? ` · ${votes} votos` : ''}`
+                    : 'Sin nota';
+            const rankLine = anime?.rank != null ? `#${anime.rank} global` : 'Sin ranking';
+            const duration = anime?.duration && anime.duration !== 'Unknown' ? anime.duration : null;
+            const rating = anime?.rating || null;
+            const searchCtx = animedaySearchContext(genreMatch, anio, temporada);
+
+            const synopsisBlock = synopsisEs || 'Sin resumen disponible.';
+
+            const statsFields = [
+                { name: '📅 Estreno', value: `${year} · ${season}`, inline: true },
+                { name: '🎞️ Episodios', value: `${anime?.episodes ?? '—'}`, inline: true },
+                { name: '📊 Nota MAL', value: scoreLine, inline: true },
+                { name: '🏆 Ranking', value: rankLine, inline: true },
+                { name: '📡 Estado', value: malStatusEs(anime?.status), inline: true },
+                { name: '🔞 Clasificacion', value: rating || '—', inline: true },
+                { name: '⏱️ Duracion', value: duration || '—', inline: true },
+                { name: '📚 Generos', value: genres, inline: false },
+                { name: '🏢 Estudio', value: studios, inline: false }
+            ];
+
+            if (coverUrl) {
+                const hero = new EmbedBuilder()
+                    .setColor(config.embedColor)
+                    .setTitle(`🎌 ${title}`)
+                    .setDescription(`Recomendacion para ${interaction.user}`)
+                    .setImage(coverUrl);
+                if (anime?.url) hero.setURL(anime.url);
+
+                const info = new EmbedBuilder()
+                    .setColor(config.embedColor)
+                    .setTitle('📖 AnimeDay · Ficha')
+                    .setDescription(
+                        [`**Busqueda:** ${searchCtx}`, '', `**Sinopsis**`, synopsisBlock].join('\n')
+                    )
+                    .addFields(statsFields);
+                setInteractionFooter(info, interaction.user.tag, title);
+
+                return interaction.editReply({ embeds: [hero, info] });
+            }
 
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
                 .setTitle(`🎌 AnimeDay: ${title}`)
-                .setDescription(synopsisEs || 'Sin resumen disponible.')
-                .addFields(
-                    { name: '📚 Categoria', value: genres, inline: false },
-                    { name: '📅 Anio', value: `${year}`, inline: true },
-                    { name: '🍂 Temporada', value: season, inline: true },
-                    { name: '🎞️ Episodios', value: `${anime?.episodes || 'Desconocido'}`, inline: true },
-                    { name: '📊 Puntuacion', value: `${anime?.score || 'N/A'}`, inline: true },
-                    { name: '📡 Estado', value: anime?.status || 'No definido', inline: true },
-                    { name: '🏢 Estudio', value: studios, inline: false }
-                );
+                .setDescription(
+                    [`**Busqueda:** ${searchCtx}`, '', `**Sinopsis**`, synopsisBlock].join('\n')
+                )
+                .addFields(statsFields);
 
             setInteractionFooter(embed, interaction.user.tag, title);
-
             if (anime?.url) embed.setURL(anime.url);
-            if (image) embed.setImage(image);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {
