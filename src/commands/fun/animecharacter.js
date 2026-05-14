@@ -195,10 +195,10 @@ async function getRandomCharacterFromAnime(animeName, type) {
     };
 }
 
-function pickTrait(about, maxLen = 220) {
+function pickTrait(about) {
     const clean = (about || '').replace(/\s+/g, ' ').trim();
     if (!clean) return 'Personaje unico con una vibra muy marcada.';
-    return clean.length > maxLen ? `${clean.slice(0, maxLen - 3)}...` : clean;
+    return clean.length > 220 ? `${clean.slice(0, 217)}...` : clean;
 }
 
 /** Retrato oficial del personaje en MAL (JPG/WebP), sin GIFs de terceros. */
@@ -262,16 +262,14 @@ module.exports = {
 
             const characterName = result.character.name || 'Personaje desconocido';
             const animeName = result.animeName || 'Anime desconocido';
-            const trait = pickTrait(result.about, 150);
+            const trait = pickTrait(result.about);
             const portraitUrl = pickCharacterPortraitUrl(result.character);
             const profileUrl = result.character.url || null;
-
-            const topBlock = [
-                `**${animeName}**`,
-                `${typeLabel(type)} · ${malRoleLabel(result.role)}`,
-                '',
-                trait
-            ].join('\n');
+            const detailFields = [
+                { name: 'Tipo de salida', value: typeLabel(type), inline: true },
+                { name: 'Rol en la obra', value: malRoleLabel(result.role), inline: true },
+                { name: 'Biografia', value: trait, inline: false }
+            ];
 
             const requester = interaction.user;
             const embed = new EmbedBuilder()
@@ -281,11 +279,12 @@ module.exports = {
                     iconURL: requester.displayAvatarURL({ extension: 'png', size: 128 })
                 })
                 .setTitle(`🎭 ${characterName}`)
-                .setDescription(topBlock);
+                .setDescription('**Anime Character**')
+                .addFields(detailFields);
 
+            if (portraitUrl) embed.setThumbnail(portraitUrl);
             if (profileUrl) embed.setURL(profileUrl);
-            if (portraitUrl) embed.setImage(portraitUrl);
-            setInteractionFooter(embed, requester.tag, null);
+            setInteractionFooter(embed, requester.tag, animeName);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {
