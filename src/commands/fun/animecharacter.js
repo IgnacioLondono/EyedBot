@@ -1,9 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config');
-const { setInteractionFooter, fetchSearchGif } = require('../../utils/fun-return');
-
-const DEFAULT_GIPHY_KEY = process.env.GIPHY_API_KEY || 'dc6zaTOxFJmzC';
+const { setInteractionFooter } = require('../../utils/fun-return');
 
 const JIKAN_BASE = 'https://api.jikan.moe/v4';
 
@@ -172,34 +170,17 @@ function pickTrait(about) {
     return clean.length > 220 ? `${clean.slice(0, 217)}...` : clean;
 }
 
-async function fetchCharacterGif(character) {
-    if (!DEFAULT_GIPHY_KEY) return null;
-
-    try {
-        const query = `${character.name} ${character.anime} anime`;
-        const { data } = await axios.get('https://api.giphy.com/v1/gifs/search', {
-            timeout: 9000,
-            params: {
-                api_key: DEFAULT_GIPHY_KEY,
-                q: query,
-                limit: 12,
-                rating: 'pg-13'
-            }
-        });
-
-        const gifs = data?.data || [];
-        if (!gifs.length) return null;
-
-        const chosen = randomFrom(gifs);
-        return (
-            chosen?.images?.original?.url ||
-            chosen?.images?.downsized_large?.url ||
-            chosen?.images?.fixed_height?.url ||
-            null
-        );
-    } catch {
-        return null;
-    }
+/** Retrato oficial del personaje en MAL (JPG/WebP), sin GIFs de terceros. */
+function pickCharacterPortraitUrl(character) {
+    const jpg = character?.images?.jpg;
+    const webp = character?.images?.webp;
+    return (
+        jpg?.large_image_url ||
+        webp?.large_image_url ||
+        jpg?.image_url ||
+        webp?.image_url ||
+        null
+    );
 }
 
 module.exports = {
@@ -251,9 +232,8 @@ module.exports = {
             const characterName = result.character.name || 'Personaje desconocido';
             const animeName = result.animeName || 'Anime desconocido';
             const trait = pickTrait(result.about);
-            const image = result.character.images?.jpg?.image_url || result.character.images?.webp?.image_url || null;
+            const portraitUrl = pickCharacterPortraitUrl(result.character);
             const profileUrl = result.character.url || null;
-            const gifMedia = await fetchSearchGif(`${characterName} ${animeName} anime`);
 
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
@@ -268,11 +248,7 @@ module.exports = {
             setInteractionFooter(embed, interaction.user.tag, animeName);
 
             if (profileUrl) embed.setURL(profileUrl);
-            if (gifMedia?.url) {
-                embed.setImage(gifMedia.url);
-            } else if (image) {
-                embed.setThumbnail(image);
-            }
+            if (portraitUrl) embed.setImage(portraitUrl);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {
