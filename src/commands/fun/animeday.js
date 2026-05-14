@@ -153,7 +153,7 @@ module.exports = {
 
             const anime = pickRandom(animes);
             const synopsisRaw = cleanSynopsis(anime?.synopsis);
-            const synopsisEs = truncate(await translateText(synopsisRaw), 750);
+            const synopsisEs = truncate(await translateText(synopsisRaw), 380);
 
             const title = anime?.title_spanish || anime?.title || anime?.title_english || 'Anime recomendado';
 
@@ -193,17 +193,12 @@ module.exports = {
             const rating = anime?.rating || null;
             const synopsisBlock = synopsisEs || 'Sin resumen disponible.';
 
-            const statsFields = [
-                { name: '📅 Estreno', value: `${year} · ${season}`, inline: true },
-                { name: '🎞️ Episodios', value: `${anime?.episodes ?? '—'}`, inline: true },
-                { name: '📊 Nota', value: scoreLine, inline: true },
-                { name: '🏆 Ranking', value: rankLine, inline: true },
-                { name: '📡 Estado', value: malStatusEs(anime?.status), inline: true },
-                { name: '🔞 Clasificacion', value: rating || '—', inline: true },
-                { name: '⏱️ Duracion', value: duration || '—', inline: true },
-                { name: '📚 Generos', value: genres, inline: false },
-                { name: '🏢 Estudio', value: studios, inline: false }
-            ];
+            const metaLines = [
+                `**${year}** · ${season} · **${anime?.episodes ?? '—'}** eps · Nota ${scoreLine} · ${malStatusEs(anime?.status)}`,
+                `**Generos:** ${genres}`,
+                `**Estudio:** ${studios}`,
+                `Ranking ${rankLine}${duration ? ` · ${duration}` : ''}${rating ? ` · ${rating}` : ''}`
+            ].join('\n');
 
             const requester = interaction.user;
             const embed = new EmbedBuilder()
@@ -213,8 +208,9 @@ module.exports = {
                     iconURL: requester.displayAvatarURL({ extension: 'png', size: 128 })
                 })
                 .setTitle(`🎌 ${title}`)
-                .setDescription(`**Sinopsis**\n${synopsisBlock}`)
-                .addFields(statsFields);
+                .setDescription(
+                    ['**Sinopsis**', synopsisBlock, '', metaLines].join('\n')
+                );
 
             if (coverUrl) embed.setImage(coverUrl);
             if (anime?.url) embed.setURL(anime.url);
