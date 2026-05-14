@@ -196,7 +196,7 @@ module.exports = {
             const statsFields = [
                 { name: '📅 Estreno', value: `${year} · ${season}`, inline: true },
                 { name: '🎞️ Episodios', value: `${anime?.episodes ?? '—'}`, inline: true },
-                { name: '📊 Nota MAL', value: scoreLine, inline: true },
+                { name: '📊 Nota', value: scoreLine, inline: true },
                 { name: '🏆 Ranking', value: rankLine, inline: true },
                 { name: '📡 Estado', value: malStatusEs(anime?.status), inline: true },
                 { name: '🔞 Clasificacion', value: rating || '—', inline: true },
@@ -216,7 +216,7 @@ module.exports = {
                 .setDescription(`**Sinopsis**\n${synopsisBlock}`)
                 .addFields(statsFields);
 
-            if (coverUrl) embed.setThumbnail(coverUrl);
+            if (coverUrl) embed.setImage(coverUrl);
             if (anime?.url) embed.setURL(anime.url);
             setInteractionFooter(embed, requester.tag, title);
 
