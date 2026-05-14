@@ -79,7 +79,7 @@ async function getRandomGlobalCharacter(type) {
             if (type === 'cualquiera') {
                 return {
                     character: candidate,
-                    animeName: 'Random global (MAL)',
+                    animeName: 'Random global',
                     role: 'Unknown',
                     about: candidate.about || ''
                 };
@@ -248,7 +248,7 @@ module.exports = {
             const profileUrl = result.character.url || null;
             const detailFields = [
                 { name: 'Tipo de salida', value: typeLabel(type), inline: true },
-                { name: 'Rol en la obra (MAL)', value: malRoleLabel(result.role), inline: true },
+                { name: 'Rol en la obra', value: malRoleLabel(result.role), inline: true },
                 { name: 'Biografia', value: trait, inline: false }
             ];
 
@@ -263,7 +263,7 @@ module.exports = {
                 .setDescription(`**Anime Character**\nObra: **${animeName}**`)
                 .addFields(detailFields);
 
-            if (portraitUrl) embed.setImage(portraitUrl);
+            if (portraitUrl) embed.setThumbnail(portraitUrl);
             if (profileUrl) embed.setURL(profileUrl);
             setInteractionFooter(embed, requester.tag, animeName);
 
