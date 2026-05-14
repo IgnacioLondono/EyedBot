@@ -77,11 +77,30 @@ async function getRandomGlobalCharacter(type) {
             if (!candidate?.mal_id) continue;
 
             if (type === 'cualquiera') {
+                const full = await getCharacterFull(candidate.mal_id).catch(() => null);
+                const character = full || candidate;
+                const animeography = full?.anime || [];
+                const mangaography = full?.manga || [];
+
+                let animeName = 'Sin obra enlazada';
+                let role = 'Unknown';
+
+                if (animeography.length) {
+                    const mains = animeography.filter((e) => e.role === 'Main');
+                    const pick = mains.length ? randomFrom(mains) : randomFrom(animeography);
+                    animeName = pick?.anime?.title || animeName;
+                    role = pick?.role || role;
+                } else if (mangaography.length) {
+                    const pick = randomFrom(mangaography);
+                    animeName = pick?.manga?.title || animeName;
+                    role = pick?.role || role;
+                }
+
                 return {
-                    character: candidate,
-                    animeName: 'Random global',
-                    role: 'Unknown',
-                    about: candidate.about || ''
+                    character,
+                    animeName,
+                    role,
+                    about: full?.about || candidate.about || ''
                 };
             }
 
