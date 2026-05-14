@@ -218,7 +218,7 @@ module.exports = {
 
             if (coverUrl) embed.setImage(coverUrl);
             if (anime?.url) embed.setURL(anime.url);
-            setInteractionFooter(embed, requester.tag, title);
+            setInteractionFooter(embed, requester.tag, null);
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {
