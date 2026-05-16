@@ -128,7 +128,14 @@ function normalizeCharacterRecord(item = {}) {
 
 function applyCatalogOverride(character = {}, override = {}) {
     if (!override || typeof override !== 'object') return normalizeCharacterRecord(character);
-    const { shopHidden: _sh, shopPrice: _sp, updatedAt: _ua, updatedBy: _ub, ...rest } = override;
+    const {
+        shopHidden: _sh,
+        shopPrice: _sp,
+        removedFromGuildCatalog: _rm,
+        updatedAt: _ua,
+        updatedBy: _ub,
+        ...rest
+    } = override;
     return normalizeCharacterRecord({
         ...character,
         ...rest,
@@ -168,6 +175,8 @@ function normalizeCatalogOverride(raw = {}, base = {}) {
             patch.shopPrice = Math.min(1_000_000_000, n);
         }
     }
+    if (raw.removedFromGuildCatalog === true) patch.removedFromGuildCatalog = true;
+    if (raw.restoreToGuildCatalog === true) patch._explicitGuildCatalogRestore = true;
     return patch;
 }
 
@@ -831,7 +840,9 @@ async function getGuildCharacterPool(guildId) {
     if (!guildId) return base;
 
     const overrides = await getGuildCatalogOverrides(guildId);
-    return base.map((character) => applyCatalogOverride(character, overrides[character.id]));
+    return base
+        .filter((character) => overrides[character.id]?.removedFromGuildCatalog !== true)
+        .map((character) => applyCatalogOverride(character, overrides[character.id]));
 }
 
 async function getShopCatalog(guildId, config = {}) {
@@ -849,42 +860,53 @@ async function getShopCatalog(guildId, config = {}) {
         .sort((left, right) => right.price - left.price);
 }
 
-/** Catálogo completo para el panel web (incluye ocultos de tienda). */
+/** Catálogo completo para el panel web (incluye ocultos y eliminados del servidor). */
 async function listShopCatalogForAdmin(guildId, config = {}) {
     const overrides = await getGuildCatalogOverrides(guildId);
-    const pool = await getGuildCharacterPool(guildId);
-    return pool
-        .map((character) => {
-            const entry = overrides[character.id];
-            const price = resolveShopPrice(character, config, entry);
-            const custom = entry?.shopPrice;
-            const customNum = Number.parseInt(`${custom}`, 10);
-            const hasCustomPrice = Number.isFinite(customNum) && customNum >= 1;
-            const shopPriceDefault = getShopPrice(character, config);
-            return {
-                ...character,
-                price,
-                shopPriceDefault,
-                shopHidden: !!entry?.shopHidden,
-                ...(hasCustomPrice ? { shopPriceOverride: Math.min(1_000_000_000, customNum) } : {})
-            };
-        })
-        .sort((left, right) => right.price - left.price);
+    const base = getCharacterPool();
+    const rows = base.map((character) => {
+        const entry = overrides[character.id];
+        const catalogRemoved = entry?.removedFromGuildCatalog === true;
+        const merged = applyCatalogOverride(character, entry || {});
+        const price = resolveShopPrice(merged, config, entry || {});
+        const custom = entry?.shopPrice;
+        const customNum = Number.parseInt(`${custom}`, 10);
+        const hasCustomPrice = Number.isFinite(customNum) && customNum >= 1;
+        const shopPriceDefault = getShopPrice(merged, config);
+        return {
+            ...merged,
+            price,
+            shopPriceDefault,
+            shopHidden: !!entry?.shopHidden,
+            catalogRemoved,
+            ...(hasCustomPrice ? { shopPriceOverride: Math.min(1_000_000_000, customNum) } : {})
+        };
+    });
+    rows.sort((left, right) => {
+        const lr = left.catalogRemoved === true ? 1 : 0;
+        const rr = right.catalogRemoved === true ? 1 : 0;
+        if (lr !== rr) return lr - rr;
+        return (right.price || 0) - (left.price || 0);
+    });
+    return rows;
 }
 
 async function pruneHiddenSystemListings(guildId) {
     const overrides = await getGuildCatalogOverrides(guildId);
-    const hiddenIds = new Set(Object.entries(overrides)
-        .filter(([, entry]) => entry && entry.shopHidden === true)
+    const blockedIds = new Set(Object.entries(overrides)
+        .filter(([, entry]) => entry && (
+            entry.shopHidden === true
+            || entry.removedFromGuildCatalog === true
+        ))
         .map(([id]) => id));
-    if (!hiddenIds.size) return false;
+    if (!blockedIds.size) return false;
 
     const market = await getGuildMarket(guildId);
     let changed = false;
     const next = market.filter((row) => {
         if (row.sellerId !== SYSTEM_MARKET_SELLER_ID) return true;
         const cid = String(row.item?.characterId || '');
-        if (cid && hiddenIds.has(cid)) {
+        if (cid && blockedIds.has(cid)) {
             changed = true;
             return false;
         }
@@ -916,9 +938,11 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
     const patch = normalizeCatalogOverride(rawPatch, base);
     const explicitImageClear = patch._explicitImageClear === true;
     const explicitShopPriceClear = patch._explicitShopPriceClear === true;
+    const explicitGuildCatalogRestore = patch._explicitGuildCatalogRestore === true;
     delete patch._explicitImageClear;
     delete patch._explicitShopPriceClear;
-    const hasMutation = Object.keys(patch).length > 0 || explicitImageClear || explicitShopPriceClear;
+    delete patch._explicitGuildCatalogRestore;
+    const hasMutation = Object.keys(patch).length > 0 || explicitImageClear || explicitShopPriceClear || explicitGuildCatalogRestore;
     if (!hasMutation) return { ok: false, reason: 'empty_patch' };
 
     const overrides = await getGuildCatalogOverrides(guildId);
@@ -930,6 +954,9 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
     }
     if (explicitShopPriceClear) {
         delete merged.shopPrice;
+    }
+    if (explicitGuildCatalogRestore) {
+        delete merged.removedFromGuildCatalog;
     }
 
     merged.updatedAt = new Date().toISOString();

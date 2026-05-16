@@ -2920,11 +2920,13 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
         const config = await gachaStore.getConfig(guildId);
         const items = (await gachaStore.listShopCatalogForAdmin(guildId, config)).slice(0, 250);
         const visibleShop = await gachaStore.getShopCatalog(guildId, config);
+        const removedFromCatalogCount = items.filter((item) => item.catalogRemoved === true).length;
         res.json({
             success: true,
             items,
             visibleShopCount: visibleShop.length,
             totalItems: items.length,
+            removedFromCatalogCount,
             config
         });
     } catch (error) {

@@ -6276,9 +6276,17 @@ async function loadGachaPanel(guildId) {
             ? await shopResponse.json().catch(() => ({ items: [] }))
             : { items: [] };
         const shopItems = Array.isArray(shopPayload.items) ? shopPayload.items : [];
+        const shopEditorLimit = 120;
+        const shopEditorItems = shopItems.slice(0, shopEditorLimit);
+        const shopCatalogSummary = shopItems.length > shopEditorLimit
+            ? `Mostrando ${shopEditorItems.length} de ${shopItems.length} artículos.`
+            : `${shopItems.length} artículo(s) en el catálogo.`;
         const visibleShopCount = Number.isFinite(Number(shopPayload.visibleShopCount))
             ? Number(shopPayload.visibleShopCount)
             : shopItems.filter((row) => !row.shopHidden).length;
+        const removedCatalogCount = Number.isFinite(Number(shopPayload.removedFromCatalogCount))
+            ? Number(shopPayload.removedFromCatalogCount)
+            : shopItems.filter((row) => row.catalogRemoved === true).length;
 
         const gachaLeaderboard = leaderboardResponse && leaderboardResponse.ok
             ? await leaderboardResponse.json().catch(() => ({ leaderboard: [] }))
@@ -6311,7 +6319,7 @@ async function loadGachaPanel(guildId) {
                     ${dpxRenderStatCard({ label: 'Rolls totales', value: Number(stats.totalRolls || 0).toLocaleString('es-ES'), hint: 'Rolls registrados', accent: '#ff78d1' })}
                     ${dpxRenderStatCard({ label: 'Claims totales', value: Number(stats.totalClaims || 0).toLocaleString('es-ES'), hint: 'Personajes reclamados', accent: '#7ef0b4' })}
                     ${dpxRenderStatCard({ label: 'Colección global', value: Number(stats.totalCollection || 0).toLocaleString('es-ES'), hint: 'Suma de colecciones del servidor', accent: '#f6c244' })}
-                    ${dpxRenderStatCard({ label: 'Artículos visibles (/tienda)', value: visibleShopCount.toLocaleString('es-ES'), hint: `Ocultos: ${Math.max(0, shopItems.length - visibleShopCount)} · Total catálogo: ${shopItems.length}`, accent: '#8fd3ff' })}
+                    ${dpxRenderStatCard({ label: 'Artículos visibles (/tienda)', value: visibleShopCount.toLocaleString('es-ES'), hint: `Ocultos: ${Math.max(0, shopItems.length - visibleShopCount)} · Eliminados: ${removedCatalogCount} · Total: ${shopItems.length}`, accent: '#8fd3ff' })}
                 </div>
                 ${dpxRenderTabs([
                     { key: 'gacha-config', label: 'Gacha', iconName: 'gear' },
@@ -6403,74 +6411,149 @@ async function loadGachaPanel(guildId) {
                 </section>
 
                 <section class="dpx-tab-panel" data-dpx-panel="gacha-shop">
-                    <div class="dpx-section">
+                    <div class="dpx-section gacha-shop-section">
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
                                 <h4>Catálogo de tienda</h4>
-                                <p>Nombre, imagen (<strong>solo enlaces HTTP/HTTPS</strong>), rareza y descripción se persisten por servidor en la misma KV/JSON que usa el bot. Puedes fijar un <strong>precio en monedas</strong> por artículo (vacío = cálculo automático con multiplicador y rareza). Discord <code>/tienda</code> muestra la imagen en grande si la URL es válida. «Restaurar personaje» quita todas las personalizaciones de ese personaje en la base.</p>
+                                <p class="gacha-shop-intro-lead">Este listado edita la misma base de datos que el bot: Discord <code>/tienda</code> y las compras usarán lo que guardes aquí.</p>
+                                <ul class="gacha-shop-intro-list">
+                                    <li><strong>Precio</strong> en blanco → automático (valor base × multiplicador × rareza).</li>
+                                    <li><strong>Imagen</strong> solo con URL <code>https://</code> o <code>http://</code>.</li>
+                                    <li><strong>Ocultar</strong> quita el artículo de <code>/tienda</code> y borra ofertas del mercado sistema para ese personaje.</li>
+                                    <li><strong>Eliminar del servidor</strong> lo quita también del <strong>pool</strong> (no sale en tienda ni en mercado sistema; los rolls pueden seguir saliendo desde el archivo global hasta que filtremos gacha).</li>
+                                    <li><strong>Activar en servidor</strong> vuelve a incluir personajes marcados como eliminados aquí.</li>
+                                    <li><strong>Restaurar personaje</strong> elimina todas las personalizaciones guardadas para ese ID.</li>
+                                </ul>
                             </div>
                         </div>
-                        <div id="gachaCatalogEditor" class="dpx-item-list">
-                            ${shopItems.slice(0, 120).map((item, index) => {
+                        <div class="gacha-catalog-toolbar">
+                            <span>${escapeHtml(shopCatalogSummary)}</span>
+                            <span>Visibles <code>/tienda</code>: <strong>${visibleShopCount.toLocaleString('es-ES')}</strong> · Eliminados servidor: <strong>${removedCatalogCount.toLocaleString('es-ES')}</strong></span>
+                        </div>
+                        <div id="gachaCatalogEditor" class="dpx-item-list gacha-catalog-list">
+                            ${shopEditorItems.map((item, index) => {
                                 const thumb = catalogThumbUrl(item.imageUrl || '');
-                                return `
-                                <div class="dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}" style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;width:100%;">
-                                    <div class="gacha-catalog-thumb-cell" style="flex:0 0 108px;width:108px;">
-                                        ${thumb
-        ? `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" style="display:block;width:100%;max-height:148px;object-fit:cover;border-radius:12px;border:1px solid rgba(var(--border-rgb,190,155,255),0.35);background:rgba(0,0,0,.2);"/>`
-        : `<div class="gacha-catalog-thumb-ph" style="display:flex;align-items:center;justify-content:center;text-align:center;min-height:120px;padding:8px;font-size:.78rem;color:var(--text-muted,#a48fd0);border-radius:12px;border:1px dashed rgba(var(--border-rgb,190,155,255),0.38);background:rgba(var(--bg-primary-rgb,10,12,26),0.65);">Sin imagen preview</div>`}
-                                    </div>
-                                    <div class="dpx-item-main gacha-catalog-fields" style="flex:1;min-width:min(100%, 280px);">
-                                        <div class="dpx-item-title">${item.shopHidden === true ? '<span class="badge-gacha-hidden" title="Oculto de /tienda">Oculto</span> ' : ''}#${index + 1} ${escapeHtml(item.id)} · Precio ${Number(item.price || 0).toLocaleString('es-ES')}${item.shopPriceOverride != null ? ' <span style="opacity:.82;font-weight:600;">(fijado)</span>' : ''}</div>
-                                        <div class="dpx-field-grid" style="margin-top:0.75rem;">
-                                            <div class="dpx-field">
-                                                <label>Nombre</label>
-                                                <input class="form-control gacha-catalog-name" value="${escapeHtmlForValue(item.name || '')}">
-                                            </div>
-                                            <div class="dpx-field">
-                                                <label>Serie</label>
-                                                <input class="form-control gacha-catalog-series" value="${escapeHtmlForValue(item.series || '')}">
-                                            </div>
-                                            <div class="dpx-field">
-                                                <label>Rareza</label>
-                                                <select class="form-control gacha-catalog-rarity">
-                                                    ${['SSR', 'SR', 'R', 'N'].map((rarity) => `<option value="${rarity}" ${String(item.rarity || 'N').toUpperCase() === rarity ? 'selected' : ''}>${rarity}</option>`).join('')}
-                                                </select>
-                                            </div>
-                                            <div class="dpx-field">
-                                                <label>Valor base</label>
-                                                <input class="form-control gacha-catalog-base-value" type="number" min="1" value="${Number(item.baseValue || 1)}">
-                                            </div>
-                                            <div class="dpx-field">
-                                                <label>Precio tienda (monedas)</label>
-                                                <input class="form-control gacha-catalog-shop-price" type="number" min="1" placeholder="Automático" value="${item.shopPriceOverride != null ? Number(item.shopPriceOverride) : ''}">
-                                                <p style="margin:0.35rem 0 0;font-size:.78rem;color:var(--text-secondary);">Vacío: precio automático (${Number(item.shopPriceDefault ?? item.price ?? 0).toLocaleString('es-ES')} con la economía actual).</p>
-                                            </div>
-                                            <div class="dpx-field is-full">
-                                                <label>URL de imagen (Discord embed)</label>
-                                                <input type="url" class="form-control gacha-catalog-image-url" placeholder="https://..." value="${escapeHtmlForValue(item.imageUrl || '')}">
-                                            </div>
-                                            <div class="dpx-field is-full">
-                                                <label>Descripción mística</label>
-                                                <textarea class="form-control gacha-catalog-description" rows="3">${escapeHtml(item.description || '')}</textarea>
-                                            </div>
-                                            <div class="dpx-field">
-                                                <label class="checkbox-label" style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
-                                                    <input type="checkbox" class="gacha-catalog-shop-hidden" ${item.shopHidden === true ? 'checked' : ''}>
-                                                    <span>Ocultar de la tienda <code>/tienda</code></span>
-                                                </label>
-                                                <p style="margin:0.35rem 0 0;font-size:.8rem;color:var(--text-secondary);">Elimina también las ofertas del mercado sistema para este personaje.</p>
-                                            </div>
-                                            <div class="dpx-field is-full">
-                                                <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
-                                                    <button type="button" class="btn btn-primary gacha-catalog-save-btn" data-gacha-save-item="${escapeHtml(item.id)}">Guardar cambios</button>
-                                                    <button type="button" class="btn btn-secondary gacha-catalog-clear-img-btn" data-gacha-clear-img="${escapeHtml(item.id)}">Quitar solo imagen</button>
-                                                    <button type="button" class="btn btn-ghost gacha-catalog-reset-btn" data-gacha-reset-item="${escapeHtml(item.id)}">Restaurar personaje</button>
+                                const thumbBlock = thumb
+                                    ? `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(thumb)}"/>`
+                                    : `<div class="gacha-catalog-thumb-ph" role="img" aria-label="">Sin imagen</div>`;
+
+                                if (item.catalogRemoved === true) {
+                                    return `
+                                <article class="gacha-catalog-card gacha-catalog-card--removed dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}">
+                                    <div class="gacha-catalog-card-inner">
+                                        <aside class="gacha-catalog-visual" aria-hidden="true">
+                                            ${thumbBlock}
+                                        </aside>
+                                        <div class="gacha-catalog-body">
+                                            <header class="gacha-catalog-header">
+                                                <div class="gacha-catalog-meta">
+                                                    <span class="badge-gacha-removed">Eliminado del servidor</span>
+                                                    ${item.shopHidden === true ? '<span class="badge-gacha-hidden" title="Configuración: oculto de /tienda">Oculto</span>' : ''}
+                                                    <span class="gacha-catalog-index">#${index + 1}</span>
+                                                    <code class="gacha-catalog-id">${escapeHtml(item.id)}</code>
+                                                </div>
+                                            </header>
+                                            <div class="gacha-catalog-removed-banner">
+                                                <div class="gacha-catalog-removed-title">${escapeHtml(item.name || 'Sin nombre')}</div>
+                                                <div class="gacha-catalog-removed-sub">${escapeHtml(item.series || '—')} · ${escapeHtml(String(item.rarity || 'N').toUpperCase())}</div>
+                                                <p class="gacha-field-hint">Este personaje <strong>no está en el pool</strong> de este servidor: no aparece en <code>/tienda</code> ni en mercado sistema. Tus ajustes en base de datos se conservan (imagen, texto, precio fijo…) hasta «Restaurar personaje». Los rolls de <code>/gacha</code> pueden seguir mostrándolo si el archivo global del bot aún lo incluye.</p>
+                                                <div class="gacha-catalog-actions is-compact">
+                                                    <button type="button" class="btn btn-primary gacha-catalog-restore-catalog-btn" data-gacha-restore-catalog="${escapeHtml(item.id)}">Activar en servidor</button>
+                                                    <button type="button" class="btn btn-ghost gacha-catalog-reset-btn" data-gacha-reset-item="${escapeHtml(item.id)}">Restaurar personaje…</button>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </article>
+                            `;
+                                }
+
+                                return `
+                                <article class="gacha-catalog-card dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}">
+                                    <div class="gacha-catalog-card-inner">
+                                        <aside class="gacha-catalog-visual" aria-hidden="true">
+                                            ${thumbBlock}
+                                        </aside>
+                                        <div class="gacha-catalog-body">
+                                            <header class="gacha-catalog-header">
+                                                <div class="gacha-catalog-meta">
+                                                    ${item.shopHidden === true ? '<span class="badge-gacha-hidden" title="Oculto de /tienda">Oculto</span>' : ''}
+                                                    <span class="gacha-catalog-index">#${index + 1}</span>
+                                                    <code class="gacha-catalog-id">${escapeHtml(item.id)}</code>
+                                                </div>
+                                                <div class="gacha-catalog-price-pill" title="Precio efectivo en la tienda">
+                                                    <span class="gacha-catalog-price-label">Precio</span>
+                                                    <strong class="gacha-catalog-price-value">${Number(item.price || 0).toLocaleString('es-ES')}</strong>
+                                                    ${item.shopPriceOverride != null ? '<span class="badge-gacha-price-fixed">Fijado</span>' : ''}
+                                                </div>
+                                            </header>
+                                            <div class="gacha-catalog-grid">
+                                                <div class="gacha-catalog-block">
+                                                    <h5 class="gacha-catalog-block-title">Personaje</h5>
+                                                    <div class="dpx-field-grid gacha-catalog-block-grid">
+                                                        <div class="dpx-field">
+                                                            <label>Nombre</label>
+                                                            <input class="form-control gacha-catalog-name" value="${escapeHtmlForValue(item.name || '')}">
+                                                        </div>
+                                                        <div class="dpx-field">
+                                                            <label>Serie</label>
+                                                            <input class="form-control gacha-catalog-series" value="${escapeHtmlForValue(item.series || '')}">
+                                                        </div>
+                                                        <div class="dpx-field">
+                                                            <label>Rareza</label>
+                                                            <select class="form-control gacha-catalog-rarity">
+                                                                ${['SSR', 'SR', 'R', 'N'].map((rarity) => `<option value="${rarity}" ${String(item.rarity || 'N').toUpperCase() === rarity ? 'selected' : ''}>${rarity}</option>`).join('')}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="gacha-catalog-block">
+                                                    <h5 class="gacha-catalog-block-title">Economía</h5>
+                                                    <div class="dpx-field-grid gacha-catalog-block-grid">
+                                                        <div class="dpx-field">
+                                                            <label>Valor base</label>
+                                                            <input class="form-control gacha-catalog-base-value" type="number" min="1" value="${Number(item.baseValue || 1)}">
+                                                        </div>
+                                                        <div class="dpx-field">
+                                                            <label>Precio tienda (monedas)</label>
+                                                            <input class="form-control gacha-catalog-shop-price" type="number" min="1" placeholder="Automático" value="${item.shopPriceOverride != null ? Number(item.shopPriceOverride) : ''}">
+                                                            <p class="gacha-field-hint">Vacío: precio automático (${Number(item.shopPriceDefault ?? item.price ?? 0).toLocaleString('es-ES')} monedas con la economía actual).</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="gacha-catalog-block gacha-catalog-block--span">
+                                                    <h5 class="gacha-catalog-block-title">Presentación en Discord</h5>
+                                                    <div class="dpx-field-grid gacha-catalog-block-grid">
+                                                        <div class="dpx-field is-full">
+                                                            <label>URL de imagen</label>
+                                                            <input type="url" class="form-control gacha-catalog-image-url" placeholder="https://..." value="${escapeHtmlForValue(item.imageUrl || '')}">
+                                                        </div>
+                                                        <div class="dpx-field is-full">
+                                                            <label>Descripción (embed)</label>
+                                                            <textarea class="form-control gacha-catalog-description" rows="3">${escapeHtml(item.description || '')}</textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="gacha-catalog-block gacha-catalog-block--span">
+                                                    <h5 class="gacha-catalog-block-title">Visibilidad y acciones</h5>
+                                                    <div class="dpx-field">
+                                                        <label class="checkbox-label gacha-catalog-visibility-label">
+                                                            <input type="checkbox" class="gacha-catalog-shop-hidden" ${item.shopHidden === true ? 'checked' : ''}>
+                                                            <span>Ocultar de <code>/tienda</code></span>
+                                                        </label>
+                                                        <p class="gacha-field-hint is-tight-before-actions">Ocultar también retira publicaciones del mercado sistema para este personaje.</p>
+                                                    </div>
+                                                    <div class="gacha-catalog-actions">
+                                                        <button type="button" class="btn btn-primary gacha-catalog-save-btn" data-gacha-save-item="${escapeHtml(item.id)}">Guardar cambios</button>
+                                                        <button type="button" class="btn btn-secondary gacha-catalog-clear-img-btn" data-gacha-clear-img="${escapeHtml(item.id)}">Quitar solo imagen</button>
+                                                        <button type="button" class="btn btn-danger gacha-catalog-remove-server-btn" data-gacha-remove-server="${escapeHtml(item.id)}">Eliminar del servidor</button>
+                                                        <button type="button" class="btn btn-ghost gacha-catalog-reset-btn" data-gacha-reset-item="${escapeHtml(item.id)}">Restaurar personaje…</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
                             `;
                             }).join('') || '<div class="dpx-empty">No hay artículos en el catálogo.</div>'}
                         </div>
@@ -6663,6 +6746,63 @@ async function loadGachaPanel(guildId) {
                 } catch (error) {
                     console.error(error);
                     showToast('Error al restaurar personaje', 'error');
+                }
+            });
+        });
+
+        container.querySelectorAll('.gacha-catalog-remove-server-btn').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const characterId = button.getAttribute('data-gacha-remove-server');
+                if (!characterId) return;
+                if (!window.confirm(
+                    '¿Eliminar este producto del servidor?\n'
+                    + 'Ya no aparecerá en la tienda ni en el mercado sistema y se quita del pool de personajes.'
+                    + ' Podrás reactivarlo con «Activar en servidor». Los rolls globales pueden seguir mostrándolo.'
+                )) {
+                    return;
+                }
+
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(characterId)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ removedFromGuildCatalog: true })
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.error || 'No se pudo eliminar', 'error');
+                        return;
+                    }
+                    showToast('Producto eliminado del servidor', 'success');
+                    await loadGachaPanel(guildId);
+                } catch (error) {
+                    console.error(error);
+                    showToast('Error al eliminar del servidor', 'error');
+                }
+            });
+        });
+
+        container.querySelectorAll('.gacha-catalog-restore-catalog-btn').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const characterId = button.getAttribute('data-gacha-restore-catalog');
+                if (!characterId) return;
+
+                try {
+                    const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(characterId)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ restoreToGuildCatalog: true })
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.error || 'No se pudo reactivar', 'error');
+                        return;
+                    }
+                    showToast('Personaje activo en servidor de nuevo', 'success');
+                    await loadGachaPanel(guildId);
+                } catch (error) {
+                    console.error(error);
+                    showToast('Error al reactivar', 'error');
                 }
             });
         });
