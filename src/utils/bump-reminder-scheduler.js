@@ -198,6 +198,18 @@ async function handleDisboardBumpMessage(message) {
     await bumpReminderStore.setBumpReminderConfig(guildId, nextConfig);
     lastDetectionByGuild.set(guildId, now);
 
+    const guild = message.guild || message.client.guilds.cache.get(guildId);
+    const channel = guild?.channels?.cache?.get(config.channelId)
+        || await guild?.channels?.fetch?.(config.channelId).catch(() => null);
+    if (channel?.isTextBased()) {
+        const nextTs = Math.floor(Date.parse(nextConfig.nextReminderAt) / 1000);
+        const rid = String(config.pingRoleId || '').trim();
+        const mention = rid ? `<@&${rid}> ` : '';
+        await channel.send({
+            content: `${mention}✅ Bump detectado. Próximo recordatorio <t:${nextTs}:R>.`
+        }).catch(() => null);
+    }
+
     await grantBumpRewards(message, config).catch((error) => {
         console.error('Error otorgando recompensas de bump:', error?.message || error);
     });

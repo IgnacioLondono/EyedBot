@@ -2918,10 +2918,12 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
 
         await gachaStore.ensureGuildEconomyContent(guildId);
         const config = await gachaStore.getConfig(guildId);
-        const items = (await gachaStore.getShopCatalog(guildId, config)).slice(0, 250);
+        const items = (await gachaStore.listShopCatalogForAdmin(guildId, config)).slice(0, 250);
+        const visibleShop = await gachaStore.getShopCatalog(guildId, config);
         res.json({
             success: true,
             items,
+            visibleShopCount: visibleShop.length,
             totalItems: items.length,
             config
         });
@@ -2953,6 +2955,35 @@ app.post('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, async (r
     } catch (error) {
         console.error('Error guardando objeto del catálogo gacha:', error);
         res.status(500).json({ error: 'Error al guardar objeto del catálogo' });
+    }
+});
+
+app.delete('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, async (req, res) => {
+    try {
+        const { guildId, characterId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!hasAdminOrManageGuildPermission(userGuild)) {
+            return res.status(403).json({ error: 'Necesitas permisos de gestión en este servidor' });
+        }
+
+        const result = await gachaStore.deleteGuildCatalogItem(
+            guildId,
+            characterId,
+            req.session.user?.id || 'web'
+        );
+        if (!result.ok) {
+            const msg = result.reason === 'no_override'
+                ? 'Este personaje no tiene personalización guardada en la base de datos.'
+                : (result.reason || 'No se pudo eliminar');
+            return res.status(400).json({ error: msg });
+        }
+
+        await gachaStore.ensureGuildEconomyContent(guildId);
+        res.json({ success: true, item: result.item });
+    } catch (error) {
+        console.error('Error eliminando personalización del catálogo:', error);
+        res.status(500).json({ error: 'Error al eliminar objeto del catálogo' });
     }
 });
 

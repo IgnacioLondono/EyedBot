@@ -76,6 +76,11 @@ async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
                     { name: '📄 Página', value: `${currentPage + 1}/${totalPages}`, inline: true },
                     { name: '📜 Lore mística', value: lore }
                 );
+
+            const imgUrl = String(item.imageUrl || '').trim();
+            if (/^https?:\/\/.+/i.test(imgUrl)) {
+                embed.setImage(imgUrl);
+            }
         }
 
         return { embed, totalPages, currentPage, item };
