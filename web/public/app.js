@@ -6322,7 +6322,10 @@ async function loadGachaPanel(guildId) {
             : { leaderboard: [] };
         const gachaLeaderboardHtml = buildGachaLeaderboardHtml(gachaLeaderboard);
 
-        const catalogThumbUrl = (u) => {
+        const catalogThumbUrl = (u, row) => {
+            if (row?.catalogDbImage) {
+                return `/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(row.id)}/image`;
+            }
             const s = String(u || '').trim();
             return /^https?:\/\/.+/i.test(s) ? s : '';
         };
@@ -6449,7 +6452,7 @@ async function loadGachaPanel(guildId) {
                                 <p class="gacha-shop-intro-lead">Este listado edita la misma base de datos que el bot: Discord <code>/tienda</code> y las compras usarán lo que guardes aquí.</p>
                                 <ul class="gacha-shop-intro-list">
                                     <li><strong>Precio</strong> en blanco → automático (valor base × multiplicador × rareza).</li>
-                                    <li><strong>Imagen</strong>: súbela o pega URL (se guarda al subir). <strong>Si la URL es solo localhost/red privada</strong>, Discord no puede descargarla para los embeds, pero si el bot y el panel corren en <strong>la misma máquina</strong>, EyedBot reenviará la imagen como archivo y se verá en <code>/tienda</code>. Para producción o bot en otro servidor, usa túnel HTTPS + <code>WEB_PUBLIC_ORIGIN</code> o un host público HTTPS.</li>
+                                    <li><strong>Imagen</strong>: al <strong>subir</strong>, se guarda en <strong>MySQL</strong>; el bot y <code>/tienda</code> la leen desde la base (no depende de la carpeta del panel). Puedes usar URL externa pegando en el campo si prefieres.</li>
                                     <li><strong>Ocultar</strong> quita el artículo de <code>/tienda</code> y borra ofertas del mercado sistema para ese personaje.</li>
                                     <li><strong>Eliminar del servidor</strong> lo quita también del <strong>pool</strong> (no sale en tienda ni en mercado sistema; los rolls pueden seguir saliendo desde el archivo global hasta que filtremos gacha).</li>
                                     <li><strong>Activar en servidor</strong> vuelve a incluir personajes marcados como eliminados aquí.</li>
@@ -6463,14 +6466,14 @@ async function loadGachaPanel(guildId) {
                         </div>
                         <div id="gachaCatalogEditor" class="dpx-item-list gacha-catalog-list">
                             ${shopEditorItems.map((item, index) => {
-                                const thumb = catalogThumbUrl(item.imageUrl || '');
+                                const thumb = catalogThumbUrl(item.imageUrl || '', item);
                                 const thumbBlock = thumb
                                     ? `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(thumb)}"/>`
                                     : `<div class="gacha-catalog-thumb-ph" role="img" aria-label="">Sin imagen</div>`;
 
                                 if (item.catalogRemoved === true) {
                                     return `
-                                <article class="gacha-catalog-card gacha-catalog-card--removed dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}">
+                                <article class="gacha-catalog-card gacha-catalog-card--removed dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}" data-catalog-db-image="${item.catalogDbImage ? '1' : ''}">
                                     <div class="gacha-catalog-card-inner">
                                         <aside class="gacha-catalog-visual" aria-hidden="true">
                                             ${thumbBlock}
@@ -6500,7 +6503,7 @@ async function loadGachaPanel(guildId) {
                                 }
 
                                 return `
-                                <article class="gacha-catalog-card dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}">
+                                <article class="gacha-catalog-card dpx-item-row gacha-catalog-row" data-character-id="${escapeHtml(item.id)}" data-catalog-db-image="${item.catalogDbImage ? '1' : ''}">
                                     <div class="gacha-catalog-card-inner">
                                         <aside class="gacha-catalog-visual" aria-hidden="true">
                                             ${thumbBlock}
@@ -6564,7 +6567,7 @@ async function loadGachaPanel(guildId) {
                                                                     <input type="file" class="gacha-catalog-upload-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" data-gacha-upload-character="${escapeHtml(item.id)}">
                                                                 </label>
                                                             </div>
-                                                            <p class="gacha-field-hint">Tras subir se guarda en BD. Con URL <code>localhost</code> / red privada, el bot puede pegar la imagen al embed solo si puede descargarla desde esa URL (panel y bot en la misma máquina). Si el bot está en otro host, necesitas HTTPS público o túnel + <code>WEB_PUBLIC_ORIGIN</code>.</p>
+                                                            <p class="gacha-field-hint">Subir imagen → se almacena en la base de datos (y se borra la URL local antigua). Discord usa esa copia desde el bot.</p>
                                                         </div>
                                                         <div class="dpx-field is-full">
                                                             <label>Descripción (embed)</label>
@@ -6731,44 +6734,38 @@ async function loadGachaPanel(guildId) {
                 });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                    showToast(data.error || 'No se pudo subir la imagen', 'error');
+                    showToast(data.error || data.catalogSaveError || 'No se pudo subir la imagen', 'error');
                     return;
                 }
                 const url = String(data.url || '').trim();
-                if (!/^https?:\/\//i.test(url)) {
-                    showToast('Respuesta de subida sin URL válida', 'error');
+                if (!url.startsWith('/api/') && !/^https?:\/\//i.test(url)) {
+                    showToast('Respuesta de subida sin ruta de imagen', 'error');
                     return;
                 }
                 const row = Array.from(container.querySelectorAll('.gacha-catalog-row')).find(
                     (r) => r.getAttribute('data-character-id') === characterId
                 );
                 const urlField = row?.querySelector('.gacha-catalog-image-url');
-                if (urlField) urlField.value = url;
+                if (urlField) {
+                    if (url.startsWith('/api/')) {
+                        urlField.value = '';
+                        urlField.placeholder = 'Imagen en MySQL (subir otra para reemplazar)';
+                    } else {
+                        urlField.value = url;
+                        urlField.placeholder = 'https://...';
+                    }
+                }
+                if (row) row.setAttribute('data-catalog-db-image', url.startsWith('/api/') ? '1' : '');
                 const thumbCell = row?.querySelector('.gacha-catalog-visual');
                 if (thumbCell) {
                     thumbCell.innerHTML = `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(url)}"/>`;
                 }
-                const discordUnreachable = data.discordEmbedUnreachable === true;
                 if (data.catalogSaved === true) {
-                    showToast('Imagen guardada en el catálogo (/tienda).', 'success');
-                    if (discordUnreachable) {
-                        showToast(
-                            'Discord no llega a esta URL desde internet. Si el bot puede descargarla (p. ej. panel y bot en la misma máquina), la imagen se adjunta al embed; si no, usa HTTPS público (túnel + WEB_PUBLIC_ORIGIN) o URL externa.',
-                            'warning'
-                        );
-                    }
+                    showToast('Imagen guardada en MySQL; /tienda la mostrará desde el bot.', 'success');
                     await loadGachaPanel(guildId);
                     return;
                 }
-                showToast(data.catalogSaveReason || data.catalogSaveError
-                    ? `Archivo subido; no se guardó en catálogo: ${data.catalogSaveError || data.catalogSaveReason}. Revisa que el ID exista o pulsa «Guardar cambios».`
-                    : 'Archivo subido; confirma con «Guardar cambios» si la imagen no se vincula.', 'warning');
-                if (discordUnreachable) {
-                    showToast(
-                        'Discord no llega a localhost/red privada; el bot debe poder descargar la imagen (misma máquina que el panel). Si falla, usa HTTPS público o URL externa.',
-                        'warning'
-                    );
-                }
+                showToast('Imagen subida pero no se vinculó al catálogo.', 'warning');
             } catch (err) {
                 console.error(err);
                 showToast('Error al subir imagen', 'error');
@@ -6781,16 +6778,21 @@ async function loadGachaPanel(guildId) {
                 const row = button.closest('.gacha-catalog-row');
                 if (!characterId || !row) return;
 
+                const urlVal = row.querySelector('.gacha-catalog-image-url')?.value ?? '';
+                const hasDb = row.getAttribute('data-catalog-db-image') === '1';
+
                 const payload = {
                     name: row.querySelector('.gacha-catalog-name')?.value || '',
                     series: row.querySelector('.gacha-catalog-series')?.value || '',
                     rarity: row.querySelector('.gacha-catalog-rarity')?.value || 'N',
                     description: row.querySelector('.gacha-catalog-description')?.value || '',
                     baseValue: Number.parseInt(row.querySelector('.gacha-catalog-base-value')?.value || '1', 10),
-                    imageUrl: row.querySelector('.gacha-catalog-image-url')?.value || '',
                     shopHidden: row.querySelector('.gacha-catalog-shop-hidden')?.checked === true,
                     shopPrice: row.querySelector('.gacha-catalog-shop-price')?.value ?? ''
                 };
+                if (!(hasDb && !String(urlVal).trim())) {
+                    payload.imageUrl = urlVal;
+                }
 
                 try {
                     const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(characterId)}`, {

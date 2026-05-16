@@ -1,6 +1,7 @@
 /**
  * Discord recupera thumbnails/imágenes de embed desde sus servidores;
- * localhost y redes privadas no son alcanzables desde Discord.
+ * localhost y redes privadas no son alcanzables desde Discord — el bot
+ * lee desde disco cuando puede y sube adjunto attachment://...
  */
 const fs = require('fs/promises');
 const path = require('path');
@@ -30,14 +31,80 @@ function isUrlLikelyUnreachableFromDiscord(absoluteUrl = '') {
 
 const MAX_EMBED_IMAGE_BYTES = 8 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 12_000;
+const ROOT_WALK_MAX = 14;
 
-function webPublicRoots() {
-    const fromEnv = String(process.env.EYEDBOT_WEB_PUBLIC_DIRS || '').split(/[,;]/).map((s) => s.trim()).filter(Boolean);
-    if (fromEnv.length) return [...new Set(fromEnv.map((d) => path.resolve(d)))];
-    return [
-        path.resolve(__dirname, '..', '..', 'web', 'public'),
-        path.resolve(process.cwd(), 'web', 'public')
-    ];
+/** Raíces `.../web/public` detectadas solo (cwd, proceso principal, ascendientes). Opcionalmente EYEDBOT_WEB_PUBLIC_DIRS. */
+function collectWebPublicRoots() {
+    /** @type {string[]} */
+    const out = [];
+    const seen = new Set();
+
+    const add = (p) => {
+        const r = path.resolve(String(p || '').trim());
+        if (!r || seen.has(r)) return;
+        seen.add(r);
+        out.push(r);
+    };
+
+    for (const raw of String(process.env.EYEDBOT_WEB_PUBLIC_DIRS || '').split(/[,;]/).map((s) => s.trim()).filter(Boolean)) {
+        add(raw);
+    }
+
+    add(path.join(__dirname, '..', '..', 'web', 'public'));
+
+    const seeds = [];
+    try {
+        seeds.push(process.cwd());
+    } catch {
+        /* noop */
+    }
+    try {
+        const mainFile = typeof require.main !== 'undefined' && require.main && require.main.filename;
+        if (mainFile) seeds.push(path.dirname(mainFile));
+    } catch {
+        /* noop */
+    }
+
+    const uniqueSeeds = [...new Set(seeds.map((s) => path.resolve(s)))];
+    for (const start of uniqueSeeds) {
+        let cur = start;
+        for (let i = 0; i < ROOT_WALK_MAX; i++) {
+            add(path.join(cur, 'web', 'public'));
+            add(path.join(cur, 'EyedBot-main', 'web', 'public'));
+            add(path.join(cur, 'public'));
+
+            const parent = path.dirname(cur);
+            if (parent === cur) break;
+            cur = parent;
+        }
+    }
+
+    return out;
+}
+
+async function validateAndReadPublicFile(publicRootAbs, segmentsFromRootOrAbsFile) {
+    const absFile = Array.isArray(segmentsFromRootOrAbsFile)
+        ? path.resolve(publicRootAbs, ...segmentsFromRootOrAbsFile)
+        : path.resolve(String(segmentsFromRootOrAbsFile));
+
+    const rel = path.relative(path.resolve(publicRootAbs), absFile);
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return null;
+
+    let st = null;
+    try {
+        st = await fs.stat(absFile);
+    } catch {
+        return null;
+    }
+    if (!st.isFile() || st.size > MAX_EMBED_IMAGE_BYTES) return null;
+
+    try {
+        const buf = Buffer.from(await fs.readFile(absFile));
+        if (!buf.length || buf.length > MAX_EMBED_IMAGE_BYTES) return null;
+        return { buf, absFile };
+    } catch {
+        return null;
+    }
 }
 
 function extFromContentType(ct = '') {
@@ -56,7 +123,7 @@ function extFromPathname(filePathOrUrlPath = '') {
     return m[1] === 'jpeg' ? 'jpg' : m[1];
 }
 
-/** @returns {string} png|jpg|gif|webp o cadena vacía */
+/** @returns {string} */
 function inferImageKindFromMagic(buf) {
     if (!buf?.length || buf.length < 12) return '';
     const b = buf;
@@ -74,8 +141,15 @@ function inferImageKindFromMagic(buf) {
     return '';
 }
 
+function bufferPartsToDiscordAttachment(buf, safeBase, pathnameForExt) {
+    const pathnameExt = extFromPathname(pathnameForExt);
+    const magic = inferImageKindFromMagic(buf);
+    const ext = magic || pathnameExt || 'png';
+    const name = `${safeBase}.${ext}`;
+    return { name, data: buf };
+}
+
 /**
- * Rutas tipo /uploads/... servidas desde web/public/uploads/...
  * @returns {Promise<FetchedDiscordImageParts | null>}
  */
 async function readLocalUploadFileForDiscordAttachment(imageUrl, safeBase) {
@@ -85,35 +159,25 @@ async function readLocalUploadFileForDiscordAttachment(imageUrl, safeBase) {
     } catch {
         return null;
     }
+
     const segments = pathname.split('?')[0].split(/[/\\]+/).filter(Boolean);
     if (segments.length < 2 || segments[0] !== 'uploads') return null;
     if (segments.some((seg) => seg === '..' || seg === '.')) return null;
 
-    const pathnameExt = extFromPathname(pathname);
-    const roots = webPublicRoots();
+    const roots = collectWebPublicRoots();
     for (const root of roots) {
-        try {
-            const abs = path.resolve(root, ...segments);
-            const rel = path.relative(path.resolve(root), abs);
-            if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue;
+        const got = await validateAndReadPublicFile(root, segments);
+        if (got) return bufferPartsToDiscordAttachment(got.buf, safeBase, pathname);
+    }
 
-            let st = null;
-            try {
-                st = await fs.stat(abs);
-            } catch {
-                continue;
+    const base = segments[segments.length - 1];
+    if (/^[\w.-]+\.(png|jpe?g|gif|webp)$/i.test(base)) {
+        const tryFolders = [['uploads', 'gacha-catalog', base], ['uploads', base]];
+        for (const root of roots) {
+            for (const parts of tryFolders) {
+                const got = await validateAndReadPublicFile(root, parts);
+                if (got) return bufferPartsToDiscordAttachment(got.buf, safeBase, base);
             }
-            if (!st.isFile() || st.size > MAX_EMBED_IMAGE_BYTES) continue;
-
-            const buf = Buffer.from(await fs.readFile(abs));
-            if (!buf.length || buf.length > MAX_EMBED_IMAGE_BYTES) continue;
-
-            const magic = inferImageKindFromMagic(buf);
-            const ext = magic || pathnameExt || 'png';
-            const name = `${safeBase}.${ext}`;
-            return { name, data: buf };
-        } catch {
-            continue;
         }
     }
 
@@ -121,7 +185,7 @@ async function readLocalUploadFileForDiscordAttachment(imageUrl, safeBase) {
 }
 
 /**
- * Imagen para embed vía attachment:// (prioriza archivo en web/public del proyecto).
+ * Imagen para embed vía attachment:// (busca archivo local del panel; si no, HTTP).
  * @param {string} imageUrl
  * @param {string} fileBase nombre base sin extensión (solo [a-zA-Z0-9_-])
  * @returns {Promise<FetchedDiscordImageParts | null>}
@@ -162,7 +226,6 @@ async function fetchImageBufferForDiscordAttachment(imageUrl, fileBase) {
 
         const ctHeader = String(res.headers.get('content-type') || '');
         const mimeMain = ctHeader.split(';')[0].trim().toLowerCase();
-        const pathnameExt = extFromPathname(pathname);
 
         const magicExt = inferImageKindFromMagic(buf);
         if (magicExt) {
@@ -170,7 +233,7 @@ async function fetchImageBufferForDiscordAttachment(imageUrl, fileBase) {
         }
 
         if (/^image\//.test(mimeMain)) {
-            const ext = extFromContentType(ctHeader) || pathnameExt || 'jpg';
+            const ext = extFromContentType(ctHeader) || extFromPathname(pathname) || 'jpg';
             return { name: `${safeBase}.${ext}`, data: buf };
         }
 

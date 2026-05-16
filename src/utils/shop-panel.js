@@ -81,11 +81,6 @@ async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
                     { name: '📄 Página', value: `${currentPage + 1}/${totalPages}`, inline: true },
                     { name: '📜 Lore mística', value: lore }
                 );
-
-            const imgUrl = String(item.imageUrl || '').trim();
-            if (/^https?:\/\/.+/i.test(imgUrl) && !isUrlLikelyUnreachableFromDiscord(imgUrl)) {
-                embed.setImage(imgUrl);
-            }
         }
 
         return { embed, totalPages, currentPage, item };
@@ -165,13 +160,27 @@ async function buildShopComponents(guildId, userId, mode = 'shop', page = 0) {
     const files = [];
 
     if (mode === 'shop' && payload.item?.id) {
-        const imgUrl = String(payload.item.imageUrl || '').trim();
-        if (/^https?:\/\/.+/i.test(imgUrl) && isUrlLikelyUnreachableFromDiscord(imgUrl)) {
-            const safeBase = `tienda-${payload.item.id}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 52) || 'tienda-item';
-            const fetched = await fetchImageBufferForDiscordAttachment(imgUrl, safeBase);
-            if (fetched) {
-                files.push(new AttachmentBuilder(fetched.data, { name: fetched.name }));
-                payload.embed.setImage(`attachment://${fetched.name}`);
+        const cid = payload.item.id;
+        const safeBase = `tienda-${cid}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 52) || 'tienda-item';
+
+        const dbImg = await gachaStore.getGuildCatalogShopImageBlob(guildId, cid);
+        if (dbImg?.data?.length) {
+            const ext = gachaStore.shopCatalogMimeToExt(dbImg.mime);
+            const name = `${safeBase}.${ext}`;
+            files.push(new AttachmentBuilder(dbImg.data, { name }));
+            payload.embed.setImage(`attachment://${name}`);
+        } else {
+            const imgUrl = String(payload.item.imageUrl || '').trim();
+            if (/^https?:\/\/.+/i.test(imgUrl)) {
+                if (!isUrlLikelyUnreachableFromDiscord(imgUrl)) {
+                    payload.embed.setImage(imgUrl);
+                } else {
+                    const fetched = await fetchImageBufferForDiscordAttachment(imgUrl, safeBase);
+                    if (fetched) {
+                        files.push(new AttachmentBuilder(fetched.data, { name: fetched.name }));
+                        payload.embed.setImage(`attachment://${fetched.name}`);
+                    }
+                }
             }
         }
     }

@@ -35,7 +35,6 @@ const freeGamesService = require('../src/utils/free-games-service');
 const channelSetupTemplates = require('../src/utils/channel-setup-templates');
 const { executeGuildNuke } = require('../src/utils/guild-nuke');
 const gachaStore = require('../src/utils/gacha-store');
-const { isUrlLikelyUnreachableFromDiscord } = require('../src/utils/discord-media-url');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const {
     ticketButtonCustomIdForGuild,
@@ -2940,7 +2939,11 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
 
         await gachaStore.ensureGuildEconomyContent(guildId);
         const config = await gachaStore.getConfig(guildId);
-        const items = (await gachaStore.listShopCatalogForAdmin(guildId, config)).slice(0, 250);
+        const blobIds = await gachaStore.listGuildCatalogShopBlobIds(guildId);
+        const items = (await gachaStore.listShopCatalogForAdmin(guildId, config)).slice(0, 250).map((row) => ({
+            ...row,
+            catalogDbImage: blobIds.has(row.id)
+        }));
         const visibleShop = await gachaStore.getShopCatalog(guildId, config);
         const removedFromCatalogCount = items.filter((item) => item.catalogRemoved === true).length;
         res.json({
@@ -2979,6 +2982,26 @@ app.post('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, async (r
     } catch (error) {
         console.error('Error guardando objeto del catálogo gacha:', error);
         res.status(500).json({ error: 'Error al guardar objeto del catálogo' });
+    }
+});
+
+app.get('/api/guild/:guildId/gacha-catalog/:characterId/image', requireAuth, async (req, res) => {
+    try {
+        const { guildId, characterId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).end();
+        if (!hasAdminOrManageGuildPermission(userGuild)) return res.status(403).end();
+
+        const row = await gachaStore.getGuildCatalogShopImageBlob(guildId, characterId);
+        if (!row?.data?.length) return res.status(404).end();
+
+        const mime = String(row.mime || 'image/png').split(';')[0].trim();
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Cache-Control', 'private, max-age=120');
+        return res.send(row.data);
+    } catch (error) {
+        console.error('Error sirviendo imagen de catálogo gacha:', error);
+        return res.status(500).end();
     }
 });
 
@@ -3498,49 +3521,58 @@ app.post('/api/guild/:guildId/gacha-catalog-upload', requireAuth, upload.single(
             return res.status(400).json({ error: 'El archivo debe ser una imagen' });
         }
 
-        const uploadsDir = ensureGachaCatalogUploadsDir();
-        const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `gacha-${guildId}`);
-        const extension = extFromMimeOrName(file.mimetype, file.originalname);
-        const fileName = `${guildId}_${Date.now()}_${baseName}${extension}`;
-        const outputPath = path.join(uploadsDir, fileName);
-
-        fs.writeFileSync(outputPath, file.buffer);
-
-        const publicPath = `/uploads/gacha-catalog/${fileName}`;
-        const publicUrl = buildPublicUploadUrl(req, publicPath);
-
         const characterId = String(req.body?.characterId || '').trim();
+        if (!characterId) {
+            return res.status(400).json({ error: 'Selecciona la fila del catálogo antes de subir (falta characterId).' });
+        }
+
+        const existsInGlobal = gachaStore.getCharacterPool().some((c) => c.id === characterId);
+        if (!existsInGlobal) {
+            return res.status(400).json({ error: 'Personaje no encontrado en el catálogo global del bot.' });
+        }
+
+        const stored = await gachaStore.setGuildCatalogShopImageBlob(guildId, characterId, file.buffer, file.mimetype);
+        if (!stored) {
+            return res.status(500).json({ error: 'No se pudo guardar la imagen en MySQL (¿DB conectada?).' });
+        }
+
+        const panelImagePath = `/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(characterId)}/image`;
+
         let catalogSaved = false;
         let catalogSaveReason = '';
         let catalogSaveError = '';
-        if (characterId) {
-            const result = await gachaStore.setGuildCatalogItem(
-                guildId,
-                characterId,
-                { imageUrl: publicUrl },
-                req.session.user?.id || 'web'
-            );
-            if (result.ok) {
-                catalogSaved = true;
-                await gachaStore.ensureGuildEconomyContent(guildId);
-            } else {
-                catalogSaveReason = String(result.reason || 'save_failed');
-                const reasons = {
-                    item_not_found: 'personaje_no_en_catalogo_global',
-                    empty_patch: 'sin_cambios',
-                    invalid_id: 'id_invalido'
-                };
-                catalogSaveError = reasons[catalogSaveReason] || catalogSaveReason;
-            }
+        const result = await gachaStore.setGuildCatalogItem(
+            guildId,
+            characterId,
+            { imageUrl: '' },
+            req.session.user?.id || 'web'
+        );
+        if (!result.ok) {
+            await gachaStore.deleteGuildCatalogShopImageBlob(guildId, characterId).catch(() => null);
+            catalogSaveReason = String(result.reason || 'save_failed');
+            const reasons = {
+                item_not_found: 'personaje_no_en_catalogo_global',
+                empty_patch: 'sin_cambios',
+                invalid_id: 'id_invalido'
+            };
+            catalogSaveError = reasons[catalogSaveReason] || catalogSaveReason;
+            return res.status(400).json({
+                success: false,
+                error: catalogSaveError || catalogSaveReason,
+                catalogSaveReason,
+                catalogSaveError
+            });
         }
+
+        catalogSaved = true;
+        await gachaStore.ensureGuildEconomyContent(guildId);
 
         res.json({
             success: true,
-            url: publicUrl,
-            path: publicPath,
+            storedInDb: true,
+            url: panelImagePath,
             catalogSaved,
-            discordEmbedUnreachable: isUrlLikelyUnreachableFromDiscord(publicUrl),
-            ...(catalogSaveReason ? { catalogSaveReason, catalogSaveError } : {})
+            discordEmbedUnreachable: false
         });
     } catch (error) {
         console.error('Error subiendo imagen de catálogo gacha:', error);
