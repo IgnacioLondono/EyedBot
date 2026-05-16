@@ -1,7 +1,10 @@
 /**
  * Discord recupera thumbnails/imágenes de embed desde sus servidores;
- * localhost y redes privadas no son accesibles desde Discord.
+ * localhost y redes privadas no son alcanzables desde Discord.
  */
+const fs = require('fs/promises');
+const path = require('path');
+
 function isUrlLikelyUnreachableFromDiscord(absoluteUrl = '') {
     try {
         const u = new URL(String(absoluteUrl).trim());
@@ -28,6 +31,15 @@ function isUrlLikelyUnreachableFromDiscord(absoluteUrl = '') {
 const MAX_EMBED_IMAGE_BYTES = 8 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 12_000;
 
+function webPublicRoots() {
+    const fromEnv = String(process.env.EYEDBOT_WEB_PUBLIC_DIRS || '').split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+    if (fromEnv.length) return [...new Set(fromEnv.map((d) => path.resolve(d)))];
+    return [
+        path.resolve(__dirname, '..', '..', 'web', 'public'),
+        path.resolve(process.cwd(), 'web', 'public')
+    ];
+}
+
 function extFromContentType(ct = '') {
     const m = String(ct).split(';')[0].trim().toLowerCase();
     if (m === 'image/png') return 'png';
@@ -37,24 +49,100 @@ function extFromContentType(ct = '') {
     return null;
 }
 
-function extFromPathname(pathname = '') {
-    const m = String(pathname).toLowerCase().match(/\.(png|jpe?g|gif|webp)(\?|$)/);
+function extFromPathname(filePathOrUrlPath = '') {
+    const base = path.basename(String(filePathOrUrlPath).split('?')[0]);
+    const m = base.toLowerCase().match(/\.(png|jpe?g|gif|webp)$/);
     if (!m) return null;
     return m[1] === 'jpeg' ? 'jpg' : m[1];
 }
 
+/** @returns {string} png|jpg|gif|webp o cadena vacía */
+function inferImageKindFromMagic(buf) {
+    if (!buf?.length || buf.length < 12) return '';
+    const b = buf;
+
+    const pngSig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    if (b.length >= 8 && b.subarray(0, 8).equals(pngSig)) return 'png';
+
+    if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg';
+
+    const g6 = b.subarray(0, 6).toString('ascii');
+    if (g6 === 'GIF87a' || g6 === 'GIF89a') return 'gif';
+
+    if (b.subarray(0, 4).toString('ascii') === 'RIFF' && b.subarray(8, 12).toString('ascii') === 'WEBP') return 'webp';
+
+    return '';
+}
+
 /**
- * Descarga una imagen HTTP(S) para usarla en embed vía attachment://name
- * (útil cuando la URL no es alcanzable desde Discord, p. ej. localhost).
+ * Rutas tipo /uploads/... servidas desde web/public/uploads/...
+ * @returns {Promise<FetchedDiscordImageParts | null>}
+ */
+async function readLocalUploadFileForDiscordAttachment(imageUrl, safeBase) {
+    let pathname = '';
+    try {
+        pathname = new URL(String(imageUrl).trim()).pathname;
+    } catch {
+        return null;
+    }
+    const segments = pathname.split('?')[0].split(/[/\\]+/).filter(Boolean);
+    if (segments.length < 2 || segments[0] !== 'uploads') return null;
+    if (segments.some((seg) => seg === '..' || seg === '.')) return null;
+
+    const pathnameExt = extFromPathname(pathname);
+    const roots = webPublicRoots();
+    for (const root of roots) {
+        try {
+            const abs = path.resolve(root, ...segments);
+            const rel = path.relative(path.resolve(root), abs);
+            if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue;
+
+            let st = null;
+            try {
+                st = await fs.stat(abs);
+            } catch {
+                continue;
+            }
+            if (!st.isFile() || st.size > MAX_EMBED_IMAGE_BYTES) continue;
+
+            const buf = Buffer.from(await fs.readFile(abs));
+            if (!buf.length || buf.length > MAX_EMBED_IMAGE_BYTES) continue;
+
+            const magic = inferImageKindFromMagic(buf);
+            const ext = magic || pathnameExt || 'png';
+            const name = `${safeBase}.${ext}`;
+            return { name, data: buf };
+        } catch {
+            continue;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Imagen para embed vía attachment:// (prioriza archivo en web/public del proyecto).
  * @param {string} imageUrl
  * @param {string} fileBase nombre base sin extensión (solo [a-zA-Z0-9_-])
  * @returns {Promise<FetchedDiscordImageParts | null>}
  */
 async function fetchImageBufferForDiscordAttachment(imageUrl, fileBase) {
     const url = String(imageUrl || '').trim();
-    if (!/^https?:\/\//i.test(url)) return null;
+    if (!/^https?:\/\/.+/i.test(url)) return null;
+
+    let pathname = '';
+    try {
+        pathname = new URL(url).pathname;
+    } catch {
+        return null;
+    }
 
     const safeBase = String(fileBase || 'img').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'img';
+
+    if (/\/uploads\//i.test(pathname)) {
+        const fromDisk = await readLocalUploadFileForDiscordAttachment(url, safeBase);
+        if (fromDisk) return fromDisk;
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -66,18 +154,27 @@ async function fetchImageBufferForDiscordAttachment(imageUrl, fileBase) {
         });
         if (!res.ok) return null;
 
-        const ct = res.headers.get('content-type') || '';
-        if (!/^image\//i.test(ct.split(';')[0].trim())) return null;
-
-        const len = Number(res.headers.get('content-length') || '0');
-        if (len > MAX_EMBED_IMAGE_BYTES) return null;
+        const declared = Number(res.headers.get('content-length') || '0');
+        if (declared > MAX_EMBED_IMAGE_BYTES) return null;
 
         const buf = Buffer.from(await res.arrayBuffer());
         if (buf.length > MAX_EMBED_IMAGE_BYTES) return null;
 
-        let ext = extFromContentType(ct) || extFromPathname(new URL(url).pathname) || 'jpg';
-        const name = `${safeBase}.${ext}`;
-        return { name, data: buf };
+        const ctHeader = String(res.headers.get('content-type') || '');
+        const mimeMain = ctHeader.split(';')[0].trim().toLowerCase();
+        const pathnameExt = extFromPathname(pathname);
+
+        const magicExt = inferImageKindFromMagic(buf);
+        if (magicExt) {
+            return { name: `${safeBase}.${magicExt}`, data: buf };
+        }
+
+        if (/^image\//.test(mimeMain)) {
+            const ext = extFromContentType(ctHeader) || pathnameExt || 'jpg';
+            return { name: `${safeBase}.${ext}`, data: buf };
+        }
+
+        return null;
     } catch {
         return null;
     } finally {
