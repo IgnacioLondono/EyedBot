@@ -1,14 +1,24 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { AttachmentBuilder, SlashCommandBuilder } = require('discord.js');
 const Embeds = require('../../utils/embeds');
 const gachaStore = require('../../utils/gacha-store');
+const {
+    isUrlLikelyUnreachableFromDiscord,
+    fetchImageBufferForDiscordAttachment
+} = require('../../utils/discord-media-url');
 const { buildShopComponents, clampPage } = require('../../utils/shop-panel');
 
 async function renderShopPanel(interaction, mode = 'shop', page = 0) {
     const payload = await buildShopComponents(interaction.guild.id, interaction.user.id, mode, page);
-    return {
+    const out = {
         embeds: [payload.embed],
         components: payload.components
     };
+    if (payload.files?.length) {
+        out.files = payload.files;
+    } else {
+        out.attachments = [];
+    }
+    return out;
 }
 
 async function handleShopButton(interaction) {
@@ -73,12 +83,24 @@ async function handleShopButton(interaction) {
             'Compra realizada',
             `Obtuviste **${result.item?.name || 'un ítem'}** por **${Number(result.price || 0).toLocaleString('es-ES')}** monedas.`
         );
+        /** @type {AttachmentBuilder[]} */
+        const buyFiles = [];
         if (/^https?:\/\/.+/i.test(thumb)) {
-            buyEmbed.setThumbnail(thumb);
+            if (isUrlLikelyUnreachableFromDiscord(thumb)) {
+                const safeBase = `tienda-buy-${characterId}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'tienda-buy';
+                const fetched = await fetchImageBufferForDiscordAttachment(thumb, safeBase);
+                if (fetched) {
+                    buyEmbed.setThumbnail(`attachment://${fetched.name}`);
+                    buyFiles.push(new AttachmentBuilder(fetched.data, { name: fetched.name }));
+                }
+            } else {
+                buyEmbed.setThumbnail(thumb);
+            }
         }
         await interaction.followUp({
             embeds: [buyEmbed],
-            flags: 64
+            flags: 64,
+            ...(buyFiles.length ? { files: buyFiles } : {})
         }).catch(() => null);
         return true;
     }

@@ -35,6 +35,7 @@ const freeGamesService = require('../src/utils/free-games-service');
 const channelSetupTemplates = require('../src/utils/channel-setup-templates');
 const { executeGuildNuke } = require('../src/utils/guild-nuke');
 const gachaStore = require('../src/utils/gacha-store');
+const { isUrlLikelyUnreachableFromDiscord } = require('../src/utils/discord-media-url');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const {
     ticketButtonCustomIdForGuild,
@@ -335,6 +336,21 @@ function extFromMimeOrName(mimeType = '', originalName = '') {
 
     const fromName = path.extname(String(originalName).toLowerCase());
     return ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(fromName) ? (fromName === '.jpeg' ? '.jpg' : fromName) : '.jpg';
+}
+
+/** URL absoluta para archivos bajo /public (embeds de Discord, etc.). Usa WEB_PUBLIC_ORIGIN o PUBLIC_ORIGIN si está definida. */
+function buildPublicUploadUrl(req, publicPath) {
+    const p = String(publicPath || '').startsWith('/') ? String(publicPath) : `/${publicPath}`;
+    const fromEnv = String(process.env.WEB_PUBLIC_ORIGIN || process.env.PUBLIC_ORIGIN || '').trim().replace(/\/+$/, '');
+    if (fromEnv) {
+        return `${fromEnv}${p}`;
+    }
+    const proto = String(req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+    const host = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
+    if (!host) {
+        return p;
+    }
+    return `${proto}://${host}${p}`;
 }
 
 const LOGIN_ANALYTICS_KEY = 'web:analytics:global_logins_v1';
@@ -3491,8 +3507,41 @@ app.post('/api/guild/:guildId/gacha-catalog-upload', requireAuth, upload.single(
         fs.writeFileSync(outputPath, file.buffer);
 
         const publicPath = `/uploads/gacha-catalog/${fileName}`;
-        const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
-        res.json({ success: true, url: publicUrl, path: publicPath });
+        const publicUrl = buildPublicUploadUrl(req, publicPath);
+
+        const characterId = String(req.body?.characterId || '').trim();
+        let catalogSaved = false;
+        let catalogSaveReason = '';
+        let catalogSaveError = '';
+        if (characterId) {
+            const result = await gachaStore.setGuildCatalogItem(
+                guildId,
+                characterId,
+                { imageUrl: publicUrl },
+                req.session.user?.id || 'web'
+            );
+            if (result.ok) {
+                catalogSaved = true;
+                await gachaStore.ensureGuildEconomyContent(guildId);
+            } else {
+                catalogSaveReason = String(result.reason || 'save_failed');
+                const reasons = {
+                    item_not_found: 'personaje_no_en_catalogo_global',
+                    empty_patch: 'sin_cambios',
+                    invalid_id: 'id_invalido'
+                };
+                catalogSaveError = reasons[catalogSaveReason] || catalogSaveReason;
+            }
+        }
+
+        res.json({
+            success: true,
+            url: publicUrl,
+            path: publicPath,
+            catalogSaved,
+            discordEmbedUnreachable: isUrlLikelyUnreachableFromDiscord(publicUrl),
+            ...(catalogSaveReason ? { catalogSaveReason, catalogSaveError } : {})
+        });
     } catch (error) {
         console.error('Error subiendo imagen de catálogo gacha:', error);
         res.status(500).json({ error: 'Error al subir imagen del catálogo' });

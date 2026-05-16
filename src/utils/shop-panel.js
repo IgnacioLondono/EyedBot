@@ -1,10 +1,15 @@
 const {
     ActionRowBuilder,
+    AttachmentBuilder,
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder
 } = require('discord.js');
 const gachaStore = require('./gacha-store');
+const {
+    isUrlLikelyUnreachableFromDiscord,
+    fetchImageBufferForDiscordAttachment
+} = require('./discord-media-url');
 
 const SHOP_MODES = {
     shop: { emoji: '🛍️', label: 'Tienda', title: 'Tienda del servidor' },
@@ -78,7 +83,7 @@ async function buildShopEmbed(guildId, userId, mode = 'shop', page = 0) {
                 );
 
             const imgUrl = String(item.imageUrl || '').trim();
-            if (/^https?:\/\/.+/i.test(imgUrl)) {
+            if (/^https?:\/\/.+/i.test(imgUrl) && !isUrlLikelyUnreachableFromDiscord(imgUrl)) {
                 embed.setImage(imgUrl);
             }
         }
@@ -156,6 +161,20 @@ async function buildShopComponents(guildId, userId, mode = 'shop', page = 0) {
     const ownerId = String(userId);
     const currentPage = payload.currentPage || 0;
     const totalPages = payload.totalPages || 1;
+    /** @type {AttachmentBuilder[]} */
+    const files = [];
+
+    if (mode === 'shop' && payload.item?.id) {
+        const imgUrl = String(payload.item.imageUrl || '').trim();
+        if (/^https?:\/\/.+/i.test(imgUrl) && isUrlLikelyUnreachableFromDiscord(imgUrl)) {
+            const safeBase = `tienda-${payload.item.id}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 52) || 'tienda-item';
+            const fetched = await fetchImageBufferForDiscordAttachment(imgUrl, safeBase);
+            if (fetched) {
+                files.push(new AttachmentBuilder(fetched.data, { name: fetched.name }));
+                payload.embed.setImage(`attachment://${fetched.name}`);
+            }
+        }
+    }
 
     const tabs = new ActionRowBuilder().addComponents(
         buildModeButton('shop', mode, ownerId),
@@ -185,7 +204,7 @@ async function buildShopComponents(guildId, userId, mode = 'shop', page = 0) {
         rows.push(buy);
     }
 
-    return { ...payload, components: rows };
+    return { ...payload, components: rows, files };
 }
 
 module.exports = {

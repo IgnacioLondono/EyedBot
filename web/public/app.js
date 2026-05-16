@@ -6449,7 +6449,7 @@ async function loadGachaPanel(guildId) {
                                 <p class="gacha-shop-intro-lead">Este listado edita la misma base de datos que el bot: Discord <code>/tienda</code> y las compras usarán lo que guardes aquí.</p>
                                 <ul class="gacha-shop-intro-list">
                                     <li><strong>Precio</strong> en blanco → automático (valor base × multiplicador × rareza).</li>
-                                    <li><strong>Imagen</strong>: pega una URL o <strong>súbela</strong> desde el panel (PNG/JPG/WebP/GIF, hasta 8&nbsp;MB). Discord solo muestra el embed si la URL es HTTPS y pública desde internet.</li>
+                                    <li><strong>Imagen</strong>: súbela o pega URL (se guarda al subir). <strong>Si la URL es solo localhost/red privada</strong>, Discord no puede descargarla para los embeds, pero si el bot y el panel corren en <strong>la misma máquina</strong>, EyedBot reenviará la imagen como archivo y se verá en <code>/tienda</code>. Para producción o bot en otro servidor, usa túnel HTTPS + <code>WEB_PUBLIC_ORIGIN</code> o un host público HTTPS.</li>
                                     <li><strong>Ocultar</strong> quita el artículo de <code>/tienda</code> y borra ofertas del mercado sistema para ese personaje.</li>
                                     <li><strong>Eliminar del servidor</strong> lo quita también del <strong>pool</strong> (no sale en tienda ni en mercado sistema; los rolls pueden seguir saliendo desde el archivo global hasta que filtremos gacha).</li>
                                     <li><strong>Activar en servidor</strong> vuelve a incluir personajes marcados como eliminados aquí.</li>
@@ -6564,7 +6564,7 @@ async function loadGachaPanel(guildId) {
                                                                     <input type="file" class="gacha-catalog-upload-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" data-gacha-upload-character="${escapeHtml(item.id)}">
                                                                 </label>
                                                             </div>
-                                                            <p class="gacha-field-hint">Al subir se rellena la URL de tu propio panel. Recuerda pulsar <strong>Guardar cambios</strong> para persistir en el bot.</p>
+                                                            <p class="gacha-field-hint">Tras subir se guarda en BD. Con URL <code>localhost</code> / red privada, el bot puede pegar la imagen al embed solo si puede descargarla desde esa URL (panel y bot en la misma máquina). Si el bot está en otro host, necesitas HTTPS público o túnel + <code>WEB_PUBLIC_ORIGIN</code>.</p>
                                                         </div>
                                                         <div class="dpx-field is-full">
                                                             <label>Descripción (embed)</label>
@@ -6724,6 +6724,7 @@ async function loadGachaPanel(guildId) {
             try {
                 const fd = new FormData();
                 fd.append('imageFile', file);
+                fd.append('characterId', characterId);
                 const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog-upload`, {
                     method: 'POST',
                     body: fd
@@ -6747,7 +6748,27 @@ async function loadGachaPanel(guildId) {
                 if (thumbCell) {
                     thumbCell.innerHTML = `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(url)}"/>`;
                 }
-                showToast('Imagen subida. Pulsa «Guardar cambios» para guardar en el catálogo.', 'success');
+                const discordUnreachable = data.discordEmbedUnreachable === true;
+                if (data.catalogSaved === true) {
+                    showToast('Imagen guardada en el catálogo (/tienda).', 'success');
+                    if (discordUnreachable) {
+                        showToast(
+                            'Discord no llega a esta URL desde internet. Si el bot puede descargarla (p. ej. panel y bot en la misma máquina), la imagen se adjunta al embed; si no, usa HTTPS público (túnel + WEB_PUBLIC_ORIGIN) o URL externa.',
+                            'warning'
+                        );
+                    }
+                    await loadGachaPanel(guildId);
+                    return;
+                }
+                showToast(data.catalogSaveReason || data.catalogSaveError
+                    ? `Archivo subido; no se guardó en catálogo: ${data.catalogSaveError || data.catalogSaveReason}. Revisa que el ID exista o pulsa «Guardar cambios».`
+                    : 'Archivo subido; confirma con «Guardar cambios» si la imagen no se vincula.', 'warning');
+                if (discordUnreachable) {
+                    showToast(
+                        'Discord no llega a localhost/red privada; el bot debe poder descargar la imagen (misma máquina que el panel). Si falla, usa HTTPS público o URL externa.',
+                        'warning'
+                    );
+                }
             } catch (err) {
                 console.error(err);
                 showToast('Error al subir imagen', 'error');
