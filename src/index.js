@@ -99,6 +99,15 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+if ((process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false') {
+    try {
+        require('./utils/tts-voice-manager').attachCleanupListeners(client);
+        console.log('🔈 TTS listeners activos (/tts texto-a-voz).');
+    } catch (ttsErr) {
+        console.warn('⚠️ No se pudieron cargar listeners TTS:', ttsErr?.message || ttsErr);
+    }
+}
+
 let slashRegisterInFlight = null;
 
 async function registerSlashCommands(targetGuildIds = null, options = {}) {
@@ -664,6 +673,11 @@ async function gracefulShutdown(signal) {
         stopStreamAlertScheduler();
         stopFreeGamesScheduler();
         stopBumpReminderScheduler();
+        try {
+            require('./utils/tts-voice-manager').disconnectAll('shutdown');
+        } catch {
+            /* noop */
+        }
         await db.close().catch(() => null);
         await client.destroy();
     } catch {
