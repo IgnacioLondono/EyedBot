@@ -102,7 +102,7 @@ const client = new Client({
 if ((process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false') {
     try {
         require('./utils/tts-voice-manager').attachCleanupListeners(client);
-        console.log('🔈 TTS listeners activos (/tts texto-a-voz).');
+        console.log('🔈 TTS: voz en llamadas + lectura opcional del chat (/tts).');
     } catch (ttsErr) {
         console.warn('⚠️ No se pudieron cargar listeners TTS:', ttsErr?.message || ttsErr);
     }
