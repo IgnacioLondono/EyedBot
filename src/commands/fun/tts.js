@@ -115,7 +115,7 @@ module.exports = {
             const code = interaction.options.getString('codigo', true);
             tts.setGuildLang(interaction.guildId, code);
             return interaction.reply({
-                content: `Idioma **`${tts.getGuildLang(interaction.guildId)}`** aplicado.`,
+                content: `Idioma **${tts.getGuildLang(interaction.guildId)}** aplicado.`,
                 flags: 64
             });
         }
@@ -125,7 +125,7 @@ module.exports = {
             const msg = result.ok
                 ? (result.reason === 'ya_conectado'
                     ? REASON_MESSAGES.ya_conectado
-                    : `Conectado a **${interaction.member?.voice?.channel?.name || 'voz'}**. Usa **`/tts decir`**.`)
+                    : `Conectado a **${interaction.member?.voice?.channel?.name || 'voz'}**. Usa **/tts decir**.`)
                 : (REASON_MESSAGES[result.reason] || 'No se pudo conectar.');
 
             return interaction.reply({ content: `${result.ok ? '✅' : '❌'} ${msg}`, flags: 64 });
