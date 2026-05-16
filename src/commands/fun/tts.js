@@ -1,6 +1,13 @@
 const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
 const config = require('../../config');
 const tts = require('../../utils/tts-voice-manager');
+const { searchVoices, getVocesSampleLines } = require('../../utils/tts-voice-catalog');
+
+/** @param {string} s @param {number} max */
+function truncateChoiceName(s, max = 100) {
+    const t = String(s);
+    return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
+}
 
 const REASON_MESSAGES = {
     no_voice: 'Entra primero a un **canal de voz**. Luego ejecuta **`/tts unir`** en el canal de texto del que quieres leer mensajes.',
@@ -8,17 +15,13 @@ const REASON_MESSAGES = {
     voz_ocupada: 'El bot **ya tiene conexión de voz** (suele ser la **música**). Pon **`/stop`**, espera que salga del canal y vuelve con **`/tts unir`**.',
     sin_permiso: 'Al bot le faltan permisos **Conectar** y **Hablar** en ese canal de voz.',
     fallo_red: 'No se pudo establecer la conexión de voz. Intenta de nuevo más tarde.',
-    vacio: 'Escribe un texto válido.',
-    cola_llena: 'Hay demasiados mensajes encolados (máximo 14). Usa **`/tts vaciar`** o espera un momento.',
-    no_guild: 'Este comando solo funciona dentro de un servidor.',
-    no_sesion: 'No hay sesión de TTS activa.',
-    ok: ''
+    no_guild: 'Este comando solo funciona dentro de un servidor.'
 };
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('tts')
-        .setDescription('EyedBot lee texto en alto en llamadas de voz (texto-a-voz)')
+        .setDescription('Texto a voz en llamadas: une al canal y lee el chat del canal configurado')
         .addSubcommand((sub) =>
             sub
                 .setName('unir')
@@ -35,55 +38,38 @@ module.exports = {
                         .setRequired(true)))
         .addSubcommand((sub) =>
             sub.setName('salir').setDescription('Desconecta EyedBot del canal de voz'))
-        .addSubcommand((sub) =>
-            sub
-                .setName('decir')
-                .setDescription('Opcional: encola una frase sin escribir en el chat')
-                .addStringOption((opt) =>
-                    opt
-                        .setName('texto')
-                        .setDescription('Texto que se leerá (máx. 900 caracteres en total)')
-                        .setRequired(true)
-                        .setMaxLength(500)))
         .addSubcommand((sub) => sub.setName('vaciar').setDescription('Vacia la cola de mensajes pendientes'))
         .addSubcommand((sub) =>
             sub
                 .setName('idioma')
-                .setDescription('Idioma de la voz (Google TTS)')
+                .setDescription(
+                    'Voz con banderas, variantes ♀♂ (tono ffmpeg) y muchos idiomas · escribe para buscar en autocomplete'
+                )
                 .addStringOption((opt) =>
                     opt
-                        .setName('codigo')
-                        .setDescription('Código de idioma')
+                        .setName('voz')
+                        .setDescription('Ej.: españa · mujer · en-au · mujer japón … (autocomplete)')
                         .setRequired(true)
-                        .addChoices(
-                            { name: 'Español', value: 'es' },
-                            { name: 'English (US)', value: 'en' },
-                            { name: 'Português (BR)', value: 'pt' },
-                            { name: 'Français', value: 'fr' },
-                            { name: 'Deutsch', value: 'de' },
-                            { name: 'Italiano', value: 'it' },
-                            { name: '日本語', value: 'ja' },
-                            { name: '한국어', value: 'ko' },
-                            { name: '中文', value: 'zh-CN' },
-                            { name: 'Русский', value: 'ru' },
-                            { name: 'Polski', value: 'pl' },
-                            { name: 'العربية', value: 'ar' },
-                            { name: 'Nederlands', value: 'nl' },
-                            { name: 'Svenska', value: 'sv' },
-                            { name: 'Türkçe', value: 'tr' },
-                            { name: 'Română', value: 'ro' },
-                            { name: 'Українська', value: 'uk' },
-                            { name: 'Čeština', value: 'cs' },
-                            { name: 'Ελληνικά', value: 'el' },
-                            { name: 'हिन्दी', value: 'hi' },
-                            { name: 'Indonesia', value: 'id' },
-                            { name: 'ไทย', value: 'th' },
-                            { name: 'Tiếng Việt', value: 'vi' },
-                            { name: 'Euskara', value: 'eu' },
-                            { name: 'Galego', value: 'gl' }
-                        )))
+                        .setAutocomplete(true)))
         .addSubcommand((sub) => sub.setName('voces').setDescription('Lista de idiomas y notas')),
     cooldown: 3,
+    async autocomplete(interaction) {
+        if (!tts.envTtsEnabled() || !interaction.inGuild()) return;
+        if (interaction.options.getSubcommand() !== 'idioma') return;
+        const focused = interaction.options.getFocused(true);
+        if (focused.name !== 'voz') return;
+        try {
+            const hits = searchVoices(String(focused.value || ''));
+            await interaction.respond(
+                hits.slice(0, 25).map((e) => ({
+                    name: truncateChoiceName(e.name),
+                    value: e.id
+                }))
+            );
+        } catch {
+            await interaction.respond([]).catch(() => null);
+        }
+    },
     async execute(interaction) {
         if (!tts.envTtsEnabled()) {
             return interaction.reply({
@@ -104,31 +90,39 @@ module.exports = {
         if (sub === 'voces') {
             const embed = new EmbedBuilder()
                 .setColor(config.embedColor)
-                .setTitle('🔊 TTS EyedBot')
+                .setTitle('🔊 Voces EyedBot (🇪🇸 🇲🇽 ♀♂ …)')
                 .setDescription(
                     [
-                        'Primero **`/tts idioma`** si quieres cambiar la voz (ej. español **`es`**).',
-                        'Tras **`/tts unir`**, EyedBot lee **en voz** los mensajes de texto que escriban en ese canal (o el que definas con **`/tts escuchar`**).',
-                        'Opcional: **`/tts decir`** para una frase sin usar el chat.',
+                        '**`/tts idioma`** → campo **voz**: escribe y elige país, **♀ mujer · tono aguda** o **♂ hombre · tono grave**, o inglés/US, etc.',
+                        'El motor es **Google Translate TTS**: una voz sintética por idioma/región real; ♀♂ **imita** registros graves/agudos con **ffmpeg**.',
                         '',
-                        '**Notas**',
-                        '• Similar a otros bots de TTS: EyedBot se une al canal de voz y reproduce audio sintetizado.',
-                        '• El motor usa el servicio público de **Google Translate** (sin API key). Puede fallar o tener límites.',
-                        '• No uses **al mismo tiempo** música y TTS si comparten una sola sesión de voz: antes **`/stop`** en música.',
-                        '• El bot necesita **`ffmpeg`** (el proyecto incluye `ffmpeg-static`).',
-                        '• Cuando **no queda ningún usuario humano** en el canal de voz (solo bots o nadie más), EyedBot **sale al instante**.',
-                        '• Opcional: **`TTS_CHAT_ECHO=true`** en `.env` para repetir también el texto cuando uses **`/tts decir`**.',
-                        '• Lectura automática del chat: **`TTS_READ_CHAT=false`** en `.env` para desactivarla; **`TTS_READ_SKIP_PREFIX`** (por defecto true) ignora líneas que empiecen por el prefijo del bot.'
+                        'Tras **`/tts unir`**, se leen en voz los mensajes del **canal de texto configurado**. **`/tts escuchar`** cambia ese canal.'
                     ].join('\n')
-                );
+                )
+                .addFields({
+                    name: '🎙 Muestra del catálogo (hay muchas más vía autocomplete)',
+                    value: truncateChoiceName(getVocesSampleLines(14), 1024)
+                })
+                .addFields({
+                    name: '⚙️ Notas',
+                    value:
+                        [
+                            '• **`TTS_DEFAULT_VOICE`** + **`TTS_DEFAULT_LANG`** en `.env`: id interno tipo `es_es` o código `tl` genérico (`es`).',
+                            '• Música y TTS **no funcionan solo** con una conexión: **`/stop`** en música primero.',
+                            '• **`ffmpeg`** requerido (**`ffmpeg-static`** en el proyecto).',
+                            '• Si el canal **no tiene humanos**, el bot sale al instante.',
+                            '• **`TTS_READ_CHAT=false`** desactiva leer mensajes · **`TTS_READ_SKIP_PREFIX`** evita líneas con prefijo del bot.'
+                        ].join('\n')
+                });
+
             return interaction.reply({ embeds: [embed], flags: 64 });
         }
 
         if (sub === 'idioma') {
-            const code = interaction.options.getString('codigo', true);
-            tts.setGuildLang(interaction.guildId, code);
+            const voiceId = interaction.options.getString('voz', true);
+            tts.setGuildVoiceId(interaction.guildId, voiceId);
             return interaction.reply({
-                content: `Idioma **${tts.getGuildLang(interaction.guildId)}** aplicado.`,
+                content: `Voz aplicada: **${tts.getGuildVoiceDisplay(interaction.guildId)}**`,
                 flags: 64
             });
         }
@@ -178,39 +172,6 @@ module.exports = {
                 content: ok ? '🗑️ Cola vaciada (y lectura actual detenida).' : 'No había sesión TTS.',
                 flags: 64
             });
-        }
-
-        if (sub === 'decir') {
-            await interaction.deferReply({ flags: 64 });
-
-            const text = interaction.options.getString('texto', true);
-            const queued = await tts.enqueueSpeak(interaction, text);
-
-            if (!queued.ok) {
-                const textHuman = REASON_MESSAGES[queued.reason] || queued.detail || 'Error desconocido.';
-                await interaction.editReply({ content: `❌ ${textHuman}` }).catch(() => null);
-                return;
-            }
-
-            await interaction.editReply({
-                content: `✅ Frase encolada. Idioma: **${tts.getGuildLang(interaction.guildId)}** · Pendientes: **${queued.queueLength}**`
-            }).catch(() => null);
-
-            /*
-             * Opcional: eco breve en el canal de texto (visible para otros)
-             */
-            try {
-                if ((process.env.TTS_CHAT_ECHO || '').toLowerCase() === 'true') {
-                    const ch = interaction.channel;
-                    if (ch && typeof ch.isTextBased === 'function' && ch.isTextBased()) {
-                        await ch.send({
-                            content: `📢 **${interaction.user.tag}** (TTS): ${String(text).slice(0, 350)}${text.length > 350 ? '…' : ''}`
-                        });
-                    }
-                }
-            } catch {
-                /* ignorar falta permiso Send Messages */
-            }
         }
     }
 };
