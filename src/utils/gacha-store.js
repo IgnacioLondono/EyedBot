@@ -7,6 +7,7 @@ const CHARACTERS_PATH = path.join(__dirname, '..', '..', 'data', 'gacha-characte
 const BUNDLED_CHARACTERS_PATH = path.join(__dirname, '..', 'bundled', 'gacha-characters.json');
 const SYSTEM_MARKET_SELLER_ID = 'system';
 const DEFAULT_MARKET_LISTING_COUNT = 16;
+const MAX_SHOP_CATALOG_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const FALLBACK_CHARACTERS = [
     { id: 'ch_fb_001', name: 'Aira Nova', series: 'Celestial Archive', rarity: 'SSR', baseValue: 500 },
@@ -931,6 +932,93 @@ function buildCatalogMarketItem(character = {}) {
     });
 }
 
+/** Imagen PNG/JPEG/WebP/GIF del catálogo de tienda (MySQL LONGBLOB), independiente del host del panel */
+function sanitizeShopImageMime(mime = '') {
+    const m = String(mime || '').split(';')[0].trim().toLowerCase();
+    if (['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'].includes(m)) {
+        return m === 'image/jpg' ? 'image/jpeg' : m;
+    }
+    return 'application/octet-stream';
+}
+
+function shopCatalogMimeToExt(mime = '') {
+    const m = String(mime || '').split(';')[0].trim().toLowerCase();
+    if (m.includes('png')) return 'png';
+    if (m.includes('webp')) return 'webp';
+    if (m.includes('gif')) return 'gif';
+    if (m.includes('jpeg') || m === 'image/jpg') return 'jpg';
+    return 'png';
+}
+
+async function deleteGuildCatalogShopImageBlob(guildId, characterId) {
+    const gid = String(guildId || '').trim().slice(0, 32);
+    const cid = String(characterId || '').trim().slice(0, 128);
+    if (!gid || !cid) return false;
+    try {
+        await db.query(
+            'DELETE FROM gacha_catalog_shop_image WHERE guild_id = ? AND character_id = ?',
+            [gid, cid]
+        );
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function listGuildCatalogShopBlobIds(guildId) {
+    const gid = String(guildId || '').trim().slice(0, 32);
+    if (!gid) return new Set();
+    try {
+        const rows = await db.query(
+            'SELECT character_id FROM gacha_catalog_shop_image WHERE guild_id = ?',
+            [gid]
+        );
+        return new Set((rows || []).map((r) => String(r.character_id || '')).filter(Boolean));
+    } catch {
+        return new Set();
+    }
+}
+
+async function getGuildCatalogShopImageBlob(guildId, characterId) {
+    const gid = String(guildId || '').trim().slice(0, 32);
+    const cid = String(characterId || '').trim().slice(0, 128);
+    if (!gid || !cid) return null;
+    try {
+        const rows = await db.query(
+            'SELECT mime_type AS mime, image AS data FROM gacha_catalog_shop_image WHERE guild_id = ? AND character_id = ? LIMIT 1',
+            [gid, cid]
+        );
+        const row = rows && rows[0];
+        if (!row || row.data === undefined || row.data === null) return null;
+        let buf = row.data;
+        if (!Buffer.isBuffer(buf)) buf = Buffer.from(buf);
+        if (!buf.length || buf.length > MAX_SHOP_CATALOG_IMAGE_BYTES) return null;
+        return { mime: String(row.mime || 'image/png'), data: buf };
+    } catch {
+        return null;
+    }
+}
+
+async function setGuildCatalogShopImageBlob(guildId, characterId, buffer, mimeType = '') {
+    const gid = String(guildId || '').trim().slice(0, 32);
+    const cid = String(characterId || '').trim().slice(0, 128);
+    if (!gid || !cid || !Buffer.isBuffer(buffer) || buffer.length === 0) return false;
+    if (buffer.length > MAX_SHOP_CATALOG_IMAGE_BYTES) return false;
+    const mime = sanitizeShopImageMime(mimeType);
+    try {
+        await db.query(
+            `INSERT INTO gacha_catalog_shop_image (guild_id, character_id, mime_type, image)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE mime_type = VALUES(mime_type), image = VALUES(image)`,
+            [gid, cid, mime, buffer]
+        );
+        return true;
+    } catch (e) {
+        console.warn('⚠️ No se pudo guardar imagen de tienda en MySQL:', e.message);
+        return false;
+    }
+}
+
 async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, updatedBy = 'system') {
     const base = getCharacterPool().find((item) => item.id === String(characterId || ''));
     if (!base) return { ok: false, reason: 'item_not_found' };
@@ -965,6 +1053,15 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
     await setGuildCatalogOverrides(guildId, overrides);
     await pruneHiddenSystemListings(guildId);
 
+    if (explicitImageClear) {
+        await deleteGuildCatalogShopImageBlob(guildId, base.id);
+    } else if (rawPatch.imageUrl !== undefined) {
+        const remote = sanitizeCatalogImageUrl(patch.imageUrl);
+        if (remote && /^https?:\/\//i.test(remote)) {
+            await deleteGuildCatalogShopImageBlob(guildId, base.id);
+        }
+    }
+
     return {
         ok: true,
         item: applyCatalogOverride(base, merged)
@@ -980,6 +1077,7 @@ async function deleteGuildCatalogItem(guildId, characterId = '', updatedBy = 'sy
 
     delete overrides[id];
     await setGuildCatalogOverrides(guildId, overrides);
+    await deleteGuildCatalogShopImageBlob(guildId, id);
     await pruneHiddenSystemListings(guildId);
 
     const base = getCharacterPool().find((item) => item.id === id);
@@ -1164,5 +1262,10 @@ module.exports = {
     ensureGuildEconomyContent,
     addCoins,
     trySpendCoins,
-    purchaseShopCharacter
+    purchaseShopCharacter,
+    getGuildCatalogShopImageBlob,
+    setGuildCatalogShopImageBlob,
+    deleteGuildCatalogShopImageBlob,
+    listGuildCatalogShopBlobIds,
+    shopCatalogMimeToExt
 };

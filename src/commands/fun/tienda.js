@@ -85,7 +85,15 @@ async function handleShopButton(interaction) {
         );
         /** @type {AttachmentBuilder[]} */
         const buyFiles = [];
-        if (/^https?:\/\/.+/i.test(thumb)) {
+
+        const buyBlob = await gachaStore.getGuildCatalogShopImageBlob(interaction.guild.id, characterId);
+        if (buyBlob?.data?.length) {
+            const safeBase = `tienda-buy-${characterId}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'tienda-buy';
+            const ext = gachaStore.shopCatalogMimeToExt(buyBlob.mime);
+            const name = `${safeBase}.${ext}`;
+            buyEmbed.setThumbnail(`attachment://${name}`);
+            buyFiles.push(new AttachmentBuilder(buyBlob.data, { name }));
+        } else if (/^https?:\/\/.+/i.test(thumb)) {
             if (isUrlLikelyUnreachableFromDiscord(thumb)) {
                 const safeBase = `tienda-buy-${characterId}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'tienda-buy';
                 const fetched = await fetchImageBufferForDiscordAttachment(thumb, safeBase);

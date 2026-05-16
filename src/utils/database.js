@@ -65,6 +65,15 @@ const CORE_SCHEMA_STATEMENTS = [
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_user_channel (user_id, channel_id),
         INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS gacha_catalog_shop_image (
+        guild_id VARCHAR(32) NOT NULL,
+        character_id VARCHAR(128) NOT NULL,
+        mime_type VARCHAR(80) NOT NULL,
+        image LONGBLOB NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (guild_id, character_id),
+        INDEX idx_shop_img_guild (guild_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 ];
 
