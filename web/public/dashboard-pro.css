@@ -8856,6 +8856,23 @@ mark.receipt-highlight {
     box-shadow: 0 0 8px currentColor;
 }
 
+/* Gacha: artículos ocultos de /tienda en el editor */
+.badge-gacha-hidden {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    margin-right: 0.35rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: rgba(255, 200, 120, 0.95);
+    background: rgba(245, 158, 11, 0.16);
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    vertical-align: middle;
+}
+
 /* Stats header */
 .dpx-stats-grid {
     display: grid;

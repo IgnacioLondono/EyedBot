@@ -68,11 +68,16 @@ async function handleShopButton(interaction) {
 
         const panel = await renderShopPanel(interaction, 'shop', 0);
         await interaction.update(panel).catch(() => null);
+        const thumb = String(result.item?.imageUrl || '').trim();
+        const buyEmbed = Embeds.success(
+            'Compra realizada',
+            `Obtuviste **${result.item?.name || 'un ítem'}** por **${Number(result.price || 0).toLocaleString('es-ES')}** monedas.`
+        );
+        if (/^https?:\/\/.+/i.test(thumb)) {
+            buyEmbed.setThumbnail(thumb);
+        }
         await interaction.followUp({
-            embeds: [Embeds.success(
-                'Compra realizada',
-                `Obtuviste **${result.item?.name || 'un ítem'}** por **${Number(result.price || 0).toLocaleString('es-ES')}** monedas.`
-            )],
+            embeds: [buyEmbed],
             flags: 64
         }).catch(() => null);
         return true;

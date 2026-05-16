@@ -100,12 +100,20 @@ function buildDefaultCharacterDescription(character = {}) {
     return flavor[rarity] || flavor.N;
 }
 
+function sanitizeCatalogImageUrl(raw) {
+    const u = String(raw || '').trim().slice(0, 2048);
+    if (!u) return '';
+    if (/^https?:\/\/.+/i.test(u)) return u;
+    return '';
+}
+
 function normalizeCharacterRecord(item = {}) {
     const id = String(item.id || `ch_${Date.now()}`);
     const name = String(item.name || 'Unknown');
     const series = String(item.series || 'Original');
     const rarity = ['SSR', 'SR', 'R', 'N'].includes(String(item.rarity || 'N').toUpperCase()) ? String(item.rarity).toUpperCase() : 'N';
     const description = String(item.description || '').trim() || buildDefaultCharacterDescription({ name, series, rarity });
+    const imageUrl = sanitizeCatalogImageUrl(item.imageUrl);
 
     return {
         id,
@@ -113,15 +121,17 @@ function normalizeCharacterRecord(item = {}) {
         series,
         rarity,
         description,
-        baseValue: Math.max(1, Number.parseInt(`${item.baseValue || 10}`, 10) || 10)
+        baseValue: Math.max(1, Number.parseInt(`${item.baseValue || 10}`, 10) || 10),
+        ...(imageUrl ? { imageUrl } : {})
     };
 }
 
 function applyCatalogOverride(character = {}, override = {}) {
     if (!override || typeof override !== 'object') return normalizeCharacterRecord(character);
+    const { shopHidden: _sh, updatedAt: _ua, updatedBy: _ub, ...rest } = override;
     return normalizeCharacterRecord({
         ...character,
-        ...override,
+        ...rest,
         id: character.id
     });
 }
@@ -138,6 +148,16 @@ function normalizeCatalogOverride(raw = {}, base = {}) {
         const rarity = String(raw.rarity || base.rarity || 'N').toUpperCase();
         if (['SSR', 'SR', 'R', 'N'].includes(rarity)) patch.rarity = rarity;
     }
+    if (raw.imageUrl !== undefined) {
+        const img = sanitizeCatalogImageUrl(raw.imageUrl);
+        patch.imageUrl = img;
+        patch._explicitImageClear = img === '';
+    }
+    if (raw.clearCatalogImage === true) {
+        patch.imageUrl = '';
+        patch._explicitImageClear = true;
+    }
+    if (raw.shopHidden !== undefined) patch.shopHidden = raw.shopHidden === true;
     return patch;
 }
 
@@ -301,6 +321,7 @@ function normalizeInventoryItem(raw = {}) {
     const series = String(raw.series || 'Original');
     const rarity = ['SSR', 'SR', 'R', 'N'].includes(String(raw.rarity || 'N').toUpperCase()) ? String(raw.rarity).toUpperCase() : 'N';
     const description = String(raw.description || '').trim() || buildDefaultCharacterDescription({ name, series, rarity });
+    const imageUrl = sanitizeCatalogImageUrl(raw.imageUrl);
 
     return {
         uid: String(raw.uid || `inv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
@@ -310,7 +331,8 @@ function normalizeInventoryItem(raw = {}) {
         rarity,
         description,
         value: Math.max(1, Number.parseInt(`${raw.value || 10}`, 10) || 10),
-        obtainedAt: Number.parseInt(`${raw.obtainedAt || Date.now()}`, 10) || Date.now()
+        obtainedAt: Number.parseInt(`${raw.obtainedAt || Date.now()}`, 10) || Date.now(),
+        ...(imageUrl ? { imageUrl } : {})
     };
 }
 
@@ -379,6 +401,7 @@ function pickCharacterForRarity(rarity) {
 
 function buildInventoryEntry(character = {}) {
     const variance = Math.max(1, Math.round((Math.random() * 0.35 + 0.85) * Number(character.baseValue || 10)));
+    const imageUrl = sanitizeCatalogImageUrl(character.imageUrl);
     return normalizeInventoryItem({
         uid: `inv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         characterId: character.id,
@@ -387,7 +410,8 @@ function buildInventoryEntry(character = {}) {
         rarity: character.rarity,
         description: character.description,
         value: variance,
-        obtainedAt: Date.now()
+        obtainedAt: Date.now(),
+        ...(imageUrl ? { imageUrl } : {})
     });
 }
 
@@ -791,14 +815,54 @@ async function getGuildCharacterPool(guildId) {
 }
 
 async function getShopCatalog(guildId, config = {}) {
+    const overrides = await getGuildCatalogOverrides(guildId);
     const pool = await getGuildCharacterPool(guildId);
-    return pool.map((character) => ({
-        ...character,
-        price: getShopPrice(character, config)
-    })).sort((left, right) => getShopPrice(right, config) - getShopPrice(left, config));
+    return pool
+        .filter((character) => !overrides[character.id]?.shopHidden)
+        .map((character) => ({
+            ...character,
+            price: getShopPrice(character, config)
+        }))
+        .sort((left, right) => getShopPrice(right, config) - getShopPrice(left, config));
+}
+
+/** Catálogo completo para el panel web (incluye ocultos de tienda). */
+async function listShopCatalogForAdmin(guildId, config = {}) {
+    const overrides = await getGuildCatalogOverrides(guildId);
+    const pool = await getGuildCharacterPool(guildId);
+    return pool
+        .map((character) => ({
+            ...character,
+            price: getShopPrice(character, config),
+            shopHidden: !!overrides[character.id]?.shopHidden
+        }))
+        .sort((left, right) => getShopPrice(right, config) - getShopPrice(left, config));
+}
+
+async function pruneHiddenSystemListings(guildId) {
+    const overrides = await getGuildCatalogOverrides(guildId);
+    const hiddenIds = new Set(Object.entries(overrides)
+        .filter(([, entry]) => entry && entry.shopHidden === true)
+        .map(([id]) => id));
+    if (!hiddenIds.size) return false;
+
+    const market = await getGuildMarket(guildId);
+    let changed = false;
+    const next = market.filter((row) => {
+        if (row.sellerId !== SYSTEM_MARKET_SELLER_ID) return true;
+        const cid = String(row.item?.characterId || '');
+        if (cid && hiddenIds.has(cid)) {
+            changed = true;
+            return false;
+        }
+        return true;
+    });
+    if (changed) await setGuildMarket(guildId, next);
+    return changed;
 }
 
 function buildCatalogMarketItem(character = {}) {
+    const imageUrl = sanitizeCatalogImageUrl(character.imageUrl);
     return normalizeInventoryItem({
         uid: `seed_${character.id}`,
         characterId: character.id,
@@ -807,7 +871,8 @@ function buildCatalogMarketItem(character = {}) {
         rarity: character.rarity,
         description: character.description,
         value: character.baseValue,
-        obtainedAt: Date.now()
+        obtainedAt: Date.now(),
+        ...(imageUrl ? { imageUrl } : {})
     });
 }
 
@@ -816,43 +881,87 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
     if (!base) return { ok: false, reason: 'item_not_found' };
 
     const patch = normalizeCatalogOverride(rawPatch, base);
+    const explicitImageClear = patch._explicitImageClear === true;
+    delete patch._explicitImageClear;
     if (!Object.keys(patch).length) return { ok: false, reason: 'empty_patch' };
 
     const overrides = await getGuildCatalogOverrides(guildId);
-    const nextEntry = {
-        ...(overrides[base.id] || {}),
-        ...patch,
-        updatedAt: new Date().toISOString(),
-        updatedBy: String(updatedBy || 'system')
-    };
-    overrides[base.id] = nextEntry;
+    const prev = { ...(overrides[base.id] || {}) };
+    const merged = { ...prev, ...patch };
+
+    if (explicitImageClear || ('imageUrl' in patch && patch.imageUrl === '')) {
+        delete merged.imageUrl;
+    }
+
+    merged.updatedAt = new Date().toISOString();
+    merged.updatedBy = String(updatedBy || 'system');
+    overrides[base.id] = merged;
     await setGuildCatalogOverrides(guildId, overrides);
+    await pruneHiddenSystemListings(guildId);
 
     return {
         ok: true,
-        item: applyCatalogOverride(base, nextEntry)
+        item: applyCatalogOverride(base, merged)
+    };
+}
+
+async function deleteGuildCatalogItem(guildId, characterId = '', updatedBy = 'system') {
+    const id = String(characterId || '').trim();
+    if (!id) return { ok: false, reason: 'invalid_id' };
+
+    const overrides = await getGuildCatalogOverrides(guildId);
+    if (!overrides[id]) return { ok: false, reason: 'no_override' };
+
+    delete overrides[id];
+    await setGuildCatalogOverrides(guildId, overrides);
+    await pruneHiddenSystemListings(guildId);
+
+    const base = getCharacterPool().find((item) => item.id === id);
+    return {
+        ok: true,
+        item: base ? normalizeCharacterRecord(base) : null,
+        clearedBy: String(updatedBy || 'system')
     };
 }
 
 async function ensureGuildEconomyContent(guildId) {
     const config = await getConfig(guildId);
     const catalog = await getShopCatalog(guildId, config);
-    if (!catalog.length) return;
-
     const market = await getGuildMarket(guildId);
+
+    if (!catalog.length) {
+        let changed = false;
+        const next = market.filter((row) => {
+            if (row.sellerId !== SYSTEM_MARKET_SELLER_ID) return true;
+            changed = true;
+            return false;
+        });
+        if (changed) await setGuildMarket(guildId, next);
+        return;
+    }
+
     const byCharacterId = new Map(catalog.map((character) => [character.id, character]));
     let marketChanged = false;
 
-    for (const row of market) {
+    for (let i = market.length - 1; i >= 0; i -= 1) {
+        const row = market[i];
         if (row.sellerId !== SYSTEM_MARKET_SELLER_ID) continue;
-        const character = byCharacterId.get(String(row.item?.characterId || ''));
-        if (!character) continue;
+        const cid = String(row.item?.characterId || '');
+        const character = cid ? byCharacterId.get(cid) : null;
+        if (!character) {
+            market.splice(i, 1);
+            marketChanged = true;
+            continue;
+        }
         const nextItem = buildCatalogMarketItem(character);
         const current = normalizeInventoryItem(row.item || {});
+        const nextImg = sanitizeCatalogImageUrl(nextItem.imageUrl);
+        const curImg = sanitizeCatalogImageUrl(current.imageUrl);
         if (current.name !== nextItem.name
             || current.series !== nextItem.series
             || current.rarity !== nextItem.rarity
-            || current.description !== nextItem.description) {
+            || current.description !== nextItem.description
+            || curImg !== nextImg) {
             row.item = nextItem;
             marketChanged = true;
         }
@@ -981,7 +1090,9 @@ module.exports = {
     getShopPrice,
     getShopCatalog,
     getGuildCharacterPool,
+    listShopCatalogForAdmin,
     setGuildCatalogItem,
+    deleteGuildCatalogItem,
     ensureGuildEconomyContent,
     addCoins,
     trySpendCoins,
