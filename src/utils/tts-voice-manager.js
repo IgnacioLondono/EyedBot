@@ -12,15 +12,20 @@ const {
     getVoiceConnection
 } = require('@discordjs/voice');
 const { textToMp3TempFiles } = require('./tts-google-gtx');
+const {
+    resolveVoiceChoice,
+    envDefaultVoiceId,
+    formatGuildVoiceDisplay
+} = require('./tts-voice-catalog');
 
-/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: string[], processing: boolean, lang: string, idleTimer?: NodeJS.Timeout | null, listenChannelId: string }} TtsGuildSession */
+/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: string[], processing: boolean, voiceId: string, idleTimer?: NodeJS.Timeout | null, listenChannelId: string }} TtsGuildSession */
 
 /** @type {Map<string, TtsGuildSession>} */
 const sessions = new Map();
 
-/** Preferencia de idioma antes de tener sesión activa */
+/** Preferencia de voz antes de tener sesión activa (`voiceId` del catálogo) */
 /** @type {Map<string, string>} */
-const guildPendingLang = new Map();
+const guildPendingVoiceId = new Map();
 
 /** Canal de texto donde leer mensajes antes de tener sesión o para aplicar en el próximo unir */
 /** @type {Map<string, string>} */
@@ -41,10 +46,6 @@ const READ_MAX_CHARS = Math.min(
 
 function envTtsEnabled() {
     return (process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false';
-}
-
-function defaultLang() {
-    return String(process.env.TTS_DEFAULT_LANG || 'es').trim().slice(0, 12) || 'es';
 }
 
 function ensureFfmpegPath() {
@@ -239,7 +240,8 @@ async function drainQueue(guildId) {
 
             let files = [];
             try {
-                files = await textToMp3TempFiles(line, s.lang);
+                const voice = resolveVoiceChoice(s.voiceId);
+                files = await textToMp3TempFiles(line, { tl: voice.tl, semitones: voice.semitones });
                 for (const f of files) {
                     await playOneMp3Path(s, f).catch(() => null);
                 }
@@ -338,7 +340,7 @@ async function joinSession(interaction) {
         player,
         queue: [],
         processing: false,
-        lang: guildPendingLang.get(guildId) || defaultLang(),
+        voiceId: guildPendingVoiceId.get(guildId) || envDefaultVoiceId(),
         idleTimer: null,
         listenChannelId
     });
@@ -386,24 +388,6 @@ async function enqueueTextForGuild(guildId, text, opts = {}) {
     return { ok: true, reason: 'ok', queueLength: q.queue.length };
 }
 
-/**
- * Encola texto para hablar por voz en el servidor.
- */
-async function enqueueSpeak(interaction, text) {
-    const guild = interaction.guild;
-    const guildId = guild?.id;
-    if (!guildId) return { ok: false, reason: 'no_guild' };
-
-    let s = sessions.get(guildId);
-    if (!s) {
-        const joined = await joinSession(interaction);
-        if (!joined.ok) return joined;
-        s = sessions.get(guildId);
-    }
-
-    return enqueueTextForGuild(guildId, text, { fromChat: false });
-}
-
 function clearQueue(interaction) {
     const guildId = interaction.guild?.id;
     const q = guildId ? sessions.get(guildId) : null;
@@ -418,23 +402,30 @@ function clearQueue(interaction) {
     return true;
 }
 
-function setGuildLang(guildId, lang) {
+function setGuildVoiceId(guildId, rawChoice) {
     const gid = String(guildId || '');
-    const lc = String(lang || 'es').trim().slice(0, 12) || 'es';
-    guildPendingLang.set(gid, lc);
+    const entry = resolveVoiceChoice(rawChoice);
+    guildPendingVoiceId.set(gid, entry.id);
     const q = sessions.get(gid);
     if (q) {
-        q.lang = lc;
+        q.voiceId = entry.id;
     }
     return true;
 }
 
-function resolveLangForGuild(guildId) {
-    return guildPendingLang.get(String(guildId)) || sessions.get(String(guildId))?.lang || defaultLang();
+function getGuildVoiceDisplay(guildId) {
+    const gid = String(guildId || '');
+    return formatGuildVoiceDisplay(guildPendingVoiceId.get(gid), sessions.get(gid));
 }
 
+/** @deprecated usar setGuildVoiceId — alias por compatibilidad */
+function setGuildLang(guildId, rawChoice) {
+    return setGuildVoiceId(guildId, rawChoice);
+}
+
+/** @deprecated usar getGuildVoiceDisplay */
 function getGuildLang(guildId) {
-    return resolveLangForGuild(String(guildId || ''));
+    return getGuildVoiceDisplay(guildId);
 }
 
 /** Si en el canal de voz de la sesión TTS no queda ningún usuario humano, cerrar al instante. */
@@ -507,9 +498,10 @@ module.exports = {
     envTtsEnabled,
     joinSession,
     leaveGuild,
-    enqueueSpeak,
     enqueueTextForGuild,
     clearQueue,
+    setGuildVoiceId,
+    getGuildVoiceDisplay,
     setGuildLang,
     setGuildListenChannel,
     getGuildLang,
