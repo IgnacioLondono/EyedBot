@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { createReadStream } = require('node:fs');
+const db = require('./database');
 const {
     joinVoiceChannel,
     createAudioPlayer,
@@ -12,7 +13,7 @@ const {
 } = require('@discordjs/voice');
 const { textToMp3TempFiles } = require('./tts-google-gtx');
 
-/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: string[], processing: boolean, lang: string, idleTimer?: NodeJS.Timeout | null }} TtsGuildSession */
+/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: string[], processing: boolean, lang: string, idleTimer?: NodeJS.Timeout | null, listenChannelId: string }} TtsGuildSession */
 
 /** @type {Map<string, TtsGuildSession>} */
 const sessions = new Map();
@@ -21,8 +22,22 @@ const sessions = new Map();
 /** @type {Map<string, string>} */
 const guildPendingLang = new Map();
 
+/** Canal de texto donde leer mensajes antes de tener sesión o para aplicar en el próximo unir */
+/** @type {Map<string, string>} */
+const guildPendingListenChannel = new Map();
+
+/** @type {Map<string, { prefix: string, at: number }>} */
+const guildPrefixCache = new Map();
+
 const MAX_QUEUE = 14;
 const IDLE_MS = Number.parseInt(process.env.TTS_IDLE_DISCONNECT_MS || '180000', 10);
+const READ_CHAT = (process.env.TTS_READ_CHAT || 'true').toLowerCase() !== 'false';
+const READ_SKIP_PREFIX = (process.env.TTS_READ_SKIP_PREFIX || 'true').toLowerCase() !== 'false';
+
+const READ_MAX_CHARS = Math.min(
+    900,
+    Math.max(40, Number.parseInt(process.env.TTS_READ_MAX_CHARS || '400', 10) || 400)
+);
 
 function envTtsEnabled() {
     return (process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false';
@@ -41,6 +56,92 @@ function ensureFfmpegPath() {
     } catch {
         /* noop */
     }
+}
+
+function normalizeSpeakLine(raw) {
+    return String(raw || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+}
+
+function sanitizeDiscordPlaintext(raw) {
+    let t = String(raw || '');
+    t = t.replace(/<@!?[0-9]+>/g, ' ');
+    t = t.replace(/<@&[0-9]+>/g, ' ');
+    t = t.replace(/<#[0-9]+>/g, ' ');
+    t = t.replace(/<a?:[\w~]+:[0-9]+>/gi, ' ');
+    t = t.replace(/https?:\/\/[^\s<]+/gi, ' ');
+    return t;
+}
+
+function prepareChatLineForTts(raw) {
+    let t = sanitizeDiscordPlaintext(raw);
+    t = normalizeSpeakLine(t);
+    if (!t.length) return '';
+    if (t.length > READ_MAX_CHARS) return t.slice(0, READ_MAX_CHARS);
+    return t;
+}
+
+/**
+ * @param {string} guildId
+ */
+async function getCachedGuildPrefix(guildId) {
+    const gid = String(guildId || '');
+    const fallback = String(process.env.DEFAULT_PREFIX || '!').trim().slice(0, 5) || '!';
+    if (!gid) return fallback;
+
+    const now = Date.now();
+    const cached = guildPrefixCache.get(gid);
+    if (cached && now - cached.at < 60_000) return cached.prefix;
+
+    let prefix = fallback;
+    try {
+        const v = await db.get(`prefix_${gid}`);
+        prefix = String(v ?? process.env.DEFAULT_PREFIX ?? '!')
+            .trim()
+            .slice(0, 5) || fallback;
+    } catch {
+        prefix = fallback;
+    }
+    guildPrefixCache.set(gid, { prefix, at: now });
+    return prefix;
+}
+
+/**
+ * @param {import('discord.js').Message} message
+ * @param {string} listenChannelId
+ */
+function messageMatchesListenChannel(message, listenChannelId) {
+    const listen = String(listenChannelId || '');
+    if (!listen) return false;
+    if (message.channelId === listen) return true;
+    const ch = message.channel;
+    if (ch && typeof ch.isThread === 'function' && ch.isThread() && ch.parentId === listen) return true;
+    return false;
+}
+
+/**
+ * Canal de texto a escuchar tras /tts unir o /tts escuchar (pendiente se consume al unir de nuevo si aplica).
+ * @returns {string}
+ */
+function resolveListenChannelIdFromInteraction(interaction) {
+    const gid = interaction.guildId;
+    const chosen = guildPendingListenChannel.get(gid) || interaction.channelId;
+    guildPendingListenChannel.delete(gid);
+    return String(chosen || '');
+}
+
+/**
+ * Fija el canal de texto donde se leen mensajes (sesión actual o pendiente para el próximo unir).
+ * @param {string} guildId
+ * @param {string} channelId
+ */
+function setGuildListenChannel(guildId, channelId) {
+    const gid = String(guildId || '');
+    const cid = String(channelId || '');
+    if (!gid || !cid) return false;
+    guildPendingListenChannel.set(gid, cid);
+    const s = sessions.get(gid);
+    if (s) s.listenChannelId = cid;
+    return true;
 }
 
 function destroyGuildSession(guildId, reason = '') {
@@ -179,6 +280,8 @@ async function joinSession(interaction) {
     if (sessions.has(guildId)) {
         const curVc = interaction.client.guilds.cache.get(guildId)?.members?.me?.voice?.channelId;
         if (curVc === ch.id) {
+            const sess = sessions.get(guildId);
+            if (sess) sess.listenChannelId = resolveListenChannelIdFromInteraction(interaction);
             return { ok: true, reason: 'ya_conectado' };
         }
         destroyGuildSession(guildId, 'reemplazo');
@@ -228,13 +331,16 @@ async function joinSession(interaction) {
         console.warn('⚠️ TTS VoiceConnection error:', err?.message || err);
     });
 
+    const listenChannelId = resolveListenChannelIdFromInteraction(interaction);
+
     sessions.set(guildId, {
         connection,
         player,
         queue: [],
         processing: false,
         lang: guildPendingLang.get(guildId) || defaultLang(),
-        idleTimer: null
+        idleTimer: null,
+        listenChannelId
     });
 
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
@@ -256,6 +362,31 @@ function leaveGuild(guildId) {
 }
 
 /**
+ * Encola texto cuando ya hay sesión TTS activa.
+ * @param {string} guildId
+ * @param {string} text
+ * @param {{ fromChat?: boolean }} [opts]
+ */
+async function enqueueTextForGuild(guildId, text, opts = {}) {
+    const gid = String(guildId || '');
+    const q = sessions.get(gid);
+    if (!q) return { ok: false, reason: 'no_sesion' };
+
+    const line = opts.fromChat ? prepareChatLineForTts(text) : normalizeSpeakLine(text);
+    if (!line.length) return { ok: false, reason: 'vacio' };
+
+    if (q.queue.length >= MAX_QUEUE) {
+        return { ok: false, reason: 'cola_llena' };
+    }
+
+    q.queue.push(line);
+    resetIdleTimer(gid);
+    drainQueue(gid).catch((e) => console.warn('TTS drain:', e));
+
+    return { ok: true, reason: 'ok', queueLength: q.queue.length };
+}
+
+/**
  * Encola texto para hablar por voz en el servidor.
  */
 async function enqueueSpeak(interaction, text) {
@@ -270,21 +401,7 @@ async function enqueueSpeak(interaction, text) {
         s = sessions.get(guildId);
     }
 
-    const line = String(text || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
-    if (!line.length) return { ok: false, reason: 'vacio' };
-
-    const q = sessions.get(guildId);
-    if (!q) return { ok: false, reason: 'no_sesion' };
-
-    if (q.queue.length >= MAX_QUEUE) {
-        return { ok: false, reason: 'cola_llena' };
-    }
-
-    q.queue.push(line);
-    resetIdleTimer(guildId);
-    drainQueue(guildId).catch((e) => console.warn('TTS drain:', e));
-
-    return { ok: true, reason: 'ok', queueLength: q.queue.length };
+    return enqueueTextForGuild(guildId, text, { fromChat: false });
 }
 
 function clearQueue(interaction) {
@@ -320,17 +437,70 @@ function getGuildLang(guildId) {
     return resolveLangForGuild(String(guildId || ''));
 }
 
-/** Listeners: bot kicked from VC */
+/** Si en el canal de voz de la sesión TTS no queda ningún usuario humano, cerrar al instante. */
+function disconnectTtsIfVoiceChannelEmpty(guild) {
+    const gid = guild?.id;
+    const s = gid ? sessions.get(gid) : undefined;
+    if (!s) return;
+
+    const chId = s.connection?.joinConfig?.channelId;
+    if (!chId) return;
+
+    const vc = guild.channels.cache.get(chId);
+    if (!vc || typeof vc.isVoiceBased !== 'function' || !vc.isVoiceBased()) {
+        destroyGuildSession(gid, 'canal_vc_invalido');
+        return;
+    }
+
+    let humanCount = 0;
+    try {
+        humanCount = [...vc.members.values()].filter((m) => m.user && !m.user.bot).length;
+    } catch {
+        return;
+    }
+
+    if (humanCount === 0) {
+        destroyGuildSession(gid, 'canal_sin_humanos');
+    }
+}
+
+/** Listeners: bot kicked from VC y lectura de chat → TTS */
 function attachCleanupListeners(client) {
     client.on('voiceStateUpdate', (oldState, newState) => {
-        if (oldState.memberId !== client.user?.id) return;
+        const guild = newState.guild;
 
-        /* Bot disconnected from any channel → limpiar TTS sólo si era nuestra sesión conocida */
-        if (oldState.channelId && !newState.channelId) {
-            const gid = oldState.guild.id;
-            if (sessions.has(gid)) destroyGuildSession(gid, 'bot_desconectado');
+        /* El propio bot se fue del canal (kick, mover, etc.): limpiar sesión TTS */
+        if (oldState.memberId === client.user?.id && oldState.channelId && !newState.channelId) {
+            if (sessions.has(guild.id)) destroyGuildSession(guild.id, 'bot_desconectado');
+            return;
         }
+
+        /* Cualquier cambio de voz en el servidor: si el canal TTS quedó sin humanos, desconectar ya */
+        disconnectTtsIfVoiceChannelEmpty(guild);
     });
+
+    if (READ_CHAT) {
+        client.on('messageCreate', (message) => {
+            if (!message.guild || message.author.bot) return;
+            if (message.webhookId) return;
+            if (!String(message.content || '').trim()) return;
+
+            const gid = message.guildId;
+            const s = sessions.get(gid);
+            if (!s?.listenChannelId) return;
+            if (!messageMatchesListenChannel(message, s.listenChannelId)) return;
+
+            Promise.resolve()
+                .then(async () => {
+                    if (READ_SKIP_PREFIX) {
+                        const prefix = await getCachedGuildPrefix(gid);
+                        if (prefix && message.content.startsWith(prefix)) return;
+                    }
+                    await enqueueTextForGuild(gid, message.content, { fromChat: true });
+                })
+                .catch((e) => console.warn('TTS messageCreate:', e?.message || e));
+        });
+    }
 }
 
 module.exports = {
@@ -338,8 +508,10 @@ module.exports = {
     joinSession,
     leaveGuild,
     enqueueSpeak,
+    enqueueTextForGuild,
     clearQueue,
     setGuildLang,
+    setGuildListenChannel,
     getGuildLang,
     attachCleanupListeners,
     destroyGuildSession,

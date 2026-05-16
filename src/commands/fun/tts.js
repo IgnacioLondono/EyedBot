@@ -1,10 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
 const config = require('../../config');
 const tts = require('../../utils/tts-voice-manager');
 
 const REASON_MESSAGES = {
-    no_voice: 'Entra primero a un **canal de voz**. Luego ejecuta **`/tts unir`**.',
-    ya_conectado: 'EyedBot ya está en tu canal de voz.',
+    no_voice: 'Entra primero a un **canal de voz**. Luego ejecuta **`/tts unir`** en el canal de texto del que quieres leer mensajes.',
+    ya_conectado: 'EyedBot ya está en tu **canal de voz**. Este canal de texto queda configurado para leer mensajes (o usa **`/tts escuchar`**).',
     voz_ocupada: 'El bot **ya tiene conexión de voz** (suele ser la **música**). Pon **`/stop`**, espera que salga del canal y vuelve con **`/tts unir`**.',
     sin_permiso: 'Al bot le faltan permisos **Conectar** y **Hablar** en ese canal de voz.',
     fallo_red: 'No se pudo establecer la conexión de voz. Intenta de nuevo más tarde.',
@@ -24,11 +24,21 @@ module.exports = {
                 .setName('unir')
                 .setDescription('Une EyedBot al canal de voz en el que estás'))
         .addSubcommand((sub) =>
+            sub
+                .setName('escuchar')
+                .setDescription('Define el canal de texto que se leerá en voz (mientras TTS está en llamada)')
+                .addChannelOption((opt) =>
+                    opt
+                        .setName('canal')
+                        .setDescription('Texto normal o anuncios del servidor')
+                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                        .setRequired(true)))
+        .addSubcommand((sub) =>
             sub.setName('salir').setDescription('Desconecta EyedBot del canal de voz'))
         .addSubcommand((sub) =>
             sub
                 .setName('decir')
-                .setDescription('Encola texto para que lo diga EyedBot en voz alta')
+                .setDescription('Opcional: encola una frase sin escribir en el chat')
                 .addStringOption((opt) =>
                     opt
                         .setName('texto')
@@ -97,15 +107,18 @@ module.exports = {
                 .setTitle('🔊 TTS EyedBot')
                 .setDescription(
                     [
-                        'Usa **`/tts idioma`** para elegir código (ej. español **`es`**).',
-                        'Luego **`/tts unir`** y **`/tts decir texto:...`**.',
+                        'Primero **`/tts idioma`** si quieres cambiar la voz (ej. español **`es`**).',
+                        'Tras **`/tts unir`**, EyedBot lee **en voz** los mensajes de texto que escriban en ese canal (o el que definas con **`/tts escuchar`**).',
+                        'Opcional: **`/tts decir`** para una frase sin usar el chat.',
                         '',
                         '**Notas**',
                         '• Similar a otros bots de TTS: EyedBot se une al canal de voz y reproduce audio sintetizado.',
                         '• El motor usa el servicio público de **Google Translate** (sin API key). Puede fallar o tener límites.',
                         '• No uses **al mismo tiempo** música y TTS si comparten una sola sesión de voz: antes **`/stop`** en música.',
                         '• El bot necesita **`ffmpeg`** (el proyecto incluye `ffmpeg-static`).',
-                        '• Opcional: **`TTS_CHAT_ECHO=true`** en `.env` para que también se publique el texto en el canal de comandos.'
+                        '• Cuando **no queda ningún usuario humano** en el canal de voz (solo bots o nadie más), EyedBot **sale al instante**.',
+                        '• Opcional: **`TTS_CHAT_ECHO=true`** en `.env` para repetir también el texto cuando uses **`/tts decir`**.',
+                        '• Lectura automática del chat: **`TTS_READ_CHAT=false`** en `.env` para desactivarla; **`TTS_READ_SKIP_PREFIX`** (por defecto true) ignora líneas que empiecen por el prefijo del bot.'
                     ].join('\n')
                 );
             return interaction.reply({ embeds: [embed], flags: 64 });
@@ -120,12 +133,32 @@ module.exports = {
             });
         }
 
+        if (sub === 'escuchar') {
+            const ch = interaction.options.getChannel('canal', true);
+            if (ch.guildId !== interaction.guildId) {
+                return interaction.reply({
+                    content: '❌ Ese canal no pertenece a este servidor.',
+                    flags: 64
+                });
+            }
+            const okListen = tts.setGuildListenChannel(interaction.guildId, ch.id);
+            if (!okListen) {
+                return interaction.reply({ content: '❌ Canal no válido.', flags: 64 });
+            }
+            const inVc = !!interaction.guild?.members.me?.voice?.channel;
+            const footer = inVc ? '' : ' Cuando ejecutes **`/tts unir`**, usaré este canal para leer el chat.';
+            return interaction.reply({
+                content: `📢 Voy a leer mensajes escritos en ${ch}.${footer}`,
+                flags: 64
+            });
+        }
+
         if (sub === 'unir') {
             const result = await tts.joinSession(interaction);
             const msg = result.ok
                 ? (result.reason === 'ya_conectado'
                     ? REASON_MESSAGES.ya_conectado
-                    : `Conectado a **${interaction.member?.voice?.channel?.name || 'voz'}**. Usa **/tts decir**.`)
+                    : `Conectado a **${interaction.member?.voice?.channel?.name || 'voz'}**. Mensajes escritos aquí (**y en hilos de este canal**) se leen en llamada.`)
                 : (REASON_MESSAGES[result.reason] || 'No se pudo conectar.');
 
             return interaction.reply({ content: `${result.ok ? '✅' : '❌'} ${msg}`, flags: 64 });
