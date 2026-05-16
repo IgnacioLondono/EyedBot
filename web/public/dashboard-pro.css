@@ -8873,6 +8873,279 @@ mark.receipt-highlight {
     vertical-align: middle;
 }
 
+.badge-gacha-price-fixed {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgba(127, 240, 180, 0.95);
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.42);
+}
+
+/* Gacha tienda — layout del editor */
+.gacha-shop-intro-list {
+    margin: 0.6rem 0 0;
+    padding-left: 1.2rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+.gacha-shop-intro-lead {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.gacha-shop-intro-list li + li {
+    margin-top: 0.35rem;
+}
+
+.gacha-field-hint.is-tight-before-actions {
+    margin-top: 0.4rem;
+}
+
+#gachaCatalogEditor.gacha-catalog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    margin-top: 0.5rem;
+}
+
+.gacha-catalog-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+    padding: 0.55rem 0.8rem;
+    border-radius: 12px;
+    background: rgba(var(--bg-card-rgb, 26, 16, 48), 0.42);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.gacha-catalog-card {
+    border-radius: 18px;
+    background: rgba(var(--bg-card-rgb, 24, 14, 44), 0.52);
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
+    padding: 1rem 1.15rem;
+    transition: border-color 0.18s ease, box-shadow 0.22s ease;
+}
+
+.gacha-catalog-card:hover {
+    border-color: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.38);
+    box-shadow:
+        0 12px 36px rgba(var(--bg-primary-rgb, 10, 12, 26), 0.4),
+        0 0 0 1px rgba(var(--accent-primary-rgb, 154, 109, 255), 0.08);
+}
+
+.gacha-catalog-card-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.gacha-catalog-visual {
+    flex: 0 0 112px;
+    width: 112px;
+}
+
+.gacha-catalog-thumb-img {
+    display: block;
+    width: 100%;
+    max-height: 152px;
+    object-fit: cover;
+    border-radius: 14px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.32);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.gacha-catalog-thumb-ph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 120px;
+    padding: 0.5rem;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    border-radius: 14px;
+    border: 1px dashed rgba(var(--border-rgb, 190, 155, 255), 0.35);
+    background: rgba(var(--bg-primary-rgb, 10, 12, 26), 0.62);
+}
+
+.gacha-catalog-body {
+    flex: 1;
+    min-width: min(100%, 280px);
+}
+
+.gacha-catalog-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.12);
+}
+
+.gacha-catalog-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    row-gap: 0.35rem;
+}
+
+.gacha-catalog-index {
+    font-size: 0.74rem;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.gacha-catalog-id {
+    display: inline-block;
+    padding: 0.15rem 0.45rem;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: ui-monospace, monospace;
+    color: rgba(200, 190, 255, 0.95);
+    background: rgba(var(--accent-primary-rgb, 154, 109, 255), 0.1);
+    border: 1px solid rgba(var(--accent-primary-rgb, 154, 109, 255), 0.22);
+    word-break: break-all;
+}
+
+.gacha-catalog-price-pill {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.55rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(246, 194, 68, 0.1);
+    border: 1px solid rgba(246, 194, 68, 0.35);
+}
+
+.gacha-catalog-price-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.gacha-catalog-price-value {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: #fcd977;
+}
+
+.gacha-catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 1.2rem;
+}
+
+@media (max-width: 760px) {
+    .gacha-catalog-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.gacha-catalog-block--span {
+    grid-column: 1 / -1;
+}
+
+.gacha-catalog-block-title {
+    margin: 0 0 0.55rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+}
+
+.gacha-field-hint {
+    margin: 0.32rem 0 0;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    line-height: 1.42;
+}
+
+.gacha-catalog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed rgba(var(--accent-primary-rgb, 154, 109, 255), 0.18);
+}
+
+.gacha-catalog-visibility-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.gacha-catalog-actions.is-compact {
+    margin-top: 0.6rem;
+    padding-top: 0;
+    border-top: none;
+}
+
+.gacha-catalog-card--removed {
+    border-color: rgba(248, 113, 113, 0.38);
+    background: rgba(60, 12, 24, 0.28);
+}
+
+.gacha-catalog-card--removed:hover {
+    border-color: rgba(251, 165, 165, 0.55);
+    box-shadow: 0 10px 32px rgba(30, 0, 8, 0.45);
+}
+
+.badge-gacha-removed {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.52rem;
+    margin-right: 0.35rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(254, 202, 202, 0.98);
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(248, 113, 113, 0.5);
+}
+
+.gacha-catalog-removed-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.gacha-catalog-removed-sub {
+    margin-top: 0.2rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.gacha-catalog-removed-banner .gacha-field-hint:last-of-type {
+    margin-top: 0.65rem;
+}
+
 /* Stats header */
 .dpx-stats-grid {
     display: grid;
@@ -9209,6 +9482,17 @@ mark.receipt-highlight {
 
 .dpx-field.is-full {
     grid-column: 1 / -1;
+}
+
+/* Tarjetas gacha tienda — rejilla más densa dentro de cada bloque */
+.dpx-field-grid.gacha-catalog-block-grid {
+    gap: 0.7rem 0.85rem;
+}
+
+@media (min-width: 761px) {
+    .dpx-field-grid.gacha-catalog-block-grid {
+        grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    }
 }
 
 /* Inline action bar at bottom of section */
