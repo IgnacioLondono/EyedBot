@@ -56,7 +56,9 @@ function defaultConfig() {
         intervalMinutes: 120,
         message: '🔔 Ya puedes hacer `/bump` en Disboard.',
         pingRoleId: '',
+        bumpXpBonus: 100,
         nextReminderAt: '',
+        waitingForBump: false,
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
     };
@@ -73,7 +75,9 @@ function normalizeConfig(raw = {}) {
         intervalMinutes,
         message: String(raw.message || base.message).slice(0, 1500),
         pingRoleId: String(raw.pingRoleId || '').replace(/\D/g, '').slice(0, 24),
+        bumpXpBonus: Math.max(0, Math.min(5000, Number.parseInt(`${raw.bumpXpBonus ?? base.bumpXpBonus}`, 10) || base.bumpXpBonus)),
         nextReminderAt: String(raw.nextReminderAt || ''),
+        waitingForBump: raw.waitingForBump === true,
         updatedAt: String(raw.updatedAt || new Date().toISOString()),
         updatedBy: String(raw.updatedBy || 'system')
     };

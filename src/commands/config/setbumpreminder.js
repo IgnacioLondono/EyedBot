@@ -33,12 +33,19 @@ module.exports = {
                 .addRoleOption((option) =>
                     option
                         .setName('rol')
-                        .setDescription('Rol a mencionar en recordatorios y al detectar bump (opcional)')
+                        .setDescription('Rol a mencionar en el recordatorio programado (opcional)')
                         .setRequired(false))
                 .addBooleanOption((option) =>
                     option
                         .setName('quitar_mencion')
                         .setDescription('Quitar la mención por rol (no uses esto si eliges un rol nuevo)')
+                        .setRequired(false))
+                .addIntegerOption((option) =>
+                    option
+                        .setName('xp_bono')
+                        .setDescription('XP extra al quien hace bump (0 = desactivado, por defecto 100)')
+                        .setMinValue(0)
+                        .setMaxValue(5000)
                         .setRequired(false)))
         .addSubcommand((subcommand) =>
             subcommand
@@ -60,6 +67,7 @@ module.exports = {
             const message = interaction.options.getString('mensaje') || '🔔 Ya puedes hacer `/bump` en Disboard.';
             const quitarMencion = interaction.options.getBoolean('quitar_mencion') === true;
             const rol = interaction.options.getRole('rol');
+            const xpBono = interaction.options.getInteger('xp_bono');
 
             const config = await bumpReminderStore.getBumpReminderConfig(guildId);
             let pingRoleId = config.pingRoleId || '';
@@ -73,6 +81,8 @@ module.exports = {
                 intervalMinutes,
                 message,
                 pingRoleId,
+                ...(xpBono !== null && xpBono !== undefined ? { bumpXpBonus: xpBono } : {}),
+                waitingForBump: false,
                 nextReminderAt: buildNextReminderAt(intervalMinutes),
                 updatedAt: new Date().toISOString(),
                 updatedBy: interaction.user.id
@@ -86,7 +96,7 @@ module.exports = {
                 embeds: [
                     Embeds.success(
                         'Bump reminder configurado',
-                        `Canal: ${channel}\nIntervalo: **${updated.intervalMinutes} min**\n${mencionLine}\nProximo aviso: <t:${Math.floor(Date.parse(updated.nextReminderAt) / 1000)}:R>`
+                        `Canal: ${channel}\nIntervalo: **${updated.intervalMinutes} min**\n${mencionLine}\nBono XP por bump: **${updated.bumpXpBonus || 0}** (0 = desactivado)\nPróximo recordatorio: <t:${Math.floor(Date.parse(updated.nextReminderAt) / 1000)}:R>\nSe envía **un solo** aviso por ciclo; el siguiente se programa cuando Disboard confirme un bump.`
                     )
                 ]
             });
@@ -101,19 +111,24 @@ module.exports = {
                 });
             }
 
-            const nextTs = Number.isFinite(Date.parse(config.nextReminderAt))
-                ? `<t:${Math.floor(Date.parse(config.nextReminderAt) / 1000)}:R>`
-                : 'No definido';
-
             const mencionEstado = config.pingRoleId
                 ? `Mención (rol): <@&${config.pingRoleId}>`
                 : 'Mención (rol): *ninguna*';
+
+            let proximoAviso;
+            if (config.waitingForBump === true) {
+                proximoAviso = '**Tras el próximo bump** (ya se envió el recordatorio de este ciclo; el siguiente se programa cuando Disboard confirme un bump).';
+            } else if (Number.isFinite(Date.parse(config.nextReminderAt))) {
+                proximoAviso = `<t:${Math.floor(Date.parse(config.nextReminderAt) / 1000)}:R>`;
+            } else {
+                proximoAviso = 'No definido';
+            }
 
             return interaction.reply({
                 embeds: [
                     Embeds.info(
                         'Estado bump reminder',
-                        `Activo: **Si**\nCanal: <#${config.channelId}>\nIntervalo: **${config.intervalMinutes} min**\n${mencionEstado}\nProximo aviso: **${nextTs}**\nMensaje: ${config.message}`
+                        `Activo: **Si**\nCanal: <#${config.channelId}>\nIntervalo: **${config.intervalMinutes} min**\n${mencionEstado}\nBono XP por bump: **${config.bumpXpBonus ?? 100}**\nPróximo recordatorio: ${proximoAviso}\nMensaje: ${config.message}`
                     )
                 ],
                 flags: 64
@@ -125,6 +140,7 @@ module.exports = {
             await bumpReminderStore.setBumpReminderConfig(guildId, {
                 ...config,
                 enabled: false,
+                waitingForBump: false,
                 nextReminderAt: '',
                 updatedAt: new Date().toISOString(),
                 updatedBy: interaction.user.id
