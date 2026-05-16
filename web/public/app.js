@@ -4638,10 +4638,18 @@ function bindDpxTabs(container, options = {}) {
     if (!tabs.length || !panels.length) return;
 
     const onTabActivate = typeof options.onTabActivate === 'function' ? options.onTabActivate : null;
+    const persistTabStorageKey = typeof options.persistTabStorageKey === 'string' && options.persistTabStorageKey.trim()
+        ? options.persistTabStorageKey.trim()
+        : null;
 
     const activate = (key) => {
         tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-dpx-tab') === key));
         panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
+        if (persistTabStorageKey) {
+            try {
+                sessionStorage.setItem(persistTabStorageKey, key);
+            } catch (_) { /* noop */ }
+        }
         if (onTabActivate) {
             try { onTabActivate(key, container); } catch (e) { console.error('bindDpxTabs onTabActivate', e); }
         }
@@ -6208,6 +6216,27 @@ function buildGachaLeaderboardHtml(payload) {
     `;
 }
 
+const GACHA_PANEL_TAB_KEYS = Object.freeze([
+    'gacha-config',
+    'gacha-economy',
+    'gacha-shop',
+    'gacha-inventory',
+    'gacha-market',
+    'gacha-top'
+]);
+
+function gachaPanelActiveTabStorageKey(guildId) {
+    return `eyedbot:gacha:${String(guildId)}:dpxActiveTab`;
+}
+
+function readGachaPanelStoredTab(guildId) {
+    try {
+        const stored = sessionStorage.getItem(gachaPanelActiveTabStorageKey(guildId));
+        if (stored && GACHA_PANEL_TAB_KEYS.includes(stored)) return stored;
+    } catch (_) { /* noop */ }
+    return 'gacha-config';
+}
+
 async function loadGachaPanel(guildId) {
     const container = document.getElementById('gachaContainer');
     if (!container) return;
@@ -6298,6 +6327,8 @@ async function loadGachaPanel(guildId) {
             return /^https?:\/\/.+/i.test(s) ? s : '';
         };
 
+        const gachaDpxActive = readGachaPanelStoredTab(guildId);
+
         container.innerHTML = `
             <div class="dpx-panel">
                 ${dpxRenderHero({
@@ -6328,9 +6359,9 @@ async function loadGachaPanel(guildId) {
                     { key: 'gacha-inventory', label: 'Inventario', iconName: 'book' },
                     { key: 'gacha-market', label: 'Mercado', iconName: 'users' },
                     { key: 'gacha-top', label: 'Ranking', iconName: 'users' }
-                ], 'gacha-config')}
+                ], gachaDpxActive)}
 
-                <section class="dpx-tab-panel is-active" data-dpx-panel="gacha-config">
+                <section class="dpx-tab-panel ${gachaDpxActive === 'gacha-config' ? 'is-active' : ''}" data-dpx-panel="gacha-config">
                     <div class="dpx-section">
                         <div class="dpx-toggle-grid">
                             ${dpxRenderToggle({ id: 'gachaEnabled', checked: !!config.enabled, title: 'Activar sistema gacha', description: 'Permite /gacha roll, /gacha claim, perfiles y top.' })}
@@ -6367,7 +6398,7 @@ async function loadGachaPanel(guildId) {
                     </div>
                 </section>
 
-                <section class="dpx-tab-panel" data-dpx-panel="gacha-economy">
+                <section class="dpx-tab-panel ${gachaDpxActive === 'gacha-economy' ? 'is-active' : ''}" data-dpx-panel="gacha-economy">
                     <div class="dpx-section">
                         <div class="dpx-toggle-grid">
                             ${dpxRenderToggle({ id: 'gachaEconomyEnabled', checked: !!config.economyEnabled, title: 'Activar economía', description: 'Habilita monedas por XP, tienda /tienda y recompensas de minijuegos.' })}
@@ -6410,7 +6441,7 @@ async function loadGachaPanel(guildId) {
                     </div>
                 </section>
 
-                <section class="dpx-tab-panel" data-dpx-panel="gacha-shop">
+                <section class="dpx-tab-panel ${gachaDpxActive === 'gacha-shop' ? 'is-active' : ''}" data-dpx-panel="gacha-shop">
                     <div class="dpx-section gacha-shop-section">
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
@@ -6418,7 +6449,7 @@ async function loadGachaPanel(guildId) {
                                 <p class="gacha-shop-intro-lead">Este listado edita la misma base de datos que el bot: Discord <code>/tienda</code> y las compras usarán lo que guardes aquí.</p>
                                 <ul class="gacha-shop-intro-list">
                                     <li><strong>Precio</strong> en blanco → automático (valor base × multiplicador × rareza).</li>
-                                    <li><strong>Imagen</strong> solo con URL <code>https://</code> o <code>http://</code>.</li>
+                                    <li><strong>Imagen</strong>: pega una URL o <strong>súbela</strong> desde el panel (PNG/JPG/WebP/GIF, hasta 8&nbsp;MB). Discord solo muestra el embed si la URL es HTTPS y pública desde internet.</li>
                                     <li><strong>Ocultar</strong> quita el artículo de <code>/tienda</code> y borra ofertas del mercado sistema para ese personaje.</li>
                                     <li><strong>Eliminar del servidor</strong> lo quita también del <strong>pool</strong> (no sale en tienda ni en mercado sistema; los rolls pueden seguir saliendo desde el archivo global hasta que filtremos gacha).</li>
                                     <li><strong>Activar en servidor</strong> vuelve a incluir personajes marcados como eliminados aquí.</li>
@@ -6526,7 +6557,14 @@ async function loadGachaPanel(guildId) {
                                                     <div class="dpx-field-grid gacha-catalog-block-grid">
                                                         <div class="dpx-field is-full">
                                                             <label>URL de imagen</label>
-                                                            <input type="url" class="form-control gacha-catalog-image-url" placeholder="https://..." value="${escapeHtmlForValue(item.imageUrl || '')}">
+                                                            <div class="gacha-catalog-image-row">
+                                                                <input type="url" class="form-control gacha-catalog-image-url" placeholder="https://..." value="${escapeHtmlForValue(item.imageUrl || '')}">
+                                                                <label class="btn btn-secondary gacha-catalog-upload-btn">
+                                                                    Subir imagen
+                                                                    <input type="file" class="gacha-catalog-upload-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" data-gacha-upload-character="${escapeHtml(item.id)}">
+                                                                </label>
+                                                            </div>
+                                                            <p class="gacha-field-hint">Al subir se rellena la URL de tu propio panel. Recuerda pulsar <strong>Guardar cambios</strong> para persistir en el bot.</p>
                                                         </div>
                                                         <div class="dpx-field is-full">
                                                             <label>Descripción (embed)</label>
@@ -6560,7 +6598,7 @@ async function loadGachaPanel(guildId) {
                     </div>
                 </section>
 
-                <section class="dpx-tab-panel" data-dpx-panel="gacha-top">
+                <section class="dpx-tab-panel ${gachaDpxActive === 'gacha-top' ? 'is-active' : ''}" data-dpx-panel="gacha-top">
                     <div class="dpx-section levels-leaderboard-shell">
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
@@ -6572,7 +6610,7 @@ async function loadGachaPanel(guildId) {
                     </div>
                 </section>
 
-                <section class="dpx-tab-panel" data-dpx-panel="gacha-inventory">
+                <section class="dpx-tab-panel ${gachaDpxActive === 'gacha-inventory' ? 'is-active' : ''}" data-dpx-panel="gacha-inventory">
                     <div class="dpx-section">
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
@@ -6613,7 +6651,7 @@ async function loadGachaPanel(guildId) {
                     </div>
                 </section>
 
-                <section class="dpx-tab-panel" data-dpx-panel="gacha-market">
+                <section class="dpx-tab-panel ${gachaDpxActive === 'gacha-market' ? 'is-active' : ''}" data-dpx-panel="gacha-market">
                     <div class="dpx-section">
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
@@ -6660,7 +6698,61 @@ async function loadGachaPanel(guildId) {
             </div>
         `;
 
-        bindDpxTabs(container);
+        bindDpxTabs(container, { persistTabStorageKey: gachaPanelActiveTabStorageKey(guildId) });
+
+        if (container._eyedbotGachaUploadAbort) {
+            try { container._eyedbotGachaUploadAbort.abort(); } catch (_) { /* noop */ }
+        }
+        const gachaUploadAbort = new AbortController();
+        container._eyedbotGachaUploadAbort = gachaUploadAbort;
+
+        container.addEventListener('change', async (uploadEvent) => {
+            const fileInput = uploadEvent.target;
+            if (!(fileInput instanceof HTMLInputElement) || !fileInput.classList.contains('gacha-catalog-upload-input')) return;
+            const characterId = fileInput.getAttribute('data-gacha-upload-character');
+            if (!characterId) return;
+
+            const file = fileInput.files && fileInput.files[0];
+            fileInput.value = '';
+            if (!file) return;
+
+            if (!/^image\/(png|jpeg|jpg|webp|gif)$/i.test(file.type)) {
+                showToast('El archivo debe ser imagen PNG, JPG, WebP o GIF.', 'error');
+                return;
+            }
+
+            try {
+                const fd = new FormData();
+                fd.append('imageFile', file);
+                const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog-upload`, {
+                    method: 'POST',
+                    body: fd
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    showToast(data.error || 'No se pudo subir la imagen', 'error');
+                    return;
+                }
+                const url = String(data.url || '').trim();
+                if (!/^https?:\/\//i.test(url)) {
+                    showToast('Respuesta de subida sin URL válida', 'error');
+                    return;
+                }
+                const row = Array.from(container.querySelectorAll('.gacha-catalog-row')).find(
+                    (r) => r.getAttribute('data-character-id') === characterId
+                );
+                const urlField = row?.querySelector('.gacha-catalog-image-url');
+                if (urlField) urlField.value = url;
+                const thumbCell = row?.querySelector('.gacha-catalog-visual');
+                if (thumbCell) {
+                    thumbCell.innerHTML = `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(url)}"/>`;
+                }
+                showToast('Imagen subida. Pulsa «Guardar cambios» para guardar en el catálogo.', 'success');
+            } catch (err) {
+                console.error(err);
+                showToast('Error al subir imagen', 'error');
+            }
+        }, { signal: gachaUploadAbort.signal });
 
         container.querySelectorAll('.gacha-catalog-save-btn').forEach((button) => {
             button.addEventListener('click', async () => {

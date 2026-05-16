@@ -311,6 +311,12 @@ function ensureVerifyUploadsDir() {
     return uploadsDir;
 }
 
+function ensureGachaCatalogUploadsDir() {
+    const uploadsDir = path.join(__dirname, 'public', 'uploads', 'gacha-catalog');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    return uploadsDir;
+}
+
 function sanitizeUploadName(name = 'welcome-image') {
     return String(name)
         .toLowerCase()
@@ -3458,6 +3464,38 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
         res.status(500).json({ error: 'Error al subir imagen de bienvenida' });
+    }
+});
+
+app.post('/api/guild/:guildId/gacha-catalog-upload', requireAuth, upload.single('imageFile'), async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!hasAdminOrManageGuildPermission(userGuild)) {
+            return res.status(403).json({ error: 'Necesitas permisos de gestión en este servidor' });
+        }
+
+        const file = req.file;
+        if (!file?.buffer) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+        if (!String(file.mimetype || '').startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
+
+        const uploadsDir = ensureGachaCatalogUploadsDir();
+        const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `gacha-${guildId}`);
+        const extension = extFromMimeOrName(file.mimetype, file.originalname);
+        const fileName = `${guildId}_${Date.now()}_${baseName}${extension}`;
+        const outputPath = path.join(uploadsDir, fileName);
+
+        fs.writeFileSync(outputPath, file.buffer);
+
+        const publicPath = `/uploads/gacha-catalog/${fileName}`;
+        const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
+        res.json({ success: true, url: publicUrl, path: publicPath });
+    } catch (error) {
+        console.error('Error subiendo imagen de catálogo gacha:', error);
+        res.status(500).json({ error: 'Error al subir imagen del catálogo' });
     }
 });
 
