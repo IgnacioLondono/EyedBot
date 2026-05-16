@@ -6407,7 +6407,7 @@ async function loadGachaPanel(guildId) {
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
                                 <h4>Catálogo de tienda</h4>
-                                <p>Nombre, imagen (<strong>solo enlaces HTTP/HTTPS</strong>), rareza y descripción se persisten por servidor en la misma KV/JSON que usa el bot. Discord <code>/tienda</code> muestra la imagen en grande si la URL es válida. «Restaurar personaje» quita todas las personalizaciones de ese personaje en la base.</p>
+                                <p>Nombre, imagen (<strong>solo enlaces HTTP/HTTPS</strong>), rareza y descripción se persisten por servidor en la misma KV/JSON que usa el bot. Puedes fijar un <strong>precio en monedas</strong> por artículo (vacío = cálculo automático con multiplicador y rareza). Discord <code>/tienda</code> muestra la imagen en grande si la URL es válida. «Restaurar personaje» quita todas las personalizaciones de ese personaje en la base.</p>
                             </div>
                         </div>
                         <div id="gachaCatalogEditor" class="dpx-item-list">
@@ -6421,7 +6421,7 @@ async function loadGachaPanel(guildId) {
         : `<div class="gacha-catalog-thumb-ph" style="display:flex;align-items:center;justify-content:center;text-align:center;min-height:120px;padding:8px;font-size:.78rem;color:var(--text-muted,#a48fd0);border-radius:12px;border:1px dashed rgba(var(--border-rgb,190,155,255),0.38);background:rgba(var(--bg-primary-rgb,10,12,26),0.65);">Sin imagen preview</div>`}
                                     </div>
                                     <div class="dpx-item-main gacha-catalog-fields" style="flex:1;min-width:min(100%, 280px);">
-                                        <div class="dpx-item-title">${item.shopHidden === true ? '<span class="badge-gacha-hidden" title="Oculto de /tienda">Oculto</span> ' : ''}#${index + 1} ${escapeHtml(item.id)} · Precio ${Number(item.price || 0).toLocaleString('es-ES')}</div>
+                                        <div class="dpx-item-title">${item.shopHidden === true ? '<span class="badge-gacha-hidden" title="Oculto de /tienda">Oculto</span> ' : ''}#${index + 1} ${escapeHtml(item.id)} · Precio ${Number(item.price || 0).toLocaleString('es-ES')}${item.shopPriceOverride != null ? ' <span style="opacity:.82;font-weight:600;">(fijado)</span>' : ''}</div>
                                         <div class="dpx-field-grid" style="margin-top:0.75rem;">
                                             <div class="dpx-field">
                                                 <label>Nombre</label>
@@ -6440,6 +6440,11 @@ async function loadGachaPanel(guildId) {
                                             <div class="dpx-field">
                                                 <label>Valor base</label>
                                                 <input class="form-control gacha-catalog-base-value" type="number" min="1" value="${Number(item.baseValue || 1)}">
+                                            </div>
+                                            <div class="dpx-field">
+                                                <label>Precio tienda (monedas)</label>
+                                                <input class="form-control gacha-catalog-shop-price" type="number" min="1" placeholder="Automático" value="${item.shopPriceOverride != null ? Number(item.shopPriceOverride) : ''}">
+                                                <p style="margin:0.35rem 0 0;font-size:.78rem;color:var(--text-secondary);">Vacío: precio automático (${Number(item.shopPriceDefault ?? item.price ?? 0).toLocaleString('es-ES')} con la economía actual).</p>
                                             </div>
                                             <div class="dpx-field is-full">
                                                 <label>URL de imagen (Discord embed)</label>
@@ -6587,7 +6592,8 @@ async function loadGachaPanel(guildId) {
                     description: row.querySelector('.gacha-catalog-description')?.value || '',
                     baseValue: Number.parseInt(row.querySelector('.gacha-catalog-base-value')?.value || '1', 10),
                     imageUrl: row.querySelector('.gacha-catalog-image-url')?.value || '',
-                    shopHidden: row.querySelector('.gacha-catalog-shop-hidden')?.checked === true
+                    shopHidden: row.querySelector('.gacha-catalog-shop-hidden')?.checked === true,
+                    shopPrice: row.querySelector('.gacha-catalog-shop-price')?.value ?? ''
                 };
 
                 try {
