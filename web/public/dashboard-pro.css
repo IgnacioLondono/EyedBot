@@ -13361,6 +13361,16 @@ body {
     min-height: calc(100vh - 110px);
 }
 
+/* Sin etiquetas de módulo (Economía, Módulo, etc.) ni icono decorativo en cabeceras */
+.server-pane-kicker,
+.server-pane-icon-badge,
+.dpx-hero-kicker,
+.dpx-hero-icon-badge,
+.overview-hero-kicker,
+.server-insight-kicker {
+    display: none !important;
+}
+
 #serverSection.server-config-shell .server-pane-head--structured {
     align-items: center;
     padding: 1rem 1.15rem;

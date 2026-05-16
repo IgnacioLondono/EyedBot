@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const bumpReminderStore = require('./bump-reminder-store');
+const { awardXpToMember } = require('../events/leveling-tracker');
 
 const CHECK_MS = Math.max(30_000, Number.parseInt(process.env.BUMP_REMINDER_CHECK_MS || '60000', 10));
 const DISBOARD_BOT_ID = '302050872383242240';
@@ -7,6 +8,8 @@ const DETECT_COOLDOWN_MS = Math.max(10_000, Number.parseInt(process.env.BUMP_DET
 let intervalRef = null;
 let running = false;
 const lastDetectionByGuild = new Map();
+const lastRewardByBumper = new Map();
+const BUMP_REWARD_COOLDOWN_MS = Math.max(30_000, Number.parseInt(process.env.BUMP_REWARD_COOLDOWN_MS || '120000', 10));
 
 function buildNextReminderAt(intervalMinutes) {
     const mins = Math.max(15, Number(intervalMinutes) || 120);
@@ -14,10 +17,11 @@ function buildNextReminderAt(intervalMinutes) {
 }
 
 function shouldSendNow(config) {
+    if (config.waitingForBump === true) return false;
     const raw = String(config.nextReminderAt || '').trim();
-    if (!raw) return true;
+    if (!raw) return false;
     const ts = Date.parse(raw);
-    if (!Number.isFinite(ts)) return true;
+    if (!Number.isFinite(ts)) return false;
     return Date.now() >= ts;
 }
 
@@ -50,13 +54,13 @@ async function processGuildConfig(client, guildId, config) {
     const posted = await postReminder(client, guildId, config).catch(() => false);
     if (!posted) return;
 
-    const nextConfig = {
+    await bumpReminderStore.setBumpReminderConfig(guildId, {
         ...config,
-        nextReminderAt: buildNextReminderAt(config.intervalMinutes),
+        waitingForBump: true,
+        nextReminderAt: '',
         updatedAt: new Date().toISOString(),
         updatedBy: 'scheduler'
-    };
-    await bumpReminderStore.setBumpReminderConfig(guildId, nextConfig);
+    });
 }
 
 async function runBumpReminderSweep(client) {
@@ -104,6 +108,57 @@ function extractMessageText(message) {
     return parts.join('\n').toLowerCase();
 }
 
+function extractBumperUserId(message) {
+    const fromInteraction = message?.interaction?.user?.id
+        || message?.interactionMetadata?.user?.id;
+    if (fromInteraction) return String(fromInteraction);
+
+    return '';
+}
+
+async function grantBumpXpBonus(message, config) {
+    const userId = extractBumperUserId(message);
+    if (!userId) return null;
+
+    const xpBonus = Math.max(0, Number.parseInt(config.bumpXpBonus ?? 0, 10) || 0);
+    if (xpBonus <= 0) return null;
+
+    const guild = message.guild || await message.client.guilds.fetch(message.guildId).catch(() => null);
+    if (!guild) return null;
+
+    const member = guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
+    if (!member || member.user?.bot) return null;
+
+    return awardXpToMember(member, xpBonus, 'bump');
+}
+
+async function grantBumpRewards(message, config) {
+    const userId = extractBumperUserId(message);
+    const guildId = String(message.guildId || '');
+    if (!userId || !guildId) return;
+
+    const rewardKey = `${guildId}:${userId}`;
+    const now = Date.now();
+    const lastReward = Number(lastRewardByBumper.get(rewardKey) || 0);
+    if (now - lastReward < BUMP_REWARD_COOLDOWN_MS) return;
+
+    const xpState = await grantBumpXpBonus(message, config).catch(() => null);
+
+    const xpBonus = Math.max(0, Number.parseInt(config.bumpXpBonus ?? 0, 10) || 0);
+    if (xpState && xpBonus > 0) {
+        const guild = message.guild || await message.client.guilds.fetch(guildId).catch(() => null);
+        const channel = guild?.channels?.cache?.get(config.channelId)
+            || await guild?.channels?.fetch(config.channelId).catch(() => null);
+        if (channel?.isTextBased()) {
+            await channel.send({
+                content: `<@${userId}> recibiste **+${xpBonus} XP** por hacer bump.`
+            }).catch(() => null);
+        }
+    }
+
+    lastRewardByBumper.set(rewardKey, now);
+}
+
 function isDisboardBumpMessage(message) {
     if (!message?.guildId) return false;
     if (String(message?.author?.id || '') !== DISBOARD_BOT_ID) return false;
@@ -135,6 +190,7 @@ async function handleDisboardBumpMessage(message) {
 
     const nextConfig = {
         ...config,
+        waitingForBump: false,
         nextReminderAt: buildNextReminderAt(config.intervalMinutes),
         updatedAt: new Date().toISOString(),
         updatedBy: 'disboard-detect'
@@ -142,17 +198,9 @@ async function handleDisboardBumpMessage(message) {
     await bumpReminderStore.setBumpReminderConfig(guildId, nextConfig);
     lastDetectionByGuild.set(guildId, now);
 
-    const guild = message.guild || message.client.guilds.cache.get(guildId);
-    const channel = guild?.channels?.cache?.get(config.channelId)
-        || await guild?.channels?.fetch?.(config.channelId).catch(() => null);
-    if (channel?.isTextBased()) {
-        const nextTs = Math.floor(Date.parse(nextConfig.nextReminderAt) / 1000);
-        const rid = String(config.pingRoleId || '').trim();
-        const mention = rid ? `<@&${rid}> ` : '';
-        await channel.send({
-            content: `${mention}✅ Bump detectado. Próximo recordatorio <t:${nextTs}:R>.`
-        }).catch(() => null);
-    }
+    await grantBumpRewards(message, config).catch((error) => {
+        console.error('Error otorgando recompensas de bump:', error?.message || error);
+    });
 
     return true;
 }

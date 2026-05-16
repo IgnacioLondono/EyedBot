@@ -809,19 +809,8 @@ function ensureServerPaneHeadStructure(head, meta = {}) {
         head.appendChild(actions);
     }
 
-    let badge = main.querySelector('.server-pane-icon-badge');
-    if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'server-pane-icon-badge';
-        badge.setAttribute('aria-hidden', 'true');
-        main.prepend(badge);
-    }
-
-    if (meta.icon) {
-        badge.innerHTML = dpxIcon(meta.icon, 'server-pane-icon-svg');
-    }
-
-    const firstBlock = badge.nextElementSibling;
+    const firstBlock = main.querySelector('.server-pane-head-copy')
+        || main.querySelector(':scope > div:not(.server-pane-head-actions):not(.ticket-manage-actions)');
     if (firstBlock && !firstBlock.classList.contains('server-pane-head-copy')) {
         firstBlock.classList.add('server-pane-head-copy');
     }
@@ -830,10 +819,6 @@ function ensureServerPaneHeadStructure(head, meta = {}) {
         actions.classList.add('server-pane-head-actions');
     }
 
-    const kicker = head.querySelector('.server-pane-kicker');
-    if (kicker && meta.kicker) {
-        kicker.textContent = meta.kicker;
-    }
 }
 
 function decorateServerConfigNavigation() {
@@ -4771,15 +4756,12 @@ function levelsRenderMainTabs(activeKey = 'config') {
     `;
 }
 
-function dpxRenderHero({ kicker = '', title = '', description = '', actionsHtml = '', accent = '#ff78d1', glow1 = 'rgba(124,77,255,0.18)', glow2 = 'rgba(255,120,209,0.18)', iconName = '' } = {}) {
+function dpxRenderHero({ title = '', description = '', actionsHtml = '', accent = '#ff78d1', glow1 = 'rgba(124,77,255,0.18)', glow2 = 'rgba(255,120,209,0.18)' } = {}) {
     const styleAttr = `style="--dpx-hero-accent:${accent};--dpx-hero-glow-1:${glow1};--dpx-hero-glow-2:${glow2};"`;
-    const iconHtml = iconName ? `<span class="dpx-hero-icon-badge" aria-hidden="true">${dpxIcon(iconName, 'dpx-hero-icon')}</span>` : '';
     return `
         <header class="dpx-hero" ${styleAttr}>
             <div class="dpx-hero-main">
-                ${iconHtml}
                 <div class="dpx-hero-text">
-                ${kicker ? `<div class="dpx-hero-kicker">${kicker}</div>` : ''}
                 <h3>${escapeHtml(title)}</h3>
                 <p>${escapeHtml(description)}</p>
                 </div>
@@ -9514,7 +9496,6 @@ function renderServerOverviewMarkup(info, topUsersMarkup, ownerTag, ownerAvatar,
                     <div class="overview-hero-identity">
                         <div class="overview-hero-icon">${serverIcon}</div>
                         <div class="overview-hero-meta">
-                            <div class="overview-hero-kicker">Servidor</div>
                             <h2 class="overview-hero-title">${serverName}</h2>
                             <div class="overview-hero-sub">Creado el ${escapeHtml(createdDate)} • ${formatServerMetric(ageDays)} días de historia</div>
                         </div>

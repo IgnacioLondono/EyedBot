@@ -282,5 +282,6 @@ module.exports = {
     seedVoiceAnalyticsSessions,
     flushAllVoiceAnalyticsSessions,
     startVoiceXpLoop,
-    stopVoiceXpLoop
+    stopVoiceXpLoop,
+    awardXpToMember
 };
