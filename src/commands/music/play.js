@@ -1,10 +1,10 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { useQueue } = require('discord-player');
+const { useQueue } = require('../../utils/music-queue-manager');
 const YouTube = require('youtube-sr').default;
 const axios = require('axios');
 const config = require('../../config');
 const { safeDeferReply, safeEditReply } = require('../../utils/interactions');
-const { getMusicSystem } = require('./_common');
+const { getMusicSystem, ensureMusicBackend } = require('./_common');
 const { resolveProviderUrl, detectProvider, formatDurationMs } = require('../../utils/music-providers');
 
 const AUTOCOMPLETE_TTL_MS = Math.max(5000, Number.parseInt(process.env.MUSIC_AUTOCOMPLETE_TTL_MS || '15000', 10));
@@ -591,6 +591,14 @@ module.exports = {
     },
 
     async execute(interaction) {
+        const backend = ensureMusicBackend(interaction);
+        if (!backend.ok) {
+            return interaction.reply({
+                embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Música no disponible').setDescription(backend.message)],
+                flags: 64
+            });
+        }
+
         const musicSystem = getMusicSystem(interaction);
         const input = interaction.options.getString('input') || interaction.options.getString('busqueda');
         const voiceChannel = interaction.member?.voice?.channel;

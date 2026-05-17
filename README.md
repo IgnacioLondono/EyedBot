@@ -129,8 +129,8 @@ MUSIC_LEAVE_ON_END=true
 MUSIC_LEAVE_ON_END_COOLDOWN_MS=180000
 MUSIC_BUFFERING_TIMEOUT_MS=7000
 
-# Lavalink (opcional, recomendado para estabilidad)
-LAVALINK_ENABLED=false
+# Lavalink (requerido si MUSIC_ENABLED=true)
+LAVALINK_ENABLED=true
 LAVALINK_HOST=lavalink
 LAVALINK_PORT=2333
 LAVALINK_PASSWORD=youshallnotpass
@@ -148,7 +148,7 @@ docker-compose up -d --build
 docker-compose logs -f lavalink
 ```
 
-Puedes dejar `LAVALINK_ENABLED=false` hasta terminar la migración de reproducción; el servicio quedará listo sin romper tu flujo actual.
+La música usa **Shoukaku → Lavalink 4** (plugin YouTube). Sin Lavalink en marcha, `/play` no funcionará.
 
 ### 3. Registrar Comandos
 

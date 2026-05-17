@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { QueueRepeatMode } = require('discord-player');
+const { QueueRepeatMode } = require('../../utils/music-repeat-modes');
 const { getQueueOrReply, userCanControlMusic, supportsAutoplayMode } = require('./_common');
 
 module.exports = {
@@ -23,7 +23,7 @@ module.exports = {
                 embeds: [new EmbedBuilder()
                     .setColor('#FFA500')
                     .setTitle('❌ No soportado')
-                    .setDescription('Autoplay no está disponible con esta versión de discord-player.')],
+                    .setDescription('Autoplay no está disponible en este servidor.')],
                 flags: 64
             });
         }

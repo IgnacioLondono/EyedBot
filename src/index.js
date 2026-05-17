@@ -227,15 +227,10 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
 }
 
 if (MUSIC_ENABLED) {
-    const { Player } = require('discord-player');
-    const ffmpegPath = require('ffmpeg-static');
-    const player = new Player(client, {
-        connectionTimeout: 45000,
-        probeTimeout: 20000,
-        skipFFmpeg: config.musicSkipFfmpeg,
-        ffmpegPath
-    });
-    client.player = player;
+    if (!config.lavalinkEnabled) {
+        console.warn('⚠️ MUSIC_ENABLED=true pero LAVALINK_ENABLED=false. Activa Lavalink para reproducir música.');
+    }
+    client.player = null;
 } else {
     console.log('🎵 Música desactivada (MUSIC_ENABLED=false).');
 }
@@ -298,11 +293,34 @@ if (MUSIC_ENABLED) {
     }
 }
 
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
     console.log(`👁️ EyedBot conectado como ${client.user.tag}`);
     if (webPanel?.setBotClient) {
         webPanel.setBotClient(client);
         console.log('🔗 Panel web conectado al cliente del bot.');
+    }
+
+    if (MUSIC_ENABLED && config.lavalinkEnabled) {
+        try {
+            const lavalink = require('./utils/lavalink-shoukaku');
+            const { initQueueManager } = require('./utils/music-queue-manager');
+            const { createMusicPlayerFacade } = require('./utils/music-player-facade');
+            const MusicSystem = require('./cogs/music');
+
+            lavalink.initShoukaku(client);
+            initQueueManager(client);
+            client.player = createMusicPlayerFacade(client);
+            client.musicSystem = new MusicSystem(client);
+
+            const node = await lavalink.waitForNodeReady(45000);
+            if (node) {
+                console.log('🎵 Música: Lavalink + Shoukaku operativos.');
+            } else {
+                console.warn('⚠️ Lavalink no respondió a tiempo. Los comandos de música fallarán hasta que el nodo esté listo.');
+            }
+        } catch (error) {
+            console.error('❌ Error iniciando música (Lavalink/Shoukaku):', error?.message || error);
+        }
     }
 
     registerSlashCommands().catch((error) => {
@@ -656,11 +674,6 @@ async function main() {
         return false;
     });
 
-    if (MUSIC_ENABLED && client.player) {
-        const { DefaultExtractors } = require('@discord-player/extractor');
-        await client.player.extractors.loadMulti(DefaultExtractors);
-    }
-
     await client.login(TOKEN);
 }
 
@@ -675,6 +688,12 @@ async function gracefulShutdown(signal) {
         stopBumpReminderScheduler();
         try {
             require('./utils/tts-voice-manager').disconnectAll('shutdown');
+        } catch {
+            /* noop */
+        }
+        try {
+            require('./utils/music-queue-manager').destroyAllQueues();
+            require('./utils/lavalink-shoukaku').destroyShoukaku();
         } catch {
             /* noop */
         }

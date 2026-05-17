@@ -23,7 +23,7 @@ module.exports = {
         const value = repeatModeFromString(mode);
         if (value === null) {
             return interaction.reply({
-                embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ No soportado').setDescription('Autoplay no está disponible con esta versión de discord-player.')],
+                embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ No soportado').setDescription('Autoplay no está disponible en este servidor.')],
                 flags: 64
             });
         }
