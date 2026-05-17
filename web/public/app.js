@@ -6237,9 +6237,72 @@ function readGachaPanelStoredTab(guildId) {
     return 'gacha-config';
 }
 
+function buildGachaCatalogThumbSrc(guildId, row, imageUrl = '') {
+    if (row?.catalogDbImage) {
+        return `/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(row.id)}/image?t=${Date.now()}`;
+    }
+    const s = String(imageUrl || '').trim();
+    if (/^https?:\/\//i.test(s)) return s;
+    if (s.startsWith('/uploads/')) return s;
+    return '';
+}
+
+function renderGachaCatalogThumbMarkup(thumbSrc) {
+    if (!thumbSrc) {
+        return '<div class="gacha-catalog-thumb-ph" role="img" aria-label="">Sin imagen</div>';
+    }
+    if (String(thumbSrc).startsWith('/api/')) {
+        return `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" data-auth-thumb="1" data-thumb-src="${escapeHtml(thumbSrc)}" src=""/>`;
+    }
+    return `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(thumbSrc)}"/>`;
+}
+
+function revokeGachaCatalogThumbBlobs(root) {
+    if (!root) return;
+    root.querySelectorAll('img.gacha-catalog-thumb-img[data-blob-url]').forEach((img) => {
+        const blobUrl = img.getAttribute('data-blob-url');
+        if (blobUrl) {
+            try { URL.revokeObjectURL(blobUrl); } catch (_) { /* noop */ }
+        }
+    });
+}
+
+async function hydrateGachaCatalogThumbs(root) {
+    if (!root) return;
+    const imgs = root.querySelectorAll('img.gacha-catalog-thumb-img[data-auth-thumb="1"]');
+    await Promise.all([...imgs].map(async (img) => {
+        const src = img.getAttribute('data-thumb-src');
+        if (!src) return;
+        try {
+            const response = await fetchWithCredentials(src);
+            if (!response.ok) {
+                const ph = document.createElement('div');
+                ph.className = 'gacha-catalog-thumb-ph';
+                ph.setAttribute('role', 'img');
+                ph.textContent = 'Sin imagen';
+                img.replaceWith(ph);
+                return;
+            }
+            const blob = await response.blob();
+            const prev = img.getAttribute('data-blob-url');
+            if (prev) {
+                try { URL.revokeObjectURL(prev); } catch (_) { /* noop */ }
+            }
+            const objectUrl = URL.createObjectURL(blob);
+            img.src = objectUrl;
+            img.setAttribute('data-blob-url', objectUrl);
+            img.removeAttribute('data-auth-thumb');
+        } catch {
+            /* noop */
+        }
+    }));
+}
+
 async function loadGachaPanel(guildId) {
     const container = document.getElementById('gachaContainer');
     if (!container) return;
+
+    revokeGachaCatalogThumbBlobs(container);
 
     container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando economía y gacha...</p></div>';
 
@@ -6321,14 +6384,6 @@ async function loadGachaPanel(guildId) {
             ? await leaderboardResponse.json().catch(() => ({ leaderboard: [] }))
             : { leaderboard: [] };
         const gachaLeaderboardHtml = buildGachaLeaderboardHtml(gachaLeaderboard);
-
-        const catalogThumbUrl = (u, row) => {
-            if (row?.catalogDbImage) {
-                return `/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(row.id)}/image`;
-            }
-            const s = String(u || '').trim();
-            return /^https?:\/\/.+/i.test(s) ? s : '';
-        };
 
         const gachaDpxActive = readGachaPanelStoredTab(guildId);
 
@@ -6466,10 +6521,9 @@ async function loadGachaPanel(guildId) {
                         </div>
                         <div id="gachaCatalogEditor" class="dpx-item-list gacha-catalog-list">
                             ${shopEditorItems.map((item, index) => {
-                                const thumb = catalogThumbUrl(item.imageUrl || '', item);
-                                const thumbBlock = thumb
-                                    ? `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(thumb)}"/>`
-                                    : `<div class="gacha-catalog-thumb-ph" role="img" aria-label="">Sin imagen</div>`;
+                                const thumbBlock = renderGachaCatalogThumbMarkup(
+                                    buildGachaCatalogThumbSrc(guildId, item, item.imageUrl || '')
+                                );
 
                                 if (item.catalogRemoved === true) {
                                     return `
@@ -6702,6 +6756,7 @@ async function loadGachaPanel(guildId) {
         `;
 
         bindDpxTabs(container, { persistTabStorageKey: gachaPanelActiveTabStorageKey(guildId) });
+        void hydrateGachaCatalogThumbs(container);
 
         if (container._eyedbotGachaUploadAbort) {
             try { container._eyedbotGachaUploadAbort.abort(); } catch (_) { /* noop */ }
@@ -6724,6 +6779,16 @@ async function loadGachaPanel(guildId) {
                 return;
             }
 
+            const rowPreview = Array.from(container.querySelectorAll('.gacha-catalog-row')).find(
+                (r) => r.getAttribute('data-character-id') === characterId
+            );
+            const thumbCellPreview = rowPreview?.querySelector('.gacha-catalog-visual');
+            let localPreviewUrl = '';
+            if (thumbCellPreview) {
+                localPreviewUrl = URL.createObjectURL(file);
+                thumbCellPreview.innerHTML = `<img class="gacha-catalog-thumb-img" alt="" src="${escapeHtml(localPreviewUrl)}"/>`;
+            }
+
             try {
                 const fd = new FormData();
                 fd.append('imageFile', file);
@@ -6734,8 +6799,14 @@ async function loadGachaPanel(guildId) {
                 });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok) {
+                    if (localPreviewUrl) {
+                        try { URL.revokeObjectURL(localPreviewUrl); } catch (_) { /* noop */ }
+                    }
                     showToast(data.error || data.catalogSaveError || 'No se pudo subir la imagen', 'error');
                     return;
+                }
+                if (localPreviewUrl) {
+                    try { URL.revokeObjectURL(localPreviewUrl); } catch (_) { /* noop */ }
                 }
                 const url = String(data.url || '').trim();
                 if (!url.startsWith('/api/') && !/^https?:\/\//i.test(url)) {
@@ -6758,9 +6829,10 @@ async function loadGachaPanel(guildId) {
                 if (row) row.setAttribute('data-catalog-db-image', url.startsWith('/api/') ? '1' : '');
                 const thumbCell = row?.querySelector('.gacha-catalog-visual');
                 if (thumbCell) {
-                    thumbCell.innerHTML = `<img class="gacha-catalog-thumb-img" alt="" loading="lazy" decoding="async" src="${escapeHtml(url)}"/>`;
+                    thumbCell.innerHTML = renderGachaCatalogThumbMarkup(url);
+                    void hydrateGachaCatalogThumbs(thumbCell);
                 }
-                if (data.catalogSaved === true) {
+                if (data.catalogSaved === true || data.storedInDb || data.storedOnDisk) {
                     showToast('Imagen guardada en MySQL; /tienda la mostrará desde el bot.', 'success');
                     await loadGachaPanel(guildId);
                     return;
