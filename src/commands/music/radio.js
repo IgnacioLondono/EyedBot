@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { useQueue, QueueRepeatMode } = require('discord-player');
+const { useQueue, QueueRepeatMode } = require('../../utils/music-queue-manager');
 const YouTube = require('youtube-sr').default;
 const config = require('../../config');
 const { safeDeferReply, safeEditReply } = require('../../utils/interactions');

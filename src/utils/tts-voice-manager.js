@@ -295,6 +295,15 @@ async function joinSession(interaction) {
         return { ok: false, reason: 'voz_ocupada' };
     }
 
+    try {
+        const musicQueue = require('./music-queue-manager').useQueue(guildId);
+        if (musicQueue?.isPlaying?.() || musicQueue?.currentTrack) {
+            return { ok: false, reason: 'voz_ocupada' };
+        }
+    } catch {
+        /* música desactivada */
+    }
+
     const me = guild.members.me;
     const perms = ch.permissionsFor(me);
     if (!perms?.has(['Connect', 'Speak'])) {

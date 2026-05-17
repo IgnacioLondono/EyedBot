@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { useQueue } = require('discord-player');
+const { useQueue } = require('../../utils/music-queue-manager');
 const config = require('../../config');
 const { safeDeferReply, safeEditReply } = require('../../utils/interactions');
 const { getLyrics, splitLyricsIntoLines } = require('../../utils/lyrics-service');

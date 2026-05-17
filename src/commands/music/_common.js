@@ -1,7 +1,18 @@
 const MusicSystem = require('../../cogs/music');
-const { useQueue, QueueRepeatMode } = require('discord-player');
+const { useQueue } = require('../../utils/music-queue-manager');
+const { QueueRepeatMode } = require('../../utils/music-repeat-modes');
 const { PermissionsBitField } = require('discord.js');
 const { getMusicConfig } = require('../../utils/music-config-store');
+
+function ensureMusicBackend(interaction) {
+    if (!interaction.client.player) {
+        return {
+            ok: false,
+            message: 'El motor de música (Lavalink) no está disponible. Comprueba que `LAVALINK_ENABLED=true` y que el contenedor **lavalink** esté en marcha.'
+        };
+    }
+    return { ok: true, message: null };
+}
 
 function getMusicSystem(interaction) {
     const musicSystem = interaction.client.musicSystem || new MusicSystem(interaction.client);
@@ -116,6 +127,7 @@ async function userCanControlMusic(interaction, queue) {
 }
 
 module.exports = {
+    ensureMusicBackend,
     getMusicSystem,
     getQueueOrReply,
     userInSameVoice,

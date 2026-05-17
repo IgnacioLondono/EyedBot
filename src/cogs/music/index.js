@@ -8,7 +8,7 @@
     TextInputBuilder,
     TextInputStyle
 } = require('discord.js');
-const { useQueue, QueueRepeatMode, GuildQueueEvent } = require('discord-player');
+const { useQueue, QueueRepeatMode, GuildQueueEvent } = require('../../utils/music-queue-manager');
 const YouTube = require('youtube-sr').default;
 const axios = require('axios');
 const config = require('../../config');
@@ -342,11 +342,8 @@ class MusicSystem {
             queue.node.setVolume(safeVolume);
         }
 
-        if (config.musicCleanProfileEnabled) {
-            const ffmpeg = queue?.filters?.ffmpeg;
-            if (ffmpeg && typeof ffmpeg.setFilters === 'function') {
-                await ffmpeg.setFilters(config.musicCleanFilters).catch(() => null);
-            }
+        if (config.musicCleanProfileEnabled && queue?.filters?.ffmpeg?.setFilters) {
+            await queue.filters.ffmpeg.setFilters(config.musicCleanFilters).catch(() => null);
         }
 
         await this.sendNowPlayingEmbed(guildId, channel, track, false);
