@@ -14149,7 +14149,12 @@ body {
 /* ---------- Server sidebar — rail (minimal) ---------- */
 #serverSection.server-config-shell .server-shell:has(.server-side-menu--rail) {
     grid-template-columns: minmax(212px, 232px) minmax(0, 1fr) !important;
-    gap: 1.15rem !important;
+    gap: 0.85rem !important;
+}
+
+/* Línea vertical heredada (left: 260px) + ancho fijo 260px rompían el borde derecho */
+#serverSection.server-config-shell .server-shell:has(.server-side-menu--rail)::after {
+    display: none !important;
 }
 
 #serverSection.server-config-shell .server-side-menu.server-side-menu--rail {
@@ -14157,13 +14162,20 @@ body {
     --rail-muted: rgba(168, 152, 198, 0.72);
     --rail-surface: rgba(255, 255, 255, 0.04);
     --rail-line: rgba(var(--border-rgb, 190, 155, 255), 0.12);
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     background: rgba(8, 6, 16, 0.55) !important;
     border: 1px solid var(--rail-line) !important;
     border-radius: 16px !important;
-    padding: 0.72rem 0.55rem 0.85rem !important;
+    padding: 0.72rem 0.5rem 0.85rem 0.55rem !important;
     box-shadow: none !important;
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-header {
@@ -14410,12 +14422,22 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar {
-    width: 5px;
+    width: 4px !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar-track {
+    background: transparent !important;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
+    border: none !important;
+    background: rgba(255, 255, 255, 0.18) !important;
+    background-clip: border-box !important;
     border-radius: 999px;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28) !important;
 }
 
 @media (max-width: 992px) {
