@@ -5,9 +5,11 @@ server:
 lavalink:
   plugins:
     - dependency: "dev.lavalink.youtube:youtube-plugin:1.13.5"
+      repository: "https://maven.lavalink.dev/releases"
       snapshot: false
   server:
-    password: ${LAVALINK_PASSWORD:youshallnotpass}
+    # Misma variable que LAVALINK_PASSWORD en Docker (bot + servicio lavalink)
+    password: "${LAVALINK_PASSWORD}"
     sources:
       # Obligatorio: desactiva YouTube integrado (deprecado) y usa el plugin de abajo
       youtube: false
