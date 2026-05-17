@@ -25,6 +25,8 @@ if (!guildId) {
 }
 
 const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
+const LAVALINK_ENABLED = (process.env.LAVALINK_ENABLED || 'false').toLowerCase() === 'true';
+const REGISTER_MUSIC = MUSIC_ENABLED && LAVALINK_ENABLED;
 const commands = [];
 const byName = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -49,7 +51,7 @@ for (const folder of commandFolders) {
     }
 }
 
-if (MUSIC_ENABLED) {
+if (REGISTER_MUSIC) {
     const musicDir = path.join(commandsPath, 'music');
     if (fs.existsSync(musicDir)) {
         const musicFiles = fs.readdirSync(musicDir).filter((f) => f.endsWith('.js') && !f.startsWith('_'));

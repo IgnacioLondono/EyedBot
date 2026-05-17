@@ -226,13 +226,14 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
     }
 }
 
-if (MUSIC_ENABLED) {
-    if (!config.lavalinkEnabled) {
-        console.warn('⚠️ MUSIC_ENABLED=true pero LAVALINK_ENABLED=false. Activa Lavalink para reproducir música.');
-    }
+if (MUSIC_ENABLED && config.lavalinkEnabled) {
     client.player = null;
 } else {
-    console.log('🎵 Música desactivada (MUSIC_ENABLED=false).');
+    if (MUSIC_ENABLED && !config.lavalinkEnabled) {
+        console.log('🎵 Música desactivada (LAVALINK_ENABLED=false).');
+    } else {
+        console.log('🎵 Música desactivada (MUSIC_ENABLED=false).');
+    }
 }
 
 client.commands = new Collection();
@@ -270,7 +271,7 @@ function loadCommands(dir) {
 
 loadCommands(commandsPath);
 
-if (MUSIC_ENABLED) {
+if (MUSIC_ENABLED && config.lavalinkEnabled) {
     const musicDir = path.join(commandsPath, 'music');
     if (fs.existsSync(musicDir)) {
         const musicFiles = fs.readdirSync(musicDir).filter((f) => f.endsWith('.js') && !f.startsWith('_'));
