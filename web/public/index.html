@@ -1146,21 +1146,28 @@
         <section id="serverSection" class="section server-config-shell" aria-label="Configuración por servidor">
             <div class="container">
                 <div class="server-shell">
-                    <aside class="server-side-menu" id="serverSideMenu">
+                    <aside class="server-side-menu server-side-menu--rail" id="serverSideMenu">
                         <div class="server-side-header">
                             <div class="server-side-identity">
                                 <img id="serverMenuGuildIcon" class="server-side-guild-icon" alt="Servidor" src="" style="display:none;">
-                                <div>
-                                    <h3>Panel del servidor</h3>
+                                <div class="server-side-identity-text">
+                                    <span class="server-side-kicker">Panel del servidor</span>
                                     <div id="serverMenuGuildName" class="server-side-guild-name">Sin servidor seleccionado</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="side-menu-search">
-                            <input type="text" id="serverTabSearch" class="form-control" placeholder="Buscar módulo o sección...">
+                            <label class="side-menu-search-field" for="serverTabSearch">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="7"></circle>
+                                    <path d="M20 20l-3.5-3.5"></path>
+                                </svg>
+                                <input type="search" id="serverTabSearch" class="form-control" placeholder="Buscar módulo o sección…" autocomplete="off" spellcheck="false">
+                            </label>
                         </div>
 
+                        <nav class="server-side-nav" aria-label="Secciones del servidor">
                         <div class="side-menu-group" data-group="panel">
                             <h4 class="side-menu-group-title" role="button" tabindex="0"><span class="side-menu-group-title-inner"><svg class="side-menu-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="12" width="7" height="9" rx="1.5"></rect><rect x="3" y="16" width="7" height="5" rx="1.5"></rect></svg><span>Panel</span></span></h4>
                             <div class="side-menu-items">
@@ -1365,6 +1372,7 @@
                             </button>
                             </div>
                         </div>
+                        </nav>
                     </aside>
 
                     <div class="server-content-area">

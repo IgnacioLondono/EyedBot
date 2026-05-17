@@ -35,7 +35,8 @@ const guildPendingListenChannel = new Map();
 const guildPrefixCache = new Map();
 
 const MAX_QUEUE = 14;
-const IDLE_MS = Number.parseInt(process.env.TTS_IDLE_DISCONNECT_MS || '180000', 10);
+/** 0 = no desconectar por inactividad; solo sale si el canal queda sin humanos o con /tts desconectar */
+const IDLE_MS = Number.parseInt(process.env.TTS_IDLE_DISCONNECT_MS || '0', 10);
 const READ_CHAT = (process.env.TTS_READ_CHAT || 'true').toLowerCase() !== 'false';
 const READ_SKIP_PREFIX = (process.env.TTS_READ_SKIP_PREFIX || 'true').toLowerCase() !== 'false';
 
@@ -363,6 +364,10 @@ function leaveGuild(guildId) {
     destroyGuildSession(String(guildId || ''), 'salir_manual');
 }
 
+function hasGuildSession(guildId) {
+    return sessions.has(String(guildId || ''));
+}
+
 /**
  * Encola texto cuando ya hay sesión TTS activa.
  * @param {string} guildId
@@ -498,6 +503,7 @@ module.exports = {
     envTtsEnabled,
     joinSession,
     leaveGuild,
+    hasGuildSession,
     enqueueTextForGuild,
     clearQueue,
     setGuildVoiceId,

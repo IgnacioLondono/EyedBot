@@ -14145,3 +14145,285 @@ body {
         justify-self: start;
     }
 }
+
+/* ---------- Server sidebar — rail (minimal) ---------- */
+#serverSection.server-config-shell .server-shell:has(.server-side-menu--rail) {
+    grid-template-columns: minmax(212px, 232px) minmax(0, 1fr) !important;
+    gap: 1.15rem !important;
+}
+
+#serverSection.server-config-shell .server-side-menu.server-side-menu--rail {
+    --rail-accent: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.92);
+    --rail-muted: rgba(168, 152, 198, 0.72);
+    --rail-surface: rgba(255, 255, 255, 0.04);
+    --rail-line: rgba(var(--border-rgb, 190, 155, 255), 0.12);
+    background: rgba(8, 6, 16, 0.55) !important;
+    border: 1px solid var(--rail-line) !important;
+    border-radius: 16px !important;
+    padding: 0.72rem 0.55rem 0.85rem !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .server-side-header {
+    padding: 0.2rem 0.45rem 0.65rem;
+    margin-bottom: 0.35rem;
+    border-bottom: 1px solid var(--rail-line);
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .server-side-identity {
+    align-items: center;
+    gap: 0.62rem;
+    min-width: 0;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .server-side-guild-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    border: 1px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
+    box-shadow: none;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .server-side-kicker {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--rail-muted);
+    line-height: 1.2;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .server-side-guild-name {
+    margin-top: 0.12rem;
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary, #f4eeff);
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-search {
+    margin: 0.15rem 0 0.55rem;
+    padding: 0 0.35rem;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-search-field {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0 0.62rem;
+    min-height: 34px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--rail-surface);
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-search-field:focus-within {
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.28);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-search-field svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--rail-muted);
+    opacity: 0.85;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-search .form-control {
+    flex: 1;
+    min-width: 0;
+    height: 32px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 0.78rem !important;
+    color: var(--text-primary, #ece6ff);
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-search .form-control::placeholder {
+    color: rgba(168, 152, 198, 0.55);
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .server-side-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0 0.2rem;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group {
+    margin-top: 0.35rem;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group:first-child {
+    margin-top: 0;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title {
+    padding: 0.38rem 0.5rem 0.28rem !important;
+    margin-top: 0 !important;
+    font-size: 0.68rem !important;
+    letter-spacing: 0.1em !important;
+    color: var(--rail-muted) !important;
+    font-weight: 600 !important;
+    border-radius: 8px;
+    transition: color 0.18s ease, background 0.18s ease;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title:hover {
+    color: rgba(220, 210, 245, 0.9) !important;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group-icon {
+    width: 14px !important;
+    height: 14px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: none !important;
+    color: var(--rail-muted) !important;
+    box-sizing: border-box;
+    opacity: 0.85;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title::after {
+    width: 7px;
+    height: 7px;
+    opacity: 0.45;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.04rem;
+    padding-left: 0.12rem;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn {
+    position: relative;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 2px;
+    height: 0;
+    border-radius: 2px;
+    background: var(--rail-accent);
+    transform: translateY(-50%);
+    transition: height 0.18s ease, opacity 0.18s ease;
+    opacity: 0;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn-inner {
+    gap: 0.58rem !important;
+    padding: 0.48rem 0.55rem 0.48rem 0.62rem !important;
+    min-height: 36px !important;
+    color: rgba(196, 184, 224, 0.88) !important;
+    font-size: 0.84rem !important;
+    font-weight: 500 !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-icon {
+    width: 17px !important;
+    height: 17px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: none !important;
+    color: var(--rail-muted) !important;
+    opacity: 0.9;
+    transform: none !important;
+    filter: none !important;
+    transition: color 0.18s ease, opacity 0.18s ease;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-label {
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.045) !important;
+    box-shadow: none !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn:hover .side-menu-btn-inner {
+    color: var(--text-primary, #f2ecff) !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn:hover .side-menu-icon {
+    color: rgba(220, 210, 245, 0.95) !important;
+    transform: none !important;
+    filter: none !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active {
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.1) !important;
+    box-shadow: none !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active::before {
+    height: 58%;
+    opacity: 1;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active .side-menu-btn-inner {
+    color: var(--text-primary, #fff) !important;
+    font-weight: 600 !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active .side-menu-icon {
+    color: var(--rail-accent) !important;
+    opacity: 1;
+    transform: none !important;
+    filter: none !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone] .side-menu-icon {
+    color: var(--rail-muted) !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active[data-pane-tone] .side-menu-icon {
+    color: var(--rail-accent) !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar {
+    width: 5px;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+}
+
+@media (max-width: 992px) {
+    #serverSection.server-config-shell .server-shell:has(.server-side-menu--rail) {
+        grid-template-columns: 1fr !important;
+    }
+
+    #serverSection.server-config-shell .server-side-menu--rail {
+        padding: 0.65rem 0.5rem !important;
+    }
+}

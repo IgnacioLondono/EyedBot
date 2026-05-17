@@ -37,7 +37,9 @@ module.exports = {
                         .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                         .setRequired(true)))
         .addSubcommand((sub) =>
-            sub.setName('salir').setDescription('Desconecta EyedBot del canal de voz'))
+            sub.setName('desconectar').setDescription('Desconecta EyedBot del canal de voz (TTS)'))
+        .addSubcommand((sub) =>
+            sub.setName('salir').setDescription('Alias de desconectar: sale del canal de voz'))
         .addSubcommand((sub) => sub.setName('vaciar').setDescription('Vacia la cola de mensajes pendientes'))
         .addSubcommand((sub) =>
             sub
@@ -110,7 +112,7 @@ module.exports = {
                             '• **`TTS_DEFAULT_VOICE`** + **`TTS_DEFAULT_LANG`** en `.env`: id interno tipo `es_es` o código `tl` genérico (`es`).',
                             '• Música y TTS **no funcionan solo** con una conexión: **`/stop`** en música primero.',
                             '• **`ffmpeg`** requerido (**`ffmpeg-static`** en el proyecto).',
-                            '• Si el canal **no tiene humanos**, el bot sale al instante.',
+                            '• El bot **permanece en llamada** aunque no haya mensajes; solo sale si **no queda nadie** en el canal de voz o con **`/tts desconectar`**.',
                             '• **`TTS_READ_CHAT=false`** desactiva leer mensajes · **`TTS_READ_SKIP_PREFIX`** evita líneas con prefijo del bot.'
                         ].join('\n')
                 });
@@ -158,10 +160,13 @@ module.exports = {
             return interaction.reply({ content: `${result.ok ? '✅' : '❌'} ${msg}`, flags: 64 });
         }
 
-        if (sub === 'salir') {
+        if (sub === 'desconectar' || sub === 'salir') {
+            const hadSession = tts.hasGuildSession(interaction.guildId);
             tts.leaveGuild(interaction.guildId);
             return interaction.reply({
-                content: '👋 EyedBot ha salido del canal de voz (TTS).',
+                content: hadSession
+                    ? '👋 EyedBot se ha desconectado del canal de voz (TTS).'
+                    : 'ℹ️ No había sesión TTS activa en este servidor.',
                 flags: 64
             });
         }
