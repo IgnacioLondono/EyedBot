@@ -307,16 +307,20 @@ client.once('clientReady', async () => {
             const { createMusicPlayerFacade } = require('./utils/music-player-facade');
             const MusicSystem = require('./cogs/music');
 
-            lavalink.initShoukaku(client);
             initQueueManager(client);
             client.player = createMusicPlayerFacade(client);
             client.musicSystem = new MusicSystem(client);
 
-            const node = await lavalink.waitForNodeReady(45000);
+            const node = await lavalink.bootstrapMusicConnection(client);
             if (node) {
                 console.log('🎵 Música: Lavalink + Shoukaku operativos.');
             } else {
-                console.warn('⚠️ Lavalink no respondió a tiempo. Los comandos de música fallarán hasta que el nodo esté listo.');
+                console.warn(
+                    '⚠️ Lavalink no conectó en el arranque. Se reintentará en segundo plano; /play esperará unos segundos si el nodo acaba de levantar.'
+                );
+                lavalink.startNodeReadyMonitor((ok) => {
+                    if (ok) console.log('🎵 Música: Lavalink + Shoukaku operativos (conexión tardía).');
+                });
             }
         } catch (error) {
             console.error('❌ Error iniciando música (Lavalink/Shoukaku):', error?.message || error);

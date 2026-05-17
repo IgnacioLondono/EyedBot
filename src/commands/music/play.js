@@ -591,7 +591,7 @@ module.exports = {
     },
 
     async execute(interaction) {
-        const backend = ensureMusicBackend(interaction);
+        const backend = await ensureMusicBackend(interaction);
         if (!backend.ok) {
             return interaction.reply({
                 embeds: [new EmbedBuilder().setColor('#FFA500').setTitle('❌ Música no disponible').setDescription(backend.message)],

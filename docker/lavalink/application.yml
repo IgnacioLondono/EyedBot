@@ -9,6 +9,7 @@ lavalink:
   server:
     password: ${LAVALINK_PASSWORD:youshallnotpass}
     sources:
+      # Obligatorio: desactiva YouTube integrado (deprecado) y usa el plugin de abajo
       youtube: false
       bandcamp: true
       soundcloud: true
@@ -46,9 +47,9 @@ plugins:
     allowDirectPlaylistIds: true
     clients:
       - MUSIC
-      - ANDROID_MUSIC
+      - ANDROID_VR
       - WEB
-      - TVHTML5EMBEDDED
+      - WEBEMBEDDED
 
 metrics:
   prometheus:

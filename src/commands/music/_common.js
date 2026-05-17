@@ -4,13 +4,26 @@ const { QueueRepeatMode } = require('../../utils/music-repeat-modes');
 const { PermissionsBitField } = require('discord.js');
 const { getMusicConfig } = require('../../utils/music-config-store');
 
-function ensureMusicBackend(interaction) {
+async function ensureMusicBackend(interaction) {
     if (!interaction.client.player) {
         return {
             ok: false,
             message: 'El motor de música (Lavalink) no está disponible. Comprueba que `LAVALINK_ENABLED=true` y que el contenedor **lavalink** esté en marcha.'
         };
     }
+
+    const lavalink = require('../../utils/lavalink-shoukaku');
+    if (!lavalink.isReady()) {
+        const node = await lavalink.ensureNodeReady(15000);
+        if (!node) {
+            return {
+                ok: false,
+                message:
+                    'Lavalink aún no está listo. Espera 1–2 minutos tras el primer arranque (descarga del plugin YouTube) y revisa `docker-compose logs lavalink`.'
+            };
+        }
+    }
+
     return { ok: true, message: null };
 }
 
