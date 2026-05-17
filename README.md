@@ -129,26 +129,21 @@ MUSIC_LEAVE_ON_END=true
 MUSIC_LEAVE_ON_END_COOLDOWN_MS=180000
 MUSIC_BUFFERING_TIMEOUT_MS=7000
 
-# Lavalink (requerido si MUSIC_ENABLED=true)
-LAVALINK_ENABLED=true
-LAVALINK_HOST=lavalink
-LAVALINK_PORT=2333
-LAVALINK_PASSWORD=youshallnotpass
+# Música desactivada por defecto
+MUSIC_ENABLED=false
+LAVALINK_ENABLED=false
 ```
 
-### 4. Activar Lavalink (Opcional, recomendado)
+### 4. Música y Lavalink (opcional, desactivado)
 
-El stack ya incluye un servicio Lavalink en Docker para una migración gradual.
+Por defecto la música está **apagada**. El bot no carga comandos `/play`, etc., y el contenedor Lavalink no arranca.
+
+Para activarla más adelante:
 
 ```bash
-# Levantar bot + lavalink
-docker-compose up -d --build
-
-# Verificar lavalink
-docker-compose logs -f lavalink
+# En .env: MUSIC_ENABLED=true y LAVALINK_ENABLED=true
+docker compose --profile music up -d --build
 ```
-
-La música usa **Shoukaku → Lavalink 4** (plugin YouTube). Sin Lavalink en marcha, `/play` no funcionará.
 
 ### 3. Registrar Comandos
 
