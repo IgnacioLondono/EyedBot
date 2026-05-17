@@ -163,7 +163,7 @@ async function buildShopComponents(guildId, userId, mode = 'shop', page = 0) {
         const cid = payload.item.id;
         const safeBase = `tienda-${cid}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 52) || 'tienda-item';
 
-        const dbImg = await gachaStore.getGuildCatalogShopImageBlob(guildId, cid);
+        const dbImg = await gachaStore.resolveGuildCatalogShopImage(guildId, cid);
         if (dbImg?.data?.length) {
             const ext = gachaStore.shopCatalogMimeToExt(dbImg.mime);
             const name = `${safeBase}.${ext}`;

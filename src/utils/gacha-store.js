@@ -8,6 +8,61 @@ const BUNDLED_CHARACTERS_PATH = path.join(__dirname, '..', 'bundled', 'gacha-cha
 const SYSTEM_MARKET_SELLER_ID = 'system';
 const DEFAULT_MARKET_LISTING_COUNT = 16;
 const MAX_SHOP_CATALOG_IMAGE_BYTES = 8 * 1024 * 1024;
+const SHOP_CATALOG_UPLOAD_DIR = path.join(__dirname, '..', '..', 'web', 'public', 'uploads', 'gacha-catalog');
+
+function ensureShopCatalogUploadDir() {
+    if (!fs.existsSync(SHOP_CATALOG_UPLOAD_DIR)) {
+        fs.mkdirSync(SHOP_CATALOG_UPLOAD_DIR, { recursive: true });
+    }
+    return SHOP_CATALOG_UPLOAD_DIR;
+}
+
+function shopCatalogDiskSafePart(raw = '', max = 80) {
+    return String(raw || '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .slice(0, max) || 'item';
+}
+
+function shopCatalogDiskFilePath(guildId, characterId, ext = 'png') {
+    const gid = shopCatalogDiskSafePart(guildId, 32);
+    const cidEnc = encodeURIComponent(String(characterId || '').trim().slice(0, 128));
+    const e = String(ext || 'png').replace(/^\./, '').toLowerCase();
+    return path.join(ensureShopCatalogUploadDir(), `${gid}__${cidEnc}.${e}`);
+}
+
+function shopCatalogDiskPrefix(guildId) {
+    return `${shopCatalogDiskSafePart(guildId, 32)}__`;
+}
+
+function characterIdFromShopDiskFile(guildId, fileName) {
+    const prefix = shopCatalogDiskPrefix(guildId);
+    if (!String(fileName || '').startsWith(prefix)) return '';
+    const rest = String(fileName).slice(prefix.length);
+    const dot = rest.lastIndexOf('.');
+    const enc = dot > 0 ? rest.slice(0, dot) : rest;
+    try {
+        return decodeURIComponent(enc);
+    } catch {
+        return enc;
+    }
+}
+
+function bufferFromDbImageField(raw) {
+    if (raw === undefined || raw === null) return null;
+    if (Buffer.isBuffer(raw)) return raw;
+    if (raw instanceof Uint8Array) return Buffer.from(raw);
+    if (Array.isArray(raw)) return Buffer.from(raw);
+    if (typeof raw === 'object' && raw.type === 'Buffer' && Array.isArray(raw.data)) {
+        return Buffer.from(raw.data);
+    }
+    try {
+        return Buffer.from(raw);
+    } catch {
+        return null;
+    }
+}
 
 const FALLBACK_CHARACTERS = [
     { id: 'ch_fb_001', name: 'Aira Nova', series: 'Celestial Archive', rarity: 'SSR', baseValue: 500 },
@@ -954,6 +1009,7 @@ async function deleteGuildCatalogShopImageBlob(guildId, characterId) {
     const gid = String(guildId || '').trim().slice(0, 32);
     const cid = String(characterId || '').trim().slice(0, 128);
     if (!gid || !cid) return false;
+    deleteGuildCatalogShopDiskImage(guildId, characterId);
     try {
         await db.query(
             'DELETE FROM gacha_catalog_shop_image WHERE guild_id = ? AND character_id = ?',
@@ -990,13 +1046,104 @@ async function getGuildCatalogShopImageBlob(guildId, characterId) {
         );
         const row = rows && rows[0];
         if (!row || row.data === undefined || row.data === null) return null;
-        let buf = row.data;
-        if (!Buffer.isBuffer(buf)) buf = Buffer.from(buf);
-        if (!buf.length || buf.length > MAX_SHOP_CATALOG_IMAGE_BYTES) return null;
+        const buf = bufferFromDbImageField(row.data);
+        if (!buf?.length || buf.length > MAX_SHOP_CATALOG_IMAGE_BYTES) return null;
         return { mime: String(row.mime || 'image/png'), data: buf };
     } catch {
         return null;
     }
+}
+
+function readGuildCatalogShopDiskImage(guildId, characterId) {
+    const gid = String(guildId || '').trim();
+    const cid = String(characterId || '').trim();
+    if (!gid || !cid) return null;
+    ensureShopCatalogUploadDir();
+    for (const ext of ['png', 'jpg', 'jpeg', 'webp', 'gif']) {
+        const abs = shopCatalogDiskFilePath(gid, cid, ext);
+        try {
+            if (!fs.existsSync(abs)) continue;
+            const buf = fs.readFileSync(abs);
+            if (!buf.length || buf.length > MAX_SHOP_CATALOG_IMAGE_BYTES) continue;
+            const mime = ext === 'png' ? 'image/png'
+                : (ext === 'webp' ? 'image/webp' : (ext === 'gif' ? 'image/gif' : 'image/jpeg'));
+            return {
+                mime,
+                data: buf,
+                diskPath: `/uploads/gacha-catalog/${path.basename(abs)}`
+            };
+        } catch {
+            continue;
+        }
+    }
+    return null;
+}
+
+function writeGuildCatalogShopDiskImage(guildId, characterId, buffer, mimeType = '') {
+    if (!Buffer.isBuffer(buffer) || !buffer.length) return null;
+    const ext = shopCatalogMimeToExt(mimeType);
+    const target = shopCatalogDiskFilePath(guildId, characterId, ext);
+    try {
+        ensureShopCatalogUploadDir();
+        const dir = path.dirname(target);
+        const fileStem = path.basename(target, `.${ext}`);
+        for (const f of fs.readdirSync(dir)) {
+            if (f.startsWith(`${fileStem}.`)) {
+                try { fs.unlinkSync(path.join(dir, f)); } catch { /* noop */ }
+            }
+        }
+        fs.writeFileSync(target, buffer);
+        return `/uploads/gacha-catalog/${path.basename(target)}`;
+    } catch (e) {
+        console.warn('⚠️ No se pudo escribir imagen de tienda en disco:', e?.message || e);
+        return null;
+    }
+}
+
+async function listGuildCatalogShopImageIds(guildId) {
+    const ids = await listGuildCatalogShopBlobIds(guildId);
+    const gid = String(guildId || '').trim();
+    if (!gid) return ids;
+    const prefix = shopCatalogDiskPrefix(gid);
+    try {
+        ensureShopCatalogUploadDir();
+        for (const f of fs.readdirSync(SHOP_CATALOG_UPLOAD_DIR)) {
+            if (!f.startsWith(prefix)) continue;
+            const cid = characterIdFromShopDiskFile(gid, f);
+            if (cid) ids.add(cid);
+        }
+    } catch {
+        /* noop */
+    }
+    return ids;
+}
+
+function deleteGuildCatalogShopDiskImage(guildId, characterId) {
+    let removed = false;
+    for (const ext of ['png', 'jpg', 'jpeg', 'webp', 'gif']) {
+        const abs = shopCatalogDiskFilePath(guildId, characterId, ext);
+        try {
+            if (fs.existsSync(abs)) {
+                fs.unlinkSync(abs);
+                removed = true;
+            }
+        } catch {
+            /* noop */
+        }
+    }
+    return removed;
+}
+
+/** MySQL primero; si falla, copia en web/public/uploads/gacha-catalog */
+async function resolveGuildCatalogShopImage(guildId, characterId) {
+    const blob = await getGuildCatalogShopImageBlob(guildId, characterId);
+    if (blob?.data?.length) return blob;
+    return readGuildCatalogShopDiskImage(guildId, characterId);
+}
+
+async function guildHasCatalogShopImage(guildId, characterId) {
+    const img = await resolveGuildCatalogShopImage(guildId, characterId);
+    return !!(img?.data?.length);
 }
 
 async function setGuildCatalogShopImageBlob(guildId, characterId, buffer, mimeType = '') {
@@ -1053,7 +1200,7 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
     await setGuildCatalogOverrides(guildId, overrides);
     await pruneHiddenSystemListings(guildId);
 
-    if (explicitImageClear) {
+    if (rawPatch.clearCatalogImage === true) {
         await deleteGuildCatalogShopImageBlob(guildId, base.id);
     } else if (rawPatch.imageUrl !== undefined) {
         const remote = sanitizeCatalogImageUrl(patch.imageUrl);
@@ -1264,8 +1411,12 @@ module.exports = {
     trySpendCoins,
     purchaseShopCharacter,
     getGuildCatalogShopImageBlob,
+    resolveGuildCatalogShopImage,
+    guildHasCatalogShopImage,
     setGuildCatalogShopImageBlob,
+    writeGuildCatalogShopDiskImage,
     deleteGuildCatalogShopImageBlob,
     listGuildCatalogShopBlobIds,
+    listGuildCatalogShopImageIds,
     shopCatalogMimeToExt
 };

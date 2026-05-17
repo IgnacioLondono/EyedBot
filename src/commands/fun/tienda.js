@@ -86,7 +86,7 @@ async function handleShopButton(interaction) {
         /** @type {AttachmentBuilder[]} */
         const buyFiles = [];
 
-        const buyBlob = await gachaStore.getGuildCatalogShopImageBlob(interaction.guild.id, characterId);
+        const buyBlob = await gachaStore.resolveGuildCatalogShopImage(interaction.guild.id, characterId);
         if (buyBlob?.data?.length) {
             const safeBase = `tienda-buy-${characterId}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'tienda-buy';
             const ext = gachaStore.shopCatalogMimeToExt(buyBlob.mime);
