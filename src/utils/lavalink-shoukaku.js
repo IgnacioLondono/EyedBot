@@ -1,8 +1,38 @@
+const http = require('http');
 const { Shoukaku, Connectors, Constants } = require('shoukaku');
 const config = require('../config');
 
+const READY_TIMEOUT_MS = Math.max(
+    15000,
+    Number.parseInt(process.env.LAVALINK_READY_TIMEOUT_MS || '120000', 10) || 120000
+);
+const HTTP_WARMUP_MS = Math.max(
+    5000,
+    Number.parseInt(process.env.LAVALINK_HTTP_WARMUP_MS || '90000', 10) || 90000
+);
+
 /** @type {Shoukaku | null} */
 let shoukaku = null;
+/** @type {((ready: boolean) => void) | null} */
+let readyCallback = null;
+
+function nodeStateLabel(state) {
+    if (state === Constants.State.CONNECTED) return 'CONNECTED';
+    if (state === Constants.State.CONNECTING) return 'CONNECTING';
+    if (state === Constants.State.DISCONNECTING) return 'DISCONNECTING';
+    if (state === Constants.State.DISCONNECTED) return 'DISCONNECTED';
+    return String(state ?? 'unknown');
+}
+
+function logNodeSnapshot(context) {
+    if (!shoukaku?.nodes?.size) {
+        console.warn(`⚠️ Lavalink (${context}): sin nodos en Shoukaku. ¿El contenedor lavalink está arriba?`);
+        return;
+    }
+    for (const [name, node] of shoukaku.nodes) {
+        console.warn(`⚠️ Lavalink (${context}) nodo "${name}": ${nodeStateLabel(node.state)} → ${node.url || '?'}`);
+    }
+}
 
 function isReady() {
     if (!shoukaku) return false;
@@ -24,6 +54,53 @@ function getNode() {
 }
 
 /**
+ * Espera a que Lavalink responda HTTP (plugin YouTube puede tardar en el primer arranque).
+ */
+function waitForLavalinkHttp(timeoutMs = HTTP_WARMUP_MS) {
+    const host = config.lavalinkHost || '127.0.0.1';
+    const port = config.lavalinkPort || 2333;
+    const password = config.lavalinkPassword || 'youshallnotpass';
+    const started = Date.now();
+
+    return new Promise((resolve) => {
+        const attempt = () => {
+            if (Date.now() - started >= timeoutMs) {
+                resolve(false);
+                return;
+            }
+
+            const req = http.request(
+                {
+                    host,
+                    port,
+                    path: '/version',
+                    method: 'GET',
+                    headers: { Authorization: password },
+                    timeout: 4000
+                },
+                (res) => {
+                    res.resume();
+                    if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve(true);
+                        return;
+                    }
+                    setTimeout(attempt, 2000);
+                }
+            );
+
+            req.on('timeout', () => {
+                req.destroy();
+                setTimeout(attempt, 2000);
+            });
+            req.on('error', () => setTimeout(attempt, 2000));
+            req.end();
+        };
+
+        attempt();
+    });
+}
+
+/**
  * @param {import('discord.js').Client} client
  */
 function initShoukaku(client) {
@@ -41,13 +118,14 @@ function initShoukaku(client) {
     ], {
         moveOnDisconnect: false,
         resume: false,
-        reconnectTries: 8,
-        reconnectInterval: 4000,
+        reconnectTries: 12,
+        reconnectInterval: 5000,
         restTimeout: 30000
     });
 
     shoukaku.on('ready', (name) => {
         console.log(`🎵 Lavalink nodo "${name}" listo (Shoukaku)`);
+        if (readyCallback) readyCallback(true);
     });
 
     shoukaku.on('error', (name, error) => {
@@ -65,25 +143,119 @@ function initShoukaku(client) {
     return shoukaku;
 }
 
-async function waitForNodeReady(timeoutMs = 30000) {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-        if (isReady()) return getNode();
-        await new Promise((r) => setTimeout(r, 500));
+/**
+ * @param {number} [timeoutMs]
+ */
+function waitForNodeReady(timeoutMs = READY_TIMEOUT_MS) {
+    const ms = timeoutMs;
+
+    return new Promise((resolve) => {
+        if (isReady()) {
+            resolve(getNode());
+            return;
+        }
+
+        if (!shoukaku) {
+            resolve(null);
+            return;
+        }
+
+        let settled = false;
+        const finish = (node) => {
+            if (settled) return;
+            settled = true;
+            shoukaku?.off('ready', onReady);
+            clearInterval(poll);
+            clearTimeout(hardTimeout);
+            resolve(node);
+        };
+
+        const onReady = () => {
+            if (isReady()) finish(getNode());
+        };
+
+        shoukaku.on('ready', onReady);
+
+        const poll = setInterval(() => {
+            if (isReady()) finish(getNode());
+        }, 750);
+
+        const hardTimeout = setTimeout(() => {
+            finish(isReady() ? getNode() : null);
+        }, ms);
+        hardTimeout.unref?.();
+    });
+}
+
+/**
+ * Arranque completo: HTTP de Lavalink + conexión Shoukaku.
+ * @param {import('discord.js').Client} client
+ */
+async function bootstrapMusicConnection(client) {
+    console.log(`🎵 Esperando API HTTP de Lavalink en ${config.lavalinkHost}:${config.lavalinkPort} (hasta ${Math.round(HTTP_WARMUP_MS / 1000)}s)...`);
+    const httpUp = await waitForLavalinkHttp(HTTP_WARMUP_MS);
+    if (!httpUp) {
+        console.warn('⚠️ Lavalink HTTP no respondió a tiempo (¿contenedor eyedbot-lavalink caído o plugin descargando?).');
+        logNodeSnapshot('sin HTTP');
+    } else {
+        console.log('🎵 Lavalink HTTP activo; conectando Shoukaku...');
     }
+
+    initShoukaku(client);
+
+    const node = await waitForNodeReady(READY_TIMEOUT_MS);
+    if (node) return node;
+
+    logNodeSnapshot('timeout Shoukaku');
     return null;
+}
+
+/**
+ * Sigue intentando en segundo plano y avisa cuando conecte.
+ * @param {(ok: boolean) => void} [onReady]
+ */
+function startNodeReadyMonitor(onReady) {
+    readyCallback = onReady || null;
+    if (isReady()) {
+        onReady?.(true);
+        return;
+    }
+
+    const monitor = setInterval(() => {
+        if (isReady()) {
+            clearInterval(monitor);
+            console.log('🎵 Lavalink conectado (reintento en segundo plano).');
+            readyCallback?.(true);
+        }
+    }, 5000);
+    monitor.unref?.();
+
+    setTimeout(() => clearInterval(monitor), 10 * 60 * 1000).unref?.();
+}
+
+/**
+ * @param {number} [timeoutMs]
+ */
+async function ensureNodeReady(timeoutMs = 12000) {
+    if (isReady()) return getNode();
+    return waitForNodeReady(timeoutMs);
 }
 
 /**
  * @param {string} identifier
  */
 async function resolve(identifier) {
-    const node = getNode();
-    if (!node) throw new Error('Lavalink no está conectado. Comprueba que el servicio Lavalink esté activo.');
+    const node = (await ensureNodeReady(15000)) || getNode();
+    if (!node) {
+        throw new Error(
+            'Lavalink no está conectado. Revisa `docker-compose logs lavalink` y que LAVALINK_HOST apunte al servicio correcto.'
+        );
+    }
     return node.rest.resolve(identifier);
 }
 
 async function destroyShoukaku() {
+    readyCallback = null;
     if (!shoukaku) return;
     try {
         const ids = [...shoukaku.players.keys()];
@@ -106,6 +278,11 @@ module.exports = {
     getNode,
     isReady,
     waitForNodeReady,
+    waitForLavalinkHttp,
+    bootstrapMusicConnection,
+    startNodeReadyMonitor,
+    ensureNodeReady,
     resolve,
-    destroyShoukaku
+    destroyShoukaku,
+    READY_TIMEOUT_MS
 };
