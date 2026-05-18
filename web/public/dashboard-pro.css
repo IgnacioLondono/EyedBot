@@ -398,10 +398,13 @@ body::before {
 }
 .guild-card::after {
     content: "";
-    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    position: absolute;
+    top: var(--pro-card-accent-inset-y, 14px);
+    bottom: var(--pro-card-accent-inset-y, 14px);
+    left: var(--pro-card-accent-inset-x, 11px);
+    width: var(--pro-card-accent-width, 3px);
+    border-radius: 999px;
     background: var(--pro-grad-primary);
-    border-top-left-radius: var(--pro-radius-md);
-    border-bottom-left-radius: var(--pro-radius-md);
     opacity: 0.9;
 }
 .guild-card:hover {
@@ -513,7 +516,12 @@ body::before {
 }
 .command-card::before {
     content: "";
-    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    position: absolute;
+    top: var(--pro-card-accent-inset-y, 12px);
+    bottom: var(--pro-card-accent-inset-y, 12px);
+    left: var(--pro-card-accent-inset-x, 10px);
+    width: var(--pro-card-accent-width, 3px);
+    border-radius: 999px;
     background: var(--pro-grad-primary);
     opacity: 0.85;
 }
@@ -1987,11 +1995,12 @@ label { color: var(--text-secondary); font-weight: 500; }
 .toast.pro-toast::before {
     content: "";
     position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 4px;
+    top: var(--pro-card-accent-inset-y, 10px);
+    bottom: var(--pro-card-accent-inset-y, 10px);
+    left: var(--pro-card-accent-inset-x, 9px);
+    width: var(--pro-card-accent-width, 3px);
+    border-radius: 999px;
     background: var(--pro-grad-primary);
-    border-top-left-radius: 16px;
-    border-bottom-left-radius: 16px;
 }
 .toast.pro-toast > svg,
 .toast.pro-toast > span:not(.pro-toast-icon):not(.pro-toast-progress) { display: none; }
@@ -4015,10 +4024,13 @@ mark.receipt-highlight {
 .overview-hero-chip::before {
     content: "";
     position: absolute;
-    inset: 0 auto 0 0;
-    width: 3px;
+    top: var(--pro-card-accent-inset-y, 10px);
+    bottom: var(--pro-card-accent-inset-y, 10px);
+    left: var(--pro-card-accent-inset-x, 9px);
+    width: var(--pro-card-accent-width, 3px);
+    border-radius: 999px;
     background: linear-gradient(180deg, var(--iris-500, #7c4dff), var(--iris-400, #2b90d9));
-    opacity: 0.8;
+    opacity: 0.85;
 }
 .overview-hero-chip:hover {
     transform: translateY(-2px);
@@ -4176,11 +4188,14 @@ mark.receipt-highlight {
 .summary-card::before {
     content: "";
     position: absolute;
-    inset: 0 auto 0 0;
-    width: 3px;
+    top: var(--pro-card-accent-inset-y, 14px);
+    bottom: var(--pro-card-accent-inset-y, 14px);
+    left: var(--pro-card-accent-inset-x, 11px);
+    width: var(--pro-card-accent-width, 3px);
+    border-radius: 999px;
     background: linear-gradient(180deg, var(--iris-500, #7c4dff), var(--iris-400, #2b90d9));
-    opacity: 0.75;
-    transition: width 0.22s ease, opacity 0.22s ease;
+    opacity: 0.85;
+    transition: width 0.22s ease, opacity 0.22s ease, left 0.22s ease;
 }
 .summary-card--interactive {
     cursor: pointer;
@@ -4191,9 +4206,9 @@ mark.receipt-highlight {
     box-shadow: 0 14px 40px rgba(var(--bg-primary-rgb, 7, 3, 22), 0.55), 0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18) inset;
 }
 .summary-card--interactive:hover::before {
-    width: 5px;
+    width: 4px;
     opacity: 1;
-    box-shadow: 0 0 16px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.6);
+    box-shadow: none;
 }
 .summary-card--interactive:focus-visible {
     outline: 2px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.7);
@@ -4714,10 +4729,13 @@ mark.receipt-highlight {
 .server-insight-grid > div::before {
     content: "";
     position: absolute;
-    inset: 0 auto 0 0;
-    width: 3px;
+    top: var(--pro-card-accent-inset-y, 14px);
+    bottom: var(--pro-card-accent-inset-y, 14px);
+    left: var(--pro-card-accent-inset-x, 11px);
+    width: var(--pro-card-accent-width, 3px);
+    border-radius: 999px;
     background: linear-gradient(180deg, var(--iris-500, #7c4dff), var(--iris-400, #ff78d1));
-    opacity: 0.75;
+    opacity: 0.85;
 }
 .server-insight-grid > article:hover,
 .server-insight-grid > div:hover {
@@ -7452,11 +7470,14 @@ mark.receipt-highlight {
 .levels-stat-card::before {
     content: '';
     position: absolute;
-    inset: 0 auto auto 0;
-    width: 4px;
-    height: 100%;
+    top: var(--pro-card-accent-inset-y, 12px);
+    bottom: var(--pro-card-accent-inset-y, 12px);
+    left: var(--pro-card-accent-inset-x, 10px);
+    width: var(--pro-card-accent-width, 3px);
+    height: auto;
+    border-radius: 999px;
     background: linear-gradient(180deg, var(--iris-400), var(--fuchsia));
-    opacity: 0.7;
+    opacity: 0.85;
 }
 
 .levels-stat-card:hover {
@@ -8554,13 +8575,15 @@ mark.receipt-highlight {
 .levels-tier-card::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 3px;
-    height: 100%;
+    top: var(--pro-card-accent-inset-y, 14px);
+    bottom: var(--pro-card-accent-inset-y, 14px);
+    left: var(--pro-card-accent-inset-x, 11px);
+    width: var(--pro-card-accent-width, 3px);
+    height: auto;
     z-index: 0;
+    border-radius: 999px;
     background: var(--tier-color);
-    box-shadow: 0 0 14px var(--tier-color);
+    box-shadow: none;
 }
 
 .levels-tier-card:hover {
@@ -8673,13 +8696,14 @@ mark.receipt-highlight {
 .levels-rank-row::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 3px;
-    height: 100%;
+    top: var(--pro-card-accent-inset-y, 8px);
+    bottom: var(--pro-card-accent-inset-y, 8px);
+    left: var(--pro-card-accent-inset-x, 8px);
+    width: var(--pro-card-accent-width, 3px);
+    height: auto;
     background: var(--tier-color, transparent);
-    border-radius: 3px 0 0 3px;
-    opacity: 0.6;
+    border-radius: 999px;
+    opacity: 0.75;
 }
 
 .levels-rank-progress-bar {
@@ -9200,11 +9224,14 @@ mark.receipt-highlight {
 .dpx-stat-card::before {
     content: '';
     position: absolute;
-    inset: 0 auto auto 0;
-    width: 4px;
-    height: 100%;
+    top: var(--pro-card-accent-inset-y, 12px);
+    bottom: var(--pro-card-accent-inset-y, 12px);
+    left: var(--pro-card-accent-inset-x, 10px);
+    width: var(--pro-card-accent-width, 3px);
+    height: auto;
+    border-radius: 999px;
     background: linear-gradient(180deg, var(--dpx-stat-accent, var(--iris-400)), var(--dpx-stat-accent-2, var(--fuchsia)));
-    opacity: 0.75;
+    opacity: 0.85;
 }
 
 .dpx-stat-card:hover {
@@ -14716,4 +14743,13 @@ body {
     #serverSection.server-config-shell .server-side-menu--rail {
         padding: 0.65rem 0.5rem !important;
     }
+}
+
+/* =====================================================================
+   Franja de acento en tarjetas — inset dentro del border-radius
+   ===================================================================== */
+:root {
+    --pro-card-accent-inset-y: 14px;
+    --pro-card-accent-inset-x: 11px;
+    --pro-card-accent-width: 3px;
 }
