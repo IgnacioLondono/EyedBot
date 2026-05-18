@@ -62,6 +62,8 @@ function ensureGuildBucket(store, guildId) {
     return store.guilds[guildId];
 }
 
+const { DEFAULT_LEVEL_TIERS } = require('./level-tier-defaults');
+
 function defaultConfig() {
     return {
         enabled: false,
@@ -76,6 +78,7 @@ function defaultConfig() {
             baseXp: 280,
             exponent: 2.08
         },
+        tiers: DEFAULT_LEVEL_TIERS.map((tier) => ({ ...tier })),
         roleRewards: [],
         /** Canal de texto (ID) donde avisar subidas de nivel; mensaje plano, sin embed */
         levelUpAnnounceChannelId: '',

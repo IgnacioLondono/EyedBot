@@ -7,7 +7,12 @@ const {
     PermissionsBitField
 } = require('discord.js');
 const tempVoiceStore = require('../utils/temp-voice-store');
-const { sanitizeChannelName, createOrMoveMemberTempChannel, buildManagementPanelPayload } = require('./temp-voice');
+const {
+    sanitizeChannelName,
+    createOrMoveMemberTempChannel,
+    buildManagementPanelPayload,
+    buildVoiceChannelInfoEmbed
+} = require('./temp-voice');
 const {
     CREATE_BUTTON_PREFIX,
     NAME_MODAL_PREFIX,
@@ -76,14 +81,23 @@ async function getOwnedTempVoiceChannel(interaction, channelId) {
     return { ok: true, channel };
 }
 
+async function resolveOwnerMemberForPanel(guild, ownerId) {
+    if (!guild || !ownerId) return null;
+    return guild.members.cache.get(ownerId) || await guild.members.fetch(ownerId).catch(() => null);
+}
+
 async function refreshManagementMessage(message, channel, ownerId, actionLabel = '', state = {}) {
     if (!message || typeof message.edit !== 'function' || !channel || !ownerId) return;
 
     const latestChannel = await channel.guild.channels.fetch(channel.id).catch(() => channel);
-    const payload = buildManagementPanelPayload(latestChannel, ownerId, { userLimit: latestChannel.userLimit || 0 }, {
-        action: actionLabel,
-        ...state
-    });
+    const ownerMember = await resolveOwnerMemberForPanel(channel.guild, ownerId);
+    const payload = buildManagementPanelPayload(
+        latestChannel,
+        ownerId,
+        { userLimit: latestChannel.userLimit || 0 },
+        { action: actionLabel, ...state },
+        ownerMember
+    );
     if (!payload) return;
 
     await message.edit(payload).catch(() => null);
@@ -103,10 +117,14 @@ async function refreshManagementInteraction(interaction, channel, ownerId, actio
     if (!interaction || !channel || !ownerId) return false;
 
     const latestChannel = await channel.guild.channels.fetch(channel.id).catch(() => channel);
-    const payload = buildManagementPanelPayload(latestChannel, ownerId, { userLimit: latestChannel.userLimit || 0 }, {
-        action: actionLabel,
-        ...state
-    });
+    const ownerMember = await resolveOwnerMemberForPanel(channel.guild, ownerId);
+    const payload = buildManagementPanelPayload(
+        latestChannel,
+        ownerId,
+        { userLimit: latestChannel.userLimit || 0 },
+        { action: actionLabel, ...state },
+        ownerMember
+    );
     if (!payload) return false;
 
     await interaction.update(payload).catch(() => null);
@@ -192,6 +210,16 @@ async function handleTempVoiceButton(interaction) {
                     isLocked: true
                 });
             }
+            return true;
+        }
+
+        if (action === 'info') {
+            const ownerMember = await resolveOwnerMemberForPanel(channel.guild, interaction.user.id);
+            const infoEmbed = buildVoiceChannelInfoEmbed(channel, interaction.user.id, ownerMember);
+            await interaction.reply({
+                embeds: infoEmbed ? [infoEmbed] : [],
+                flags: 64
+            }).catch(() => null);
             return true;
         }
 

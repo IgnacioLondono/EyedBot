@@ -7,9 +7,21 @@ const {
     ButtonStyle,
     AuditLogEvent
 } = require('discord.js');
+const config = require('../config');
 const tempVoiceStore = require('../utils/temp-voice-store');
 const { isTempVoiceProtectedFromOwnerKick } = require('../utils/temp-voice-protected-users');
 const { CONTROL_BUTTON_PREFIX } = require('./temp-voice-constants');
+
+function parseEmbedColorInt() {
+    const hex = String(config.embedColor || '#0099FF').replace('#', '').trim();
+    const parsed = Number.parseInt(hex, 16);
+    return Number.isFinite(parsed) ? parsed : 0x0099ff;
+}
+
+function resolveOwnerMember(channel, ownerId) {
+    if (!channel?.guild || !ownerId) return null;
+    return channel.guild.members.cache.get(ownerId) || null;
+}
 
 async function findRecentVoiceDisconnectOrMoveExecutor(guild, memberId) {
     if (!guild?.members?.me?.permissions?.has(PermissionsBitField.Flags.ViewAuditLog)) return null;
@@ -121,78 +133,135 @@ function buildChannelName(member, config, preferredName = '') {
     return sanitizeChannelName(template) || `Canal de ${username}`;
 }
 
-function buildManagementRows(channelId, isLocked = false) {
+function buildManagementRows(channelId, state = {}) {
     const id = String(channelId || '').trim();
+    const isLocked = state.isLocked === true;
 
-    const rowA = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}locktoggle_${id}`)
-            .setLabel(isLocked ? 'Desbloquear' : 'Bloquear')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}rename_${id}`)
-            .setLabel('Renombrar')
-            .setStyle(ButtonStyle.Primary)
+    const controlBtn = (action, emoji) => new ButtonBuilder()
+        .setCustomId(`${CONTROL_BUTTON_PREFIX}${action}_${id}`)
+        .setEmoji(emoji)
+        .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder().addComponents(
+        controlBtn('locktoggle', isLocked ? '🔐' : '🔒'),
+        controlBtn('rename', '🖋️'),
+        controlBtn('limit', '👤'),
+        controlBtn('info', '👀')
     );
 
-    const rowB = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`${CONTROL_BUTTON_PREFIX}limit_${id}`)
-            .setLabel('Limite')
-            .setStyle(ButtonStyle.Secondary)
-    );
-
-    return [rowA, rowB];
+    return [row];
 }
 
-function buildManagementPanelPayload(channel, ownerId, config = {}, extra = {}) {
+function buildVoiceMasterButtonGuide() {
+    return [
+        '🔒 · `Bloquear`',
+        '🔐 · `Desbloquear`',
+        '🖋️ · `Renombrar`',
+        '👤 · `Ajustar límite`',
+        '👀 · `Ver información`',
+        '',
+        '📎 Invitar o quitar acceso: `/vozinvitar` · `/vozquitar`'
+    ].join('\n');
+}
+
+function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra = {}, ownerMember = null) {
     if (!channel) return null;
 
     const baseName = channel.name || 'Canal temporal';
     const resolvedLimit = extra && Number.isFinite(extra.userLimit)
         ? extra.userLimit
-        : (channel.userLimit || config?.userLimit || 0);
+        : (channel.userLimit || voiceConfig?.userLimit || 0);
     const userLimit = Math.max(0, Number.parseInt(resolvedLimit, 10) || 0);
     const everyRole = channel.guild.roles.everyone;
-    const connectOverwrite = channel.permissionOverwrites.cache.get(everyRole.id);
-    const derivedLocked = connectOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
+    const everyoneOverwrite = channel.permissionOverwrites.cache.get(everyRole.id);
+    const derivedLocked = everyoneOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
     const isLocked = typeof extra?.isLocked === 'boolean' ? extra.isLocked : derivedLocked;
-    const ownerMember = channel.guild.members.cache.get(ownerId) || null;
-    const ownerDisplayName = ownerMember?.displayName || `<@${ownerId}>`;
+
+    const member = ownerMember || resolveOwnerMember(channel, ownerId);
+    const ownerUser = member?.user || null;
+    const ownerAvatar = ownerUser?.displayAvatarURL?.({ size: 256, extension: 'png' }) || null;
+
+    const botUser = channel.client?.user || null;
+    const brandLabel = 'EYEDBOT';
+    const brandIcon = botUser?.displayAvatarURL?.({ size: 64, extension: 'png' }) || null;
 
     const embed = new EmbedBuilder()
-        .setColor(0x0099ff)
-        .setTitle('Panel de gestion de canal de voz')
-        .setDescription('Administra tu canal temporal desde este panel.')
-        .addFields(
-            { name: 'Canal', value: `**${baseName}**`, inline: false },
-            { name: 'Estado del canal', value: isLocked ? 'Bloqueado' : 'Abierto', inline: true },
-            { name: 'Limite', value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin limite', inline: true },
-            { name: 'Propietario', value: ownerDisplayName, inline: true }
-        );
-
-    if (isLocked) {
-        embed.addFields({
-            name: 'Invitar usuarios',
-            value: 'Usa `/vozinvitar (nombre)` para permitir el acceso.\nUsa `/vozquitar (nombre)` para quitar el acceso.',
+        .setColor(parseEmbedColorInt())
+        .setAuthor({
+            name: brandLabel,
+            iconURL: brandIcon || undefined
+        })
+        .setTitle('Interfaz de Voice Master')
+        .setDescription('Haz clic en los botones de abajo para controlar tu canal de voz.')
+        .addFields({
+            name: 'Uso de botones',
+            value: buildVoiceMasterButtonGuide(),
             inline: false
+        })
+        .setFooter({
+            text: extra?.action
+                ? `Última acción: ${String(extra.action).slice(0, 80)}`
+                : 'Usa los botones para cambiar tu configuración',
+            iconURL: brandIcon || undefined
         });
+
+    if (ownerAvatar) {
+        embed.setThumbnail(ownerAvatar);
     }
 
-    if (extra && extra.action) {
-        embed.setFooter({ text: `Ultima accion: ${String(extra.action).slice(0, 90)}` });
-    }
+    embed.addFields(
+        {
+            name: 'Tu canal',
+            value: `**${baseName}** · ${isLocked ? '🔒 Bloqueado' : '🔓 Abierto'}`,
+            inline: false
+        },
+        {
+            name: 'Límite',
+            value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin límite',
+            inline: true
+        },
+        {
+            name: 'Propietario',
+            value: member ? member.toString() : `<@${ownerId}>`,
+            inline: true
+        }
+    );
 
     return {
         embeds: [embed],
-        components: buildManagementRows(channel.id, isLocked)
+        components: buildManagementRows(channel.id, { isLocked })
     };
 }
 
-async function sendManagementEmbed(channel, member, config) {
+function buildVoiceChannelInfoEmbed(channel, ownerId, ownerMember = null) {
+    if (!channel) return null;
+
+    const member = ownerMember || resolveOwnerMember(channel, ownerId);
+    const everyRole = channel.guild.roles.everyone;
+    const everyoneOverwrite = channel.permissionOverwrites.cache.get(everyRole.id);
+    const isLocked = everyoneOverwrite?.deny?.has(PermissionsBitField.Flags.Connect) === true;
+    const userLimit = Math.max(0, Number.parseInt(channel.userLimit || 0, 10) || 0);
+    const connected = channel.members?.size || 0;
+
+    return new EmbedBuilder()
+        .setColor(parseEmbedColorInt())
+        .setTitle('Información del canal')
+        .setDescription(`Canal temporal de ${member ? member.toString() : `<@${ownerId}>`}`)
+        .addFields(
+            { name: 'Nombre', value: channel.name || '—', inline: true },
+            { name: 'Conectados', value: `${connected}${userLimit > 0 ? ` / ${userLimit}` : ''}`, inline: true },
+            { name: 'Estado', value: isLocked ? '🔒 Bloqueado' : '🔓 Abierto', inline: true },
+            { name: 'ID del canal', value: `\`${channel.id}\``, inline: false }
+        );
+}
+
+async function sendManagementEmbed(channel, member, voiceConfig) {
     if (!channel || typeof channel.send !== 'function') return;
 
-    const payload = buildManagementPanelPayload(channel, member.id, config);
+    const ownerMember = member?.id
+        ? await channel.guild.members.fetch(member.id).catch(() => member)
+        : null;
+    const payload = buildManagementPanelPayload(channel, member.id, voiceConfig, {}, ownerMember);
     if (!payload) return;
 
     const sentMessage = await channel.send(payload).catch(() => null);
@@ -356,5 +425,6 @@ module.exports = {
     handleVoiceStateUpdate,
     sanitizeChannelName,
     createOrMoveMemberTempChannel,
-    buildManagementPanelPayload
+    buildManagementPanelPayload,
+    buildVoiceChannelInfoEmbed
 };

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260507-bg-bubbles-toggle">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260516-guild-layout-fix">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260516-app-dialog">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -1676,7 +1676,31 @@
         </div>
     </div>
 
+    <!-- Modal: confirmación / entrada de texto (reemplaza alert, confirm y prompt nativos) -->
+    <div id="appDialogModal" class="app-dialog-modal" aria-hidden="true" role="dialog" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage">
+        <div class="app-dialog-backdrop" data-app-dialog-close="1"></div>
+        <div class="app-dialog-panel" role="document">
+            <header class="app-dialog-head">
+                <h3 id="appDialogTitle" class="app-dialog-title">Confirmar</h3>
+                <button type="button" class="app-dialog-close" data-app-dialog-close="1" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </header>
+            <div class="app-dialog-body">
+                <p id="appDialogMessage" class="app-dialog-message"></p>
+                <div id="appDialogInputWrap" class="app-dialog-input-wrap" hidden>
+                    <label id="appDialogInputLabel" class="app-dialog-input-label" for="appDialogInput"></label>
+                    <input type="text" id="appDialogInput" class="app-dialog-input form-control" autocomplete="off">
+                </div>
+            </div>
+            <footer class="app-dialog-actions">
+                <button type="button" id="appDialogCancelBtn" class="btn btn-secondary" data-app-dialog-close="1">Cancelar</button>
+                <button type="button" id="appDialogConfirmBtn" class="btn btn-primary">Aceptar</button>
+            </footer>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260516-guild-layout-fix"></script>
+    <script src="app.js?v=20260516-app-dialog"></script>
 </body>
 </html>

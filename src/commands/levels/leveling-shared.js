@@ -3,7 +3,7 @@ const config = require('../../config');
 const levelingStore = require('../../utils/leveling-store');
 const { getLevelFromXp, getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
 const { parseRoleRewards, getRoleRewardTiersForLevel } = require('../../utils/leveling-rewards');
-const { EYED_LEVEL_TIERS, formatLevelRange } = require('../../utils/eyed-tier-catalog');
+const { getEyedTiersForGuild, formatLevelRange } = require('../../utils/eyed-tier-catalog');
 
 function progressBar(percent, width = 14) {
     const p = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -163,7 +163,7 @@ async function runRangos(interaction) {
     const rewardsSorted = parseRoleRewards(cfg?.roleRewards);
 
     if (rewardsSorted.length === 0) {
-        const refLines = EYED_LEVEL_TIERS.map((t) => `**${formatLevelRange(t)}** · ${t.label}`).join('\n');
+        const refLines = getEyedTiersForGuild(cfg).map((t) => `**${formatLevelRange(t)}** · ${t.label}`).join('\n');
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle('Nivel para conseguir')
