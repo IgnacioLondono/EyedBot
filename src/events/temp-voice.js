@@ -226,6 +226,11 @@ function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra =
             name: 'Estado del canal',
             value: isLocked ? '🔒 Bloqueado' : '🔓 Abierto',
             inline: true
+        },
+        {
+            name: 'Límite',
+            value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin límite',
+            inline: true
         }
     ];
 
@@ -236,12 +241,6 @@ function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra =
             inline: false
         });
     }
-
-    channelFields.push({
-        name: 'Límite',
-        value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin límite',
-        inline: true
-    });
 
     embed.addFields(...channelFields);
 
