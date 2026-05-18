@@ -1,75 +1,34 @@
-/**
- * Rangos Eyed alineados con LEVEL_TIERS del panel web (web/public/app.js).
- * Un solo origen conceptual; si cambias rangos en el panel, actualiza aquí también.
- */
+const {
+    DEFAULT_LEVEL_TIERS,
+    normalizeLevelTiers,
+    tierForLevelFromTiers,
+    formatLevelRange,
+    tiersForEyedCatalog
+} = require('./level-tier-defaults');
 
-function formatLevelRange(tier) {
-    const min = Math.max(1, Number.parseInt(tier.minLevel, 10) || 1);
-    const max = tier.maxLevel;
-    if (max === Infinity || max >= 99999) return `Nv ${min}+`;
-    return `Nv ${min}–${max}`;
+/** Rangos por defecto (sin config de guild). */
+const EYED_LEVEL_TIERS = tiersForEyedCatalog(DEFAULT_LEVEL_TIERS);
+
+function tierForLevel(level, guildTiers) {
+    const tiers = guildTiers ? normalizeLevelTiers(guildTiers) : normalizeLevelTiers(DEFAULT_LEVEL_TIERS);
+    const hit = tierForLevelFromTiers(level, tiers);
+    if (!hit) return null;
+    return {
+        label: hit.name,
+        minLevel: hit.minLevel,
+        maxLevel: hit.maxLevel,
+        description: ''
+    };
 }
 
-/** @type {Array<{ label: string, minLevel: number, maxLevel: number, description: string }>} */
-const EYED_LEVEL_TIERS = [
-    {
-        label: 'Iniciado',
-        minLevel: 1,
-        maxLevel: 4,
-        description:
-            'Primeros pasos en la comunidad. Ideal para conocer el servidor y ganar confianza con el grupo.'
-    },
-    {
-        label: 'Explorador',
-        minLevel: 5,
-        maxLevel: 14,
-        description:
-            'Ya recorres el servidor con más soltura. Participás en conversaciones y descubrís dinámicas.'
-    },
-    {
-        label: 'Guardián',
-        minLevel: 15,
-        maxLevel: 29,
-        description:
-            'Miembro consistente: tu presencia suma estabilidad al servidor en chat y actividades.'
-    },
-    {
-        label: 'Núcleo',
-        minLevel: 30,
-        maxLevel: 49,
-        description:
-            'Formás parte central de la comunidad: referencia para otros y participación fuerte.'
-    },
-    {
-        label: 'Arcano',
-        minLevel: 50,
-        maxLevel: 74,
-        description:
-            'Veterano de élite con trayectoria larga. Reconocimiento por dedicación y experiencia.'
-    },
-    {
-        label: 'Leyenda',
-        minLevel: 75,
-        maxLevel: Infinity,
-        description:
-            'Presencia mítica: máximo tramo del sistema de niveles Eyed. Símbolo de la comunidad.'
-    }
-];
-
-/**
- * Rango narrativo Eyed que corresponde a un nivel numérico (p. ej. umbral de rol en nivel 15 → Guardián).
- */
-function tierForLevel(level) {
-    const n = Math.max(1, Number.parseInt(level, 10) || 1);
-    for (const tier of EYED_LEVEL_TIERS) {
-        const max = tier.maxLevel === Infinity ? Number.POSITIVE_INFINITY : tier.maxLevel;
-        if (n >= tier.minLevel && n <= max) return tier;
-    }
-    return EYED_LEVEL_TIERS[EYED_LEVEL_TIERS.length - 1] || null;
+function getEyedTiersForGuild(config) {
+    return tiersForEyedCatalog(config?.tiers);
 }
 
 module.exports = {
     EYED_LEVEL_TIERS,
     formatLevelRange,
-    tierForLevel
+    tierForLevel,
+    getEyedTiersForGuild,
+    normalizeLevelTiers
 };

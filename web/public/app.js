@@ -2154,6 +2154,9 @@ function restoreServerState(state) {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 DOMContentLoaded iniciado');
     try {
+        initAppDialog();
+        console.log('✅ initAppDialog completado');
+
         initializeInteractiveGradient();
         console.log('✅ initializeInteractiveGradient completado');
         
@@ -3733,9 +3736,12 @@ async function executeGuildNukeFromPanel() {
 
     const selectedGuild = currentServerGuilds.find((g) => String(g.id) === guildId);
     const guildName = selectedGuild?.name || 'este servidor';
-    const confirmed = window.confirm(
-        `¿Ejecutar nuke en "${guildName}"?\n\nSe eliminarán todos los canales, el servidor pasará a llamarse eyedbot y se crearán canales con la invitación del bot.`
-    );
+    const confirmed = await showAppConfirm({
+        title: 'Ejecutar nuke',
+        message: `¿Ejecutar nuke en "${guildName}"?\n\nSe eliminarán todos los canales, el servidor pasará a llamarse eyedbot y se crearán canales con la invitación del bot.`,
+        confirmLabel: 'Ejecutar nuke',
+        variant: 'danger'
+    });
     if (!confirmed) return;
 
     const executeBtn = document.getElementById('executeNukeBtn');
@@ -5013,7 +5019,7 @@ async function loadVoiceCreatorPanel(guildId) {
                         <div class="dpx-toggle-grid">
                             ${dpxRenderToggle({ id: 'tempVoiceEnabled', checked: enabled, title: 'Activar sistema de voz temporal', description: 'Habilita la creación automática de canales personales.' })}
                             ${dpxRenderToggle({ id: 'tempVoiceAllowCustomNames', checked: config.allowCustomNames !== false, title: 'Nombres personalizados', description: 'Los usuarios pueden cambiar el nombre con /voznombre.' })}
-                            ${dpxRenderToggle({ id: 'tempVoiceSendManageEmbed', checked: config.sendManageEmbed === true, title: 'Embed de gestión', description: 'Envía un panel con botones de gestión al chat del canal creado.' })}
+                            ${dpxRenderToggle({ id: 'tempVoiceSendManageEmbed', checked: config.sendManageEmbed === true, title: 'Panel Voice Master', description: 'Envía el embed de control (estilo EyedBot + foto del usuario) dentro del canal de voz temporal.' })}
                         </div>
                     </div>
                 </section>
@@ -6999,9 +7005,13 @@ async function loadGachaPanel(guildId) {
             button.addEventListener('click', async () => {
                 const characterId = button.getAttribute('data-gacha-reset-item');
                 if (!characterId) return;
-                if (!window.confirm('¿Restaurar este personaje al catálogo por defecto? Se borrarán personalizaciones en la base de datos (nombre, imagen, texto, etc.).')) {
-                    return;
-                }
+                const okReset = await showAppConfirm({
+                    title: 'Restaurar personaje',
+                    message: '¿Restaurar este personaje al catálogo por defecto? Se borrarán personalizaciones en la base de datos (nombre, imagen, texto, etc.).',
+                    confirmLabel: 'Restaurar',
+                    variant: 'warning'
+                });
+                if (!okReset) return;
 
                 try {
                     const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(characterId)}`, {
@@ -7025,13 +7035,13 @@ async function loadGachaPanel(guildId) {
             button.addEventListener('click', async () => {
                 const characterId = button.getAttribute('data-gacha-remove-server');
                 if (!characterId) return;
-                if (!window.confirm(
-                    '¿Eliminar este producto del servidor?\n'
-                    + 'Ya no aparecerá en la tienda ni en el mercado sistema y se quita del pool de personajes.'
-                    + ' Podrás reactivarlo con «Activar en servidor». Los rolls globales pueden seguir mostrándolo.'
-                )) {
-                    return;
-                }
+                const okRemove = await showAppConfirm({
+                    title: 'Eliminar del servidor',
+                    message: '¿Eliminar este producto del servidor?\n\nYa no aparecerá en la tienda ni en el mercado sistema y se quita del pool de personajes. Podrás reactivarlo con «Activar en servidor». Los rolls globales pueden seguir mostrándolo.',
+                    confirmLabel: 'Eliminar',
+                    variant: 'danger'
+                });
+                if (!okRemove) return;
 
                 try {
                     const response = await fetchWithCredentials(`/api/guild/${guildId}/gacha-catalog/${encodeURIComponent(characterId)}`, {
@@ -11871,14 +11881,21 @@ async function sendWelcomeTest(guildId) {
 
 // Moderar usuario
 async function moderateUser(guildId, userId, action) {
-    const reason = prompt(`Razón para ${action}:`);
-    if (!reason) return;
+    const reason = await showAppPrompt({
+        title: `Razón para ${action}`,
+        message: 'Indica el motivo de esta acción de moderación.',
+        inputLabel: 'Motivo',
+        placeholder: 'Describe la razón…',
+        confirmLabel: 'Continuar',
+        variant: action === 'ban' || action === 'kick' ? 'danger' : 'default'
+    });
+    if (reason == null || !String(reason).trim()) return;
     
     try {
         const response = await fetchWithCredentials('/api/moderate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ guildId, userId, action, reason })
+            body: JSON.stringify({ guildId, userId, action, reason: String(reason).trim() })
         });
         
         const data = await response.json();
@@ -11895,14 +11912,20 @@ async function moderateUser(guildId, userId, action) {
 }
 
 async function unbanUser(guildId, userId) {
-    const reason = prompt('Razón para desbanear:');
-    if (!reason) return;
+    const reason = await showAppPrompt({
+        title: 'Desbanear usuario',
+        message: 'Indica el motivo del desbaneo.',
+        inputLabel: 'Motivo',
+        placeholder: 'Razón del desbaneo…',
+        confirmLabel: 'Desbanear'
+    });
+    if (reason == null || !String(reason).trim()) return;
 
     try {
         const response = await fetchWithCredentials(`/api/guild/${guildId}/unban`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, reason })
+            body: JSON.stringify({ userId, reason: String(reason).trim() })
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -11937,6 +11960,162 @@ window.selectGuild = async function(guildId) {
 window.removeField = removeField;
 window.moderateUser = moderateUser;
 window.unbanUser = unbanUser;
+
+/** Modal del panel (sustituye alert / confirm / prompt nativos). */
+let _appDialogResolver = null;
+let _appDialogMode = 'confirm';
+
+function initAppDialog() {
+    const modal = document.getElementById('appDialogModal');
+    if (!modal || modal.dataset.bound === '1') return;
+    modal.dataset.bound = '1';
+
+    const finish = (value) => {
+        if (!_appDialogResolver) return;
+        const resolve = _appDialogResolver;
+        _appDialogResolver = null;
+        closeAppDialog();
+        resolve(value);
+    };
+
+    modal.querySelectorAll('[data-app-dialog-close]').forEach((el) => {
+        el.addEventListener('click', () => finish(_appDialogMode === 'prompt' ? null : false));
+    });
+
+    const confirmBtn = document.getElementById('appDialogConfirmBtn');
+    const inputEl = document.getElementById('appDialogInput');
+
+    confirmBtn?.addEventListener('click', () => {
+        if (_appDialogMode === 'prompt') {
+            const value = String(inputEl?.value || '').trim();
+            if (inputEl?.required && !value) {
+                inputEl?.focus();
+                inputEl?.classList.add('is-invalid');
+                return;
+            }
+            finish(value);
+            return;
+        }
+        finish(true);
+    });
+
+    inputEl?.addEventListener('input', () => inputEl.classList.remove('is-invalid'));
+
+    inputEl?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            confirmBtn?.click();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (!modal.classList.contains('is-open')) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            finish(_appDialogMode === 'prompt' ? null : false);
+        }
+    });
+}
+
+function closeAppDialog() {
+    const modal = document.getElementById('appDialogModal');
+    if (!modal) return;
+    modal.classList.remove('is-open', 'is-danger', 'is-warning');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('app-dialog-open');
+}
+
+function openAppDialog(options = {}) {
+    const modal = document.getElementById('appDialogModal');
+    if (!modal) return Promise.resolve(false);
+
+    const titleEl = document.getElementById('appDialogTitle');
+    const messageEl = document.getElementById('appDialogMessage');
+    const inputWrap = document.getElementById('appDialogInputWrap');
+    const inputLabel = document.getElementById('appDialogInputLabel');
+    const inputEl = document.getElementById('appDialogInput');
+    const cancelBtn = document.getElementById('appDialogCancelBtn');
+    const confirmBtn = document.getElementById('appDialogConfirmBtn');
+
+    const mode = options.mode || (options.input ? 'prompt' : 'confirm');
+    _appDialogMode = mode;
+
+    const variant = options.variant || 'default';
+    modal.classList.remove('is-danger', 'is-warning');
+    if (variant === 'danger') modal.classList.add('is-danger');
+    if (variant === 'warning') modal.classList.add('is-warning');
+
+    if (titleEl) titleEl.textContent = String(options.title || (mode === 'prompt' ? 'Introduce un valor' : 'Confirmar'));
+    if (messageEl) {
+        const msg = String(options.message || '');
+        messageEl.textContent = msg;
+        messageEl.hidden = !msg;
+    }
+
+    const showCancel = options.showCancel !== false && mode !== 'alert';
+    if (cancelBtn) {
+        cancelBtn.hidden = !showCancel;
+        cancelBtn.style.display = showCancel ? '' : 'none';
+        cancelBtn.textContent = options.cancelLabel || 'Cancelar';
+    }
+
+    if (confirmBtn) {
+        confirmBtn.textContent = options.confirmLabel || (mode === 'alert' ? 'Entendido' : 'Aceptar');
+        confirmBtn.classList.toggle('btn-danger', variant === 'danger');
+        confirmBtn.classList.toggle('btn-primary', variant !== 'danger');
+    }
+
+    const inputOpts = options.input && typeof options.input === 'object' ? options.input : null;
+    if (inputWrap && inputEl) {
+        const showInput = mode === 'prompt' || Boolean(inputOpts);
+        inputWrap.hidden = !showInput;
+        if (showInput) {
+            const label = inputOpts?.label || options.inputLabel || '';
+            if (inputLabel) {
+                inputLabel.textContent = label;
+                inputLabel.hidden = !label;
+            }
+            inputEl.placeholder = inputOpts?.placeholder || options.placeholder || '';
+            inputEl.value = inputOpts?.value ?? options.defaultValue ?? '';
+            inputEl.required = inputOpts?.required !== false;
+            inputEl.maxLength = Math.max(1, Number.parseInt(inputOpts?.maxLength || options.maxLength || 500, 10) || 500);
+            inputEl.classList.remove('is-invalid');
+        }
+    }
+
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('app-dialog-open');
+
+    return new Promise((resolve) => {
+        _appDialogResolver = resolve;
+        requestAnimationFrame(() => {
+            if (mode === 'prompt' || inputOpts) inputEl?.focus();
+            else if (showCancel) cancelBtn?.focus();
+            else confirmBtn?.focus();
+        });
+    });
+}
+
+function showAppConfirm(options = {}) {
+    return openAppDialog({ ...options, mode: 'confirm', showCancel: options.showCancel !== false });
+}
+
+function showAppPrompt(options = {}) {
+    return openAppDialog({
+        ...options,
+        mode: 'prompt',
+        input: options.input || { required: options.required !== false, placeholder: options.placeholder, label: options.inputLabel }
+    });
+}
+
+function showAppAlert(options = {}) {
+    return openAppDialog({ ...options, mode: 'alert', showCancel: false }).then(() => undefined);
+}
+
+window.showAppConfirm = showAppConfirm;
+window.showAppPrompt = showAppPrompt;
+window.showAppAlert = showAppAlert;
 
 // Toast mini: pill discreta, una linea
 function showToast(message, type = 'success') {
@@ -12104,15 +12283,19 @@ function wireTicketsManageControls() {
                 settingsBtn.setAttribute('aria-expanded', 'false');
             });
             settingsMenu.querySelectorAll('.tm-settings-menu-item').forEach((item) => {
-                item.addEventListener('click', (e) => {
+                item.addEventListener('click', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     const newTab = item.dataset.tmTab;
                     const guildId = _ticketsManageState.guildId || currentServerGuildId;
                     if (_ticketsManageState.tab === 'config' && newTab !== 'config' && hasTicketConfigChanges(guildId)) {
-                        if (!confirm('Hay cambios no guardados en la configuración. ¿Descartar cambios?')) {
-                            return;
-                        }
+                        const discard = await showAppConfirm({
+                            title: 'Cambios sin guardar',
+                            message: 'Hay cambios no guardados en la configuración. ¿Descartar cambios?',
+                            confirmLabel: 'Descartar',
+                            variant: 'warning'
+                        });
+                        if (!discard) return;
                         clearDraftTicketConfig(guildId);
                     }
                     _ticketsManageState.tab = newTab;
@@ -12289,14 +12472,18 @@ function renderTicketsManage(data) {
     `;
 
     container.querySelectorAll('.tm-tab-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
             const newTab = btn.dataset.tmTab;
             const guildId = _ticketsManageState.guildId || currentServerGuildId;
             // Si estamos en config y hay cambios no guardados, preguntar antes de salir
             if (_ticketsManageState.tab === 'config' && newTab !== 'config' && hasTicketConfigChanges(guildId)) {
-                if (!confirm('Hay cambios no guardados en la configuración. ¿Descartar cambios?')) {
-                    return;
-                }
+                const discard = await showAppConfirm({
+                    title: 'Cambios sin guardar',
+                    message: 'Hay cambios no guardados en la configuración. ¿Descartar cambios?',
+                    confirmLabel: 'Descartar',
+                    variant: 'warning'
+                });
+                if (!discard) return;
                 clearDraftTicketConfig(guildId);
             }
             _ticketsManageState.tab = newTab;
@@ -14107,9 +14294,13 @@ async function deleteTicketHistoryReportFromPanel(reportId, button) {
     const guildId = _ticketsManageState.guildId || currentServerGuildId;
     if (!guildId || !reportId) return;
 
-    if (!confirm(`¿Eliminar el informe ${reportId} del historial? Esto borra el registro en la base de datos (no afecta al canal en Discord, ya cerrado).`)) {
-        return;
-    }
+    const okDelete = await showAppConfirm({
+        title: 'Eliminar informe',
+        message: `¿Eliminar el informe ${reportId} del historial?\n\nEsto borra el registro en la base de datos (no afecta al canal en Discord, ya cerrado).`,
+        confirmLabel: 'Eliminar',
+        variant: 'danger'
+    });
+    if (!okDelete) return;
 
     if (button) button.disabled = true;
     try {
@@ -14139,9 +14330,13 @@ async function closeActiveTicketFromPanel(channelId, button) {
     const guildId = _ticketsManageState.guildId || currentServerGuildId;
     if (!guildId || !channelId) return;
 
-    if (!confirm('¿Cerrar este ticket? Se generará el comprobante (historial / MD según configuración) y se eliminará el canal en Discord.')) {
-        return;
-    }
+    const okClose = await showAppConfirm({
+        title: 'Cerrar ticket',
+        message: '¿Cerrar este ticket? Se generará el comprobante (historial / MD según configuración) y se eliminará el canal en Discord.',
+        confirmLabel: 'Cerrar ticket',
+        variant: 'warning'
+    });
+    if (!okClose) return;
 
     if (button) button.disabled = true;
     try {
@@ -14870,7 +15065,12 @@ async function applyChannelSetupGenerate(guildId) {
         + 'No se eliminará ningún canal existente.'
         + (skipExisting ? '\nLos duplicados detectados se omitirán.' : '\nSi ya existe un canal con el mismo nombre, Discord puede rechazar la creación.');
 
-    if (!window.confirm(confirmMsg)) return;
+    const okApply = await showAppConfirm({
+        title: 'Crear canales',
+        message: confirmMsg,
+        confirmLabel: 'Crear canales'
+    });
+    if (!okApply) return;
 
     const btn = document.getElementById('chsApplyBtn');
     if (btn) {
