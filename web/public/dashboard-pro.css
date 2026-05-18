@@ -14150,111 +14150,62 @@ body {
     }
 }
 
-/* ---------- Server sidebar — rail (neon glass) ---------- */
+/* ---------- Server sidebar — rail (limpio + scroll interno) ---------- */
 #serverSection.server-config-shell .server-shell:has(.server-side-menu--rail) {
-    grid-template-columns: minmax(228px, 248px) minmax(0, 1fr) !important;
-    gap: 0.95rem !important;
+    grid-template-columns: 260px minmax(0, 1fr) !important;
+    gap: 0 !important;
 }
 
-/* Línea vertical heredada (left: 260px) + ancho fijo 260px rompían el borde derecho */
 #serverSection.server-config-shell .server-shell:has(.server-side-menu--rail)::after {
     display: none !important;
 }
 
 #serverSection.server-config-shell .server-side-menu.server-side-menu--rail {
-    --rail-accent: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.95);
-    --rail-accent-soft: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22);
-    --rail-muted: rgba(186, 172, 220, 0.78);
-    --rail-surface: rgba(255, 255, 255, 0.055);
-    --rail-line: rgba(var(--border-rgb, 190, 155, 255), 0.2);
+    --rail-accent: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.92);
+    --rail-muted: rgba(168, 152, 198, 0.75);
+    --rail-surface: rgba(255, 255, 255, 0.05);
+    --rail-line: rgba(var(--border-rgb, 190, 155, 255), 0.16);
     position: relative;
-    isolation: isolate;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    background:
-        linear-gradient(
-            165deg,
-            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.14) 0%,
-            rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.06) 38%,
-            rgba(8, 6, 18, 0.72) 100%
-        ) !important;
-    border: 1px solid var(--rail-line) !important;
-    border-radius: 18px !important;
-    padding: 0.78rem 0.55rem 0.9rem 0.6rem !important;
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-        0 18px 42px rgba(4, 2, 14, 0.42),
-        0 0 48px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12) !important;
-    backdrop-filter: blur(20px) saturate(175%);
-    -webkit-backdrop-filter: blur(20px) saturate(175%);
     display: flex !important;
     flex-direction: column !important;
-    scrollbar-width: none;
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-right: 1px solid var(--rail-line) !important;
+    background:
+        linear-gradient(
+            180deg,
+            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.1) 0%,
+            rgba(8, 6, 18, 0.55) 42%
+        ) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
     overflow: hidden !important;
+    scrollbar-width: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-menu-top {
     flex: 0 0 auto;
-    position: relative;
-    z-index: 3;
-    padding-bottom: 0.15rem;
-    margin-bottom: 0.1rem;
-    background:
-        linear-gradient(
-            180deg,
-            rgba(10, 8, 20, 0.98) 0%,
-            rgba(10, 8, 20, 0.94) 72%,
-            rgba(10, 8, 20, 0) 100%
-        );
-}
-
-#serverSection.server-config-shell .server-side-menu--rail::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    z-index: 0;
-    background:
-        radial-gradient(ellipse 90% 55% at -8% -12%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.38), transparent 58%),
-        radial-gradient(ellipse 70% 50% at 108% 88%, rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.22), transparent 52%);
-    opacity: 0.85;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 12%;
-    right: 12%;
-    height: 1px;
-    border-radius: 999px;
-    pointer-events: none;
-    z-index: 0;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.35),
-        transparent
-    );
-    opacity: 0.55;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail > * {
-    position: relative;
-    z-index: 1;
+    z-index: 2;
+    padding: 0.75rem 0.7rem 0.55rem;
+    border-bottom: 1px solid var(--rail-line);
+    background: rgba(10, 8, 20, 0.97);
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-header {
-    padding: 0.55rem 0.62rem 0.7rem;
-    margin: 0 0.2rem 0.45rem;
-    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.22);
-    border-radius: 14px;
-    background:
-        linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.16), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.08)),
-        rgba(255, 255, 255, 0.03);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    padding: 0;
+    margin: 0 0 0.55rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-identity {
@@ -14264,37 +14215,29 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-guild-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    border: 2px solid transparent;
-    background:
-        linear-gradient(#0c0818, #0c0818) padding-box,
-        linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.95), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.85)) border-box;
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.06) inset,
-        0 10px 22px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    border: 1px solid rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4);
+    box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-kicker {
     display: block;
     font-size: 0.62rem;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.88);
+    color: var(--rail-muted);
     line-height: 1.2;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-guild-name {
-    margin-top: 0.14rem;
-    font-size: 1rem;
-    font-weight: 800;
+    margin-top: 0.12rem;
+    font-size: 0.98rem;
+    font-weight: 700;
     letter-spacing: -0.02em;
-    background: linear-gradient(92deg, #fff 0%, #e8dcff 42%, #ffc4f0 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--text-primary, #f4eeff);
     max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
@@ -14302,8 +14245,8 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-search {
-    margin: 0 0 0.35rem;
-    padding: 0 0.35rem;
+    margin: 0;
+    padding: 0;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-search-field {
@@ -14354,97 +14297,59 @@ body {
 #serverSection.server-config-shell .server-side-menu--rail .server-side-nav {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.1rem;
     flex: 1 1 auto;
     min-height: 0;
-    padding: 0 0.2rem 0.15rem;
+    padding: 0.45rem 0.55rem 0.7rem;
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45) transparent;
+    scrollbar-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.4) transparent;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group {
-    position: relative;
-    isolation: isolate;
-    margin-top: 0.42rem;
-    padding-top: 0.28rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    overflow: hidden;
+    margin-top: 0.35rem;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group:first-child {
     margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-group[data-group="panel"] {
-    --group-glow: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.9);
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-group[data-group="modules"] {
-    --group-glow: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.92);
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-group[data-group="moderation"] {
-    --group-glow: #ffb86b;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-group[data-group="notifications"] {
-    --group-glow: #6ee7c8;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title {
-    padding: 0.42rem 0.52rem 0.32rem !important;
+    padding: 0.4rem 0.45rem 0.3rem !important;
     margin-top: 0 !important;
     font-size: 0.68rem !important;
-    letter-spacing: 0.11em !important;
-    color: rgba(220, 210, 245, 0.82) !important;
-    font-weight: 700 !important;
-    border-radius: 9px;
+    letter-spacing: 0.1em !important;
+    color: var(--rail-muted) !important;
+    font-weight: 600 !important;
+    border-radius: 8px;
     transition: color 0.18s ease, background 0.18s ease;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title-inner {
-    position: relative;
-    padding-left: 0.55rem;
+    padding-left: 0;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title-inner::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    width: 3px;
-    height: 62%;
-    border-radius: 999px;
-    transform: translateY(-50%);
-    background: var(--group-glow, var(--rail-accent));
-    box-shadow: none;
+    display: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title:hover {
-    color: #fff !important;
+    color: rgba(235, 225, 255, 0.95) !important;
     background: rgba(255, 255, 255, 0.04);
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-icon {
-    width: 16px !important;
-    height: 16px !important;
-    padding: 4px !important;
-    border: 1px solid color-mix(in srgb, var(--group-glow, var(--rail-accent)) 32%, transparent) !important;
-    border-radius: 7px !important;
-    background: color-mix(in srgb, var(--group-glow, var(--rail-accent)) 12%, rgba(255, 255, 255, 0.04)) !important;
-    color: var(--group-glow, var(--rail-muted)) !important;
-    box-sizing: content-box;
-    opacity: 1;
+    width: 14px !important;
+    height: 14px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: none !important;
+    color: var(--rail-muted) !important;
+    box-sizing: border-box;
+    opacity: 0.9;
     box-shadow: none;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-group.collapsed .side-menu-group-icon,
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-group.collapsed .side-menu-group-title-inner::before {
-    opacity: 0.55;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title::after {
@@ -14456,22 +14361,12 @@ body {
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-items {
     display: flex;
     flex-direction: column;
-    gap: 0.04rem;
-    padding-left: 0.12rem;
-    overflow: hidden;
-    max-height: 1200px;
-    opacity: 1;
-    transition: max-height 0.28s ease, opacity 0.2s ease, padding 0.2s ease, margin 0.2s ease;
+    gap: 0.02rem;
+    padding-left: 0.1rem;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group.collapsed .side-menu-items {
     display: none !important;
-    max-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn {
@@ -14480,9 +14375,9 @@ body {
     padding: 0 !important;
     border: 0 !important;
     border-radius: 9px !important;
-    background: rgba(10, 8, 20, 0.72) !important;
+    background: transparent !important;
     box-shadow: none !important;
-    overflow: hidden;
+    overflow: visible;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn::before {
@@ -14510,23 +14405,18 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-icon {
-    width: 18px !important;
-    height: 18px !important;
-    padding: 5px !important;
-    box-sizing: content-box !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 9px !important;
-    background: rgba(255, 255, 255, 0.04) !important;
+    width: 17px !important;
+    height: 17px !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: none !important;
     color: var(--rail-muted) !important;
-    opacity: 0.95;
+    opacity: 0.9;
     transform: none !important;
     filter: none !important;
-    transition:
-        color 0.2s ease,
-        background 0.2s ease,
-        border-color 0.2s ease,
-        box-shadow 0.2s ease,
-        transform 0.2s ease;
+    transition: color 0.18s ease, opacity 0.18s ease;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-label {
@@ -14544,18 +14434,12 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn:hover .side-menu-icon {
-    transform: translateY(-1px) scale(1.04) !important;
-    border-color: rgba(255, 255, 255, 0.16) !important;
+    color: rgba(225, 215, 248, 0.95) !important;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active {
-    background:
-        linear-gradient(
-            118deg,
-            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.28),
-            rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14)
-        ) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.14) !important;
+    box-shadow: none !important;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active::before {
@@ -14569,53 +14453,20 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active .side-menu-icon {
+    color: var(--rail-accent) !important;
     opacity: 1;
-    transform: scale(1.05) !important;
-    box-shadow: none;
 }
 
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="sky"] .side-menu-icon { color: #9fd8ff !important; }
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="rose"] .side-menu-icon { color: #ffb8d8 !important; }
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="violet"] .side-menu-icon { color: #d7c4ff !important; }
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="amber"] .side-menu-icon { color: #ffd18a !important; }
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="teal"] .side-menu-icon { color: #8ce8d8 !important; }
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="cyan"] .side-menu-icon { color: #9de8ff !important; }
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="sky"]:hover .side-menu-icon,
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="sky"].active .side-menu-icon {
-    background: rgba(159, 216, 255, 0.14) !important;
-    border-color: rgba(159, 216, 255, 0.38) !important;
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone]:not(.active) .side-menu-icon {
+    color: var(--rail-muted) !important;
 }
 
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="rose"]:hover .side-menu-icon,
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="rose"].active .side-menu-icon {
-    background: rgba(255, 184, 216, 0.14) !important;
-    border-color: rgba(255, 184, 216, 0.38) !important;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="violet"]:hover .side-menu-icon,
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="violet"].active .side-menu-icon {
-    background: rgba(215, 196, 255, 0.14) !important;
-    border-color: rgba(215, 196, 255, 0.38) !important;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="amber"]:hover .side-menu-icon,
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="amber"].active .side-menu-icon {
-    background: rgba(255, 209, 138, 0.14) !important;
-    border-color: rgba(255, 209, 138, 0.38) !important;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="teal"]:hover .side-menu-icon,
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="teal"].active .side-menu-icon {
-    background: rgba(140, 232, 216, 0.14) !important;
-    border-color: rgba(140, 232, 216, 0.38) !important;
-}
-
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="cyan"]:hover .side-menu-icon,
-#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="cyan"].active .side-menu-icon {
-    background: rgba(157, 232, 255, 0.14) !important;
-    border-color: rgba(157, 232, 255, 0.38) !important;
-}
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="sky"].active .side-menu-icon { color: #9fd8ff !important; }
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="rose"].active .side-menu-icon { color: #ffb8d8 !important; }
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="violet"].active .side-menu-icon { color: #d7c4ff !important; }
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="amber"].active .side-menu-icon { color: #ffd18a !important; }
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="teal"].active .side-menu-icon { color: #8ce8d8 !important; }
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="cyan"].active .side-menu-icon { color: #9de8ff !important; }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-nav::-webkit-scrollbar {
     width: 4px !important;
