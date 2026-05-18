@@ -4,8 +4,6 @@ const levelingStore = require('../../utils/leveling-store');
 const { applyXpDeltaToMember } = require('../../events/leveling-tracker');
 const { getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
 
-const XP_AMOUNT_MAX = 1_000_000;
-
 function formatXp(n) {
     return Math.max(0, Number.parseInt(n, 10) || 0).toLocaleString('es-ES');
 }
@@ -99,7 +97,6 @@ const amountOption = (opt) =>
         .setName('cantidad')
         .setDescription('Cantidad de XP')
         .setMinValue(1)
-        .setMaxValue(XP_AMOUNT_MAX)
         .setRequired(true);
 
 const reasonOption = (opt) =>
