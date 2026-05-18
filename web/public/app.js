@@ -3193,11 +3193,11 @@ function renderDashboardGuildCard(guild) {
         : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
 
     return `
-        <button type="button" class="guild-card dashboard-guild-card${isFavorite ? ' is-favorite' : ''}" data-guild-id="${escapeHtml(guildId)}" onclick="selectGuild('${safeGuildId}')">
+        <article class="guild-card dashboard-guild-card${isFavorite ? ' is-favorite' : ''}" data-guild-id="${escapeHtml(guildId)}" role="button" tabindex="0" onclick="selectGuild('${safeGuildId}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectGuild('${safeGuildId}');}">
             <span class="dashboard-guild-card__shine" aria-hidden="true"></span>
-            <span class="guild-card-top dashboard-guild-card__head">
-                <span class="guild-icon dashboard-guild-card__icon">${iconHtml}</span>
-                <span class="dashboard-guild-card__actions">
+            <div class="guild-card-top dashboard-guild-card__head">
+                <div class="guild-icon dashboard-guild-card__icon">${iconHtml}</div>
+                <div class="dashboard-guild-card__actions">
                     <button type="button" class="dashboard-guild-card__favorite${isFavorite ? ' is-active' : ''}" aria-label="${favoriteLabel}" aria-pressed="${isFavorite ? 'true' : 'false'}" title="${favoriteLabel}" onclick="event.stopPropagation(); toggleDashboardGuildFavorite('${safeGuildId}')">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path class="dashboard-guild-card__favorite-outline" d="M12 2.5l2.86 5.8 6.39.93-4.62 4.5 1.09 6.36L12 17.9l-5.72 3.01 1.09-6.36-4.62-4.5 6.39-.93L12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
@@ -3205,13 +3205,13 @@ function renderDashboardGuildCard(guild) {
                         </svg>
                     </button>
                     <span class="guild-pill dashboard-guild-card__status">Listo para configurar</span>
-                </span>
-            </span>
-            <span class="dashboard-guild-card__body">
-                <span class="guild-name dashboard-guild-card__name">${guildName}</span>
-                <span class="guild-info dashboard-guild-card__info">Espacio principal del servidor en el panel</span>
-            </span>
-            <span class="guild-meta dashboard-guild-card__meta">
+                </div>
+            </div>
+            <div class="dashboard-guild-card__body">
+                <div class="guild-name dashboard-guild-card__name">${guildName}</div>
+                <div class="guild-info dashboard-guild-card__info">Espacio principal del servidor en el panel</div>
+            </div>
+            <div class="guild-meta dashboard-guild-card__meta">
                 <span class="guild-meta-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -3220,12 +3220,12 @@ function renderDashboardGuildCard(guild) {
                     ${formatDashboardMemberCount(memberCount)} miembros
                 </span>
                 <span class="guild-meta-item guild-meta-item--ghost">ID · ${shortId}</span>
-            </span>
-            <span class="dashboard-guild-card__cta" aria-hidden="true">
+            </div>
+            <div class="dashboard-guild-card__cta" aria-hidden="true">
                 <span>Abrir panel</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
-            </span>
-        </button>`;
+            </div>
+        </article>`;
 }
 
 function renderDashboardGuildSection(title, guilds) {
