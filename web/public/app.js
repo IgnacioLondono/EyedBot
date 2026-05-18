@@ -60,6 +60,59 @@ let loadGuildsForServerPromise = null;
 let channelSetupFetchGeneration = 0;
 let dashboardGuildsCache = [];
 let dashboardGuildSearchQuery = '';
+const DASHBOARD_GUILD_FAVORITES_STORAGE = 'eyedbot.dashboard.guildFavorites';
+
+function getDashboardFavoritesStorageKey() {
+    const userId = String(currentUser?.id || 'guest');
+    return `${DASHBOARD_GUILD_FAVORITES_STORAGE}.${userId}`;
+}
+
+function readDashboardFavoriteGuildIds() {
+    try {
+        const raw = localStorage.getItem(getDashboardFavoritesStorageKey());
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.map((id) => String(id)).filter(Boolean) : [];
+    } catch {
+        return [];
+    }
+}
+
+function writeDashboardFavoriteGuildIds(ids) {
+    try {
+        const unique = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id)).filter(Boolean))];
+        localStorage.setItem(getDashboardFavoritesStorageKey(), JSON.stringify(unique));
+    } catch (error) {
+        console.warn('No se pudieron guardar favoritos de servidores:', error);
+    }
+}
+
+function isDashboardGuildFavorite(guildId) {
+    return readDashboardFavoriteGuildIds().includes(String(guildId || ''));
+}
+
+function toggleDashboardGuildFavorite(guildId) {
+    const id = String(guildId || '');
+    if (!id) return;
+
+    const favorites = new Set(readDashboardFavoriteGuildIds());
+    if (favorites.has(id)) favorites.delete(id);
+    else favorites.add(id);
+    writeDashboardFavoriteGuildIds([...favorites]);
+    displayGuilds(getFilteredDashboardGuilds());
+}
+
+function partitionDashboardGuilds(guilds) {
+    const favoriteIds = new Set(readDashboardFavoriteGuildIds());
+    const favorites = [];
+    const others = [];
+
+    (Array.isArray(guilds) ? guilds : []).forEach((guild) => {
+        const bucket = favoriteIds.has(String(guild?.id || '')) ? favorites : others;
+        bucket.push(guild);
+    });
+
+    return { favorites, others };
+}
 const serverActivityCharts = new Map();
 let serverActivityChartMode = 'week';
 let botInviteUrl = '';
@@ -3127,48 +3180,32 @@ function updateDashboardGuildSummary(guilds = dashboardGuildsCache) {
     membersEl.textContent = formatDashboardMemberCount(totalMembers);
 }
 
-// Mostrar servidores
-function displayGuilds(guilds) {
-    const container = document.getElementById('guildsList');
-    if (!container) return;
+function renderDashboardGuildCard(guild) {
+    const guildId = String(guild.id || '');
+    const safeGuildId = guildId.replace(/'/g, "\\'");
+    const guildName = escapeHtml(String(guild.name || 'Servidor'));
+    const memberCount = Number(guild?.botGuild?.memberCount) || 0;
+    const shortId = escapeHtml(String(guild.id || '').slice(-4));
+    const isFavorite = isDashboardGuildFavorite(guildId);
+    const favoriteLabel = isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos';
+    const iconHtml = guild.icon
+        ? `<img src="${escapeHtml(String(guild.icon))}" alt="${guildName}" loading="lazy" decoding="async">`
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
 
-    updateDashboardGuildSummary(dashboardGuildsCache);
-
-    if (guilds.length === 0) {
-        const emptyTitle = dashboardGuildSearchQuery ? 'Sin coincidencias' : 'Sin servidores todavía';
-        const emptyText = dashboardGuildSearchQuery
-            ? 'Prueba con otro nombre o borra la búsqueda para ver todas las comunidades.'
-            : 'Cuando el bot esté en un servidor con permisos de administración, aparecerá aquí.';
-        container.innerHTML = `
-            <div class="dashboard-guild-empty">
-                <div class="dashboard-guild-empty__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <rect x="3" y="6" width="18" height="12" rx="2"></rect>
-                        <path d="M7 10h10"></path>
-                        <path d="M7 14h6"></path>
-                    </svg>
-                </div>
-                <h3>${escapeHtml(emptyTitle)}</h3>
-                <p>${escapeHtml(emptyText)}</p>
-            </div>`;
-        return;
-    }
-
-    container.innerHTML = guilds.map((guild) => {
-        const guildId = String(guild.id || '');
-        const guildName = escapeHtml(String(guild.name || 'Servidor'));
-        const memberCount = Number(guild?.botGuild?.memberCount) || 0;
-        const shortId = escapeHtml(String(guild.id || '').slice(-4));
-        const iconHtml = guild.icon
-            ? `<img src="${escapeHtml(String(guild.icon))}" alt="${guildName}" loading="lazy" decoding="async">`
-            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
-
-        return `
-        <button type="button" class="guild-card dashboard-guild-card" data-guild-id="${escapeHtml(guildId)}" onclick="selectGuild('${guildId.replace(/'/g, "\\'")}')">
+    return `
+        <button type="button" class="guild-card dashboard-guild-card${isFavorite ? ' is-favorite' : ''}" data-guild-id="${escapeHtml(guildId)}" onclick="selectGuild('${safeGuildId}')">
             <span class="dashboard-guild-card__shine" aria-hidden="true"></span>
             <span class="guild-card-top dashboard-guild-card__head">
                 <span class="guild-icon dashboard-guild-card__icon">${iconHtml}</span>
-                <span class="guild-pill dashboard-guild-card__status">Listo para configurar</span>
+                <span class="dashboard-guild-card__actions">
+                    <button type="button" class="dashboard-guild-card__favorite${isFavorite ? ' is-active' : ''}" aria-label="${favoriteLabel}" aria-pressed="${isFavorite ? 'true' : 'false'}" title="${favoriteLabel}" onclick="event.stopPropagation(); toggleDashboardGuildFavorite('${safeGuildId}')">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path class="dashboard-guild-card__favorite-outline" d="M12 2.5l2.86 5.8 6.39.93-4.62 4.5 1.09 6.36L12 17.9l-5.72 3.01 1.09-6.36-4.62-4.5 6.39-.93L12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+                            <path class="dashboard-guild-card__favorite-fill" d="M12 2.5l2.86 5.8 6.39.93-4.62 4.5 1.09 6.36L12 17.9l-5.72 3.01 1.09-6.36-4.62-4.5 6.39-.93L12 2.5z"></path>
+                        </svg>
+                    </button>
+                    <span class="guild-pill dashboard-guild-card__status">Listo para configurar</span>
+                </span>
             </span>
             <span class="dashboard-guild-card__body">
                 <span class="guild-name dashboard-guild-card__name">${guildName}</span>
@@ -3189,7 +3226,54 @@ function displayGuilds(guilds) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
             </span>
         </button>`;
-    }).join('');
+}
+
+function renderDashboardGuildSection(title, guilds) {
+    if (!Array.isArray(guilds) || guilds.length === 0) return '';
+    const cards = guilds.map((guild) => renderDashboardGuildCard(guild)).join('');
+    return `
+        <section class="dashboard-guild-section">
+            <h3 class="dashboard-guild-section-title">${escapeHtml(title)}</h3>
+            <div class="dashboard-guild-section-grid guilds-grid dashboard-guilds-grid">${cards}</div>
+        </section>`;
+}
+
+// Mostrar servidores
+function displayGuilds(guilds) {
+    const container = document.getElementById('guildsList');
+    if (!container) return;
+
+    updateDashboardGuildSummary(dashboardGuildsCache);
+
+    if (guilds.length === 0) {
+        const emptyTitle = dashboardGuildSearchQuery ? 'Sin coincidencias' : 'Sin servidores todavía';
+        const emptyText = dashboardGuildSearchQuery
+            ? 'Prueba con otro nombre o borra la búsqueda para ver todas las comunidades.'
+            : 'Cuando el bot esté en un servidor con permisos de administración, aparecerá aquí.';
+        container.className = 'dashboard-guilds-board';
+        container.innerHTML = `
+            <div class="dashboard-guild-empty">
+                <div class="dashboard-guild-empty__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="3" y="6" width="18" height="12" rx="2"></rect>
+                        <path d="M7 10h10"></path>
+                        <path d="M7 14h6"></path>
+                    </svg>
+                </div>
+                <h3>${escapeHtml(emptyTitle)}</h3>
+                <p>${escapeHtml(emptyText)}</p>
+            </div>`;
+        return;
+    }
+
+    const { favorites, others } = partitionDashboardGuilds(guilds);
+    const sections = [
+        renderDashboardGuildSection('Servidores favoritos', favorites),
+        renderDashboardGuildSection('Servidores', others)
+    ].filter(Boolean);
+
+    container.className = 'dashboard-guilds-board';
+    container.innerHTML = sections.join('');
 }
 
 // Cargar servidores para el formulario de embed
@@ -11835,6 +11919,7 @@ async function unbanUser(guildId, userId) {
 
 
 // Funciones globales
+window.toggleDashboardGuildFavorite = toggleDashboardGuildFavorite;
 window.selectGuild = async function(guildId) {
     serverFeaturesUnlocked = true;
     currentServerGuildId = guildId;

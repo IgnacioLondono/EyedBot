@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260507-bg-bubbles-toggle">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260516-no-search-pills">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260516-guild-favorites">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -160,7 +160,7 @@
                         </div>
                     </div>
                 </header>
-                <div id="guildsList" class="guilds-grid dashboard-guilds-grid">
+                <div id="guildsList" class="dashboard-guilds-board">
                     <div class="loading dashboard-guild-loading">
                         <div class="loading-spinner"></div>
                         <p>Cargando servidores...</p>
@@ -1143,6 +1143,15 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="side-menu-search">
+                            <label class="side-menu-search-field" for="serverTabSearch">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="7"></circle>
+                                    <path d="M20 20l-3.5-3.5"></path>
+                                </svg>
+                                <input type="search" id="serverTabSearch" class="form-control" placeholder="Buscar módulo o sección…" autocomplete="off" spellcheck="false">
+                            </label>
+                        </div>
                         </div>
 
                         <nav class="server-side-nav" aria-label="Secciones del servidor">
@@ -1668,6 +1677,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260516-toast-mini"></script>
+    <script src="app.js?v=20260516-guild-favorites"></script>
 </body>
 </html>
