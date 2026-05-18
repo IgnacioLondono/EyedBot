@@ -11853,7 +11853,7 @@ window.removeField = removeField;
 window.moderateUser = moderateUser;
 window.unbanUser = unbanUser;
 
-// Mostrar toast (tarjeta unica que se actualiza en vez de apilarse)
+// Toast mini: pill discreta, una linea
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -11867,26 +11867,25 @@ function showToast(message, type = 'success') {
     const validType = icons[type] ? type : 'success';
     const iconSvg = icons[validType];
 
-    // Reutilizar el toast activo si existe para evitar apilamiento
-    let toast = container.querySelector('.toast.pro-toast');
+    const legacyToast = container.querySelector('.toast.pro-toast:not(.pro-toast--mini)');
+    if (legacyToast) legacyToast.remove();
+
+    let toast = container.querySelector('.toast.pro-toast.pro-toast--mini');
     const isExisting = Boolean(toast);
 
     if (!toast) {
         toast = document.createElement('div');
-        toast.className = `toast pro-toast ${validType}`;
+        toast.className = `toast pro-toast pro-toast--mini ${validType}`;
         toast.setAttribute('role', 'status');
         toast.setAttribute('aria-live', 'polite');
         toast.innerHTML = `
             <span class="pro-toast-icon" aria-hidden="true">${iconSvg}</span>
-            <div class="pro-toast-body">
-                <div class="pro-toast-title"></div>
-                <div class="pro-toast-message"></div>
-            </div>
-            <button type="button" class="pro-toast-close" aria-label="Cerrar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
-            </button>
-            <div class="pro-toast-progress"><span></span></div>
+            <span class="pro-toast-message"></span>
         `;
+        toast.addEventListener('click', () => {
+            if (toast._hideTimer) clearTimeout(toast._hideTimer);
+            dismissToast(toast);
+        });
         container.appendChild(toast);
     }
 
@@ -11894,15 +11893,10 @@ function showToast(message, type = 'success') {
     toast.classList.remove('success', 'error', 'warning');
     toast.classList.add(validType);
 
-    const titles = { success: 'Listo', error: 'Atencion', warning: 'Aviso' };
     const iconEl = toast.querySelector('.pro-toast-icon');
-    const titleEl = toast.querySelector('.pro-toast-title');
     const messageEl = toast.querySelector('.pro-toast-message');
-    const progressBar = toast.querySelector('.pro-toast-progress span');
-    const closeBtn = toast.querySelector('.pro-toast-close');
 
     if (iconEl) iconEl.innerHTML = iconSvg;
-    if (titleEl) titleEl.textContent = titles[validType] || '';
     if (messageEl) messageEl.textContent = String(message == null ? '' : message);
 
     // Reset animaciones para que se vuelvan a ejecutar al actualizar
@@ -11915,17 +11909,6 @@ function showToast(message, type = 'success') {
         toast.classList.add('pro-toast-enter');
     }
 
-    // Reiniciar barra de progreso
-    if (progressBar) {
-        progressBar.style.transition = 'none';
-        progressBar.style.transform = 'scaleX(1)';
-        // forzar reflow
-        // eslint-disable-next-line no-unused-expressions
-        void progressBar.offsetWidth;
-        progressBar.style.transition = 'transform 4s linear';
-        progressBar.style.transform = 'scaleX(0)';
-    }
-
     // Limpiar timers previos
     if (toast._hideTimer) clearTimeout(toast._hideTimer);
     if (toast._pulseTimer) clearTimeout(toast._pulseTimer);
@@ -11933,21 +11916,11 @@ function showToast(message, type = 'success') {
 
     // Quitar la clase de pulse despues de la animacion para permitir repetirla
     toast._pulseTimer = setTimeout(() => {
-        toast.classList.remove('pro-toast-pulse');
-        toast.classList.remove('pro-toast-enter');
-    }, 420);
-
-    // Cerrar manual
-    if (closeBtn && !closeBtn._wired) {
-        closeBtn._wired = true;
-        closeBtn.addEventListener('click', () => {
-            if (toast._hideTimer) clearTimeout(toast._hideTimer);
-            dismissToast(toast);
-        });
-    }
+        toast.classList.remove('pro-toast-pulse', 'pro-toast-enter');
+    }, 260);
 
     // Auto-ocultar
-    toast._hideTimer = setTimeout(() => dismissToast(toast), 4000);
+    toast._hideTimer = setTimeout(() => dismissToast(toast), 2600);
 }
 
 function dismissToast(toast) {
