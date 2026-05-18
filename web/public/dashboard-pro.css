@@ -14867,6 +14867,15 @@ body {
     }
 }
 
+/* Sin buscadores pill en el panel */
+.side-menu-search,
+.dashboard-home-search,
+.commands-search,
+.search-pill.dashboard-home-search,
+.search-pill.commands-search {
+    display: none !important;
+}
+
 /* =====================================================================
    Franja de acento en tarjetas — inset dentro del border-radius
    ===================================================================== */

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EyedBot - Panel de Control</title>
     <link rel="stylesheet" href="styles.css?v=20260507-bg-bubbles-toggle">
-    <link rel="stylesheet" href="dashboard-pro.css?v=20260516-card-accent-gap">
+    <link rel="stylesheet" href="dashboard-pro.css?v=20260516-no-search-pills">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -157,13 +157,6 @@
                                 <strong id="dashboardMemberCount">-</strong>
                                 <span>Miembros</span>
                             </div>
-                        </div>
-                        <div class="search-pill dashboard-home-search" role="search">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                            <input id="guildSearch" class="search-input" type="search" placeholder="Buscar servidor..." autocomplete="off">
                         </div>
                     </div>
                 </header>
@@ -1126,13 +1119,6 @@
                 </header>
 
                 <div class="commands-toolbar commands-toolbar--catalog">
-                    <div class="search-pill commands-search" role="search">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input id="commandsSearchInput" class="search-input" type="search" placeholder="Buscar por nombre o descripción..." autocomplete="off">
-                    </div>
                     <div id="commandsCategoryFilters" class="commands-filters commands-filters--catalog"></div>
                 </div>
 
@@ -1156,16 +1142,6 @@
                                     <div id="serverMenuGuildName" class="server-side-guild-name">Sin servidor seleccionado</div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="side-menu-search">
-                            <label class="side-menu-search-field" for="serverTabSearch">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <circle cx="11" cy="11" r="7"></circle>
-                                    <path d="M20 20l-3.5-3.5"></path>
-                                </svg>
-                                <input type="search" id="serverTabSearch" class="form-control" placeholder="Buscar módulo o sección…" autocomplete="off" spellcheck="false">
-                            </label>
                         </div>
                         </div>
 
