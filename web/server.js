@@ -4560,6 +4560,8 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
 
         const moderator = req.session.user.username;
         const actionReason = reason || `Moderado por ${moderator} desde el panel web`;
+        const durationMs = Math.max(0, Number.parseInt(req.body.duration, 10) || 0);
+        const maxTimeoutMs = 28 * 24 * 60 * 60 * 1000;
 
         let result;
         switch (action) {
@@ -4568,12 +4570,16 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
                 result = { success: true, message: `Usuario ${member.user.tag} expulsado` };
                 break;
             case 'ban':
-                await member.ban({ reason: actionReason });
-                result = { success: true, message: `Usuario ${member.user.tag} baneado` };
+                if (durationMs > 0 && durationMs <= maxTimeoutMs) {
+                    await member.timeout(durationMs, actionReason);
+                    result = { success: true, message: `Usuario ${member.user.tag} restringido temporalmente` };
+                } else {
+                    await member.ban({ reason: actionReason });
+                    result = { success: true, message: `Usuario ${member.user.tag} baneado` };
+                }
                 break;
             case 'timeout':
-                const duration = req.body.duration || 600000; // 10 minutos por defecto
-                await member.timeout(duration, actionReason);
+                await member.timeout(durationMs > 0 ? durationMs : 600000, actionReason);
                 result = { success: true, message: `Usuario ${member.user.tag} silenciado` };
                 break;
             case 'removeTimeout':

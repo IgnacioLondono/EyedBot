@@ -2346,6 +2346,15 @@ label { color: var(--text-secondary); font-weight: 500; }
     width: 100%;
     border-radius: 12px;
 }
+
+.app-dialog-input.form-control.is-invalid {
+    border-color: rgba(248, 113, 113, 0.75);
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.2);
+}
+
+select.app-dialog-input {
+    cursor: pointer;
+}
 .app-dialog-actions {
     display: flex;
     justify-content: flex-end;
