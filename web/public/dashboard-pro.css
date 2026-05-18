@@ -13070,11 +13070,17 @@ body {
     display: flex !important;
     flex-direction: column !important;
     padding: 0 !important;
+    margin-top: 0 !important;
     box-sizing: border-box !important;
     height: calc(100vh - 70px) !important;
     min-height: calc(100vh - 70px) !important;
     max-height: calc(100vh - 70px) !important;
     overflow: hidden !important;
+}
+
+.main-content:has(#serverSection.active) #serverSection.section {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
 #serverSection.section.active {
@@ -13657,19 +13663,25 @@ body {
 
 /* ---------- Server configuration shell (scoped) ---------- */
 #serverSection.server-config-shell .server-shell {
-    align-items: start;
+    align-items: stretch;
 }
 
 #serverSection.server-config-shell .server-side-menu {
     position: sticky;
-    top: 0.75rem;
-    max-height: calc(100vh - 88px);
+    top: 0;
+    max-height: calc(100vh - 70px);
     overflow: auto;
     scrollbar-width: thin;
+    margin-top: 0 !important;
 }
 
 #serverSection.server-config-shell .server-side-menu.server-side-menu--rail {
+    position: relative !important;
+    top: 0 !important;
+    align-self: stretch !important;
+    max-height: none !important;
     overflow: hidden !important;
+    margin-top: 0 !important;
 }
 
 #serverSection.server-config-shell .side-menu-btn {
@@ -14154,6 +14166,7 @@ body {
 #serverSection.server-config-shell .server-shell:has(.server-side-menu--rail) {
     grid-template-columns: 260px minmax(0, 1fr) !important;
     gap: 0 !important;
+    align-items: stretch !important;
 }
 
 #serverSection.server-config-shell .server-shell:has(.server-side-menu--rail)::after {
@@ -14215,10 +14228,12 @@ body {
 #serverSection.server-config-shell .server-side-menu--rail .server-side-menu-top {
     flex: 0 0 auto;
     z-index: 2;
-    padding: 0.8rem 0.72rem 0.62rem;
+    padding: 0 0.72rem 0.62rem;
+    margin-top: 0;
+    border-top: none;
     border-bottom: 1px solid var(--rail-line);
     background: rgba(10, 8, 20, 0.98);
-    box-shadow: 0 10px 24px rgba(4, 2, 12, 0.35);
+    box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-header {
