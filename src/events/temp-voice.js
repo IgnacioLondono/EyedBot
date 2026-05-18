@@ -214,10 +214,12 @@ function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra =
         embed.setThumbnail(ownerAvatar);
     }
 
+    const ownerLabel = member ? member.toString() : `<@${ownerId}>`;
+
     const channelFields = [
         {
-            name: 'Tu canal',
-            value: `**${baseName}**`,
+            name: 'Propietario',
+            value: ownerLabel,
             inline: true
         },
         {
@@ -235,18 +237,11 @@ function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra =
         });
     }
 
-    channelFields.push(
-        {
-            name: 'Límite',
-            value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin límite',
-            inline: true
-        },
-        {
-            name: 'Propietario',
-            value: member ? member.toString() : `<@${ownerId}>`,
-            inline: true
-        }
-    );
+    channelFields.push({
+        name: 'Límite',
+        value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin límite',
+        inline: true
+    });
 
     embed.addFields(...channelFields);
 

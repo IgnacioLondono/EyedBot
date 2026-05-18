@@ -10553,7 +10553,7 @@ function renderModerationMemberCards(members, guildId) {
                 <div class="modx-member-actions">
                     <button class="modx-action-btn is-timeout" onclick="moderateUser('${guildId}', '${member.id}', 'timeout')">
                         <span class="modx-action-icon">${dpxIcon('clock')}</span>
-                        <span>Timeout</span>
+                        <span>Mute</span>
                     </button>
                     <button class="modx-action-btn is-kick" onclick="moderateUser('${guildId}', '${member.id}', 'kick')">
                         <span class="modx-action-icon">${dpxIcon('close')}</span>
@@ -11879,23 +11879,78 @@ async function sendWelcomeTest(guildId) {
     }
 }
 
-// Moderar usuario
-async function moderateUser(guildId, userId, action) {
-    const reason = await showAppPrompt({
-        title: `Razón para ${action}`,
-        message: 'Indica el motivo de esta acción de moderación.',
+const MODERATION_DURATION_PRESETS = [
+    { ms: 5 * 60 * 1000, label: '5 minutos' },
+    { ms: 10 * 60 * 1000, label: '10 minutos' },
+    { ms: 30 * 60 * 1000, label: '30 minutos' },
+    { ms: 60 * 60 * 1000, label: '1 hora' },
+    { ms: 6 * 60 * 60 * 1000, label: '6 horas' },
+    { ms: 24 * 60 * 60 * 1000, label: '1 día' },
+    { ms: 7 * 24 * 60 * 60 * 1000, label: '7 días' },
+    { ms: 28 * 24 * 60 * 60 * 1000, label: '28 días' }
+];
+
+function getModerationDurationPresets(action) {
+    if (action === 'ban') {
+        return [{ ms: 0, label: 'Permanente' }, ...MODERATION_DURATION_PRESETS];
+    }
+    if (action === 'kick') {
+        return [{ ms: 0, label: 'Inmediato' }, ...MODERATION_DURATION_PRESETS];
+    }
+    return MODERATION_DURATION_PRESETS;
+}
+
+function getModerationModalCopy(action) {
+    const titles = { timeout: 'Silenciar (mute)', ban: 'Banear', kick: 'Expulsar (kick)' };
+    const messages = {
+        timeout: 'Elige la duración del silencio y el motivo.',
+        ban: 'Elige duración y motivo. «Permanente» aplica ban; otras duraciones usan timeout (máx. 28 días).',
+        kick: 'La expulsión es inmediata. El tiempo solo queda registrado en el motivo si lo indicas abajo.'
+    };
+    return {
+        title: titles[action] || `Moderar: ${action}`,
+        message: messages[action] || 'Indica duración y motivo.',
+        variant: action === 'ban' || action === 'kick' ? 'danger' : 'default'
+    };
+}
+
+async function showAppModerationPrompt(action) {
+    const copy = getModerationModalCopy(action);
+    const presets = getModerationDurationPresets(action);
+    const defaultMs = action === 'ban' ? 0 : (presets[0]?.ms || MODERATION_DURATION_PRESETS[1].ms);
+
+    return showAppDialog({
+        mode: 'prompt',
+        title: copy.title,
+        message: copy.message,
+        variant: copy.variant,
+        confirmLabel: 'Aplicar',
         inputLabel: 'Motivo',
         placeholder: 'Describe la razón…',
-        confirmLabel: 'Continuar',
-        variant: action === 'ban' || action === 'kick' ? 'danger' : 'default'
+        durationPresets: presets,
+        defaultDurationMs: defaultMs,
+        returnObject: true
     });
-    if (reason == null || !String(reason).trim()) return;
-    
+}
+
+// Moderar usuario
+async function moderateUser(guildId, userId, action) {
+    const form = await showAppModerationPrompt(action);
+    if (!form || form.reason == null || !String(form.reason).trim()) return;
+
+    const durationMs = Math.max(0, Number.parseInt(form.durationMs, 10) || 0);
+
     try {
         const response = await fetchWithCredentials('/api/moderate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ guildId, userId, action, reason: String(reason).trim() })
+            body: JSON.stringify({
+                guildId,
+                userId,
+                action,
+                reason: String(form.reason).trim(),
+                duration: durationMs
+            })
         });
         
         const data = await response.json();
@@ -11964,6 +12019,7 @@ window.unbanUser = unbanUser;
 /** Modal del panel (sustituye alert / confirm / prompt nativos). */
 let _appDialogResolver = null;
 let _appDialogMode = 'confirm';
+let _appDialogReturnObject = false;
 
 function initAppDialog() {
     const modal = document.getElementById('appDialogModal');
@@ -11984,6 +12040,7 @@ function initAppDialog() {
 
     const confirmBtn = document.getElementById('appDialogConfirmBtn');
     const inputEl = document.getElementById('appDialogInput');
+    const selectEl = document.getElementById('appDialogSelect');
 
     confirmBtn?.addEventListener('click', () => {
         if (_appDialogMode === 'prompt') {
@@ -11993,7 +12050,14 @@ function initAppDialog() {
                 inputEl?.classList.add('is-invalid');
                 return;
             }
-            finish(value);
+            if (_appDialogReturnObject) {
+                finish({
+                    reason: value,
+                    durationMs: Number.parseInt(selectEl?.value || '0', 10) || 0
+                });
+            } else {
+                finish(value);
+            }
             return;
         }
         finish(true);
@@ -12034,11 +12098,15 @@ function openAppDialog(options = {}) {
     const inputWrap = document.getElementById('appDialogInputWrap');
     const inputLabel = document.getElementById('appDialogInputLabel');
     const inputEl = document.getElementById('appDialogInput');
+    const selectWrap = document.getElementById('appDialogSelectWrap');
+    const selectLabel = document.getElementById('appDialogSelectLabel');
+    const selectEl = document.getElementById('appDialogSelect');
     const cancelBtn = document.getElementById('appDialogCancelBtn');
     const confirmBtn = document.getElementById('appDialogConfirmBtn');
 
     const mode = options.mode || (options.input ? 'prompt' : 'confirm');
     _appDialogMode = mode;
+    _appDialogReturnObject = options.returnObject === true;
 
     const variant = options.variant || 'default';
     modal.classList.remove('is-danger', 'is-warning');
@@ -12066,6 +12134,26 @@ function openAppDialog(options = {}) {
     }
 
     const inputOpts = options.input && typeof options.input === 'object' ? options.input : null;
+    const durationPresets = Array.isArray(options.durationPresets) ? options.durationPresets : null;
+
+    if (selectWrap && selectEl) {
+        const showSelect = Boolean(durationPresets?.length) && mode === 'prompt';
+        selectWrap.hidden = !showSelect;
+        if (showSelect) {
+            const selectText = options.durationLabel || 'Duración';
+            if (selectLabel) {
+                selectLabel.textContent = selectText;
+                selectLabel.hidden = !selectText;
+            }
+            const defaultMs = Number(options.defaultDurationMs);
+            selectEl.innerHTML = durationPresets.map((preset) => {
+                const ms = Number(preset.ms) || 0;
+                const selected = ms === defaultMs ? ' selected' : '';
+                return `<option value="${ms}"${selected}>${escapeHtml(preset.label || String(ms))}</option>`;
+            }).join('');
+        }
+    }
+
     if (inputWrap && inputEl) {
         const showInput = mode === 'prompt' || Boolean(inputOpts);
         inputWrap.hidden = !showInput;
