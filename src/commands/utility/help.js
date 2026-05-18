@@ -179,7 +179,8 @@ function buildEmbed(activeKey, grouped, totalCommands, showModeration) {
             '• `/nivel` — Tu progreso o el de otro usuario (opción miembro): nivel, XP, barra, puesto, mensajes/voz y roles.',
             '• `/rangos` — Roles de nivel configurados en el servidor (con tramo Eyed); si aún no hay, muestra referencia por nivel.',
             '• `/top` — Ranking público del servidor por XP, mensajes o minutos en voz (cantidad 5–25).',
-            '• `/canal-niveles` — Canal donde enviar mensajes de texto (sin embed) cuando alguien sube de nivel.'
+            '• `/canal-niveles` — Canal donde enviar mensajes de texto (sin embed) cuando alguien sube de nivel.',
+            '• `/xp` — Dar o quitar XP a un miembro (requiere Gestionar servidor).'
         ];
         return new EmbedBuilder()
             .setColor(config.embedColor)
