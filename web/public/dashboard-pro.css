@@ -13036,6 +13036,7 @@ body {
 
 #dashboard .dashboard-guilds-grid,
 #dashboard .dashboard-guild-section-grid {
+    display: grid !important;
     align-content: start !important;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
     gap: 1rem !important;
@@ -13115,7 +13116,8 @@ body {
 }
 
 #dashboard .dashboard-guild-card {
-    display: flex;
+    position: relative;
+    display: flex !important;
     flex-direction: column;
     align-items: stretch;
     width: 100%;
