@@ -119,20 +119,31 @@ async function applyRoleRewards(member, level, rewards) {
     }
 }
 
-async function awardXpToMember(member, amount, source = 'message') {
+/**
+ * Aplica un cambio de XP (positivo o negativo). Usado por el tracker y por /xp.
+ * @returns {{ oldXp, newXp, oldLevel, newLevel, delta } | null}
+ */
+async function applyXpDeltaToMember(member, delta, options = {}) {
     if (!member || !member.guild || member.user?.bot) return null;
+
+    const signedDelta = Number.parseInt(delta, 10);
+    if (!Number.isFinite(signedDelta) || signedDelta === 0) return null;
+
+    const force = options.force === true;
+    const awardCoins = options.awardCoins !== false;
 
     const guildId = member.guild.id;
     const userId = member.user.id;
 
     const cfg = await levelingStore.getLevelingConfig(guildId);
-    if (!cfg || cfg.enabled !== true) return null;
+    if (!force && (!cfg || cfg.enabled !== true)) return null;
 
     const state = await levelingStore.getUserState(guildId, userId);
-    const difficulty = sanitizeDifficulty(cfg.difficulty);
+    const difficulty = sanitizeDifficulty(cfg?.difficulty || {});
 
+    const oldXp = Math.max(0, Number.parseInt(state.xp || 0, 10) || 0);
     const oldLevel = Math.max(0, Number.parseInt(state.level || 0, 10) || 0);
-    const newXp = Math.max(0, (Number.parseInt(state.xp || 0, 10) || 0) + Math.max(0, Number.parseInt(amount || 0, 10) || 0));
+    const newXp = Math.max(0, oldXp + signedDelta);
     const newLevel = getLevelFromXp(newXp, difficulty);
 
     const nextState = {
@@ -143,16 +154,27 @@ async function awardXpToMember(member, amount, source = 'message') {
     };
 
     await levelingStore.setUserState(guildId, userId, nextState);
-    await awardCoinsForXp(guildId, userId, amount).catch(() => null);
 
-    if (newLevel > oldLevel) {
+    if (signedDelta > 0 && awardCoins && cfg?.enabled === true) {
+        await awardCoinsForXp(guildId, userId, signedDelta).catch(() => null);
+    }
+
+    if (newLevel > oldLevel && cfg?.enabled === true) {
         const rewards = parseRoleRewards(cfg.roleRewards);
         await applyRoleRewards(member, newLevel, rewards);
         await sendLevelUpAnnouncements(member, oldLevel, newLevel, cfg);
         await awardCoinsForLevelUp(guildId, userId, oldLevel, newLevel).catch(() => null);
     }
 
-    return nextState;
+    return { oldXp, newXp, oldLevel, newLevel, delta: signedDelta };
+}
+
+async function awardXpToMember(member, amount, source = 'message') {
+    const amt = Math.max(0, Number.parseInt(amount, 10) || 0);
+    if (amt <= 0) return null;
+    const result = await applyXpDeltaToMember(member, amt, { force: false, awardCoins: true });
+    if (!result) return null;
+    return levelingStore.getUserState(member.guild.id, member.user.id);
 }
 
 async function handleMessageCreate(message) {
@@ -283,5 +305,6 @@ module.exports = {
     flushAllVoiceAnalyticsSessions,
     startVoiceXpLoop,
     stopVoiceXpLoop,
-    awardXpToMember
+    awardXpToMember,
+    applyXpDeltaToMember
 };
