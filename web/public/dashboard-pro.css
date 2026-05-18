@@ -11715,7 +11715,7 @@ body.wc-studio-open {
 }
 
 .server-pane-head {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-bottom: none !important;
     margin-bottom: 1.2rem !important;
 }
 
@@ -12198,6 +12198,13 @@ body.wc-studio-open {
 #serverSection .server-pane-head {
     margin: 0 0 0.55rem !important;
     padding: 0.35rem 0 0.5rem !important;
+    border-bottom: none !important;
+}
+
+#serverPaneOverview .server-pane-head {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 @media (max-width: 1024px) {
@@ -13000,13 +13007,111 @@ body {
     align-self: center;
 }
 
-#dashboard .dashboard-guilds-grid {
+#dashboard .dashboard-guilds-board {
     flex: 1 !important;
     min-height: 0 !important;
     padding: 1rem 1.15rem 1.15rem !important;
+    display: flex;
+    flex-direction: column;
+    gap: 1.35rem;
+    overflow-y: auto;
+}
+
+#dashboard .dashboard-guild-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+#dashboard .dashboard-guild-section-title {
+    margin: 0;
+    padding: 0 0.15rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--iris-300, #c4b5fd);
+}
+
+#dashboard .dashboard-guilds-grid,
+#dashboard .dashboard-guild-section-grid {
     align-content: start !important;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
     gap: 1rem !important;
+}
+
+#dashboard .dashboard-guild-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.65rem;
+    width: 100%;
+}
+
+#dashboard .dashboard-guild-card__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.38rem;
+    flex-shrink: 0;
+}
+
+#dashboard .dashboard-guild-card__favorite {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(212, 196, 255, 0.72);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+#dashboard .dashboard-guild-card__favorite svg {
+    width: 18px;
+    height: 18px;
+}
+
+#dashboard .dashboard-guild-card__favorite-fill {
+    opacity: 0;
+    fill: currentColor;
+    transition: opacity 0.2s ease;
+}
+
+#dashboard .dashboard-guild-card__favorite-outline {
+    opacity: 1;
+}
+
+#dashboard .dashboard-guild-card__favorite:hover,
+#dashboard .dashboard-guild-card__favorite:focus-visible {
+    color: #fde68a;
+    border-color: rgba(251, 191, 36, 0.45);
+    background: rgba(251, 191, 36, 0.12);
+    transform: scale(1.04);
+}
+
+#dashboard .dashboard-guild-card__favorite.is-active {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.55);
+    background: rgba(251, 191, 36, 0.16);
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.2);
+}
+
+#dashboard .dashboard-guild-card__favorite.is-active .dashboard-guild-card__favorite-fill {
+    opacity: 1;
+}
+
+#dashboard .dashboard-guild-card__favorite.is-active .dashboard-guild-card__favorite-outline {
+    opacity: 0;
+}
+
+#dashboard .dashboard-guild-card.is-favorite {
+    border-color: rgba(251, 191, 36, 0.28) !important;
 }
 
 #dashboard .dashboard-guild-card {
@@ -13124,6 +13229,7 @@ body {
 
 #dashboard .dashboard-guild-empty,
 #dashboard .dashboard-guild-loading {
+    width: 100%;
     grid-column: 1 / -1;
     min-height: 280px;
     display: flex;
@@ -13279,15 +13385,7 @@ body {
 }
 
 #serverSection .server-shell::after {
-    content: "" !important;
-    position: absolute !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    left: 260px !important;
-    width: 1px !important;
-    background: rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
-    pointer-events: none !important;
-    z-index: 2 !important;
+    display: none !important;
 }
 
 #serverSection .server-side-menu,
@@ -13870,11 +13968,12 @@ body {
 
 #serverSection.server-config-shell .server-pane-head--structured {
     align-items: center;
-    padding: 1rem 1.15rem;
-    margin: -0.35rem -0.35rem 1.35rem;
-    border-radius: 18px;
-    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.16);
-    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.55), rgba(var(--bg-primary-rgb, 10, 12, 26), 0.72));
+    padding: 0 0 0.65rem;
+    margin: 0 0 0.85rem;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-pane-head-main {
@@ -14380,14 +14479,14 @@ body {
     padding: 0 0.72rem 0.62rem;
     margin-top: 0;
     border-top: none;
-    border-bottom: 1px solid var(--rail-line);
+    border-bottom: none;
     background: rgba(10, 8, 20, 0.98);
     box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .server-side-header {
     padding: 0.58rem 0.62rem;
-    margin: 0 0 0.58rem;
+    margin: 0 0 0.45rem;
     border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
     border-radius: 13px;
     background:
@@ -14867,8 +14966,7 @@ body {
     }
 }
 
-/* Sin buscadores pill en el panel */
-.side-menu-search,
+/* Sin buscadores pill en dashboard/comandos (sidebar del servidor conserva búsqueda) */
 .dashboard-home-search,
 .commands-search,
 .search-pill.dashboard-home-search,
