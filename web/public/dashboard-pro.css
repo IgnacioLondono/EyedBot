@@ -13668,6 +13668,10 @@ body {
     scrollbar-width: thin;
 }
 
+#serverSection.server-config-shell .server-side-menu.server-side-menu--rail {
+    overflow: hidden !important;
+}
+
 #serverSection.server-config-shell .side-menu-btn {
     width: 100%;
 }
@@ -14184,10 +14188,25 @@ body {
         0 0 48px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12) !important;
     backdrop-filter: blur(20px) saturate(175%);
     -webkit-backdrop-filter: blur(20px) saturate(175%);
-    scrollbar-width: thin;
-    scrollbar-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45) transparent;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    scrollbar-width: none;
+    overflow: hidden !important;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .server-side-menu-top {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 3;
+    padding-bottom: 0.15rem;
+    margin-bottom: 0.1rem;
+    background:
+        linear-gradient(
+            180deg,
+            rgba(10, 8, 20, 0.98) 0%,
+            rgba(10, 8, 20, 0.94) 72%,
+            rgba(10, 8, 20, 0) 100%
+        );
 }
 
 #serverSection.server-config-shell .server-side-menu--rail::before {
@@ -14283,7 +14302,7 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-search {
-    margin: 0.15rem 0 0.55rem;
+    margin: 0 0 0.35rem;
     padding: 0 0.35rem;
 }
 
@@ -14336,13 +14355,22 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    padding: 0 0.2rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 0.2rem 0.15rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45) transparent;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group {
+    position: relative;
+    isolation: isolate;
     margin-top: 0.42rem;
     padding-top: 0.28rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group:first-child {
@@ -14393,7 +14421,7 @@ body {
     border-radius: 999px;
     transform: translateY(-50%);
     background: var(--group-glow, var(--rail-accent));
-    box-shadow: 0 0 10px var(--group-glow, var(--rail-accent));
+    box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title:hover {
@@ -14405,13 +14433,18 @@ body {
     width: 16px !important;
     height: 16px !important;
     padding: 4px !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid color-mix(in srgb, var(--group-glow, var(--rail-accent)) 32%, transparent) !important;
     border-radius: 7px !important;
-    background: rgba(255, 255, 255, 0.05) !important;
+    background: color-mix(in srgb, var(--group-glow, var(--rail-accent)) 12%, rgba(255, 255, 255, 0.04)) !important;
     color: var(--group-glow, var(--rail-muted)) !important;
     box-sizing: content-box;
     opacity: 1;
-    box-shadow: 0 0 12px color-mix(in srgb, var(--group-glow, var(--rail-accent)) 35%, transparent);
+    box-shadow: none;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group.collapsed .side-menu-group-icon,
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group.collapsed .side-menu-group-title-inner::before {
+    opacity: 0.55;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-group-title::after {
@@ -14425,6 +14458,20 @@ body {
     flex-direction: column;
     gap: 0.04rem;
     padding-left: 0.12rem;
+    overflow: hidden;
+    max-height: 1200px;
+    opacity: 1;
+    transition: max-height 0.28s ease, opacity 0.2s ease, padding 0.2s ease, margin 0.2s ease;
+}
+
+#serverSection.server-config-shell .server-side-menu--rail .side-menu-group.collapsed .side-menu-items {
+    display: none !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn {
@@ -14433,9 +14480,9 @@ body {
     padding: 0 !important;
     border: 0 !important;
     border-radius: 9px !important;
-    background: transparent !important;
+    background: rgba(10, 8, 20, 0.72) !important;
     box-shadow: none !important;
-    overflow: visible;
+    overflow: hidden;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn::before {
@@ -14450,7 +14497,7 @@ body {
     transform: translateY(-50%);
     transition: height 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
     opacity: 0;
-    box-shadow: 0 0 12px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.65);
+    box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn-inner {
@@ -14505,12 +14552,10 @@ body {
     background:
         linear-gradient(
             118deg,
-            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.22),
-            rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.1)
+            rgba(var(--accent-primary-rgb, 124, 77, 255), 0.28),
+            rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.14)
         ) !important;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.1),
-        0 10px 26px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active::before {
@@ -14526,7 +14571,7 @@ body {
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active .side-menu-icon {
     opacity: 1;
     transform: scale(1.05) !important;
-    box-shadow: 0 0 14px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
+    box-shadow: none;
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn[data-pane-tone="sky"] .side-menu-icon { color: #9fd8ff !important; }
@@ -14572,26 +14617,15 @@ body {
     border-color: rgba(157, 232, 255, 0.38) !important;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active {
-        animation: rail-active-pulse 3.2s ease-in-out infinite;
-    }
-}
-
-@keyframes rail-active-pulse {
-    0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 10px 26px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18); }
-    50% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 30px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.28); }
-}
-
-#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar {
+#serverSection.server-config-shell .server-side-menu--rail .server-side-nav::-webkit-scrollbar {
     width: 4px !important;
 }
 
-#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar-track {
+#serverSection.server-config-shell .server-side-menu--rail .server-side-nav::-webkit-scrollbar-track {
     background: transparent !important;
 }
 
-#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar-thumb {
+#serverSection.server-config-shell .server-side-menu--rail .server-side-nav::-webkit-scrollbar-thumb {
     border: none !important;
     background: linear-gradient(
         180deg,
@@ -14602,7 +14636,7 @@ body {
     border-radius: 999px;
 }
 
-#serverSection.server-config-shell .server-side-menu--rail::-webkit-scrollbar-thumb:hover {
+#serverSection.server-config-shell .server-side-menu--rail .server-side-nav::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(
         180deg,
         rgba(var(--accent-primary-rgb, 124, 77, 255), 0.85),
