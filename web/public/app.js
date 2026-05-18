@@ -11919,14 +11919,13 @@ async function showAppModerationPrompt(action) {
     const presets = getModerationDurationPresets(action);
     const defaultMs = action === 'ban' ? 0 : (presets[0]?.ms || MODERATION_DURATION_PRESETS[1].ms);
 
-    return showAppDialog({
+    return openAppDialog({
         mode: 'prompt',
         title: copy.title,
         message: copy.message,
         variant: copy.variant,
         confirmLabel: 'Aplicar',
-        inputLabel: 'Motivo',
-        placeholder: 'Describe la razón…',
+        input: { required: true, label: 'Motivo', placeholder: 'Describe la razón…' },
         durationPresets: presets,
         defaultDurationMs: defaultMs,
         returnObject: true
@@ -11935,10 +11934,22 @@ async function showAppModerationPrompt(action) {
 
 // Moderar usuario
 async function moderateUser(guildId, userId, action) {
-    const form = await showAppModerationPrompt(action);
-    if (!form || form.reason == null || !String(form.reason).trim()) return;
+    let form;
+    try {
+        form = await showAppModerationPrompt(action);
+    } catch (error) {
+        console.error('Error abriendo modal de moderación:', error);
+        showToast('No se pudo abrir el formulario de moderación', 'error');
+        return;
+    }
+    if (form == null) return;
 
+    const reason = String(form.reason || '').trim();
     const durationMs = Math.max(0, Number.parseInt(form.durationMs, 10) || 0);
+    if (!reason) {
+        showToast('Debes indicar un motivo', 'warning');
+        return;
+    }
 
     try {
         const response = await fetchWithCredentials('/api/moderate', {
@@ -12090,8 +12101,9 @@ function closeAppDialog() {
 }
 
 function openAppDialog(options = {}) {
+    initAppDialog();
     const modal = document.getElementById('appDialogModal');
-    if (!modal) return Promise.resolve(false);
+    if (!modal) return Promise.resolve(null);
 
     const titleEl = document.getElementById('appDialogTitle');
     const messageEl = document.getElementById('appDialogMessage');
@@ -12145,12 +12157,16 @@ function openAppDialog(options = {}) {
                 selectLabel.textContent = selectText;
                 selectLabel.hidden = !selectText;
             }
-            const defaultMs = Number(options.defaultDurationMs);
-            selectEl.innerHTML = durationPresets.map((preset) => {
+            const defaultMs = Number(options.defaultDurationMs) || 0;
+            selectEl.replaceChildren();
+            durationPresets.forEach((preset) => {
                 const ms = Number(preset.ms) || 0;
-                const selected = ms === defaultMs ? ' selected' : '';
-                return `<option value="${ms}"${selected}>${escapeHtml(preset.label || String(ms))}</option>`;
-            }).join('');
+                const option = document.createElement('option');
+                option.value = String(ms);
+                option.textContent = String(preset.label || ms);
+                if (ms === defaultMs) option.selected = true;
+                selectEl.appendChild(option);
+            });
         }
     }
 
