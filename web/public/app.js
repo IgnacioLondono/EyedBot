@@ -5019,7 +5019,7 @@ async function loadVoiceCreatorPanel(guildId) {
                         <div class="dpx-toggle-grid">
                             ${dpxRenderToggle({ id: 'tempVoiceEnabled', checked: enabled, title: 'Activar sistema de voz temporal', description: 'Habilita la creación automática de canales personales.' })}
                             ${dpxRenderToggle({ id: 'tempVoiceAllowCustomNames', checked: config.allowCustomNames !== false, title: 'Nombres personalizados', description: 'Los usuarios pueden cambiar el nombre con /voznombre.' })}
-                            ${dpxRenderToggle({ id: 'tempVoiceSendManageEmbed', checked: config.sendManageEmbed === true, title: 'Panel Voice Master', description: 'Envía el embed de control (estilo EyedBot + foto del usuario) dentro del canal de voz temporal.' })}
+                            ${dpxRenderToggle({ id: 'tempVoiceSendManageEmbed', checked: config.sendManageEmbed === true, title: 'Panel de Voz', description: 'Envía el embed de control (EyedBot + foto del usuario) dentro del canal de voz temporal.' })}
                         </div>
                     </div>
                 </section>

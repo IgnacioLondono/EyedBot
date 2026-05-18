@@ -158,9 +158,14 @@ function buildVoiceMasterButtonGuide() {
         '🔐 · `Desbloquear`',
         '🖋️ · `Renombrar`',
         '👤 · `Ajustar límite`',
-        '👀 · `Ver información`',
-        '',
-        '📎 Invitar o quitar acceso: `/vozinvitar` · `/vozquitar`'
+        '👀 · `Ver información`'
+    ].join('\n');
+}
+
+function buildVoiceMasterLockedAccessGuide() {
+    return [
+        '📎 **Invitar** (`/vozinvitar`) — para permitir acceso',
+        '📎 **Quitar** (`/vozquitar`) — para quitar acceso'
     ].join('\n');
 }
 
@@ -191,7 +196,7 @@ function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra =
             name: brandLabel,
             iconURL: brandIcon || undefined
         })
-        .setTitle('Interfaz de Voice Master')
+        .setTitle('Panel de Voz')
         .setDescription('Haz clic en los botones de abajo para controlar tu canal de voz.')
         .addFields({
             name: 'Uso de botones',
@@ -209,12 +214,28 @@ function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra =
         embed.setThumbnail(ownerAvatar);
     }
 
-    embed.addFields(
+    const channelFields = [
         {
             name: 'Tu canal',
-            value: `**${baseName}** · ${isLocked ? '🔒 Bloqueado' : '🔓 Abierto'}`,
-            inline: false
+            value: `**${baseName}**`,
+            inline: true
         },
+        {
+            name: 'Estado del canal',
+            value: isLocked ? '🔒 Bloqueado' : '🔓 Abierto',
+            inline: true
+        }
+    ];
+
+    if (isLocked) {
+        channelFields.push({
+            name: 'Acceso al canal bloqueado',
+            value: buildVoiceMasterLockedAccessGuide(),
+            inline: false
+        });
+    }
+
+    channelFields.push(
         {
             name: 'Límite',
             value: userLimit > 0 ? `${userLimit} usuarios` : 'Sin límite',
@@ -226,6 +247,8 @@ function buildManagementPanelPayload(channel, ownerId, voiceConfig = {}, extra =
             inline: true
         }
     );
+
+    embed.addFields(...channelFields);
 
     return {
         embeds: [embed],
