@@ -8483,9 +8483,12 @@ function renderLeaderboardPodium(entries) {
                         <div class="levels-podium-medal">${renderPodiumMedal(realRank)}</div>
                         ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${tier.color};">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${tier.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
                         <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
-                        <div class="levels-podium-level">Nivel ${entry.level}</div>
-                        <div class="levels-podium-progress">
-                            <div class="levels-podium-progress-bar" style="width:${progress}%; --tier-color:${tier.color};"></div>
+                        <div class="levels-podium-level">Nivel ${entry.level} · ${formatLeaderboardProgressPercent(progress)}</div>
+                        <div class="levels-podium-progress-wrap">
+                            <div class="levels-podium-progress">
+                                <div class="levels-podium-progress-bar" style="width:${progress}%; --tier-color:${tier.color};"></div>
+                            </div>
+                            <span class="levels-podium-progress-pct">${formatLeaderboardProgressPercent(progress)}</span>
                         </div>
                         <div class="levels-podium-xp">${levelingFormatNumber(entry.xp)} XP</div>
                         ${renderTierBadge(tier, 'sm')}
@@ -8494,6 +8497,11 @@ function renderLeaderboardPodium(entries) {
             }).join('')}
         </div>
     `;
+}
+
+function formatLeaderboardProgressPercent(value) {
+    const p = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+    return `${p}%`;
 }
 
 function buildLeaderboardHtml(payload) {
@@ -8515,11 +8523,12 @@ function buildLeaderboardHtml(payload) {
     }
 
     const top3 = rows.slice(0, 3);
-    const rest = rows.slice(3, 15);
+    const rest = rows.slice(3);
 
     const restHtml = rest.map((item, idx) => {
         const rank = idx + 4;
         const progress = Math.max(0, Math.min(100, Number(item.progressPercent) || 0));
+        const progressLabel = formatLeaderboardProgressPercent(progress);
         const tier = tierForLevel(item.level);
         return `
             <div class="levels-rank-row" style="--tier-color:${tier.color};">
@@ -8531,10 +8540,14 @@ function buildLeaderboardHtml(payload) {
                         <div class="levels-rank-head-tags">
                             ${renderTierBadge(tier, 'sm')}
                             <span class="levels-rank-level">Nv ${item.level}</span>
+                            <span class="levels-rank-progress-pct">${progressLabel}</span>
                         </div>
                     </div>
-                    <div class="levels-rank-progress">
-                        <div class="levels-rank-progress-bar" style="width:${progress}%; --tier-color:${tier.color};"></div>
+                    <div class="levels-rank-progress-wrap">
+                        <div class="levels-rank-progress">
+                            <div class="levels-rank-progress-bar" style="width:${progress}%; --tier-color:${tier.color};"></div>
+                        </div>
+                        <span class="levels-rank-progress-pct levels-rank-progress-pct--bar">${progressLabel}</span>
                     </div>
                     <div class="levels-rank-meta">
                         <span>${levelingFormatNumber(item.xp)} XP</span>

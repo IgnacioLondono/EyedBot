@@ -238,19 +238,21 @@ async function runTop(interaction) {
     try {
         const lines = await Promise.all(
             slice.map(async (row, i) => {
-                const lvl = getLevelFromXp(Number(row.xp) || 0, difficulty);
+                const xp = Math.max(0, Number.parseInt(row.xp || 0, 10) || 0);
+                const prog = getProgress(xp, difficulty);
+                const lvl = prog.level;
                 let sufijo = '';
                 if (orden === 'mensajes') {
                     sufijo = ` · **${(Number(row.messageCount) || 0).toLocaleString('es-ES')}** msgs`;
                 } else if (orden === 'voz') {
                     sufijo = ` · **${(Number(row.voiceMinutes) || 0).toLocaleString('es-ES')}** min`;
                 } else {
-                    sufijo = ` · **${(Number(row.xp) || 0).toLocaleString('es-ES')}** XP`;
+                    sufijo = ` · **${xp.toLocaleString('es-ES')}** XP`;
                 }
                 const label = escapeDiscordEmbed(
                     await resolveLeaderboardDisplayName(guild, client, row.userId)
                 );
-                return `**${i + 1}.** ${label} — Nv **${lvl}**${sufijo}`;
+                return `**${i + 1}.** ${label} — Nv **${lvl}** · **${prog.percent}%**${sufijo}`;
             })
         );
 
