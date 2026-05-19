@@ -1,7 +1,7 @@
 const { ChannelType, PermissionsBitField } = require('discord.js');
 const levelingStore = require('../utils/leveling-store');
 const guildActivityStore = require('../utils/guild-activity-store');
-const { getLevelFromXp, sanitizeDifficulty } = require('../utils/leveling-math');
+const { getLevelFromXp, sanitizeDifficulty, scaleXpByMultiplier } = require('../utils/leveling-math');
 const { parseRoleRewards } = require('../utils/leveling-rewards');
 const {
     awardCoinsForXp,
@@ -194,7 +194,8 @@ async function handleMessageCreate(message) {
 
     messageCooldownMap.set(cooldownKey, now);
 
-    const xpGain = randInt(cfg.messageXpMin ?? 10, cfg.messageXpMax ?? 16);
+    const rawXpGain = randInt(cfg.messageXpMin ?? 10, cfg.messageXpMax ?? 16);
+    const xpGain = scaleXpByMultiplier(rawXpGain, cfg.xpMultiplier);
     const member = message.member || await message.guild.members.fetch(message.author.id).catch(() => null);
     if (!member) return;
 
@@ -253,7 +254,10 @@ async function runVoiceXpCycle(client) {
             const cfg = await levelingStore.getLevelingConfig(guild.id);
             if (!cfg || cfg.enabled !== true || cfg.voiceXpEnabled !== true) continue;
 
-            const voiceXpPerMinute = Math.max(1, Math.min(100, Number.parseInt(cfg.voiceXpPerMinute || 6, 10) || 6));
+            const voiceXpPerMinute = scaleXpByMultiplier(
+                Math.max(1, Math.min(100, Number.parseInt(cfg.voiceXpPerMinute || 6, 10) || 6)),
+                cfg.xpMultiplier
+            );
             const requirePeers = cfg.voiceRequirePeers !== false;
 
             const voiceChannels = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildVoice);

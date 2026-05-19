@@ -7913,6 +7913,7 @@ function collectLevelingConfigFromForm() {
         messageXpMax: Math.max(1, Number.parseInt(document.getElementById('levelingMsgXpMax')?.value || '16', 10) || 16),
         voiceXpPerMinute: Math.max(1, Number.parseInt(document.getElementById('levelingVoiceXp')?.value || '6', 10) || 6),
         voiceRequirePeers: document.getElementById('levelingVoicePeers')?.checked ?? true,
+        xpMultiplier: levelingSanitizeXpMultiplier(document.getElementById('levelingXpMultiplierCustom')?.value ?? 1),
         difficulty: {
             baseXp: Math.max(50, Number.parseInt(document.getElementById('levelingBaseXp')?.value || '280', 10) || 280),
             exponent: Math.max(1.2, Number.parseFloat(document.getElementById('levelingExponent')?.value || '2.08') || 2.08)
@@ -8076,6 +8077,50 @@ function levelingSanitizeDifficulty(raw) {
     return { baseXp, exponent };
 }
 
+const LEVEL_XP_MULTIPLIER_PRESETS = [
+    { value: 1, name: '1× Normal', description: 'Sin bonificación extra.' },
+    { value: 2, name: '2× Doble', description: 'El doble de XP por mensajes y voz.' },
+    { value: 3, name: '3× Triple', description: 'Ideal para eventos de fin de semana.' },
+    { value: 5, name: '5× Boost', description: 'Subida muy rápida; úsalo con moderación.' }
+];
+
+function levelingSanitizeXpMultiplier(raw) {
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.min(20, Math.max(0.5, Math.round(parsed * 100) / 100));
+}
+
+function levelingFormatXpMultiplier(mult) {
+    const safe = levelingSanitizeXpMultiplier(mult);
+    if (safe === 1) return '1×';
+    const label = safe % 1 === 0 ? String(safe) : String(safe).replace(/\.?0+$/, '');
+    return `${label}×`;
+}
+
+function isXpMultiplierPresetActive(current, presetValue) {
+    return Math.abs(levelingSanitizeXpMultiplier(current) - presetValue) < 0.01;
+}
+
+function renderXpMultiplierPresets(currentMultiplier) {
+    const current = levelingSanitizeXpMultiplier(currentMultiplier);
+    return `
+        <div class="levels-presets levels-xp-mult-presets" id="levelsXpMultiplierWrap">
+            ${LEVEL_XP_MULTIPLIER_PRESETS.map((preset) => {
+                const isActive = isXpMultiplierPresetActive(current, preset.value);
+                return `
+                    <button type="button" class="levels-preset ${isActive ? 'is-active' : ''}" data-xp-mult="${preset.value}">
+                        <div class="levels-preset-head">
+                            <span class="levels-preset-name">${escapeHtml(preset.name)}</span>
+                            ${isActive ? '<span class="levels-preset-dot"></span>' : ''}
+                        </div>
+                        <div class="levels-preset-desc">${escapeHtml(preset.description)}</div>
+                    </button>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
 function levelingXpForLevel(level, difficulty) {
     const d = levelingSanitizeDifficulty(difficulty);
     const n = Math.max(1, Number.parseInt(level, 10) || 1);
@@ -8099,17 +8144,18 @@ function levelingFormatNumber(value) {
 
 function levelingEstimateTimeToLevel(targetLevel, difficulty, config) {
     const totalXp = levelingTotalXpForLevel(targetLevel, difficulty);
+    const mult = levelingSanitizeXpMultiplier(config?.xpMultiplier ?? 1);
     const msgMin = Math.max(1, Number.parseInt(config?.messageXpMin || 10, 10) || 10);
     const msgMax = Math.max(msgMin, Number.parseInt(config?.messageXpMax || 16, 10) || 16);
-    const avgMsgXp = (msgMin + msgMax) / 2;
+    const avgMsgXp = ((msgMin + msgMax) / 2) * mult;
     const cooldownSec = Math.max(10, Math.round((config?.messageCooldownMs || 45000) / 1000));
     const msgsNeeded = Math.ceil(totalXp / avgMsgXp);
     const msgHours = (msgsNeeded * cooldownSec) / 3600;
 
-    const voiceXpPerMin = Math.max(1, Number.parseInt(config?.voiceXpPerMinute || 6, 10) || 6);
+    const voiceXpPerMin = Math.max(1, Number.parseInt(config?.voiceXpPerMinute || 6, 10) || 6) * mult;
     const voiceHours = totalXp / voiceXpPerMin / 60;
 
-    return { totalXp, msgsNeeded, msgHours, voiceHours };
+    return { totalXp, msgsNeeded, msgHours, voiceHours, xpMultiplier: mult };
 }
 
 function renderLevelCurveSvg(difficulty, maxLevel = 75) {
@@ -8352,6 +8398,7 @@ function renderLevelsStatsHeader(config, leaderboard, roles = []) {
     const msgOn = config?.messageXpEnabled !== false;
     const voiceOn = config?.voiceXpEnabled !== false;
     const diff = levelingSanitizeDifficulty(config?.difficulty);
+    const xpMult = levelingSanitizeXpMultiplier(config?.xpMultiplier ?? 1);
 
     const rewards = Array.isArray(config?.roleRewards) ? config.roleRewards.filter((r) => r && r.roleId) : [];
     const roleMap = tierRolesMap(rewards, roles);
@@ -8411,6 +8458,11 @@ function renderLevelsStatsHeader(config, leaderboard, roles = []) {
                 <div class="levels-stat-label">Dificultad</div>
                 <div class="levels-stat-value">base ${levelingFormatNumber(diff.baseXp)} · exp ${diff.exponent.toFixed(2)}</div>
                 <div class="levels-stat-hint">XP Nv 10 ≈ ${levelingFormatNumber(levelingTotalXpForLevel(10, diff))}</div>
+            </div>
+            <div class="levels-stat-card ${xpMult > 1 ? 'is-active' : ''}">
+                <div class="levels-stat-label">Multiplicador XP</div>
+                <div class="levels-stat-value"><span class="levels-stat-pill ${xpMult > 1 ? '' : 'is-empty'}">${levelingFormatXpMultiplier(xpMult)}</span></div>
+                <div class="levels-stat-hint">${xpMult > 1 ? 'Boost activo en mensajes y voz' : 'Sin bonificación (1×)'}</div>
             </div>
         </div>
     `;
@@ -8604,6 +8656,25 @@ async function loadLevelsPanel(guildId) {
 
                     <div class="levels-section">
                         <div class="levels-section-head">
+                            <h4>Multiplicador de XP (farmeo)</h4>
+                            <p>Aumenta la XP ganada por mensajes y voz. No afecta los ajustes manuales con <code>/xp</code>.</p>
+                        </div>
+                        ${renderXpMultiplierPresets(config.xpMultiplier ?? 1)}
+                        <div class="levels-field-grid levels-xp-mult-custom">
+                            <div class="levels-field">
+                                <label for="levelingXpMultiplierCustom">Multiplicador personalizado</label>
+                                <div class="levels-input-with-suffix">
+                                    <input type="number" min="0.5" max="20" step="0.1" id="levelingXpMultiplierCustom" class="form-control" value="${levelingSanitizeXpMultiplier(config.xpMultiplier ?? 1)}">
+                                    <span>×</span>
+                                </div>
+                                <small>Entre 0.5× y 20×. Usa los botones rápidos o escribe un valor (ej. 2.5).</small>
+                            </div>
+                        </div>
+                        <p id="levelingXpEffectiveHint" class="levels-xp-effective-hint" aria-live="polite"></p>
+                    </div>
+
+                    <div class="levels-section">
+                        <div class="levels-section-head">
                             <h4>Mensajes</h4>
                             <p>Controla cuánto XP da cada mensaje y cada cuánto tiempo.</p>
                         </div>
@@ -8736,6 +8807,7 @@ async function loadLevelsPanel(guildId) {
 
         bindLevelsTabs(container);
         bindLevelsCurveLive(container, config, { roles, leaderboard });
+        bindLevelsXpMultiplier(container, { roles, leaderboard, initialConfig: config });
         bindLevelsPresets(container, config);
         bindLevelsRewardsLive(container, { roles, leaderboard, initialConfig: config });
 
@@ -8860,6 +8932,9 @@ function readLevelingLiveConfig(container, initialConfig) {
         messageXpMax: Number(container.querySelector('#levelingMsgXpMax')?.value) || initialConfig?.messageXpMax,
         messageCooldownMs: (Number(container.querySelector('#levelingMsgCooldown')?.value) || 45) * 1000,
         voiceXpPerMinute: Number(container.querySelector('#levelingVoiceXp')?.value) || initialConfig?.voiceXpPerMinute,
+        xpMultiplier: levelingSanitizeXpMultiplier(
+            container.querySelector('#levelingXpMultiplierCustom')?.value ?? initialConfig?.xpMultiplier ?? 1
+        ),
         difficulty: {
             baseXp: Number(baseInput?.value) || initialConfig?.difficulty?.baseXp || 280,
             exponent: Number(expInput?.value) || initialConfig?.difficulty?.exponent || 2.08
@@ -8947,6 +9022,84 @@ function bindLevelsRewardsLive(container, context = {}) {
             refresh();
         }
     });
+}
+
+function refreshXpMultiplierPresetButtons(container) {
+    const custom = container.querySelector('#levelingXpMultiplierCustom');
+    const wrap = container.querySelector('#levelsXpMultiplierWrap');
+    if (!custom || !wrap) return;
+
+    const current = levelingSanitizeXpMultiplier(custom.value);
+    wrap.querySelectorAll('[data-xp-mult]').forEach((btn) => {
+        const val = Number(btn.getAttribute('data-xp-mult'));
+        const active = isXpMultiplierPresetActive(current, val);
+        btn.classList.toggle('is-active', active);
+        const head = btn.querySelector('.levels-preset-head');
+        const dot = btn.querySelector('.levels-preset-dot');
+        if (active && head && !dot) {
+            head.insertAdjacentHTML('beforeend', '<span class="levels-preset-dot"></span>');
+        } else if (!active && dot) {
+            dot.remove();
+        }
+    });
+}
+
+function refreshXpMultiplierEffectiveHint(container) {
+    const hint = container.querySelector('#levelingXpEffectiveHint');
+    const custom = container.querySelector('#levelingXpMultiplierCustom');
+    if (!hint || !custom) return;
+
+    const mult = levelingSanitizeXpMultiplier(custom.value);
+    if (mult === 1) {
+        hint.textContent = '';
+        hint.classList.remove('is-active');
+        return;
+    }
+
+    const min = Number(container.querySelector('#levelingMsgXpMin')?.value) || 10;
+    const max = Number(container.querySelector('#levelingMsgXpMax')?.value) || 16;
+    const voice = Number(container.querySelector('#levelingVoiceXp')?.value) || 6;
+    const effMin = Math.max(1, Math.round(min * mult));
+    const effMax = Math.max(effMin, Math.round(max * mult));
+    const effVoice = Math.max(1, Math.round(voice * mult));
+    hint.textContent = `Con ${levelingFormatXpMultiplier(mult)}: mensajes ${effMin}–${effMax} XP · voz ${effVoice} XP/min`;
+    hint.classList.add('is-active');
+}
+
+function bindLevelsXpMultiplier(container, context = {}) {
+    const wrap = container.querySelector('#levelsXpMultiplierWrap');
+    const custom = container.querySelector('#levelingXpMultiplierCustom');
+    if (!wrap || !custom) return;
+
+    const refreshDerived = () => refreshLevelsDerivedViews(container, context.initialConfig, context);
+
+    const applyMult = (value) => {
+        custom.value = String(levelingSanitizeXpMultiplier(value));
+        refreshXpMultiplierPresetButtons(container);
+        refreshXpMultiplierEffectiveHint(container);
+        refreshDerived();
+    };
+
+    wrap.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-xp-mult]');
+        if (!btn) return;
+        applyMult(btn.getAttribute('data-xp-mult'));
+        showToast(`Multiplicador ${levelingFormatXpMultiplier(btn.getAttribute('data-xp-mult'))}`, 'success');
+    });
+
+    custom.addEventListener('input', () => {
+        refreshXpMultiplierPresetButtons(container);
+        refreshXpMultiplierEffectiveHint(container);
+        refreshDerived();
+    });
+
+    ['#levelingMsgXpMin', '#levelingMsgXpMax', '#levelingVoiceXp'].forEach((sel) => {
+        const input = container.querySelector(sel);
+        if (!input) return;
+        input.addEventListener('input', () => refreshXpMultiplierEffectiveHint(container));
+    });
+
+    refreshXpMultiplierEffectiveHint(container);
 }
 
 function bindLevelsPresets(container) {

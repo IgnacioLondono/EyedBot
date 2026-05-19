@@ -5,6 +5,21 @@ function sanitizeDifficulty(raw = {}) {
     return { baseXp, exponent };
 }
 
+/** Multiplicador global de XP por mensajes y voz (0.5–20, por defecto 1). */
+function sanitizeXpMultiplier(raw) {
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.min(20, Math.max(0.5, Math.round(parsed * 100) / 100));
+}
+
+function scaleXpByMultiplier(amount, multiplier) {
+    const base = Math.max(0, Number.parseInt(amount, 10) || 0);
+    if (base <= 0) return 0;
+    const mult = sanitizeXpMultiplier(multiplier);
+    if (mult === 1) return base;
+    return Math.max(1, Math.round(base * mult));
+}
+
 function xpForLevel(level, difficulty) {
     const safeLevel = Math.max(1, Number.parseInt(level, 10) || 1);
     const safeDiff = sanitizeDifficulty(difficulty);
@@ -53,6 +68,8 @@ function getProgress(totalXp, difficulty) {
 
 module.exports = {
     sanitizeDifficulty,
+    sanitizeXpMultiplier,
+    scaleXpByMultiplier,
     xpForLevel,
     totalXpForLevel,
     getLevelFromXp,

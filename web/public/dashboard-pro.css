@@ -8729,6 +8729,23 @@ mark.receipt-highlight {
     font-family: 'Sora', 'Plus Jakarta Sans', sans-serif;
 }
 
+.levels-xp-mult-custom {
+    margin-top: 0.85rem;
+    max-width: 280px;
+}
+
+.levels-xp-effective-hint {
+    margin: 0.65rem 0 0;
+    font-size: 0.86rem;
+    color: var(--text-muted, rgba(220, 210, 245, 0.72));
+    min-height: 1.25em;
+}
+
+.levels-xp-effective-hint.is-active {
+    color: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.95);
+    font-weight: 600;
+}
+
 .levels-preset-desc {
     font-size: 0.8rem;
     color: var(--text-secondary);

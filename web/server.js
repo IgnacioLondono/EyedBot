@@ -52,7 +52,7 @@ const {
     listTicketChannelMessages,
     sendWebMessageToTicket
 } = require('../src/events/ticket-interaction');
-const { sanitizeDifficulty, getProgress } = require('../src/utils/leveling-math');
+const { sanitizeDifficulty, sanitizeXpMultiplier, getProgress } = require('../src/utils/leveling-math');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -2475,6 +2475,7 @@ function normalizeLevelingConfigInput(body = {}, current = null, userId = 'unkno
         messageXpMax,
         voiceXpPerMinute: Math.max(1, Math.min(100, Number.parseInt(body.voiceXpPerMinute ?? base.voiceXpPerMinute ?? 6, 10) || 6)),
         voiceRequirePeers: body.voiceRequirePeers !== false,
+        xpMultiplier: sanitizeXpMultiplier(body.xpMultiplier ?? base.xpMultiplier ?? 1),
         difficulty: sanitizeDifficulty(body.difficulty || base.difficulty || {}),
         roleRewards,
         levelUpAnnounceChannelId: /^\d{10,25}$/.test(levelUpAnnounceChannelId) ? levelUpAnnounceChannelId : '',

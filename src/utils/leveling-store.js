@@ -74,6 +74,8 @@ function defaultConfig() {
         messageXpMax: 16,
         voiceXpPerMinute: 6,
         voiceRequirePeers: true,
+        /** Multiplicador de XP ganada por mensajes y voz (1 = normal, 2 = doble, etc.). */
+        xpMultiplier: 1,
         difficulty: {
             baseXp: 280,
             exponent: 2.08
