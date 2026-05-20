@@ -5712,6 +5712,10 @@ mark.receipt-highlight {
 #serverPaneVerify        { --pane-accent: color-mix(in srgb, var(--iris-400) 45%, var(--iris-500)); --pane-accent-2: var(--fuchsia); --pane-ink: var(--iris-300); }
 #serverPaneTickets       { --pane-accent: color-mix(in srgb, var(--fuchsia) 55%, var(--iris-500)); --pane-accent-2: var(--iris-500); --pane-ink: var(--iris-300); }
 #serverPaneLevels        { --pane-accent: var(--accent-gold); --pane-accent-2: color-mix(in srgb, var(--iris-500) 42%, var(--accent-gold)); --pane-ink: var(--iris-300); }
+
+#serverPaneLevels.active .moderation-container {
+    overflow: visible !important;
+}
 #serverPaneVoiceCreator  { --pane-accent: color-mix(in srgb, var(--fuchsia) 52%, var(--iris-400)); --pane-accent-2: var(--iris-500); --pane-ink: var(--iris-300); }
 #serverPaneAutomation    { --pane-accent: var(--iris-400); --pane-accent-2: color-mix(in srgb, var(--iris-400) 38%, var(--fuchsia)); --pane-ink: var(--iris-300); }
 #serverPaneSecurity      { --pane-accent: color-mix(in srgb, var(--iris-500) 52%, var(--accent-gold)); --pane-accent-2: var(--iris-500); --pane-ink: var(--iris-300); }
@@ -5762,7 +5766,7 @@ mark.receipt-highlight {
         inset 0 1px 0 color-mix(in srgb, var(--pane-accent) 18%, rgba(255, 255, 255, 0.05));
     position: relative;
     overflow: hidden;
-    animation: panePremiumIn 0.45s cubic-bezier(.2,.9,.3,1.1);
+    animation: none;
 }
 .server-pane:not(#serverPaneOverview):not(#serverPaneTicketsManage).active .moderation-container::before {
     content: "";
@@ -7860,13 +7864,16 @@ mark.receipt-highlight {
 /* ---- Tab panels (pestañas = .dpx-tab dentro de .levels-main-tabs) ---- */
 .levels-tab-panel {
     display: none;
-    animation: levelsFadeIn 0.25s ease;
 }
 
 .levels-tab-panel.is-active {
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
+}
+
+.levels-tab-panel[data-levels-panel="leaderboard"].is-active {
+    padding-bottom: 1.25rem;
 }
 
 @keyframes levelsFadeIn {
@@ -8348,6 +8355,8 @@ mark.receipt-highlight {
     gap: 0.7rem;
     align-items: end;
     margin-bottom: 1.2rem;
+    padding-top: 0.65rem;
+    overflow: visible;
 }
 
 .levels-podium-slot {
@@ -15196,8 +15205,7 @@ body {
 /* Rendimiento: listas largas fuera de viewport (misma UI, menos trabajo de pintura) */
 .dashboard-guilds-board,
 .server-switcher-track,
-.levels-rank-list,
-.levels-podium {
+.levels-rank-list {
     content-visibility: auto;
     contain-intrinsic-size: 520px 640px;
 }

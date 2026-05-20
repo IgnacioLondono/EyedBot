@@ -979,7 +979,15 @@ function handleServerSideAction(button) {
     const quickSection = button.dataset.quickSection || '';
 
     if (paneId) {
+        const serverSection = document.getElementById('serverSection');
+        const alreadyOnServer = serverSection?.classList.contains('active');
+        if (alreadyOnServer && hasSelectedGuildContext()) {
+            switchServerPane(paneId, button);
+            saveState();
+            return;
+        }
         showSection('serverSection', {
+            skipServerDataLoad: hasSelectedGuildContext(),
             serverPaneAfterLoad: paneId,
             serverPaneAfterLoadButton: button
         });
@@ -3199,12 +3207,14 @@ function showSection(sectionId, options = {}) {
     } else if (sectionId === 'commandsSection') {
         loadCommands();
     } else if (sectionId === 'serverSection') {
+        const pane = options.serverPaneAfterLoad || currentServerPaneId || 'serverPaneOverview';
+        const paneBtn = options.serverPaneAfterLoadButton || null;
         if (!options.skipServerDataLoad) {
             void loadGuildsForServer().then(() => {
-                const pane = options.serverPaneAfterLoad || currentServerPaneId || 'serverPaneOverview';
-                const paneBtn = options.serverPaneAfterLoadButton || null;
                 switchServerPane(pane, paneBtn);
             });
+        } else {
+            switchServerPane(pane, paneBtn);
         }
     } else if (sectionId === 'controlCenterSection') {
         loadAboutOverview();
