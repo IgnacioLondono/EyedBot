@@ -1868,6 +1868,8 @@ async function resetThemeSettings() {
     showToast('Personalizacion restablecida', 'success');
 }
 
+const SETTINGS_PANE_STORAGE_KEY = 'eyedbot:settings:activePane';
+
 function switchSettingsPane(paneId, options = {}) {
     const pane = document.getElementById(paneId);
     if (!pane) return;
@@ -1881,6 +1883,10 @@ function switchSettingsPane(paneId, options = {}) {
     document.querySelectorAll('.settings-side-btn').forEach((button) => {
         button.classList.toggle('active', button.dataset.settingsPane === paneId);
     });
+
+    try {
+        sessionStorage.setItem(SETTINGS_PANE_STORAGE_KEY, paneId);
+    } catch (_) { /* noop */ }
 
     if (!options.silent) {
         const container = document.querySelector('#profileSettingsSection > .container');
@@ -1897,7 +1903,13 @@ function bindSettingsPaneNavigation() {
         });
     });
 
-    switchSettingsPane(currentSettingsPaneId, { silent: true });
+    let initialPane = currentSettingsPaneId;
+    try {
+        const stored = sessionStorage.getItem(SETTINGS_PANE_STORAGE_KEY);
+        if (stored && document.getElementById(stored)) initialPane = stored;
+    } catch (_) { /* noop */ }
+
+    switchSettingsPane(initialPane, { silent: true });
 }
 
 function bindThemeControls() {
@@ -4048,30 +4060,20 @@ function initEmbedPanel() {
     if (!section) return;
 
     if (!embedPanelInitialized) {
-        const tabsNav = section.querySelector('#embedTabs');
-        if (tabsNav) {
-            const tabs = Array.from(tabsNav.querySelectorAll('[data-dpx-tab]'));
-            const panels = Array.from(section.querySelectorAll('[data-dpx-panel]'));
-            tabs.forEach((tab) => {
-                tab.addEventListener('click', () => {
-                    if (!isOwnerUser && tab.getAttribute('data-dpx-tab') === 'attachments') return;
-                    const key = tab.getAttribute('data-dpx-tab');
-                    tabs.forEach((t) => t.classList.toggle('is-active', t === tab));
-                    panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
-                });
-            });
+        bindDpxTabs(section, { persistTabStorageKey: 'eyedbot:embed:activeTab' });
 
-            if (!isOwnerUser) {
-                const activeTab = tabs.find((t) => t.classList.contains('is-active'));
-                if (activeTab && activeTab.getAttribute('data-dpx-tab') === 'attachments') {
-                    const fallbackTab = tabs.find((t) => t.getAttribute('data-dpx-tab') === 'content');
-                    if (fallbackTab) {
-                        fallbackTab.classList.add('is-active');
-                        tabs.forEach((t) => {
-                            if (t !== fallbackTab) t.classList.remove('is-active');
-                        });
-                        panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === 'content'));
-                    }
+        if (!isOwnerUser) {
+            const tabsNav = section.querySelector('#embedTabs');
+            const tabs = tabsNav ? Array.from(tabsNav.querySelectorAll('[data-dpx-tab]')) : [];
+            const panels = Array.from(section.querySelectorAll('[data-dpx-panel]'));
+            const activeTab = tabs.find((t) => t.classList.contains('is-active'));
+            if (activeTab && activeTab.getAttribute('data-dpx-tab') === 'attachments') {
+                const fallbackTab = tabs.find((t) => t.getAttribute('data-dpx-tab') === 'content');
+                if (fallbackTab) {
+                    const key = 'content';
+                    tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-dpx-tab') === key));
+                    panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
+                    try { sessionStorage.setItem('eyedbot:embed:activeTab', key); } catch (_) { /* noop */ }
                 }
             }
         }
@@ -4817,6 +4819,24 @@ function collectPanelValues(containerId) {
 
 // ====== Generic dashboard panel UI helpers (dpx-*) ======
 
+function panelTabStorageKey(panelId, guildId) {
+    return `eyedbot:panel-tab:${String(panelId)}:${String(guildId || '')}`;
+}
+
+function readPanelStoredTab(panelId, guildId, fallback, validKeys = null) {
+    try {
+        const stored = sessionStorage.getItem(panelTabStorageKey(panelId, guildId));
+        if (!stored) return fallback;
+        if (validKeys) {
+            const allowed = validKeys instanceof Set ? validKeys : new Set(validKeys);
+            if (!allowed.has(stored)) return fallback;
+        }
+        return stored;
+    } catch (_) {
+        return fallback;
+    }
+}
+
 function bindDpxTabs(container, options = {}) {
     if (!container) return;
     const tabs = Array.from(container.querySelectorAll('[data-dpx-tab]'));
@@ -4828,7 +4848,10 @@ function bindDpxTabs(container, options = {}) {
         ? options.persistTabStorageKey.trim()
         : null;
 
+    const tabKeys = new Set(tabs.map((t) => t.getAttribute('data-dpx-tab')).filter(Boolean));
+
     const activate = (key) => {
+        if (!key || !tabKeys.has(key)) return;
         tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-dpx-tab') === key));
         panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === key));
         if (persistTabStorageKey) {
@@ -4845,28 +4868,53 @@ function bindDpxTabs(container, options = {}) {
         tab.addEventListener('click', () => activate(tab.getAttribute('data-dpx-tab')));
     });
 
-    if (!tabs.some((t) => t.classList.contains('is-active'))) {
+    let storedKey = null;
+    if (persistTabStorageKey) {
+        try {
+            const stored = sessionStorage.getItem(persistTabStorageKey);
+            if (stored && tabKeys.has(stored)) storedKey = stored;
+        } catch (_) { /* noop */ }
+    }
+
+    const domActive = tabs.find((t) => t.classList.contains('is-active'));
+    const domKey = domActive ? domActive.getAttribute('data-dpx-tab') : null;
+
+    if (storedKey) {
+        activate(storedKey);
+    } else if (domKey && tabKeys.has(domKey)) {
+        panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-dpx-panel') === domKey));
+    } else {
         activate(tabs[0].getAttribute('data-dpx-tab'));
     }
 }
 
 /** Subpestañas dentro de Notificaciones → Directos (no usar data-dpx-tab para no mezclar con el panel principal). */
-function bindStreamDirectosSubtabs(rootEl) {
+function bindStreamDirectosSubtabs(rootEl, guildId) {
     if (!rootEl) return;
     const tabs = Array.from(rootEl.querySelectorAll('[data-stream-subtab]'));
     const panels = Array.from(rootEl.querySelectorAll('[data-stream-subpanel]'));
     if (!tabs.length || !panels.length) return;
 
+    const storageKey = panelTabStorageKey('notifications-stream', guildId);
+    const tabKeys = new Set(tabs.map((t) => t.getAttribute('data-stream-subtab')).filter(Boolean));
+
     const activate = (key) => {
+        if (!key || !tabKeys.has(key)) return;
         tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-stream-subtab') === key));
         panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-stream-subpanel') === key));
+        try {
+            sessionStorage.setItem(storageKey, key);
+        } catch (_) { /* noop */ }
     };
 
     tabs.forEach((tab) => {
         tab.addEventListener('click', () => activate(tab.getAttribute('data-stream-subtab')));
     });
 
-    if (!tabs.some((t) => t.classList.contains('is-active'))) {
+    const storedKey = readPanelStoredTab('notifications-stream', guildId, null, tabKeys);
+    if (storedKey) {
+        activate(storedKey);
+    } else if (!tabs.some((t) => t.classList.contains('is-active'))) {
         activate(tabs[0].getAttribute('data-stream-subtab'));
     }
 }
@@ -5144,7 +5192,7 @@ async function loadVoiceCreatorPanel(guildId) {
             </div>
         `;
 
-        bindDpxTabs(container);
+        bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('voice-creator', guildId) });
 
         const saveBtn = document.getElementById('saveTempVoiceBtn');
         if (saveBtn) {
@@ -5346,6 +5394,7 @@ async function loadAutomationPanel(guildId) {
     `;
 
     bindDpxTabs(container, {
+        persistTabStorageKey: panelTabStorageKey('automation', guildId),
         onTabActivate: (key) => {
             if (key === 'channelsetup') {
                 void openChannelSetupPane();
@@ -5607,7 +5656,7 @@ async function loadSecurityPanel(guildId) {
             </div>
         `;
 
-        bindDpxTabs(container);
+        bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('security', guildId) });
 
         const saveBtn = document.getElementById('saveAntiRaidBtn');
         if (saveBtn) {
@@ -6278,10 +6327,10 @@ async function loadNotificationsPanel(guildId) {
         </div>
     `;
 
-    bindDpxTabs(container);
+    bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('notifications', guildId) });
 
     initStreamAlertEditor(guildId, streamConfig.sources);
-    bindStreamDirectosSubtabs(container.querySelector('#streamDirectosRoot'));
+    bindStreamDirectosSubtabs(container.querySelector('#streamDirectosRoot'), guildId);
 
     const saveBtn = document.getElementById('saveNotificationsBtn');
     const testBtn = document.getElementById('testNotificationsBtn');
@@ -7632,7 +7681,7 @@ async function loadVerifyPanel(guildId) {
             </div>
         `;
 
-        bindDpxTabs(container);
+        bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('verify', guildId) });
 
         const saveBtn = document.getElementById('saveVerifyBtn');
         const publishBtn = document.getElementById('publishVerifyBtn');
@@ -7974,7 +8023,7 @@ async function loadTicketPanel(guildId) {
             </div>
         `;
 
-        bindDpxTabs(container);
+        bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('ticket', guildId) });
 
         const saveBtn = document.getElementById('saveTicketBtn');
         const publishBtn = document.getElementById('publishTicketBtn');
@@ -8717,7 +8766,7 @@ async function loadLevelsPanel(guildId) {
 
                 <div id="levelsStatsHeaderWrap">${renderLevelsStatsHeader(config, leaderboard, roles)}</div>
 
-                ${levelsRenderMainTabs('config')}
+                ${levelsRenderMainTabs(readPanelStoredTab('levels', guildId, 'config'))}
 
                 <div class="levels-tab-panel is-active" data-levels-panel="config">
                     <input type="hidden" id="levelUpAnnounceChannelId" value="${escapeHtml(String(config.levelUpAnnounceChannelId || '').trim())}">
@@ -8913,7 +8962,7 @@ async function loadLevelsPanel(guildId) {
             </div>
         `;
 
-        bindLevelsTabs(container);
+        bindLevelsTabs(container, guildId);
         bindLevelsCurveLive(container, config, { roles, leaderboard });
         bindLevelsXpMultiplier(container, { roles, leaderboard, initialConfig: config });
         bindLevelsPresets(container, config);
@@ -9013,19 +9062,35 @@ async function loadLevelsPanel(guildId) {
     }
 }
 
-function bindLevelsTabs(container) {
-    const tabs = container.querySelectorAll('[data-levels-tab][role="tab"]');
-    const panels = container.querySelectorAll('[data-levels-panel]');
+function bindLevelsTabs(container, guildId) {
+    const tabs = Array.from(container.querySelectorAll('[data-levels-tab][role="tab"]'));
+    const panels = Array.from(container.querySelectorAll('[data-levels-panel]'));
+    if (!tabs.length || !panels.length) return;
+
+    const storageKey = panelTabStorageKey('levels', guildId);
+    const tabKeys = new Set(tabs.map((t) => t.getAttribute('data-levels-tab')).filter(Boolean));
+
+    const activate = (key) => {
+        if (!key || !tabKeys.has(key)) return;
+        tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-levels-tab') === key));
+        panels.forEach((panel) => {
+            panel.classList.toggle('is-active', panel.getAttribute('data-levels-panel') === key);
+        });
+        try {
+            sessionStorage.setItem(storageKey, key);
+        } catch (_) { /* noop */ }
+    };
 
     tabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-            const target = tab.getAttribute('data-levels-tab');
-            tabs.forEach((t) => t.classList.toggle('is-active', t === tab));
-            panels.forEach((panel) => {
-                panel.classList.toggle('is-active', panel.getAttribute('data-levels-panel') === target);
-            });
-        });
+        tab.addEventListener('click', () => activate(tab.getAttribute('data-levels-tab')));
     });
+
+    const storedKey = readPanelStoredTab('levels', guildId, null, tabKeys);
+    if (storedKey) {
+        activate(storedKey);
+    } else if (!tabs.some((t) => t.classList.contains('is-active'))) {
+        activate(tabs[0].getAttribute('data-levels-tab'));
+    }
 }
 
 function readLevelingLiveConfig(container, initialConfig) {
@@ -11013,7 +11078,7 @@ function displayMembers(members, guildId, initialQuery = '') {
         </div>
     `;
 
-    bindDpxTabs(container);
+    bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('moderation', guildId) });
 
     const refreshBtn = document.getElementById('modRefreshBtn');
     if (refreshBtn) {
@@ -11113,13 +11178,17 @@ function saveCurrentGreetingDraft() {
     setCurrentGreetingConfig(currentGreetingMode, collectWelcomeConfigFromForm());
 }
 
-function bindWelcomeEditorSectionTabs(container) {
-    const tabs = container.querySelectorAll('[data-welcome-section-tab]');
-    const panes = container.querySelectorAll('[data-welcome-pane]');
+function bindWelcomeEditorSectionTabs(container, guildId, mode = 'welcome') {
+    const tabs = Array.from(container.querySelectorAll('[data-welcome-section-tab]'));
+    const panes = Array.from(container.querySelectorAll('[data-welcome-pane]'));
     if (!tabs.length || !panes.length) return;
 
+    const panelId = `welcome-section-${mode}`;
+    const storageKey = panelTabStorageKey(panelId, guildId);
+    const tabKeys = new Set(tabs.map((t) => t.getAttribute('data-welcome-section-tab')).filter(Boolean));
+
     const activate = (key) => {
-        if (!key) return;
+        if (!key || !tabKeys.has(key)) return;
         tabs.forEach((t) => {
             const k = t.getAttribute('data-welcome-section-tab');
             const on = k === key;
@@ -11129,11 +11198,21 @@ function bindWelcomeEditorSectionTabs(container) {
         panes.forEach((p) => {
             p.classList.toggle('is-active', p.getAttribute('data-welcome-pane') === key);
         });
+        try {
+            sessionStorage.setItem(storageKey, key);
+        } catch (_) { /* noop */ }
     };
 
     tabs.forEach((tab) => {
         tab.addEventListener('click', () => activate(tab.getAttribute('data-welcome-section-tab')));
     });
+
+    const storedKey = readPanelStoredTab(panelId, guildId, null, tabKeys);
+    if (storedKey) {
+        activate(storedKey);
+    } else if (!tabs.some((t) => t.classList.contains('is-active'))) {
+        activate(tabs[0].getAttribute('data-welcome-section-tab'));
+    }
 }
 
 function renderGreetingPanel(guildId, channels, mode) {
@@ -11545,6 +11624,9 @@ function renderGreetingPanel(guildId, channels, mode) {
             if (!nextMode || nextMode === currentGreetingMode) return;
             saveCurrentGreetingDraft();
             currentGreetingMode = nextMode;
+            try {
+                sessionStorage.setItem(panelTabStorageKey('welcome-mode', guildId), nextMode);
+            } catch (_) { /* noop */ }
             renderGreetingPanel(guildId, channels, currentGreetingMode);
         });
     });
@@ -11580,7 +11662,7 @@ function renderGreetingPanel(guildId, channels, mode) {
             document.getElementById('welcomeBgImageSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     });
-    bindWelcomeEditorSectionTabs(container);
+    bindWelcomeEditorSectionTabs(container, guildId, mode);
     updateWelcomePreviewPanel(guildId);
     scheduleWelcomeCropVisualUpdate();
 }
@@ -11617,7 +11699,8 @@ async function loadWelcomePanel(guildId) {
         clearTimeout(welcomeCropVisualTimer);
         welcomeCropVisualTimer = null;
 
-        if (!['welcome', 'goodbye'].includes(currentGreetingMode)) currentGreetingMode = 'welcome';
+        const storedMode = readPanelStoredTab('welcome-mode', guildId, 'welcome', ['welcome', 'goodbye']);
+        currentGreetingMode = storedMode;
         renderGreetingPanel(guildId, channels, currentGreetingMode);
     } catch (error) {
         console.error('Error cargando panel de bienvenida/despedida:', error);
