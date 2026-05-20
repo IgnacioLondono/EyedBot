@@ -134,6 +134,7 @@ let serverSummaryRefreshInterval = null;
 let isSwitchingServer = false;
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
+let lastThemeSettingsDiskJson = null;
 /** Data URL en JSON (legacy); IndexedDB lleva el archivo pesado */
 const WALLPAPER_MAX_INLINE_URL_CHARS = 5_000_000;
 const WALLPAPER_MAX_VIDEO_BYTES = 180 * 1024 * 1024;
@@ -1189,6 +1190,32 @@ function debounce(fn, delay = 180) {
     };
 }
 
+/** Aplica el tema como máximo una vez por frame (sliders que disparan muchos `input`). */
+let _themeControlsApplyRaf = 0;
+function scheduleThemeControlsApply() {
+    if (_themeControlsApplyRaf) return;
+    _themeControlsApplyRaf = requestAnimationFrame(() => {
+        _themeControlsApplyRaf = 0;
+        applyThemeSettings(getThemeControlsState(), { persist: true });
+    });
+}
+
+/** Re-render del bloque de niveles (curva, hitos, ladder) coalescado por frame. */
+const _levelsDerivedRefreshByContainer = new WeakMap();
+function scheduleLevelsDerivedRefresh(container, initialConfig, context) {
+    if (!container) return;
+    let slot = _levelsDerivedRefreshByContainer.get(container);
+    if (!slot) {
+        slot = { rafId: 0 };
+        _levelsDerivedRefreshByContainer.set(container, slot);
+    }
+    if (slot.rafId) return;
+    slot.rafId = requestAnimationFrame(() => {
+        slot.rafId = 0;
+        refreshLevelsDerivedViews(container, initialConfig, context);
+    });
+}
+
 async function fetchCachedGetJSON(url, ttlMs = 30000, options = {}) {
     const now = Date.now();
     const cached = apiGetCache.get(url);
@@ -1222,6 +1249,7 @@ function invalidateGetCache(prefix = '') {
 
 // Clave para localStorage
 const STORAGE_KEY = 'tulabot_panel_state';
+let _lastPersistedPanelStateJson = null;
 
 // Guardar estado en localStorage
 function saveState() {
@@ -1273,7 +1301,10 @@ function saveState() {
     });
 
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        const json = JSON.stringify(state);
+        if (json === _lastPersistedPanelStateJson) return;
+        _lastPersistedPanelStateJson = json;
+        localStorage.setItem(STORAGE_KEY, json);
     } catch (e) {
         console.warn('No se pudo guardar el estado:', e);
     }
@@ -1466,7 +1497,10 @@ function saveThemeSettings(theme = themeSettings) {
         if (forDisk.wallpaperStorage === 'indexeddb') {
             forDisk.wallpaperUrl = '';
         }
-        localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(forDisk));
+        const json = JSON.stringify(forDisk);
+        if (json === lastThemeSettingsDiskJson) return;
+        lastThemeSettingsDiskJson = json;
+        localStorage.setItem(THEME_STORAGE_KEY, json);
     } catch (error) {
         console.warn('No se pudo guardar la personalizacion visual:', error);
         const code = error?.code;
@@ -1591,7 +1625,27 @@ function initBrandEyeAnimation() {
     let targetY = 0;
     let curX = 0;
     let curY = 0;
-    let raf = 0;
+    let rafId = 0;
+
+    const tick = () => {
+        rafId = 0;
+        if (document.visibilityState === 'hidden') return;
+
+        curX += (targetX - curX) * 0.22;
+        curY += (targetY - curY) * 0.22;
+        pupil.setAttribute('transform', `translate(${curX.toFixed(3)}, ${curY.toFixed(3)})`);
+
+        const dx = targetX - curX;
+        const dy = targetY - curY;
+        if (Math.abs(dx) > 0.002 || Math.abs(dy) > 0.002) {
+            rafId = requestAnimationFrame(tick);
+        }
+    };
+
+    const scheduleTick = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(tick);
+    };
 
     const onMove = (e) => {
         const rect = svg.getBoundingClientRect();
@@ -1604,17 +1658,22 @@ function initBrandEyeAnimation() {
         ny = Math.max(-1, Math.min(1, ny));
         targetX = nx * maxMove;
         targetY = ny * maxMove;
-    };
-
-    const tick = () => {
-        curX += (targetX - curX) * 0.22;
-        curY += (targetY - curY) * 0.22;
-        pupil.setAttribute('transform', `translate(${curX.toFixed(3)}, ${curY.toFixed(3)})`);
-        raf = requestAnimationFrame(tick);
+        scheduleTick();
     };
 
     document.addEventListener('mousemove', onMove, { passive: true });
-    raf = requestAnimationFrame(tick);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = 0;
+        } else if (document.visibilityState === 'visible') {
+            const dx = targetX - curX;
+            const dy = targetY - curY;
+            if (Math.abs(dx) > 0.002 || Math.abs(dy) > 0.002) {
+                scheduleTick();
+            }
+        }
+    });
 }
 
 function initializeInteractiveGradient() {
@@ -1625,20 +1684,48 @@ function initializeInteractiveGradient() {
     let currentY = window.innerHeight * 0.5;
     let targetX = currentX;
     let targetY = currentY;
+    let rafId = 0;
 
-    const moveInteractive = () => {
+    interactive.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(currentY)}px)`;
+
+    const loop = () => {
+        rafId = 0;
+        if (document.visibilityState === 'hidden') return;
+
         currentX += (targetX - currentX) * 0.035;
         currentY += (targetY - currentY) * 0.035;
         interactive.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(currentY)}px)`;
-        requestAnimationFrame(moveInteractive);
+
+        if (Math.abs(targetX - currentX) > 0.75 || Math.abs(targetY - currentY) > 0.75) {
+            rafId = requestAnimationFrame(loop);
+        }
     };
 
-    window.addEventListener('pointermove', (event) => {
-        targetX = event.clientX;
-        targetY = event.clientY;
-    }, { passive: true });
+    const kick = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(loop);
+    };
 
-    moveInteractive();
+    window.addEventListener(
+        'pointermove',
+        (event) => {
+            targetX = event.clientX;
+            targetY = event.clientY;
+            kick();
+        },
+        { passive: true }
+    );
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = 0;
+        } else if (document.visibilityState === 'visible') {
+            if (Math.abs(targetX - currentX) > 0.75 || Math.abs(targetY - currentY) > 0.75) {
+                kick();
+            }
+        }
+    });
 }
 
 function getThemeControlsState() {
@@ -1835,8 +1922,7 @@ function bindThemeControls() {
                 const lab = document.getElementById('themeWallpaperVeilValue');
                 if (lab) lab.textContent = `${el.value}%`;
             }
-            const nextTheme = getThemeControlsState();
-            applyThemeSettings(nextTheme, { persist: true });
+            scheduleThemeControlsApply();
         });
     });
 
@@ -8990,7 +9076,7 @@ function bindLevelsCurveLive(container, initialConfig, context = {}) {
     const curveWrap = container.querySelector('#levelsCurveWrap');
     if (!baseInput || !expInput || !curveWrap) return;
 
-    const refresh = () => refreshLevelsDerivedViews(container, initialConfig, context);
+    const refresh = () => scheduleLevelsDerivedRefresh(container, initialConfig, context);
 
     ['input', 'change'].forEach((evt) => {
         baseInput.addEventListener(evt, refresh);
@@ -9017,21 +9103,30 @@ function bindLevelsCurveLive(container, initialConfig, context = {}) {
 function bindLevelsRewardsLive(container, context = {}) {
     const rewardsWrap = container.querySelector('#levelRewardRows');
     if (!rewardsWrap) return;
-    const refresh = () => refreshLevelsDerivedViews(container, context.initialConfig, context);
+    const refresh = () => scheduleLevelsDerivedRefresh(container, context.initialConfig, context);
 
-    const observer = new MutationObserver(() => refresh());
+    let rewardsRefreshRaf = 0;
+    const scheduleRewardsRefresh = () => {
+        if (rewardsRefreshRaf) return;
+        rewardsRefreshRaf = requestAnimationFrame(() => {
+            rewardsRefreshRaf = 0;
+            refresh();
+        });
+    };
+
+    const observer = new MutationObserver(() => scheduleRewardsRefresh());
     observer.observe(rewardsWrap, { childList: true, subtree: false });
 
     rewardsWrap.addEventListener('input', (event) => {
         const target = event.target;
         if (target && (target.classList.contains('level-reward-level') || target.classList.contains('level-reward-role'))) {
-            refresh();
+            scheduleRewardsRefresh();
         }
     });
     rewardsWrap.addEventListener('change', (event) => {
         const target = event.target;
         if (target && (target.classList.contains('level-reward-level') || target.classList.contains('level-reward-role'))) {
-            refresh();
+            scheduleRewardsRefresh();
         }
     });
 }
@@ -9083,7 +9178,7 @@ function bindLevelsXpMultiplier(container, context = {}) {
     const custom = container.querySelector('#levelingXpMultiplierCustom');
     if (!wrap || !custom) return;
 
-    const refreshDerived = () => refreshLevelsDerivedViews(container, context.initialConfig, context);
+    const refreshDerived = () => scheduleLevelsDerivedRefresh(container, context.initialConfig, context);
 
     const applyMult = (value) => {
         custom.value = String(levelingSanitizeXpMultiplier(value));

@@ -15199,3 +15199,12 @@ body {
         padding-left: var(--pro-card-pad-left) !important;
     }
 }
+
+/* Rendimiento: listas largas fuera de viewport (misma UI, menos trabajo de pintura) */
+.dashboard-guilds-board,
+.server-switcher-track,
+.levels-rank-list,
+.levels-podium {
+    content-visibility: auto;
+    contain-intrinsic-size: 520px 640px;
+}
