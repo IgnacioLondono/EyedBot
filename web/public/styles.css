@@ -1733,6 +1733,26 @@ body {
     font-weight: 600;
 }
 
+.discord-channel-preview {
+    display: inline;
+    padding: 0 0.12em;
+    border-radius: 3px;
+    background: rgba(88, 101, 242, 0.28);
+    color: #aeb4f4;
+    font-weight: 600;
+}
+
+.embed-channel-var-select {
+    max-width: 11rem;
+    min-width: 7rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+}
+
+.greeting-var-strip--compact {
+    margin-top: 0.35rem;
+}
+
 .discord-embed-fields {
     margin-top: 1rem;
     display: flex;

@@ -1,16 +1,9 @@
 const welcomeStore = require('../utils/welcome-config-store');
 const { applyWelcomeMediaToEmbed } = require('../utils/welcome-upload-resolve');
+const { applyGuildEmbedText } = require('../utils/embed-text-template');
 
 function applyTemplate(text, member) {
-    const uid = member?.user?.id ?? member?.id;
-    const discordMention = uid ? `<@${uid}>` : '@usuario';
-    const uname = member.user?.username || 'Usuario';
-    return String(text || '')
-        .replace(/\{mention\}/gi, discordMention)
-        .replace(/\{user\}/gi, discordMention)
-        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
-        .replace(/\{server\}|\{guild\}/gi, member.guild?.name || 'Servidor')
-        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, String(member.guild?.memberCount || 0));
+    return applyGuildEmbedText(text, { guild: member?.guild, member });
 }
 
 module.exports = {

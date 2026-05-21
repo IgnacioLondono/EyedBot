@@ -2,6 +2,7 @@ const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
 const { resolveWelcomeUploadFile, applyWelcomeMediaToEmbed } = require('../utils/welcome-upload-resolve');
+const { applyGuildEmbedText } = require('../utils/embed-text-template');
 const { AttachmentBuilder } = require('discord.js');
 
 // Queue welcome sends by channel so simultaneous joins are processed one by one.
@@ -26,18 +27,7 @@ function enqueueWelcomeSend(queueKey, task) {
 }
 
 function applyTemplate(text, member) {
-    const uid = member?.user?.id ?? member?.id;
-    // Discord solo pinta la mención en azul con <@id>, no con @texto.
-    const discordMention = uid ? `<@${uid}>` : '@usuario';
-    const uname = member.user.username;
-    const srv = member.guild.name;
-    const mc = String(member.guild.memberCount);
-    return String(text || '')
-        .replace(/\{mention\}/gi, discordMention)
-        .replace(/\{user\}/gi, discordMention)
-        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
-        .replace(/\{server\}|\{guild\}/gi, srv)
-        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
+    return applyGuildEmbedText(text, { guild: member?.guild, member });
 }
 
 module.exports = {

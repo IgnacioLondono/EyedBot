@@ -17,6 +17,7 @@ const {
     resolveWelcomeUploadFile: resolveLocalUploadFile,
     applyWelcomeMediaToEmbed
 } = require('../src/utils/welcome-upload-resolve');
+const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../src/utils/welcome-card');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
@@ -1086,17 +1087,7 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
 });
 
 function applyWelcomeTemplate(text, member) {
-    const uname = member.user?.username || 'Usuario';
-    const uid = member.id || member.user?.id;
-    const discordMention = uid && uid !== '0' ? `<@${uid}>` : `@${uname}`;
-    const srv = member.guild.name;
-    const mc = String(member.guild.memberCount);
-    return String(text || '')
-        .replace(/\{mention\}/gi, discordMention)
-        .replace(/\{user\}/gi, discordMention)
-        .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
-        .replace(/\{server\}|\{guild\}/gi, srv)
-        .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
+    return applyGuildEmbedText(text, { guild: member?.guild, member });
 }
 
 function sessionUserAvatarUrl(user) {
@@ -1230,12 +1221,12 @@ function normalizeVerifyEmojiInput(rawEmoji = '✅') {
     return { reactValue: raw, stored: raw, display: raw };
 }
 
-function buildVerifyEmbedFromConfig(cfg) {
+function buildVerifyEmbedFromConfig(cfg, guild) {
     const embed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
-        .setTitle(cfg.title || 'Verify')
-        .setDescription(cfg.message || '¡Reacciona para verificarte!');
-    if (cfg.footer) embed.setFooter({ text: cfg.footer });
+        .setTitle(applyGuildEmbedText(cfg.title || 'Verify', { guild }))
+        .setDescription(applyGuildEmbedText(cfg.message || '¡Reacciona para verificarte!', { guild }));
+    if (cfg.footer) embed.setFooter({ text: applyGuildEmbedText(cfg.footer, { guild }) });
     const files = [];
     if (cfg.imageUrl) {
         applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, 'image');
@@ -1243,16 +1234,16 @@ function buildVerifyEmbedFromConfig(cfg) {
     return { embed, files };
 }
 
-function buildTicketPanelPayload(guildId, cfg) {
+function buildTicketPanelPayload(guildId, cfg, guild) {
     const embed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
-        .setTitle(cfg.title || 'Soporte')
-        .setDescription(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.');
-    if (cfg.footer) embed.setFooter({ text: cfg.footer });
+        .setTitle(applyGuildEmbedText(cfg.title || 'Soporte', { guild }))
+        .setDescription(applyGuildEmbedText(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.', { guild }));
+    if (cfg.footer) embed.setFooter({ text: applyGuildEmbedText(cfg.footer, { guild }) });
     const openTicketBtn = new ButtonBuilder()
         .setCustomId(ticketButtonCustomIdForGuild(guildId))
         .setStyle(ButtonStyle.Primary)
-        .setLabel(cfg.buttonLabel || 'Solicitar ticket');
+        .setLabel(applyGuildEmbedText(cfg.buttonLabel || 'Solicitar ticket', { guild }));
     const components = [new ActionRowBuilder().addComponents(openTicketBtn)];
     return { embed, components };
 }
@@ -1340,7 +1331,7 @@ async function refreshVerifyPanelMessage(guildId, updatedByUserId) {
         throw e;
     }
 
-    const { embed, files } = buildVerifyEmbedFromConfig(cfg);
+    const { embed, files } = buildVerifyEmbedFromConfig(cfg, guild);
     await message.edit({
         embeds: [embed],
         files: files.length ? files : []
@@ -1411,7 +1402,7 @@ async function refreshTicketPanelMessage(guildId, updatedByUserId) {
         throw e;
     }
 
-    const { embed, components } = buildTicketPanelPayload(guildId, cfg);
+    const { embed, components } = buildTicketPanelPayload(guildId, cfg, guild);
     await message.edit({ embeds: [embed], components });
 
     const updatedCfg = {
@@ -1518,7 +1509,7 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
             return res.status(403).json({ error: 'El bot no puede administrar ese rol (revisa jerarquía y permiso Gestionar roles)' });
         }
 
-        const { embed, files } = buildVerifyEmbedFromConfig(cfg);
+        const { embed, files } = buildVerifyEmbedFromConfig(cfg, guild);
 
         const posted = await channel.send({ embeds: [embed], files });
 
@@ -1813,7 +1804,7 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => 
             return res.status(403).json({ error: 'Faltan permisos: Enviar mensajes o Insertar enlaces' });
         }
 
-        const { embed, components } = buildTicketPanelPayload(guildId, cfg);
+        const { embed, components } = buildTicketPanelPayload(guildId, cfg, guild);
 
         const posted = await channel.send({
             embeds: [embed],
@@ -3862,17 +3853,18 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
         // Crear embed usando discord.js
         const { EmbedBuilder } = require('discord.js');
         const discordEmbed = new EmbedBuilder();
+        const tpl = (value) => applyGuildEmbedText(value, { guild });
 
-        if (embed.title) discordEmbed.setTitle(embed.title);
-        if (embed.description) discordEmbed.setDescription(embed.description);
+        if (embed.title) discordEmbed.setTitle(tpl(embed.title));
+        if (embed.description) discordEmbed.setDescription(tpl(embed.description));
         if (embed.color) discordEmbed.setColor(embed.color);
-        if (embed.footer) discordEmbed.setFooter({ text: embed.footer });
+        if (embed.footer) discordEmbed.setFooter({ text: tpl(embed.footer) });
         if (embed.image) discordEmbed.setImage(embed.image);
         if (embed.thumbnail) discordEmbed.setThumbnail(embed.thumbnail);
         if (embed.timestamp) discordEmbed.setTimestamp();
         if (embed.author) {
             discordEmbed.setAuthor({
-                name: embed.author.name || '',
+                name: tpl(embed.author.name || ''),
                 iconURL: embed.author.iconURL,
                 url: embed.author.url
             });
@@ -3881,8 +3873,8 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             embed.fields.forEach(field => {
                 if (field.name && field.value) {
                     discordEmbed.addFields({
-                        name: field.name,
-                        value: field.value,
+                        name: tpl(field.name),
+                        value: tpl(field.value),
                         inline: field.inline || false
                     });
                 }

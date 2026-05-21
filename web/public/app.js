@@ -50,6 +50,89 @@ function resolveWelcomePreviewMediaUrl(raw) {
     }
     return u;
 }
+
+/** Canales de texto del servidor activo (para insertar {#nombre} en embeds). */
+let panelGuildTextChannels = [];
+
+function setPanelGuildTextChannels(channels) {
+    panelGuildTextChannels = Array.isArray(channels)
+        ? channels.filter((c) => c && (c.type === 0 || c.type === 5))
+        : [];
+    refreshEmbedChannelVarSelects();
+}
+
+function refreshEmbedChannelVarSelects() {
+    const host = document.getElementById('embedChannelVarSelects');
+    if (!host) return;
+    if (!panelGuildTextChannels.length) {
+        host.innerHTML = '<span class="dpx-field-hint" style="margin:0;">Selecciona un servidor</span>';
+        return;
+    }
+    host.innerHTML = [
+        renderChannelVarSelectHtml('embedTitle'),
+        renderChannelVarSelectHtml('embedDescription'),
+        renderChannelVarSelectHtml('embedFooter')
+    ].join('');
+    bindChannelVarSelects(host.parentElement || document);
+}
+
+function renderChannelVarSelectHtml(targetInputId) {
+    if (!panelGuildTextChannels.length) return '';
+    const opts = panelGuildTextChannels
+        .map((c) => `<option value="{#${escapeHtmlForValue(c.name)}}">#${escapeHtml(c.name)}</option>`)
+        .join('');
+    return `<select class="embed-channel-var-select form-control" data-target-input="${escapeHtmlForValue(targetInputId)}" title="Insertar mención de canal"><option value="">+ Canal</option>${opts}</select>`;
+}
+
+function insertTextAtCursor(el, text) {
+    if (!el || !text) return;
+    const start = typeof el.selectionStart === 'number' ? el.selectionStart : el.value.length;
+    const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : el.value.length;
+    el.value = `${el.value.slice(0, start)}${text}${el.value.slice(end)}`;
+    const caret = start + text.length;
+    el.focus();
+    el.setSelectionRange(caret, caret);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function bindChannelVarSelects(root) {
+    const scope = root || document;
+    scope.querySelectorAll('.embed-channel-var-select').forEach((select) => {
+        if (select._channelVarBound) return;
+        select._channelVarBound = true;
+        select.addEventListener('change', () => {
+            const token = select.value;
+            if (!token) return;
+            const target = document.getElementById(select.dataset.targetInput || '');
+            insertTextAtCursor(target, token);
+            select.value = '';
+            if (currentServerGuildId) updateWelcomePreviewPanel(currentServerGuildId);
+            updateEmbedPreview();
+        });
+    });
+}
+
+function resolveChannelMentionsPreview(text) {
+    const raw = String(text || '');
+    if (!raw || !panelGuildTextChannels.length) return raw;
+
+    const linkFor = (name) => `<span class="discord-channel-preview">#${escapeHtml(name)}</span>`;
+
+    return raw
+        .replace(/\{channel:([^}]+)\}/gi, (match, ref) => {
+            const refStr = String(ref).trim().replace(/^#/, '');
+            const ch = panelGuildTextChannels.find((c) =>
+                c.id === refStr || c.name?.toLowerCase() === refStr.toLowerCase()
+            );
+            return ch ? linkFor(ch.name) : match;
+        })
+        .replace(/\{#([^}]+)\}/gi, (match, name) => {
+            const refStr = String(name).trim().replace(/^#/, '');
+            const ch = panelGuildTextChannels.find((c) => c.name?.toLowerCase() === refStr.toLowerCase());
+            return ch ? linkFor(ch.name) : match;
+        });
+}
+
 const gatedNavButtonIds = [];
 let serverFeaturesUnlocked = false;
 let currentServerPaneId = 'serverPaneOverview';
@@ -3438,6 +3521,7 @@ async function handleGuildSelect() {
 
     try {
         const channels = await fetchCachedGetJSON(`/api/guild/${guildId}/channels`, API_CACHE_TTL.channels);
+        setPanelGuildTextChannels(channels);
         channelSelect.disabled = false;
         channelSelect.innerHTML = '<option value="">Selecciona un canal</option>' +
             (Array.isArray(channels) ? channels : [])
@@ -3677,8 +3761,8 @@ function updateEmbedPreview() {
         if (name && value) {
             fieldsHTML += `
                 <div class="discord-embed-field" style="display: ${inline ? 'inline-block' : 'block'}; width: ${inline ? '48%' : '100%'};">
-                    <div class="discord-embed-field-name">${escapeHtml(name)}</div>
-                    <div class="discord-embed-field-value">${escapeHtml(value)}</div>
+                    <div class="discord-embed-field-name">${resolveChannelMentionsPreview(escapeHtml(name))}</div>
+                    <div class="discord-embed-field-value">${resolveChannelMentionsPreview(escapeHtml(value))}</div>
                 </div>
             `;
         }
@@ -3686,12 +3770,12 @@ function updateEmbedPreview() {
 
     preview.innerHTML = `
         <div class="discord-embed" style="border-left-color: ${color};">
-            ${title ? `<div class="discord-embed-title">${escapeHtml(title)}</div>` : ''}
-            ${description ? `<div class="discord-embed-description">${escapeHtml(description)}</div>` : ''}
+            ${title ? `<div class="discord-embed-title">${resolveChannelMentionsPreview(escapeHtml(title))}</div>` : ''}
+            ${description ? `<div class="discord-embed-description">${resolveChannelMentionsPreview(escapeHtml(description))}</div>` : ''}
             ${thumbSource ? `<img src="${thumbSource}" alt="Thumbnail" class="discord-embed-thumbnail" style="float: right; max-width: ${Math.max(30, Math.round(80 * (thumbnailScale / 100)))}px; border-radius: 4px; margin-left: 1rem;">` : ''}
             ${fieldsHTML ? `<div class="discord-embed-fields">${fieldsHTML}</div>` : ''}
             ${imageSource ? `<img src="${imageSource}" alt="Image" class="discord-embed-image" style="max-width: ${imageScale}%;">` : ''}
-            ${footer || timestamp ? `<div class="discord-embed-footer">${footer || ''} ${timestamp ? '• ' + new Date().toLocaleString() : ''}</div>` : ''}
+            ${footer || timestamp ? `<div class="discord-embed-footer">${resolveChannelMentionsPreview(escapeHtml(footer || ''))} ${timestamp ? '• ' + new Date().toLocaleString() : ''}</div>` : ''}
         </div>
     `;
 }
@@ -4107,6 +4191,7 @@ function initEmbedPanel() {
             syncThumb();
         }
 
+        refreshEmbedChannelVarSelects();
         embedPanelInitialized = true;
     }
 
@@ -7519,6 +7604,7 @@ async function loadVerifyPanel(guildId) {
 
         const info = await infoResponse.json();
         const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
+        setPanelGuildTextChannels(channels);
         const cfg = await configResponse.json();
 
         const roles = (Array.isArray(info?.roles) ? info.roles : [])
@@ -7629,6 +7715,12 @@ async function loadVerifyPanel(guildId) {
                                     <div class="dpx-field is-full">
                                         <label for="verifyMessage">Mensaje</label>
                                         <textarea id="verifyMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || '¡Reacciona a este mensaje para ver los demás canales!')}</textarea>
+                                        <div class="greeting-var-strip" style="margin-top:0.5rem;">
+                                            ${renderChannelVarSelectHtml('verifyMessage')}
+                                            ${renderChannelVarSelectHtml('verifyTitle')}
+                                            ${renderChannelVarSelectHtml('verifyFooter')}
+                                        </div>
+                                        <small class="dpx-field-hint">Canales: <code>{#nombre}</code> o «+ Canal»</small>
                                     </div>
                                     <div class="dpx-field is-full">
                                         <label for="verifyFooter">Footer</label>
@@ -7682,6 +7774,7 @@ async function loadVerifyPanel(guildId) {
         `;
 
         bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('verify', guildId) });
+        bindChannelVarSelects(container);
 
         const saveBtn = document.getElementById('saveVerifyBtn');
         const publishBtn = document.getElementById('publishVerifyBtn');
@@ -7841,6 +7934,7 @@ async function loadTicketPanel(guildId) {
         }
 
         const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
+        setPanelGuildTextChannels(channels);
         const info = await infoResponse.json();
         const cfg = await configResponse.json();
         const selectedRoleIds = new Set(Array.isArray(cfg.adminRoleIds) ? cfg.adminRoleIds.map(String) : []);
@@ -7917,6 +8011,12 @@ async function loadTicketPanel(guildId) {
                             <div class="dpx-field is-full">
                                 <label for="ticketMessage">Mensaje</label>
                                 <textarea id="ticketMessage" class="form-control" rows="4">${escapeHtmlForValue(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.')}</textarea>
+                                <div class="greeting-var-strip" style="margin-top:0.5rem;">
+                                    ${renderChannelVarSelectHtml('ticketMessage')}
+                                    ${renderChannelVarSelectHtml('ticketTitle')}
+                                    ${renderChannelVarSelectHtml('ticketFooter')}
+                                </div>
+                                <small class="dpx-field-hint">Canales: <code>{#nombre}</code> o «+ Canal»</small>
                             </div>
                             <div class="dpx-field is-full">
                                 <label>Opciones - Categorías</label>
@@ -8024,6 +8124,7 @@ async function loadTicketPanel(guildId) {
         `;
 
         bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('ticket', guildId) });
+        bindChannelVarSelects(container);
 
         const saveBtn = document.getElementById('saveTicketBtn');
         const publishBtn = document.getElementById('publishTicketBtn');
@@ -11400,6 +11501,13 @@ function renderGreetingPanel(guildId, channels, mode) {
                         <button type="button" class="greeting-var-chip" data-var="{username}" title="Nombre de usuario">{username}</button>
                         <button type="button" class="greeting-var-chip" data-var="{server}" title="Nombre del servidor">{server}</button>
                         <button type="button" class="greeting-var-chip" data-var="{memberCount}" title="Número de miembros">{memberCount}</button>
+                        ${renderChannelVarSelectHtml('welcomeMessage')}
+                    </div>
+                    <small class="dpx-field-hint">Canales: escribe <code>{#nombre}</code> o elige «+ Canal». También <code>{channel:id}</code>.</small>
+                    <div class="greeting-var-strip greeting-var-strip--compact" role="group" aria-label="Insertar canal en título o pie">
+                        <span class="greeting-var-strip__label">Canal en</span>
+                        ${renderChannelVarSelectHtml('welcomeTitle')}
+                        ${renderChannelVarSelectHtml('welcomeFooter')}
                     </div>
                     <div class="form-group">
                         <label for="welcomeFooter">Pie del embed</label>
@@ -11663,6 +11771,7 @@ function renderGreetingPanel(guildId, channels, mode) {
         });
     });
     bindWelcomeEditorSectionTabs(container, guildId, mode);
+    bindChannelVarSelects(container);
     updateWelcomePreviewPanel(guildId);
     scheduleWelcomeCropVisualUpdate();
 }
@@ -11684,6 +11793,7 @@ async function loadWelcomePanel(guildId) {
         }
 
         const channels = (await channelsResponse.json()).filter((c) => c.type === 0);
+        setPanelGuildTextChannels(channels);
         currentWelcomeConfig = await welcomeResponse.json();
         currentGoodbyeConfig = await goodbyeResponse.json();
         if (typeof window.WelcomeCardStudio?.mergeCardLayout === 'function') {
@@ -11716,11 +11826,11 @@ function applyWelcomePreviewTemplate(text, sample, options = {}) {
     const htmlMentions = options.htmlMentions === true;
 
     if (!htmlMentions) {
-        return String(text || '')
+        return resolveChannelMentionsPreview(String(text || '')
             .replace(/\{user\}|\{mention\}/gi, plainMention)
             .replace(/\{username\}|\{usuario\}|\{nombre\}/gi, uname)
             .replace(/\{server\}|\{guild\}/gi, srv)
-            .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc);
+            .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, mc));
     }
 
     const T_M = '{{__EYED_USER_MENTION__}}';
@@ -11734,11 +11844,11 @@ function applyWelcomePreviewTemplate(text, sample, options = {}) {
         .replace(/\{memberCount\}|\{members\}|\{member_count\}/gi, T_MC);
     s = escapeHtml(s);
     const mentionSafe = `<span class="discord-mention-preview">@${escapeHtml(uname)}</span>`;
-    return s
+    return resolveChannelMentionsPreview(s
         .split(T_M).join(mentionSafe)
         .split(T_U).join(escapeHtml(uname))
         .split(T_S).join(escapeHtml(srv))
-        .split(T_MC).join(escapeHtml(mc));
+        .split(T_MC).join(escapeHtml(mc)));
 }
 
 function scheduleWelcomeCardPreview(guildId) {

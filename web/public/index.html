@@ -667,6 +667,11 @@
                                         <textarea id="embedDescription" class="form-control" rows="5" placeholder="Descripción del embed" maxlength="4000"></textarea>
                                         <small class="dpx-field-hint"><span id="embedDescriptionCount">0</span> / 4000 caracteres</small>
                                     </div>
+                                    <div class="greeting-var-strip embed-var-strip" id="embedChannelVarStrip" role="group" aria-label="Insertar mención de canal">
+                                        <span class="greeting-var-strip__label">Canales</span>
+                                        <span id="embedChannelVarSelects"></span>
+                                    </div>
+                                    <small class="dpx-field-hint">Usa <code>{#nombre-canal}</code> en título, descripción, pie o campos. Selecciona un servidor arriba para cargar la lista «+ Canal».</small>
                                 </div>
 
                                 <div class="dpx-section">
@@ -1705,6 +1710,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=20260520-welcome-img"></script>
+    <script src="app.js?v=20260520-channel-embed"></script>
 </body>
 </html>
