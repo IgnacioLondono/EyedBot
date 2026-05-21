@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { AttachmentBuilder } = require('discord.js');
+const greetingImageStore = require('./greeting-image-store');
 
 /**
  * Devuelve la ruta public bajo /uploads/... si la cadena es una URL absoluta o ya es pathname.
@@ -27,11 +28,15 @@ function getWelcomePublicOrigin() {
 }
 
 /**
- * Para persistir en JSON/MySQL: `/uploads/...` local, https externas. Ignora blob/data.
+ * Para persistir en JSON/MySQL: ruta API de imagen en BD, `/uploads/...`, o https externas.
  */
 function canonicalWelcomeMediaUrl(raw) {
     const rawStr = String(raw || '').trim();
     if (!rawStr || /^(blob:|data:)/i.test(rawStr)) return '';
+
+    if (greetingImageStore.parseGreetingImageApiUrl(rawStr)) {
+        return rawStr.split('?')[0].slice(0, 1000);
+    }
 
     const uploadPath = extractUploadPath(rawStr);
     if (uploadPath) return uploadPath.slice(0, 1000);
@@ -68,27 +73,50 @@ function resolveWelcomeUploadFile(rawUrl = '') {
     return null;
 }
 
+function slotForMediaKind(slot = 'image', parsedSlot = null, rawUrl = '') {
+    if (parsedSlot) return parsedSlot;
+    const raw = String(rawUrl || '');
+    const isGoodbye = /\/greeting-image\/goodbye/i.test(raw) || /greeting-db:[^:]+:goodbye/i.test(raw);
+    if (slot === 'thumbnail') return isGoodbye ? 'goodbye_thumb' : 'welcome_thumb';
+    return isGoodbye ? 'goodbye' : 'welcome';
+}
+
 /**
- * Decide cómo enviar la imagen a Discord: adjunto local o URL pública.
+ * Decide cómo enviar la imagen a Discord (adjunto local, buffer en MySQL o URL pública).
  */
-function resolveWelcomeMediaForDiscord(rawUrl = '', options = {}) {
+async function resolveWelcomeMediaForDiscord(rawUrl = '', options = {}) {
     const slot = options.slot === 'thumbnail' ? 'thumbnail' : 'image';
-    const localPath = resolveWelcomeUploadFile(rawUrl);
+    const guild = options.guild || null;
+    const raw = String(rawUrl || '').trim();
+    if (!raw) return null;
+
+    const parsed = greetingImageStore.parseGreetingImageApiUrl(raw);
+    if (guild && parsed && parsed.guildId === guild.id) {
+        const imageSlot = slotForMediaKind(slot, parsed.slot, raw);
+        const blob = await greetingImageStore.getImage(guild.id, imageSlot);
+        if (blob?.data?.length) {
+            const attachmentName = slot === 'thumbnail'
+                ? `thumb_greeting.${blob.ext}`
+                : `greeting.${blob.ext}`;
+            return { mode: 'buffer', buffer: blob.data, attachmentName, mime: blob.mime };
+        }
+    }
+
+    const localPath = resolveWelcomeUploadFile(raw);
     if (localPath) {
         const base = path.basename(localPath);
         const attachmentName = slot === 'thumbnail' ? `thumb_${base}` : base;
         return { mode: 'attachment', localPath, attachmentName };
     }
 
-    const uploadPath = extractUploadPath(rawUrl);
+    const uploadPath = extractUploadPath(raw);
     const origin = getWelcomePublicOrigin();
     if (uploadPath && origin) {
         return { mode: 'url', url: `${origin}${uploadPath}` };
     }
 
-    const trimmed = String(rawUrl || '').trim();
-    if (/^https?:\/\//i.test(trimmed)) {
-        return { mode: 'url', url: trimmed };
+    if (/^https?:\/\//i.test(raw)) {
+        return { mode: 'url', url: raw };
     }
 
     return null;
@@ -97,9 +125,29 @@ function resolveWelcomeMediaForDiscord(rawUrl = '', options = {}) {
 /**
  * Aplica imagen o miniatura al embed y añade adjuntos si hace falta.
  */
-function applyWelcomeMediaToEmbed(embed, rawUrl, files, slot = 'image') {
-    const resolved = resolveWelcomeMediaForDiscord(rawUrl, { slot });
+async function applyWelcomeMediaToEmbed(embed, rawUrl, files, guildOrSlot = 'image', maybeSlot = 'image') {
+    let guild = null;
+    let slot = 'image';
+    if (typeof guildOrSlot === 'object' && guildOrSlot !== null) {
+        guild = guildOrSlot;
+        slot = maybeSlot === 'thumbnail' ? 'thumbnail' : 'image';
+    } else {
+        slot = guildOrSlot === 'thumbnail' ? 'thumbnail' : 'image';
+    }
+
+    const resolved = await resolveWelcomeMediaForDiscord(rawUrl, { guild, slot });
     if (!resolved || !embed) return false;
+
+    if (resolved.mode === 'buffer') {
+        const attachName = resolved.attachmentName;
+        if (slot === 'thumbnail') {
+            embed.setThumbnail(`attachment://${attachName}`);
+        } else {
+            embed.setImage(`attachment://${attachName}`);
+        }
+        files.push(new AttachmentBuilder(resolved.buffer, { name: attachName }));
+        return true;
+    }
 
     if (resolved.mode === 'attachment') {
         if (slot === 'thumbnail') {

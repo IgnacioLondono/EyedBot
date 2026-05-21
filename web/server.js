@@ -18,6 +18,7 @@ const {
     applyWelcomeMediaToEmbed
 } = require('../src/utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
+const greetingImageStore = require('../src/utils/greeting-image-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../src/utils/welcome-card');
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
@@ -1166,14 +1167,16 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
 
     const rawImage = String(body.imageUrl ?? '').trim();
     let imageUrl = canonicalWelcomeMediaUrl(body.imageUrl);
-    if (!imageUrl && existing?.imageUrl && /^(blob:|data:)/i.test(rawImage)) {
-        imageUrl = canonicalWelcomeMediaUrl(existing.imageUrl);
+    if (!imageUrl && existing?.imageUrl) {
+        const keepExisting = !rawImage || /^(blob:|data:)/i.test(rawImage);
+        if (keepExisting) imageUrl = canonicalWelcomeMediaUrl(existing.imageUrl);
     }
 
     const rawThumb = String(body.thumbnailUrl ?? '').trim();
     let thumbnailUrl = canonicalWelcomeMediaUrl(body.thumbnailUrl);
-    if (!thumbnailUrl && existing?.thumbnailUrl && /^(blob:|data:)/i.test(rawThumb)) {
-        thumbnailUrl = canonicalWelcomeMediaUrl(existing.thumbnailUrl);
+    if (!thumbnailUrl && existing?.thumbnailUrl) {
+        const keepExisting = !rawThumb || /^(blob:|data:)/i.test(rawThumb);
+        if (keepExisting) thumbnailUrl = canonicalWelcomeMediaUrl(existing.thumbnailUrl);
     }
 
     const base = {
@@ -1221,7 +1224,7 @@ function normalizeVerifyEmojiInput(rawEmoji = '✅') {
     return { reactValue: raw, stored: raw, display: raw };
 }
 
-function buildVerifyEmbedFromConfig(cfg, guild) {
+async function buildVerifyEmbedFromConfig(cfg, guild) {
     const embed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
         .setTitle(applyGuildEmbedText(cfg.title || 'Verify', { guild }))
@@ -1229,7 +1232,7 @@ function buildVerifyEmbedFromConfig(cfg, guild) {
     if (cfg.footer) embed.setFooter({ text: applyGuildEmbedText(cfg.footer, { guild }) });
     const files = [];
     if (cfg.imageUrl) {
-        applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, 'image');
+        await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
     }
     return { embed, files };
 }
@@ -1331,7 +1334,7 @@ async function refreshVerifyPanelMessage(guildId, updatedByUserId) {
         throw e;
     }
 
-    const { embed, files } = buildVerifyEmbedFromConfig(cfg, guild);
+    const { embed, files } = await buildVerifyEmbedFromConfig(cfg, guild);
     await message.edit({
         embeds: [embed],
         files: files.length ? files : []
@@ -1509,7 +1512,7 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
             return res.status(403).json({ error: 'El bot no puede administrar ese rol (revisa jerarquía y permiso Gestionar roles)' });
         }
 
-        const { embed, files } = buildVerifyEmbedFromConfig(cfg, guild);
+        const { embed, files } = await buildVerifyEmbedFromConfig(cfg, guild);
 
         const posted = await channel.send({ embeds: [embed], files });
 
@@ -3474,6 +3477,26 @@ app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFi
     }
 });
 
+app.get('/api/guild/:guildId/greeting-image/:slot', requireAuth, async (req, res) => {
+    try {
+        const { guildId, slot } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const image = await greetingImageStore.getImage(guildId, slot);
+        if (!image?.data?.length) {
+            return res.status(404).json({ error: 'Imagen no encontrada' });
+        }
+
+        res.setHeader('Content-Type', image.mime);
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        return res.send(image.data);
+    } catch (error) {
+        console.error('Error sirviendo imagen greeting:', error);
+        res.status(500).json({ error: 'Error al cargar la imagen' });
+    }
+});
+
 app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageFile'), async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -3486,17 +3509,57 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
             return res.status(400).json({ error: 'El archivo debe ser una imagen' });
         }
 
+        const slot = greetingImageStore.normalizeSlot(req.body?.slot || 'welcome');
+        const storedDb = await greetingImageStore.setImage(guildId, slot, file.buffer, file.mimetype);
+
         const uploadsDir = ensureWelcomeUploadsDir();
         const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `welcome-${guildId}`);
         const extension = extFromMimeOrName(file.mimetype, file.originalname);
-        const fileName = `${guildId}_${Date.now()}_${baseName}${extension}`;
+        const fileName = `${guildId}_${slot}_${Date.now()}_${baseName}${extension}`;
         const outputPath = path.join(uploadsDir, fileName);
-
         fs.writeFileSync(outputPath, file.buffer);
 
-        const publicPath = `/uploads/welcome/${fileName}`;
-        const publicUrl = buildPublicUploadUrl(req, publicPath);
-        res.json({ success: true, url: publicUrl, path: publicPath, publicUrl });
+        const apiPath = greetingImageStore.buildApiPath(guildId, slot);
+        const panelUrl = `${req.protocol}://${req.get('host')}${apiPath}?t=${Date.now()}`;
+        const publicUrl = buildPublicUploadUrl(req, apiPath);
+
+        const isGoodbye = slot === 'goodbye' || slot === 'goodbye_thumb';
+        const getCfg = isGoodbye ? welcomeStore.getGoodbyeConfig : welcomeStore.getWelcomeConfig;
+        const setCfg = isGoodbye ? welcomeStore.setGoodbyeConfig : welcomeStore.setWelcomeConfig;
+        const currentCfg = (await getCfg(guildId)) || {};
+        const nextCfg = {
+            ...currentCfg,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+        if (slot.endsWith('_thumb')) {
+            nextCfg.thumbnailUrl = apiPath;
+            nextCfg.thumbnailMode = 'url';
+        } else {
+            nextCfg.imageUrl = apiPath;
+        }
+        await setCfg(guildId, nextCfg);
+        welcomeStore.invalidateConfigCache(guildId);
+
+        if (!storedDb) {
+            return res.status(500).json({
+                error: 'La imagen se guardó en disco pero no en MySQL. Revisa DB_HOST, DB_USER y DB_PASSWORD.',
+                path: apiPath,
+                url: panelUrl,
+                storedInDb: false,
+                storedOnDisk: true
+            });
+        }
+
+        res.json({
+            success: true,
+            url: panelUrl,
+            path: apiPath,
+            publicUrl,
+            storedInDb: true,
+            storedOnDisk: true,
+            config: nextCfg
+        });
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
         res.status(500).json({ error: 'Error al subir imagen de bienvenida' });
@@ -3600,8 +3663,9 @@ app.post('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => 
 
         await welcomeStore.setWelcomeConfig(guildId, config);
         await welcomeStore.setWelcomeChannelId(guildId, config.channelId);
+        welcomeStore.invalidateConfigCache(guildId);
 
-        res.json({ success: true, config });
+        res.json({ success: true, config, storedInDb: true });
     } catch (error) {
         console.error('Error guardando welcome config:', error);
         res.status(500).json({ error: 'Error al guardar configuración de bienvenida' });
@@ -3662,10 +3726,10 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (cfg?.imageUrl) applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, 'image');
+        if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-            applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, 'thumbnail');
+            await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
         }
 
         await channel.send({ content, embeds: [embed], files, allowedMentions });
@@ -3767,8 +3831,9 @@ app.post('/api/guild/:guildId/goodbye-config', requireAuth, async (req, res) => 
 
         await welcomeStore.setGoodbyeConfig(guildId, config);
         await welcomeStore.setGoodbyeChannelId(guildId, config.channelId);
+        welcomeStore.invalidateConfigCache(guildId);
 
-        res.json({ success: true, config });
+        res.json({ success: true, config, storedInDb: true });
     } catch (error) {
         console.error('Error guardando goodbye config:', error);
         res.status(500).json({ error: 'Error al guardar configuración de despedida' });
@@ -3801,10 +3866,10 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (cfg?.imageUrl) applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, 'image');
+        if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-            applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, 'thumbnail');
+            await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
         }
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;

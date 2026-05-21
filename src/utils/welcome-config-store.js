@@ -124,11 +124,18 @@ async function getWelcomeConfig(guildId) {
     return fallback;
 }
 
+function invalidateConfigCache(guildId) {
+    cache.delete(`welcomeConfig_${guildId}`);
+    cache.delete(`goodbyeConfig_${guildId}`);
+    cache.delete(`welcomeChannel_${guildId}`);
+    cache.delete(`goodbyeChannel_${guildId}`);
+}
+
 async function setWelcomeConfig(guildId, config) {
     try {
         await db.set(`welcome_config_${guildId}`, config);
-    } catch {
-        // ignore db failures and still persist locally
+    } catch (error) {
+        console.warn(`⚠️ No se pudo guardar welcome_config_${guildId} en MySQL:`, error.message);
     }
 
     const store = readStore();
@@ -201,8 +208,8 @@ async function getGoodbyeConfig(guildId) {
 async function setGoodbyeConfig(guildId, config) {
     try {
         await db.set(`goodbye_config_${guildId}`, config);
-    } catch {
-        // ignore db failures and still persist locally
+    } catch (error) {
+        console.warn(`⚠️ No se pudo guardar goodbye_config_${guildId} en MySQL:`, error.message);
     }
 
     const store = readStore();
@@ -223,5 +230,6 @@ module.exports = {
     getGoodbyeChannelId,
     setGoodbyeChannelId,
     getGoodbyeConfig,
-    setGoodbyeConfig
+    setGoodbyeConfig,
+    invalidateConfigCache
 };

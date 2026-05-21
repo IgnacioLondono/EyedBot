@@ -12163,6 +12163,12 @@ function updateWelcomeCropVisual() {
     im.src = loadSrc;
 }
 
+function getGreetingImageUploadSlot(kind = 'image') {
+    const isGoodbye = currentGreetingMode === 'goodbye';
+    if (kind === 'thumbnail') return isGoodbye ? 'goodbye_thumb' : 'welcome_thumb';
+    return isGoodbye ? 'goodbye' : 'welcome';
+}
+
 async function uploadWelcomeEditedImage(guildId, opts = {}) {
     const { suppressSuccessToast = false } = opts;
     if (!welcomeImageFile) {
@@ -12185,6 +12191,7 @@ async function uploadWelcomeEditedImage(guildId, opts = {}) {
 
         const formData = new FormData();
         formData.append('imageFile', resized, uploadName);
+        formData.append('slot', getGreetingImageUploadSlot('image'));
 
         const response = await fetchWithCredentials(`/api/guild/${guildId}/welcome-image`, {
             method: 'POST',
@@ -12192,20 +12199,30 @@ async function uploadWelcomeEditedImage(guildId, opts = {}) {
         });
 
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.url) {
+        const persisted = data.path || data.url || '';
+        if (!response.ok || !persisted) {
             showToast(data.error || 'No se pudo subir la imagen', 'error');
             return false;
         }
 
-        const persisted = data.path || data.url || '';
+        if (data.config) setCurrentGreetingConfig(currentGreetingMode, data.config);
         if (imageUrlInput) imageUrlInput.value = persisted;
-        if (status) status.textContent = 'Imagen subida y aplicada';
-        if (!suppressSuccessToast) showToast(getGreetingPanelMeta(currentGreetingMode).uploadSuccess, 'success');
+        welcomeImageFile = null;
+
+        if (data.storedInDb === false) {
+            showToast(data.error || 'Imagen en disco pero no en MySQL. Revisa la conexión a la base de datos.', 'warning');
+        } else if (status) {
+            status.textContent = 'Imagen guardada en la base de datos';
+        }
+
+        if (!suppressSuccessToast && data.storedInDb !== false) {
+            showToast(getGreetingPanelMeta(currentGreetingMode).uploadSuccess, 'success');
+        }
         welcomeCropVisualCache = { src: '', img: null };
         clearWelcomeImagePendingPreview();
         updateWelcomePreviewPanel(guildId);
         scheduleWelcomeCropVisualUpdate();
-        return true;
+        return data.storedInDb !== false;
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
         showToast('Error subiendo la imagen', 'error');
@@ -12224,18 +12241,23 @@ async function processAndUploadWelcomeStudioBackground(guildId, file) {
     const uploadName = `welcome_studio_${Date.now()}.${extension}`;
     const formData = new FormData();
     formData.append('imageFile', resized, uploadName);
+    formData.append('slot', getGreetingImageUploadSlot('image'));
 
     const response = await fetchWithCredentials(`/api/guild/${guildId}/welcome-image`, {
         method: 'POST',
         body: formData
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.url) {
+    const persisted = data.path || data.url || '';
+    if (!response.ok || !persisted) {
         throw new Error(data.error || 'No se pudo subir la imagen');
     }
+    if (data.storedInDb === false) {
+        throw new Error(data.error || 'No se pudo guardar la imagen en MySQL');
+    }
+    if (data.config) setCurrentGreetingConfig(currentGreetingMode, data.config);
 
     const imageUrlInput = document.getElementById('welcomeImageUrl');
-    const persisted = data.path || data.url || '';
     if (imageUrlInput) imageUrlInput.value = persisted;
     clearWelcomeImagePendingPreview();
     const status = document.getElementById('welcomeImageUploadStatus');

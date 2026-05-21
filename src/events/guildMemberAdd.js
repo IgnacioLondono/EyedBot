@@ -114,13 +114,13 @@ module.exports = {
             if (welcomeConfig.footer) embed.setFooter({ text: applyTemplate(welcomeConfig.footer, member) });
             const files = [];
             if (welcomeConfig.imageUrl) {
-                applyWelcomeMediaToEmbed(embed, welcomeConfig.imageUrl, files, 'image');
+                await applyWelcomeMediaToEmbed(embed, welcomeConfig.imageUrl, files, member.guild, 'image');
             }
 
             if (welcomeConfig.thumbnailMode === 'avatar') {
                 embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
             } else if (welcomeConfig.thumbnailMode === 'url' && welcomeConfig.thumbnailUrl) {
-                applyWelcomeMediaToEmbed(embed, welcomeConfig.thumbnailUrl, files, 'thumbnail');
+                await applyWelcomeMediaToEmbed(embed, welcomeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
             }
 
             await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files, allowedMentions })).catch(() => null);

@@ -31,13 +31,13 @@ module.exports = {
 
         const files = [];
         if (goodbyeConfig?.imageUrl) {
-            applyWelcomeMediaToEmbed(embed, goodbyeConfig.imageUrl, files, 'image');
+            await applyWelcomeMediaToEmbed(embed, goodbyeConfig.imageUrl, files, member.guild, 'image');
         }
 
         if (goodbyeConfig?.thumbnailMode === 'avatar') {
             embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         } else if (goodbyeConfig?.thumbnailMode === 'url' && goodbyeConfig?.thumbnailUrl) {
-            applyWelcomeMediaToEmbed(embed, goodbyeConfig.thumbnailUrl, files, 'thumbnail');
+            await applyWelcomeMediaToEmbed(embed, goodbyeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
         }
 
         await channel.send({ embeds: [embed], files }).catch(() => null);

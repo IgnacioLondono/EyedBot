@@ -74,6 +74,15 @@ const CORE_SCHEMA_STATEMENTS = [
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (guild_id, character_id),
         INDEX idx_shop_img_guild (guild_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS greeting_embed_image (
+        guild_id VARCHAR(32) NOT NULL,
+        slot VARCHAR(32) NOT NULL,
+        mime_type VARCHAR(80) NOT NULL,
+        image LONGBLOB NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (guild_id, slot),
+        INDEX idx_greeting_img_guild (guild_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 ];
 
