@@ -11406,12 +11406,12 @@ function renderGreetingPanel(guildId, channels, mode) {
                     <div class="greeting-card__head">
                         <div class="greeting-card__title-row">
                             <h4 id="greeting-section-welcome-style" class="greeting-card__title">Estilo de bienvenida</h4>
-                            <button type="button" id="welcomeOpenStudioBtn" class="btn btn-secondary wc-studio-launch-btn" style="display:none;" title="Editor visual a pantalla completa">
-                                <span class="wc-studio-launch-icon" aria-hidden="true">+</span>
-                                Editor visual
+                            <button type="button" id="welcomeOpenStudioBtn" class="btn btn-primary wc-studio-launch-btn" style="display:none;" title="Editor profesional a pantalla completa">
+                                <span class="wc-studio-launch-icon" aria-hidden="true">✦</span>
+                                Editor profesional
                             </button>
                         </div>
-                        <p class="greeting-card__hint">La bienvenida se envía como un embed clásico (sin tarjeta PNG).</p>
+                        <p class="greeting-card__hint greeting-card__hint--style" data-welcome-style-hint>La bienvenida se envía como un <strong>embed</strong> clásico de Discord (borde de color, miniatura e imagen).</p>
                     </div>
                     <div class="form-group greeting-style-field">
                         <span class="greeting-var-strip__label greeting-style-field__label">Formato del mensaje</span>
@@ -11423,11 +11423,11 @@ function renderGreetingPanel(guildId, channels, mode) {
                                     <span class="greeting-style-option__desc">Mensaje con borde de color, como en Discord</span>
                                 </span>
                             </label>
-                            <label class="greeting-style-option" style="display:none;">
+                            <label class="greeting-style-option">
                                 <input type="radio" name="welcomeStyle" value="card" ${cfg.welcomeStyle === 'card' ? 'checked' : ''}>
                                 <span class="greeting-style-option__body">
-                                    <span class="greeting-style-option__title">Tarjeta PNG</span>
-                                    <span class="greeting-style-option__desc">Imagen personalizada con textos y avatar</span>
+                                    <span class="greeting-style-option__title">Imagen con fondo</span>
+                                    <span class="greeting-style-option__desc">Tarjeta PNG 920×520 con editor visual, fuentes y colores</span>
                                 </span>
                             </label>
                         </div>
@@ -11695,10 +11695,11 @@ function renderGreetingPanel(guildId, channels, mode) {
 
     container.querySelectorAll('input[name="welcomeStyle"]').forEach((radio) => {
         radio.addEventListener('change', () => {
-            updateWelcomePreviewPanel(guildId);
+            syncWelcomeStyleUI(guildId);
             scheduleWelcomeCropVisualUpdate();
         });
     });
+    if (mode === 'welcome') syncWelcomeStyleUI(guildId);
 
     const bindWelcomeCropPreset = (btnId, apply) => {
         document.getElementById(btnId)?.addEventListener('click', () => {
@@ -11759,9 +11760,7 @@ function renderGreetingPanel(guildId, channels, mode) {
     if (testBtn) testBtn.addEventListener('click', () => sendWelcomeTest(guildId));
     const studioBtn = document.getElementById('welcomeOpenStudioBtn');
     if (studioBtn && mode === 'welcome') {
-        studioBtn.addEventListener('click', () => {
-            showToast('Editor visual deshabilitado (Tarjeta PNG no disponible).', 'warning');
-        });
+        studioBtn.addEventListener('click', () => openWelcomeCardStudio(guildId));
     }
     container.querySelector('#welcomeScrollToBg')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -11796,9 +11795,7 @@ async function loadWelcomePanel(guildId) {
         setPanelGuildTextChannels(channels);
         currentWelcomeConfig = await welcomeResponse.json();
         currentGoodbyeConfig = await goodbyeResponse.json();
-        if (typeof window.WelcomeCardStudio?.mergeCardLayout === 'function') {
-            currentWelcomeConfig.cardLayout = window.WelcomeCardStudio.mergeCardLayout(currentWelcomeConfig.cardLayout);
-        }
+        currentWelcomeConfig.cardLayout = welcomeMergeCardLayout(currentWelcomeConfig.cardLayout);
 
         clearWelcomeImagePendingPreview();
         if (welcomeCardPreviewObjectUrl) URL.revokeObjectURL(welcomeCardPreviewObjectUrl);
@@ -11849,6 +11846,74 @@ function applyWelcomePreviewTemplate(text, sample, options = {}) {
         .split(T_U).join(escapeHtml(uname))
         .split(T_S).join(escapeHtml(srv))
         .split(T_MC).join(escapeHtml(mc)));
+}
+
+function getWelcomeStyleFromForm() {
+    const checked = document.querySelector('input[name="welcomeStyle"]:checked');
+    return checked?.value === 'card' ? 'card' : 'embed';
+}
+
+function welcomeMergeCardLayout(raw) {
+    if (typeof window.WelcomeCardStudio?.mergeCardLayout === 'function') {
+        return window.WelcomeCardStudio.mergeCardLayout(raw);
+    }
+    const d = {
+        bgFocalX: 0.5,
+        bgFocalY: 0.5,
+        avatarCx: 460,
+        avatarCy: 168,
+        avatarR: 78,
+        titleX: 460,
+        titleY: 262,
+        nameX: 460,
+        nameY: 320,
+        subtitleX: 460,
+        subtitleY: 368,
+        overlayX: 892,
+        overlayY: 498
+    };
+    if (!raw || typeof raw !== 'object') return { ...d };
+    const num = (v, def, min, max) => {
+        const x = Number(v);
+        return Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : def;
+    };
+    return {
+        bgFocalX: num(raw.bgFocalX, d.bgFocalX, 0, 1),
+        bgFocalY: num(raw.bgFocalY, d.bgFocalY, 0, 1),
+        avatarCx: num(raw.avatarCx, d.avatarCx, 0, 920),
+        avatarCy: num(raw.avatarCy, d.avatarCy, 0, 520),
+        avatarR: num(raw.avatarR, d.avatarR, 36, 150),
+        titleX: num(raw.titleX, d.titleX, 0, 920),
+        titleY: num(raw.titleY, d.titleY, 0, 520),
+        nameX: num(raw.nameX, d.nameX, 0, 920),
+        nameY: num(raw.nameY, d.nameY, 0, 520),
+        subtitleX: num(raw.subtitleX, d.subtitleX, 0, 920),
+        subtitleY: num(raw.subtitleY, d.subtitleY, 0, 520),
+        overlayX: num(raw.overlayX, d.overlayX, 0, 920),
+        overlayY: num(raw.overlayY, d.overlayY, 0, 520)
+    };
+}
+
+function syncWelcomeStyleUI(guildId) {
+    const style = getWelcomeStyleFromForm();
+    const studioBtn = document.getElementById('welcomeOpenStudioBtn');
+    const cardColors = document.getElementById('welcomeCardColorFields');
+    const thumbRow = document.querySelector('#serverPaneWelcome .greeting-thumb-row');
+    const styleHint = document.querySelector('[data-welcome-style-hint]');
+    const footerField = document.getElementById('welcomeFooter')?.closest('.form-group');
+    const colorField = document.getElementById('welcomeColor')?.closest('.form-group');
+
+    if (studioBtn) studioBtn.style.display = style === 'card' ? '' : 'none';
+    if (cardColors) cardColors.style.display = style === 'card' ? '' : 'none';
+    if (thumbRow) thumbRow.style.display = style === 'card' ? 'none' : '';
+    if (footerField) footerField.style.display = style === 'card' ? 'none' : '';
+    if (colorField) colorField.style.display = style === 'card' ? 'none' : '';
+    if (styleHint) {
+        styleHint.innerHTML = style === 'card'
+            ? 'La bienvenida se envía como <strong>imagen PNG</strong> con fondo a pantalla completa. Usa el <strong>Editor profesional</strong> para posicionar avatar, textos, fuentes y colores.'
+            : 'La bienvenida se envía como un <strong>embed</strong> clásico de Discord (borde de color, miniatura e imagen).';
+    }
+    updateWelcomePreviewPanel(guildId);
 }
 
 function scheduleWelcomeCardPreview(guildId) {
@@ -11929,7 +11994,7 @@ function updateWelcomePreviewPanel(guildId) {
     const embedWrap = document.getElementById('welcomeEmbedPreviewWrap');
     const cardWrap = document.getElementById('welcomeCardPreviewWrap');
     const mode = currentGreetingMode;
-    const style = 'embed';
+    const style = mode === 'welcome' ? getWelcomeStyleFromForm() : 'embed';
 
     if (headingEmbed && headingCard) {
         if (mode === 'welcome' && style === 'card') {
@@ -12294,7 +12359,7 @@ function collectWelcomeConfigFromForm() {
         dmMessage: document.getElementById('welcomeDmMessage')?.value || ''
     };
     if (currentGreetingMode === 'welcome') {
-        base.welcomeStyle = 'embed';
+        base.welcomeStyle = getWelcomeStyleFromForm();
         base.cardAccentColor = (document.getElementById('welcomeCardAccent')?.value || '#4ade80').replace('#', '');
         base.cardTitleColor = (document.getElementById('welcomeCardTitle')?.value || '#ffffff').replace('#', '');
         base.cardNameColor = (document.getElementById('welcomeCardName')?.value || '#f8fafc').replace('#', '');
@@ -12303,11 +12368,7 @@ function collectWelcomeConfigFromForm() {
         base.cardNameTemplate = (document.getElementById('welcomeCardNameLine')?.value || '').trim() || '{username}';
         base.cardOverlayText = document.getElementById('welcomeCardOverlay')?.value || '';
         base.cardOverlayColor = (document.getElementById('welcomeCardOverlayColor')?.value || '#ffffff').replace('#', '');
-        base.cardLayout = typeof window !== 'undefined' && window.WelcomeCardStudio?.mergeCardLayout
-            ? window.WelcomeCardStudio.mergeCardLayout(currentWelcomeConfig?.cardLayout)
-            : (currentWelcomeConfig?.cardLayout && typeof currentWelcomeConfig.cardLayout === 'object'
-                ? currentWelcomeConfig.cardLayout
-                : {});
+        base.cardLayout = welcomeMergeCardLayout(currentWelcomeConfig?.cardLayout);
     }
     return base;
 }
@@ -15730,6 +15791,11 @@ function openWelcomeCardStudio(guildId) {
     if (typeof window.WelcomeCardStudio?.open !== 'function') {
         showToast('Recarga la página para cargar el editor visual.', 'warning');
         return;
+    }
+    const cardRadio = document.querySelector('input[name="welcomeStyle"][value="card"]');
+    if (cardRadio && !cardRadio.checked) {
+        cardRadio.checked = true;
+        syncWelcomeStyleUI(guildId);
     }
     saveCurrentGreetingDraft();
     currentWelcomeConfig = { ...(currentWelcomeConfig || {}) };

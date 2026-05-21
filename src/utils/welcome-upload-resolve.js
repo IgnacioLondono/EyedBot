@@ -167,11 +167,53 @@ async function applyWelcomeMediaToEmbed(embed, rawUrl, files, guildOrSlot = 'ima
     return true;
 }
 
+function greetingImageSlotForCardBackground(parsed) {
+    if (!parsed?.slot) return 'welcome';
+    if (parsed.slot === 'goodbye' || parsed.slot === 'goodbye_thumb') return 'goodbye';
+    return 'welcome';
+}
+
+/**
+ * Resuelve fondo de tarjeta PNG: archivo local, buffer MySQL o URL pública.
+ */
+async function resolveWelcomeCardBackground(imageUrl, guildId) {
+    const raw = String(imageUrl || '').trim();
+    if (!raw) return {};
+
+    const localPath = resolveWelcomeUploadFile(raw);
+    if (localPath) {
+        return { backgroundFilePath: localPath, backgroundUrl: null, backgroundBuffer: null };
+    }
+
+    const gid = String(guildId || '').trim();
+    const parsed = greetingImageStore.parseGreetingImageApiUrl(raw);
+    if (gid && parsed && parsed.guildId === gid) {
+        const slot = greetingImageSlotForCardBackground(parsed);
+        const blob = await greetingImageStore.getImage(gid, slot);
+        if (blob?.data?.length) {
+            return { backgroundFilePath: null, backgroundUrl: null, backgroundBuffer: blob.data };
+        }
+    }
+
+    const origin = getWelcomePublicOrigin();
+    const pathOnly = raw.split('?')[0];
+    if (parsed && origin && pathOnly.startsWith('/api/')) {
+        return { backgroundFilePath: null, backgroundUrl: `${origin}${pathOnly}`, backgroundBuffer: null };
+    }
+
+    if (/^https?:\/\//i.test(raw)) {
+        return { backgroundFilePath: null, backgroundUrl: raw, backgroundBuffer: null };
+    }
+
+    return {};
+}
+
 module.exports = {
     extractUploadPath,
     getWelcomePublicOrigin,
     canonicalWelcomeMediaUrl,
     resolveWelcomeUploadFile,
     resolveWelcomeMediaForDiscord,
-    applyWelcomeMediaToEmbed
+    applyWelcomeMediaToEmbed,
+    resolveWelcomeCardBackground
 };

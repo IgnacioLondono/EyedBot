@@ -15,6 +15,7 @@ const welcomeStore = require('../src/utils/welcome-config-store');
 const {
     canonicalWelcomeMediaUrl,
     resolveWelcomeUploadFile: resolveLocalUploadFile,
+    resolveWelcomeCardBackground,
     applyWelcomeMediaToEmbed
 } = require('../src/utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
@@ -1197,8 +1198,7 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
     };
 
     if (mode === 'welcome') {
-        // Forzar modo embed: deshabilitamos "Tarjeta PNG" (fondo/imagen de fondo).
-        base.welcomeStyle = 'embed';
+        base.welcomeStyle = body.welcomeStyle === 'card' ? 'card' : 'embed';
         base.cardAccentColor = sanitizeHexColor6(body.cardAccentColor, '4ade80');
         base.cardTitleColor = sanitizeHexColor6(body.cardTitleColor, 'ffffff');
         base.cardNameColor = sanitizeHexColor6(body.cardNameColor, 'f8fafc');
@@ -3440,7 +3440,6 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
         if (!config) return res.json(buildDefaultGreetingConfig('welcome', fallbackChannel));
 
         if (!config.channelId && fallbackChannel) config.channelId = fallbackChannel;
-        if (config.welcomeStyle === 'card') config.welcomeStyle = 'embed';
         res.json(config);
     } catch (error) {
         console.error('Error obteniendo welcome config:', error);
@@ -3683,7 +3682,6 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const cfg = await welcomeStore.getWelcomeConfig(guildId);
-        if (cfg && cfg.welcomeStyle === 'card') cfg.welcomeStyle = 'embed';
         const channelId = cfg?.channelId || await welcomeStore.getWelcomeChannelId(guildId);
         const channel = channelId ? guild.channels.cache.get(channelId) : null;
         if (!channel) return res.status(404).json({ error: 'Canal de bienvenida no encontrado' });
@@ -3695,11 +3693,12 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         const allowedMentions = cfg?.mentionUser ? { parse: ['users'] } : undefined;
 
         if (cfg?.welcomeStyle === 'card') {
-            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
+            const bg = await resolveWelcomeCardBackground(cfg.imageUrl, guildId);
             const buffer = await renderWelcomeCardPng({
                 avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
-                backgroundUrl: localImagePath ? null : cfg.imageUrl,
-                backgroundFilePath: localImagePath,
+                backgroundUrl: bg.backgroundUrl || null,
+                backgroundFilePath: bg.backgroundFilePath || null,
+                backgroundBuffer: bg.backgroundBuffer || null,
                 headline: applyWelcomeTemplate(cfg.title || '¡Bienvenido!', member),
                 displayName: applyWelcomeTemplate(cfg.cardNameTemplate || '{username}', member),
                 subtitle: applyWelcomeTemplate(cfg.message || '¡Hola {user}!', member),
@@ -3743,7 +3742,6 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
 
 app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, res) => {
     try {
-        return res.status(404).json({ error: 'Editor visual y "Tarjeta PNG" deshabilitados.' });
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
@@ -3763,7 +3761,7 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
         const plainUser = member ? member.user.username : (req.session.user?.username || 'Usuario');
         const nameTpl = String(body.cardNameTemplate != null ? body.cardNameTemplate : '{username}').trim() || '{username}';
 
-        const localImagePath = resolveLocalUploadFile(body.imageUrl);
+        const bg = await resolveWelcomeCardBackground(body.imageUrl, guildId);
         const titleRaw = String(body.title != null ? body.title : '').trim();
         const messageRaw = String(body.message != null ? body.message : '').trim();
         const subtitleTpl =
@@ -3771,8 +3769,9 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
 
         const buffer = await renderWelcomeCardPng({
             avatarUrl,
-            backgroundUrl: localImagePath ? null : String(body.imageUrl || ''),
-            backgroundFilePath: localImagePath,
+            backgroundUrl: bg.backgroundUrl || null,
+            backgroundFilePath: bg.backgroundFilePath || null,
+            backgroundBuffer: bg.backgroundBuffer || null,
             headline: applyWelcomeTemplate(titleRaw || '¡Bienvenido!', tplMember),
             displayName: applyWelcomeTemplate(nameTpl, tplMember),
             subtitle: applyWelcomeTemplate(subtitleTpl, tplMember),

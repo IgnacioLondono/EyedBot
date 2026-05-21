@@ -6112,6 +6112,24 @@ mark.receipt-highlight {
     padding-top: 1rem;
     border-top: 1px solid color-mix(in srgb, var(--pane-accent) 16%, rgba(var(--border-rgb, 190, 155, 255), 0.12));
 }
+#serverPaneWelcome .greeting-card__title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 1rem;
+}
+#serverPaneWelcome .wc-studio-launch-btn {
+    margin-left: auto;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--pane-accent) 35%, transparent);
+}
+#serverPaneWelcome .welcome-card-preview-img {
+    max-width: 100%;
+    width: min(100%, 460px);
+    height: auto;
+    border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
 #serverPaneWelcome .greeting-toggle-row {
     display: grid !important;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

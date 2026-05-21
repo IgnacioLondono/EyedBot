@@ -1,7 +1,7 @@
 const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
-const { resolveWelcomeUploadFile, applyWelcomeMediaToEmbed } = require('../utils/welcome-upload-resolve');
+const { applyWelcomeMediaToEmbed, resolveWelcomeCardBackground } = require('../utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../utils/embed-text-template');
 const { AttachmentBuilder } = require('discord.js');
 
@@ -53,17 +53,17 @@ module.exports = {
             const allowedMentions = welcomeConfig.mentionUser
                 ? { parse: ['users'] }
                 : { parse: [], users: [], roles: [], repliedUser: false };
-            // Deshabilitar el modo tarjeta (PNG con "fondo/imagen de fondo").
-            const welcomeStyle = welcomeConfig.welcomeStyle === 'card' ? 'embed' : welcomeConfig.welcomeStyle;
+            const welcomeStyle = welcomeConfig.welcomeStyle === 'card' ? 'card' : 'embed';
 
             if (welcomeStyle === 'card') {
                 let buffer;
                 try {
-                    const localImagePath = resolveWelcomeUploadFile(welcomeConfig.imageUrl);
+                    const bg = await resolveWelcomeCardBackground(welcomeConfig.imageUrl, member.guild.id);
                     buffer = await renderWelcomeCardPng({
                         avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
-                        backgroundUrl: localImagePath ? null : welcomeConfig.imageUrl,
-                        backgroundFilePath: localImagePath,
+                        backgroundUrl: bg.backgroundUrl || null,
+                        backgroundFilePath: bg.backgroundFilePath || null,
+                        backgroundBuffer: bg.backgroundBuffer || null,
                         headline: applyTemplate(welcomeConfig.title || '¡Bienvenido!', member),
                         displayName: applyTemplate(
                             welcomeConfig.cardNameTemplate || '{username}',

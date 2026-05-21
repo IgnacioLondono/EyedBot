@@ -109,8 +109,11 @@ function canvasSafeLine(text, usernameFallback = 'usuario') {
     return s;
 }
 
-async function loadBackgroundImage(backgroundUrl, backgroundFilePath) {
+async function loadBackgroundImage(backgroundUrl, backgroundFilePath, backgroundBuffer) {
     try {
+        if (backgroundBuffer && Buffer.isBuffer(backgroundBuffer) && backgroundBuffer.length > 0) {
+            return await loadImage(backgroundBuffer);
+        }
         if (backgroundFilePath && fs.existsSync(backgroundFilePath)) {
             return await loadImage(backgroundFilePath);
         }
@@ -319,7 +322,7 @@ async function renderWelcomeCardPng(opts = {}) {
     roundRectPath(ctx, 0, 0, W, H, 24);
     ctx.clip();
 
-    const bgImg = await loadBackgroundImage(opts.backgroundUrl, opts.backgroundFilePath);
+    const bgImg = await loadBackgroundImage(opts.backgroundUrl, opts.backgroundFilePath, opts.backgroundBuffer);
     if (!bgImg) {
         drawBackgroundGradient(ctx);
     } else {
