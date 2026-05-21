@@ -70,6 +70,63 @@
     let activeTool = 'select';
     let selectedLayer = null;
     let canvasUserZoomPct = 100;
+    let rightPanelTab = 'layers';
+    let snapEnabled = true;
+    let showGrid = false;
+    let showSafeZone = true;
+    const layerHidden = new Set();
+    const layerLocked = new Set();
+    let historyPast = [];
+    let historyFuture = [];
+    const HISTORY_MAX = 48;
+    let historyDragSnapshot = null;
+
+    const LAYER_ORDER = ['overlay', 'subtitle', 'name', 'title', 'avatar'];
+    const LAYER_ICONS = { avatar: '👤', title: 'T', name: 'N', subtitle: 'S', overlay: '◇' };
+
+    const LAYOUT_PRESETS = {
+        classic: {
+            label: 'Centrado clásico',
+            layout: { ...DEFAULT_LAYOUT }
+        },
+        hero: {
+            label: 'Avatar destacado',
+            layout: {
+                ...DEFAULT_LAYOUT,
+                avatarCy: 140,
+                titleY: 248,
+                nameY: 312,
+                subtitleY: 368
+            }
+        },
+        lower: {
+            label: 'Textos abajo',
+            layout: {
+                ...DEFAULT_LAYOUT,
+                avatarCy: 120,
+                titleY: 300,
+                nameY: 352,
+                subtitleY: 400,
+                bgFocalY: 0.35
+            }
+        },
+        corner: {
+            label: 'Esquina dinámica',
+            layout: {
+                ...DEFAULT_LAYOUT,
+                avatarCx: 180,
+                avatarCy: 160,
+                titleX: 520,
+                titleY: 200,
+                nameX: 520,
+                nameY: 268,
+                subtitleX: 520,
+                subtitleY: 330,
+                overlayX: 880,
+                overlayY: 480
+            }
+        }
+    };
 
     function applyCanvasUserZoom() {
         if (rootEl) rootEl.style.setProperty('--wc-user-zoom', String(canvasUserZoomPct / 100));
@@ -90,9 +147,132 @@
         menu.innerHTML = '';
     }
 
+    function recordHistoryBeforeChange() {
+        historyPast.push(JSON.stringify(layout));
+        if (historyPast.length > HISTORY_MAX) historyPast.shift();
+        historyFuture = [];
+        updateHistoryButtons();
+    }
+
+    function undoHistory() {
+        if (!historyPast.length) {
+            toast('No hay más pasos para deshacer', 'warning');
+            return;
+        }
+        historyFuture.push(JSON.stringify(layout));
+        layout = mergeCardLayout(JSON.parse(historyPast.pop()));
+        syncDomFromLayout({ skipHistory: true });
+        renderRightPanel();
+        updateHistoryButtons();
+        toast('Deshecho', 'success');
+    }
+
+    function redoHistory() {
+        if (!historyFuture.length) {
+            toast('No hay más pasos para rehacer', 'warning');
+            return;
+        }
+        historyPast.push(JSON.stringify(layout));
+        layout = mergeCardLayout(JSON.parse(historyFuture.pop()));
+        syncDomFromLayout({ skipHistory: true });
+        renderRightPanel();
+        updateHistoryButtons();
+        toast('Rehecho', 'success');
+    }
+
+    function updateHistoryButtons() {
+        const undoBtn = rootEl?.querySelector('#wcStudioUndo');
+        const redoBtn = rootEl?.querySelector('#wcStudioRedo');
+        if (undoBtn) undoBtn.disabled = historyPast.length === 0;
+        if (redoBtn) redoBtn.disabled = historyFuture.length === 0;
+    }
+
+    function resetHistory() {
+        historyPast = [];
+        historyFuture = [];
+        updateHistoryButtons();
+    }
+
+    function applyLayoutPreset(key) {
+        const preset = LAYOUT_PRESETS[key];
+        if (!preset) return;
+        recordHistoryBeforeChange();
+        layout = mergeCardLayout(preset.layout);
+        syncDomFromLayout({ skipHistory: true });
+        renderRightPanel();
+        toast(`Plantilla «${preset.label}» aplicada`, 'success');
+    }
+
+    function updateStatusBar() {
+        const el = rootEl?.querySelector('#wcStudioStatus');
+        if (!el) return;
+        const layerLabel = selectedLayer ? LAYER_LABELS[selectedLayer] || selectedLayer : 'Ninguna';
+        const toolNames = { select: 'Selección', avatar: 'Avatar', bg: 'Fondo' };
+        el.innerHTML = `
+            <span>Herramienta: <strong>${toolNames[activeTool] || activeTool}</strong></span>
+            <span>Capa: <strong>${layerLabel}</strong></span>
+            <span>Encuadre: <strong>${Math.round(layout.bgFocalX * 100)}% · ${Math.round(layout.bgFocalY * 100)}%</strong></span>
+            <span>Zoom: <strong>${canvasUserZoomPct}%</strong></span>
+        `;
+    }
+
+    function updateOverlayToggles() {
+        rootEl?.querySelector('#wcToggleGrid')?.classList.toggle('is-on', showGrid);
+        rootEl?.querySelector('#wcToggleSafe')?.classList.toggle('is-on', showSafeZone);
+        rootEl?.querySelector('#wcToggleSnap')?.classList.toggle('is-on', snapEnabled);
+        rootEl?.querySelector('#wcStudioGrid')?.classList.toggle('is-visible', showGrid);
+        rootEl?.querySelector('#wcStudioSafe')?.classList.toggle('is-visible', showSafeZone);
+    }
+
     function studioKeyHandler(ev) {
-        if (ev.key !== 'Escape') return;
         if (!rootEl?.classList.contains('is-open')) return;
+
+        const mod = ev.ctrlKey || ev.metaKey;
+        if (mod && ev.key.toLowerCase() === 'z' && !ev.shiftKey) {
+            ev.preventDefault();
+            undoHistory();
+            return;
+        }
+        if (mod && (ev.key.toLowerCase() === 'y' || (ev.key.toLowerCase() === 'z' && ev.shiftKey))) {
+            ev.preventDefault();
+            redoHistory();
+            return;
+        }
+        if (mod && ev.key.toLowerCase() === 's') {
+            ev.preventDefault();
+            saveAndClose();
+            return;
+        }
+
+        if (selectedLayer && !editingTextLayer && !ev.target.closest('input, textarea, select, [contenteditable="true"]')) {
+            const step = ev.shiftKey ? 10 : 1;
+            if (ev.key === 'ArrowLeft') {
+                ev.preventDefault();
+                recordHistoryBeforeChange();
+                nudgeLayer(selectedLayer, -step, 0);
+                return;
+            }
+            if (ev.key === 'ArrowRight') {
+                ev.preventDefault();
+                recordHistoryBeforeChange();
+                nudgeLayer(selectedLayer, step, 0);
+                return;
+            }
+            if (ev.key === 'ArrowUp') {
+                ev.preventDefault();
+                recordHistoryBeforeChange();
+                nudgeLayer(selectedLayer, 0, -step);
+                return;
+            }
+            if (ev.key === 'ArrowDown') {
+                ev.preventDefault();
+                recordHistoryBeforeChange();
+                nudgeLayer(selectedLayer, 0, step);
+                return;
+            }
+        }
+
+        if (ev.key !== 'Escape') return;
         const tfm = rootEl.querySelector('#wcTextFormatMenu');
         if (tfm && !tfm.hidden) {
             hideTextFormatMenu();
@@ -346,10 +526,17 @@
 
     function setActiveTool(tool) {
         activeTool = tool || 'select';
-        rootEl?.querySelectorAll('.wc-studio__tool').forEach((b) => {
+        rootEl?.querySelectorAll('.wc-studio__tool[data-tool]').forEach((b) => {
             b.classList.toggle('is-active', b.dataset.tool === activeTool);
         });
-        renderSidebar();
+        if (activeTool === 'bg' || activeTool === 'avatar') {
+            rightPanelTab = 'adjust';
+            rootEl?.querySelectorAll('.wc-studio__panel-tab').forEach((t) => {
+                t.classList.toggle('is-active', t.dataset.panelTab === rightPanelTab);
+            });
+        }
+        renderRightPanel();
+        updateStatusBar();
     }
 
     function resetLayerToDefault(key) {
@@ -439,7 +626,7 @@
         layout.bgFocalX = clamp(Number(fx) || 0.5, 0, 1);
         layout.bgFocalY = clamp(Number(fy) || 0.5, 0, 1);
         syncDomFromLayout();
-        renderSidebar();
+        renderRightPanel();
     }
 
     function flashCenterGuides() {
@@ -464,7 +651,7 @@
             const parsed = JSON.parse(raw);
             layout = mergeCardLayout(parsed);
             syncDomFromLayout();
-            renderSidebar();
+            renderRightPanel();
             toast('Posiciones pegadas desde JSON', 'success');
         } catch {
             toast('Portapapeles vacío o JSON inválido', 'error');
@@ -643,7 +830,7 @@
                 if (Number.isFinite(r)) {
                     layout.avatarR = clamp(r, 36, 150);
                     syncDomFromLayout();
-                    renderSidebar();
+                    renderRightPanel();
                     toast(`Radio del avatar: ${Math.round(layout.avatarR)} px`, 'success');
                 }
                 break;
@@ -657,7 +844,7 @@
                 if (Number.isFinite(z)) {
                     canvasUserZoomPct = clamp(z, 55, 130);
                     applyCanvasUserZoom();
-                    renderSidebar();
+                    renderRightPanel();
                 }
                 break;
             }
@@ -683,7 +870,7 @@
                 applyCanvasUserZoom();
                 syncDomFromLayout();
                 clearGuides();
-                renderSidebar();
+                renderRightPanel();
                 toast('Diseño restablecido', 'success');
                 break;
             case 'save-design':
@@ -699,7 +886,7 @@
 
     function onStudioContextMenu(ev) {
         if (!rootEl?.classList.contains('is-open')) return;
-        if (ev.target.closest('#wcStudioSidebar')) return;
+        if (ev.target.closest('#wcStudioPanel')) return;
         if (ev.target.closest('#wcContextMenu')) return;
         if (ev.target.closest('#wcTextFormatMenu')) return;
         const editLayer = ev.target.closest('.wc-layer--editing');
@@ -764,16 +951,25 @@
         rootEl.setAttribute('aria-hidden', 'true');
         rootEl.innerHTML = `
             <header class="wc-studio__topbar">
-                <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioClose" aria-label="Cerrar editor">← Volver</button>
-                <div class="wc-studio__titlewrap">
-                    <h2 class="wc-studio__title">Editor de tarjeta</h2>
-                    <p class="wc-studio__subtitle">920×520 · Doble clic para editar · Clic derecho con selección: color del fragmento · Variables {user} {username} {server} {memberCount}</p>
+                <div class="wc-studio__brand">
+                    <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioClose" aria-label="Cerrar editor">← Volver</button>
+                    <div class="wc-studio__logo" aria-hidden="true">WC</div>
+                    <div class="wc-studio__titlewrap">
+                        <h2 class="wc-studio__title">Studio de bienvenida</h2>
+                        <p class="wc-studio__subtitle">Tarjeta 920×520 · Editor profesional</p>
+                    </div>
                 </div>
-                <div class="wc-studio__actions wc-studio__actions--grow">
+                <div class="wc-studio__top-center">
+                    <span class="wc-studio__chip">Lienzo <strong>${W}×${H}</strong></span>
+                    <span class="wc-studio__chip">Variables <strong>{user}</strong> <strong>{server}</strong></span>
+                </div>
+                <div class="wc-studio__actions">
+                    <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioUndo" title="Deshacer (Ctrl+Z)" disabled>↶</button>
+                    <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioRedo" title="Rehacer (Ctrl+Y)" disabled>↷</button>
                     <input type="file" id="wcStudioBgFile" accept="image/*" class="wc-studio__file-input" aria-hidden="true" tabindex="-1">
-                    <button type="button" class="wc-studio__btn wc-studio__btn--accent" id="wcStudioUploadBg" title="Redimensiona, optimiza y sube el fondo">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        Subir fondo
+                    <button type="button" class="wc-studio__btn wc-studio__btn--accent" id="wcStudioUploadBg" title="Subir imagen de fondo">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Fondo
                     </button>
                     <span class="wc-studio__upload-status" id="wcStudioUploadStatus" aria-live="polite"></span>
                     <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioReset">Restablecer</button>
@@ -782,42 +978,74 @@
             </header>
             <div class="wc-studio__body">
                 <aside class="wc-studio__toolbar" aria-label="Herramientas">
-                    <button type="button" class="wc-studio__tool is-active" data-tool="select" title="Seleccionar y mover">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
-                    </button>
-                    <button type="button" class="wc-studio__tool" data-tool="avatar" title="Foto de perfil">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
-                    </button>
-                    <button type="button" class="wc-studio__tool" data-tool="bg" title="Encuadre del fondo">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                    </button>
+                    <div class="wc-studio__toolbar-group">
+                        <span class="wc-studio__toolbar-label">Herramientas</span>
+                        <button type="button" class="wc-studio__tool is-active" data-tool="select" title="Seleccionar (V)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+                        </button>
+                        <button type="button" class="wc-studio__tool" data-tool="avatar" title="Avatar">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
+                        </button>
+                        <button type="button" class="wc-studio__tool" data-tool="bg" title="Encuadre fondo">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        </button>
+                    </div>
+                    <div class="wc-studio__toolbar-divider"></div>
+                    <div class="wc-studio__toolbar-group">
+                        <span class="wc-studio__toolbar-label">Alinear</span>
+                        <button type="button" class="wc-studio__tool" data-action="align-texts-x" title="Centrar textos">≡</button>
+                        <button type="button" class="wc-studio__tool" data-action="mirror-h" title="Espejo horizontal">⇋</button>
+                    </div>
                 </aside>
-                <div class="wc-studio__canvas-wrap">
-                    <div class="wc-studio__zoom-outer" id="wcStudioZoomOuter">
-                        <div class="wc-studio__canvas-scaler">
-                        <div class="wc-studio__stage" id="wcStudioStage" style="width:${W}px;height:${H}px;">
-                            <div class="wc-stage-bg" id="wcStageBg"></div>
-                            <div class="wc-stage-vignette" aria-hidden="true"></div>
-                            <div class="wc-layer wc-layer--avatar" id="wcLayerAvatar" data-drag="avatar" tabindex="0" role="button" aria-label="Avatar — arrastra para mover">
-                                <div class="wc-avatar-ring" id="wcAvatarRing"></div>
-                                <img class="wc-avatar-img" id="wcAvatarImg" alt="" width="160" height="160" draggable="false" />
-                            </div>
-                            <div class="wc-layer wc-layer--text wc-layer--title" id="wcLayerTitle" data-drag="title" tabindex="0"></div>
-                            <div class="wc-layer wc-layer--text wc-layer--name" id="wcLayerName" data-drag="name" tabindex="0"></div>
-                            <div class="wc-layer wc-layer--text wc-layer--subtitle" id="wcLayerSubtitle" data-drag="subtitle" tabindex="0"></div>
-                            <div class="wc-layer wc-layer--text wc-layer--overlay" id="wcLayerOverlay" data-drag="overlay" tabindex="0"></div>
-                            <svg class="wc-studio-guides" id="wcStudioGuides" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false"></svg>
+                <div class="wc-studio__workspace">
+                    <div class="wc-studio__canvas-toolbar">
+                        <div class="wc-studio__canvas-tools">
+                            <label class="wc-studio__toggle is-on" id="wcToggleSnap"><input type="checkbox" checked> Snap</label>
+                            <label class="wc-studio__toggle" id="wcToggleGrid"><input type="checkbox"> Cuadrícula</label>
+                            <label class="wc-studio__toggle is-on" id="wcToggleSafe"><input type="checkbox" checked> Zona segura</label>
                         </div>
+                        <div class="wc-studio__zoom-pills" role="group" aria-label="Zoom">
+                            <button type="button" class="wc-studio__zoom-pill" data-zoom="70">70%</button>
+                            <button type="button" class="wc-studio__zoom-pill" data-zoom="85">85%</button>
+                            <button type="button" class="wc-studio__zoom-pill is-active" data-zoom="100">100%</button>
+                            <button type="button" class="wc-studio__zoom-pill" data-zoom="115">115%</button>
+                        </div>
+                    </div>
+                    <div class="wc-studio__canvas-wrap">
+                        <div class="wc-studio__zoom-outer" id="wcStudioZoomOuter">
+                            <div class="wc-studio__canvas-scaler">
+                                <div class="wc-studio__stage" id="wcStudioStage" style="width:${W}px;height:${H}px;">
+                                    <div class="wc-stage-bg" id="wcStageBg"></div>
+                                    <div class="wc-studio__grid-overlay" id="wcStudioGrid" aria-hidden="true"></div>
+                                    <div class="wc-studio__safe-overlay is-visible" id="wcStudioSafe" aria-hidden="true"></div>
+                                    <div class="wc-stage-vignette" aria-hidden="true"></div>
+                                    <div class="wc-layer wc-layer--avatar" id="wcLayerAvatar" data-drag="avatar" tabindex="0" role="button" aria-label="Avatar">
+                                        <div class="wc-avatar-ring" id="wcAvatarRing"></div>
+                                        <img class="wc-avatar-img" id="wcAvatarImg" alt="" width="160" height="160" draggable="false" />
+                                    </div>
+                                    <div class="wc-layer wc-layer--text wc-layer--title" id="wcLayerTitle" data-drag="title" tabindex="0"></div>
+                                    <div class="wc-layer wc-layer--text wc-layer--name" id="wcLayerName" data-drag="name" tabindex="0"></div>
+                                    <div class="wc-layer wc-layer--text wc-layer--subtitle" id="wcLayerSubtitle" data-drag="subtitle" tabindex="0"></div>
+                                    <div class="wc-layer wc-layer--text wc-layer--overlay" id="wcLayerOverlay" data-drag="overlay" tabindex="0"></div>
+                                    <svg class="wc-studio-guides" id="wcStudioGuides" viewBox="0 0 ${W} ${H}" aria-hidden="true"></svg>
+                                    <div class="wc-studio__stage-frame" aria-hidden="true"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <aside class="wc-studio__sidebar" id="wcStudioSidebar">
-                    <h3 class="wc-studio__side-title">Propiedades</h3>
-                    <div id="wcStudioSideContent" class="wc-studio__side-content"></div>
+                <aside class="wc-studio__panel" id="wcStudioPanel">
+                    <div class="wc-studio__panel-tabs" role="tablist">
+                        <button type="button" class="wc-studio__panel-tab is-active" data-panel-tab="layers" role="tab">Capas</button>
+                        <button type="button" class="wc-studio__panel-tab" data-panel-tab="design" role="tab">Diseño</button>
+                        <button type="button" class="wc-studio__panel-tab" data-panel-tab="adjust" role="tab">Ajustes</button>
+                    </div>
+                    <div class="wc-studio__panel-body" id="wcStudioPanelBody"></div>
                 </aside>
             </div>
-            <div id="wcContextMenu" class="wc-ctx" role="menu" aria-label="Menú contextual del editor" hidden tabindex="-1"></div>
-            <div id="wcTextFormatMenu" class="wc-txtfmt" role="menu" aria-label="Formato de texto" hidden tabindex="-1"></div>
+            <footer class="wc-studio__statusbar" id="wcStudioStatus" aria-live="polite"></footer>
+            <div id="wcContextMenu" class="wc-ctx" role="menu" hidden tabindex="-1"></div>
+            <div id="wcTextFormatMenu" class="wc-txtfmt" role="menu" hidden tabindex="-1"></div>
         `;
         document.body.appendChild(rootEl);
         applyCanvasUserZoom();
@@ -855,6 +1083,7 @@
     }
 
     function snapScalar(val, targets) {
+        if (!snapEnabled) return { value: val, hit: null };
         let best = val;
         let hit = null;
         for (const t of targets) {
@@ -905,27 +1134,131 @@
     function setSelectedLayer(key) {
         selectedLayer = key;
         rootEl?.querySelectorAll('.wc-layer').forEach((el) => {
-            el.classList.toggle('wc-layer--selected', key != null && el.dataset.drag === key);
+            const k = el.dataset.drag;
+            el.classList.toggle('wc-layer--selected', key != null && k === key);
+            el.classList.toggle('wc-layer--hidden', layerHidden.has(k));
+            el.classList.toggle('wc-layer--locked', layerLocked.has(k));
         });
+        renderLayersList();
+        renderPropertiesInspector();
+        updateStatusBar();
+    }
+
+    function toggleLayerVisibility(key) {
+        if (layerHidden.has(key)) layerHidden.delete(key);
+        else layerHidden.add(key);
+        setSelectedLayer(selectedLayer);
+    }
+
+    function toggleLayerLock(key) {
+        if (layerLocked.has(key)) layerLocked.delete(key);
+        else layerLocked.add(key);
+        setSelectedLayer(selectedLayer);
+    }
+
+    function setLayerPositionFromInputs(key, x, y) {
+        if (!key || layerLocked.has(key)) return;
+        recordHistoryBeforeChange();
+        if (key === 'avatar') {
+            layout.avatarCx = clamp(x, layout.avatarR + 8, W - layout.avatarR - 8);
+            layout.avatarCy = clamp(y, layout.avatarR + 8, H - layout.avatarR - 8);
+        } else if (key === 'title') {
+            layout.titleX = clamp(x, 40, W - 40);
+            layout.titleY = clamp(y, 16, H - 100);
+        } else if (key === 'name') {
+            layout.nameX = clamp(x, 40, W - 40);
+            layout.nameY = clamp(y, 16, H - 80);
+        } else if (key === 'subtitle') {
+            layout.subtitleX = clamp(x, 40, W - 40);
+            layout.subtitleY = clamp(y, 16, H - 36);
+        } else if (key === 'overlay') {
+            layout.overlayX = clamp(x, 48, W - 4);
+            layout.overlayY = clamp(y, 18, H - 4);
+        }
+        syncDomFromLayout({ skipHistory: true });
+        renderPropertiesInspector();
     }
 
     function bindChrome() {
         rootEl.querySelector('#wcStudioClose')?.addEventListener('click', close);
         rootEl.querySelector('#wcStudioSave')?.addEventListener('click', saveAndClose);
+        rootEl.querySelector('#wcStudioUndo')?.addEventListener('click', undoHistory);
+        rootEl.querySelector('#wcStudioRedo')?.addEventListener('click', redoHistory);
         rootEl.querySelector('#wcStudioReset')?.addEventListener('click', () => {
+            recordHistoryBeforeChange();
             layout = { ...DEFAULT_LAYOUT };
             canvasUserZoomPct = 100;
             applyCanvasUserZoom();
-            syncDomFromLayout();
+            syncDomFromLayout({ skipHistory: true });
             clearGuides();
-            renderSidebar();
+            renderRightPanel();
+            updateZoomPills();
             toast('Posiciones por defecto', 'success');
         });
-        rootEl.querySelectorAll('.wc-studio__tool').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                activeTool = btn.dataset.tool || 'select';
-                rootEl.querySelectorAll('.wc-studio__tool').forEach((b) => b.classList.toggle('is-active', b === btn));
-                renderSidebar();
+        rootEl.querySelectorAll('.wc-studio__tool[data-tool]').forEach((btn) => {
+            btn.addEventListener('click', () => setActiveTool(btn.dataset.tool || 'select'));
+        });
+        rootEl.querySelector('[data-action="align-texts-x"]')?.addEventListener('click', () => {
+            recordHistoryBeforeChange();
+            centerTextsX();
+        });
+        rootEl.querySelector('[data-action="mirror-h"]')?.addEventListener('click', () => {
+            recordHistoryBeforeChange();
+            mirrorLayoutHorizontal();
+        });
+
+        rootEl.querySelector('#wcToggleSnap')?.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            snapEnabled = !snapEnabled;
+            const inp = rootEl.querySelector('#wcToggleSnap input');
+            if (inp) inp.checked = snapEnabled;
+            updateOverlayToggles();
+        });
+        rootEl.querySelector('#wcToggleSnap input')?.addEventListener('change', (e) => {
+            snapEnabled = e.target.checked;
+            updateOverlayToggles();
+        });
+        rootEl.querySelector('#wcToggleGrid')?.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            showGrid = !showGrid;
+            const inp = rootEl.querySelector('#wcToggleGrid input');
+            if (inp) inp.checked = showGrid;
+            updateOverlayToggles();
+        });
+        rootEl.querySelector('#wcToggleGrid input')?.addEventListener('change', (e) => {
+            showGrid = e.target.checked;
+            updateOverlayToggles();
+        });
+        rootEl.querySelector('#wcToggleSafe')?.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            showSafeZone = !showSafeZone;
+            const inp = rootEl.querySelector('#wcToggleSafe input');
+            if (inp) inp.checked = showSafeZone;
+            updateOverlayToggles();
+        });
+        rootEl.querySelector('#wcToggleSafe input')?.addEventListener('change', (e) => {
+            showSafeZone = e.target.checked;
+            updateOverlayToggles();
+        });
+
+        rootEl.querySelectorAll('.wc-studio__zoom-pill').forEach((pill) => {
+            pill.addEventListener('click', () => {
+                const z = Number(pill.dataset.zoom);
+                if (!Number.isFinite(z)) return;
+                canvasUserZoomPct = clamp(z, 55, 130);
+                applyCanvasUserZoom();
+                updateZoomPills();
+                updateStatusBar();
+            });
+        });
+
+        rootEl.querySelectorAll('.wc-studio__panel-tab').forEach((tab) => {
+            tab.addEventListener('click', () => {
+                rightPanelTab = tab.dataset.panelTab || 'layers';
+                rootEl.querySelectorAll('.wc-studio__panel-tab').forEach((t) => {
+                    t.classList.toggle('is-active', t.dataset.panelTab === rightPanelTab);
+                });
+                renderRightPanel();
             });
         });
 
@@ -941,6 +1274,214 @@
         const uploadBtn = rootEl.querySelector('#wcStudioUploadBg');
         uploadBtn?.addEventListener('click', () => fileInput?.click());
         fileInput?.addEventListener('change', onBackgroundFileSelected);
+        updateOverlayToggles();
+    }
+
+    function updateZoomPills() {
+        rootEl?.querySelectorAll('.wc-studio__zoom-pill').forEach((pill) => {
+            pill.classList.toggle('is-active', Number(pill.dataset.zoom) === canvasUserZoomPct);
+        });
+    }
+
+    function getLayerCoords(key) {
+        if (key === 'avatar') return { x: layout.avatarCx, y: layout.avatarCy };
+        if (key === 'title') return { x: layout.titleX, y: layout.titleY };
+        if (key === 'name') return { x: layout.nameX, y: layout.nameY };
+        if (key === 'subtitle') return { x: layout.subtitleX, y: layout.subtitleY };
+        if (key === 'overlay') return { x: layout.overlayX, y: layout.overlayY };
+        return { x: 0, y: 0 };
+    }
+
+    function renderLayersList() {
+        const host = rootEl?.querySelector('#wcStudioLayersList');
+        if (!host) return;
+        host.innerHTML = LAYER_ORDER.map((key) => {
+            const selected = selectedLayer === key;
+            const hidden = layerHidden.has(key);
+            const locked = layerLocked.has(key);
+            return `
+                <li class="wc-studio__layer-item${selected ? ' is-selected' : ''}" data-layer-pick="${key}">
+                    <span class="wc-studio__layer-icon">${LAYER_ICONS[key] || '·'}</span>
+                    <span class="wc-studio__layer-name">${LAYER_LABELS[key] || key}</span>
+                    <button type="button" class="wc-studio__layer-mini${hidden ? ' is-off' : ''}" data-layer-vis="${key}" title="Mostrar/ocultar">${hidden ? '○' : '●'}</button>
+                    <button type="button" class="wc-studio__layer-mini${locked ? '' : ' is-off'}" data-layer-lock="${key}" title="Bloquear">${locked ? '🔒' : '🔓'}</button>
+                </li>
+            `;
+        }).join('');
+
+        host.querySelectorAll('[data-layer-pick]').forEach((row) => {
+            row.addEventListener('click', (ev) => {
+                if (ev.target.closest('[data-layer-vis],[data-layer-lock]')) return;
+                setSelectedLayer(row.dataset.layerPick);
+                setActiveTool(row.dataset.layerPick === 'avatar' ? 'avatar' : 'select');
+            });
+        });
+        host.querySelectorAll('[data-layer-vis]').forEach((btn) => {
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                toggleLayerVisibility(btn.dataset.layerVis);
+            });
+        });
+        host.querySelectorAll('[data-layer-lock]').forEach((btn) => {
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                toggleLayerLock(btn.dataset.layerLock);
+            });
+        });
+    }
+
+    function renderPropertiesInspector() {
+        const box = rootEl?.querySelector('#wcStudioProps');
+        if (!box) return;
+        if (!selectedLayer) {
+            box.innerHTML = '<p class="wc-studio__hint">Selecciona una capa en la lista para editar posición exacta (px).</p>';
+            return;
+        }
+        const c = getLayerCoords(selectedLayer);
+        const locked = layerLocked.has(selectedLayer);
+        box.innerHTML = `
+            <div class="wc-studio__props-grid">
+                <div class="wc-studio__field">
+                    <label class="wc-studio__label">Posición X</label>
+                    <input type="number" class="wc-studio__input" id="wcPropX" min="0" max="${W}" value="${Math.round(c.x)}" ${locked ? 'disabled' : ''}>
+                </div>
+                <div class="wc-studio__field">
+                    <label class="wc-studio__label">Posición Y</label>
+                    <input type="number" class="wc-studio__input" id="wcPropY" min="0" max="${H}" value="${Math.round(c.y)}" ${locked ? 'disabled' : ''}>
+                </div>
+            </div>
+            ${selectedLayer === 'avatar' ? `
+                <label class="wc-studio__label" style="margin-top:0.65rem">Radio avatar (${Math.round(layout.avatarR)} px)</label>
+                <input type="range" id="wcPropAvatarR" min="48" max="130" value="${Math.round(layout.avatarR)}" class="wc-studio__range" ${locked ? 'disabled' : ''}>
+            ` : ''}
+            <p class="wc-studio__hint">Flechas del teclado: mover 1 px · Shift: 10 px</p>
+        `;
+        const applyXY = () => {
+            const x = Number(box.querySelector('#wcPropX')?.value);
+            const y = Number(box.querySelector('#wcPropY')?.value);
+            if (Number.isFinite(x) && Number.isFinite(y)) setLayerPositionFromInputs(selectedLayer, x, y);
+        };
+        box.querySelector('#wcPropX')?.addEventListener('change', applyXY);
+        box.querySelector('#wcPropY')?.addEventListener('change', applyXY);
+        box.querySelector('#wcPropAvatarR')?.addEventListener('input', (e) => {
+            recordHistoryBeforeChange();
+            layout.avatarR = Number(e.target.value) || 78;
+            syncDomFromLayout({ skipHistory: true });
+            renderPropertiesInspector();
+        });
+    }
+
+    function renderRightPanel() {
+        const body = rootEl?.querySelector('#wcStudioPanelBody');
+        if (!body) return;
+
+        if (rightPanelTab === 'layers') {
+            body.innerHTML = `
+                <div class="wc-studio__section">
+                    <h4 class="wc-studio__section-title">Capas</h4>
+                    <ul class="wc-studio__layer-list" id="wcStudioLayersList"></ul>
+                </div>
+                <div class="wc-studio__section">
+                    <h4 class="wc-studio__section-title">Transformar</h4>
+                    <div id="wcStudioProps"></div>
+                </div>
+                <div class="wc-studio__section">
+                    <h4 class="wc-studio__section-title">Atajos</h4>
+                    <div class="wc-studio__kbd-row">
+                        <span class="wc-studio__kbd">Ctrl+Z</span><span class="wc-studio__kbd">Ctrl+Y</span>
+                        <span class="wc-studio__kbd">Ctrl+S</span><span class="wc-studio__kbd">Esc</span>
+                    </div>
+                    <p class="wc-studio__hint">Doble clic en texto para editar · Clic derecho: menú contextual y color de fragmento.</p>
+                </div>
+            `;
+            renderLayersList();
+            renderPropertiesInspector();
+            return;
+        }
+
+        if (rightPanelTab === 'design') {
+            const presets = Object.entries(LAYOUT_PRESETS)
+                .map(([k, p]) => `<button type="button" class="wc-studio__preset" data-preset="${k}">${p.label}</button>`)
+                .join('');
+            body.innerHTML = `
+                <div class="wc-studio__section">
+                    <h4 class="wc-studio__section-title">Plantillas</h4>
+                    <div class="wc-studio__preset-grid">${presets}</div>
+                </div>
+                <div class="wc-studio__section">
+                    <h4 class="wc-studio__section-title">Alineación</h4>
+                    <div class="wc-studio__btn-stack">
+                        <button type="button" class="wc-studio__side-btn" id="wcAlignTextsX">Centrar textos (horizontal)</button>
+                        <button type="button" class="wc-studio__side-btn" id="wcStackTexts">Apilar título · nombre · subtítulo</button>
+                        <button type="button" class="wc-studio__side-btn" id="wcDistributeTexts">Distribuir en vertical</button>
+                        <button type="button" class="wc-studio__side-btn" id="wcAlignAvatar">Centrar avatar</button>
+                        <button type="button" class="wc-studio__side-btn" id="wcMirrorH">Espejo horizontal</button>
+                    </div>
+                </div>
+            `;
+            body.querySelectorAll('[data-preset]').forEach((btn) => {
+                btn.addEventListener('click', () => applyLayoutPreset(btn.dataset.preset));
+            });
+            body.querySelector('#wcAlignTextsX')?.addEventListener('click', () => { recordHistoryBeforeChange(); centerTextsX(); });
+            body.querySelector('#wcStackTexts')?.addEventListener('click', () => { recordHistoryBeforeChange(); stackTitleNameSubtitle(); });
+            body.querySelector('#wcDistributeTexts')?.addEventListener('click', () => { recordHistoryBeforeChange(); distributeTextsVertically(); });
+            body.querySelector('#wcAlignAvatar')?.addEventListener('click', () => { recordHistoryBeforeChange(); centerAvatarOnCanvas(); });
+            body.querySelector('#wcMirrorH')?.addEventListener('click', () => { recordHistoryBeforeChange(); mirrorLayoutHorizontal(); });
+            return;
+        }
+
+        body.innerHTML = `
+            <div class="wc-studio__section">
+                <h4 class="wc-studio__section-title">Herramienta activa</h4>
+                <p class="wc-studio__hint">${activeTool === 'bg' ? 'Arrastra el fondo o usa los sliders de encuadre.' : activeTool === 'avatar' ? 'Arrastra solo el avatar y ajusta el radio.' : 'Selecciona capas y arrástralas con snap inteligente.'}</p>
+            </div>
+            ${activeTool === 'bg' ? `
+            <div class="wc-studio__section">
+                <label class="wc-studio__label">Encuadre horizontal</label>
+                <input type="range" id="wcBgFx" min="0" max="100" value="${Math.round(layout.bgFocalX * 100)}" class="wc-studio__range">
+                <label class="wc-studio__label">Encuadre vertical</label>
+                <input type="range" id="wcBgFy" min="0" max="100" value="${Math.round(layout.bgFocalY * 100)}" class="wc-studio__range">
+            </div>` : ''}
+            ${activeTool === 'avatar' ? `
+            <div class="wc-studio__section">
+                <label class="wc-studio__label">Radio del avatar (${Math.round(layout.avatarR)} px)</label>
+                <input type="range" id="wcAvatarRadius" min="48" max="130" value="${Math.round(layout.avatarR)}" class="wc-studio__range">
+            </div>` : ''}
+            <div class="wc-studio__section">
+                <label class="wc-studio__label" for="wcCanvasZoom">Zoom (${canvasUserZoomPct}%)</label>
+                <input type="range" id="wcCanvasZoom" min="55" max="130" value="${canvasUserZoomPct}" class="wc-studio__range">
+            </div>
+            <div class="wc-studio__section">
+                <h4 class="wc-studio__section-title">Portapapeles</h4>
+                <div class="wc-studio__btn-stack">
+                    <button type="button" class="wc-studio__side-btn" id="wcCopyLayout">Copiar layout (JSON)</button>
+                    <button type="button" class="wc-studio__side-btn" id="wcPasteLayout">Pegar layout (JSON)</button>
+                </div>
+            </div>
+        `;
+        body.querySelector('#wcBgFx')?.addEventListener('input', (e) => {
+            layout.bgFocalX = (Number(e.target.value) || 0) / 100;
+            syncDomFromLayout();
+        });
+        body.querySelector('#wcBgFy')?.addEventListener('input', (e) => {
+            layout.bgFocalY = (Number(e.target.value) || 0) / 100;
+            syncDomFromLayout();
+        });
+        body.querySelector('#wcAvatarRadius')?.addEventListener('input', (e) => {
+            layout.avatarR = Number(e.target.value) || 78;
+            syncDomFromLayout();
+        });
+        body.querySelector('#wcCanvasZoom')?.addEventListener('input', (e) => {
+            canvasUserZoomPct = Number(e.target.value) || 100;
+            applyCanvasUserZoom();
+            updateZoomPills();
+            updateStatusBar();
+        });
+        body.querySelector('#wcCopyLayout')?.addEventListener('click', copyLayoutJson);
+        body.querySelector('#wcPasteLayout')?.addEventListener('click', () => {
+            recordHistoryBeforeChange();
+            pasteLayoutJson();
+        });
     }
 
     async function onBackgroundFileSelected(ev) {
@@ -993,8 +1534,11 @@
         if (!stage || ev.target.closest('[data-drag]')) return;
         if (!ev.target.closest('#wcStudioStage')) return;
         ev.preventDefault();
+        historyDragSnapshot = JSON.stringify(layout);
         const start = { x: ev.clientX, y: ev.clientY, fx: layout.bgFocalX, fy: layout.bgFocalY };
+        let moved = false;
         const onMove = (e) => {
+            moved = true;
             const dx = (e.clientX - start.x) / 400;
             const dy = (e.clientY - start.y) / 250;
             layout.bgFocalX = clamp(start.fx - dx, 0, 1);
@@ -1004,6 +1548,13 @@
         const onUp = () => {
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
+            if (moved && historyDragSnapshot && historyDragSnapshot !== JSON.stringify(layout)) {
+                historyPast.push(historyDragSnapshot);
+                if (historyPast.length > HISTORY_MAX) historyPast.shift();
+                historyFuture = [];
+                updateHistoryButtons();
+            }
+            historyDragSnapshot = null;
         };
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
@@ -1015,6 +1566,10 @@
             if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') return;
             if (activeTool === 'bg') return;
             if (activeTool === 'avatar' && key !== 'avatar') return;
+            if (layerLocked.has(key) || layerHidden.has(key)) {
+                toast('Capa bloqueada u oculta', 'warning');
+                return;
+            }
 
             ev.preventDefault();
             ev.stopPropagation();
@@ -1100,14 +1655,24 @@
             const onUp = () => {
                 window.removeEventListener('pointermove', onMove);
                 window.removeEventListener('pointerup', onUp);
-                if (moved) clearGuides();
+                if (moved) {
+                    clearGuides();
+                    if (historyDragSnapshot && historyDragSnapshot !== JSON.stringify(layout)) {
+                        historyPast.push(historyDragSnapshot);
+                        if (historyPast.length > HISTORY_MAX) historyPast.shift();
+                        historyFuture = [];
+                        updateHistoryButtons();
+                    }
+                }
+                historyDragSnapshot = null;
             };
+            historyDragSnapshot = JSON.stringify(layout);
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
         });
     }
 
-    function syncDomFromLayout() {
+    function syncDomFromLayout(opts = {}) {
         const bg = rootEl.querySelector('#wcStageBg');
         if (bg) {
             bg.style.backgroundPosition = `${layout.bgFocalX * 100}% ${layout.bgFocalY * 100}%`;
@@ -1151,14 +1716,41 @@
             ov.style.right = `${W - layout.overlayX}px`;
             ov.style.bottom = `${H - layout.overlayY}px`;
         }
+        if (selectedLayer) {
+            rootEl?.querySelectorAll('.wc-layer').forEach((el) => {
+                const k = el.dataset.drag;
+                el.classList.toggle('wc-layer--selected', k === selectedLayer);
+                el.classList.toggle('wc-layer--hidden', layerHidden.has(k));
+                el.classList.toggle('wc-layer--locked', layerLocked.has(k));
+            });
+        }
+        updateStatusBar();
+    }
+
+    function resolveStudioBgUrl(raw) {
+        const u = String(raw || '').trim();
+        if (!u) return '';
+        if (/^(https?:|blob:|data:)/i.test(u)) return u;
+        if (u.startsWith('/') && typeof win.resolveWelcomePreviewMediaUrl === 'function') {
+            return win.resolveWelcomePreviewMediaUrl(u);
+        }
+        if (u.startsWith('/')) {
+            try {
+                return new URL(u, win.location.origin).href;
+            } catch {
+                return u;
+            }
+        }
+        return u;
     }
 
     function applyBgImage(url) {
         const bg = rootEl.querySelector('#wcStageBg');
         if (!bg) return;
-        if (url) {
+        const loadUrl = resolveStudioBgUrl(url);
+        if (loadUrl) {
             bg.style.background = '';
-            bg.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+            bg.style.backgroundImage = `url("${loadUrl.replace(/"/g, '\\"')}")`;
             bg.style.backgroundSize = 'cover';
             bg.style.backgroundRepeat = 'no-repeat';
         } else {
@@ -1278,21 +1870,6 @@
         });
     }
 
-    function sidebarEditBlock() {
-        return `
-            <div class="wc-studio__edit-block">
-                <h4 class="wc-studio__edit-heading">Edición rápida</h4>
-                <div class="wc-studio__btn-stack">
-                    <button type="button" class="wc-studio__side-btn" id="wcAlignTextsX">Centrar textos (horizontal)</button>
-                    <button type="button" class="wc-studio__side-btn" id="wcStackTexts">Apilar título · nombre · subtítulo</button>
-                    <button type="button" class="wc-studio__side-btn" id="wcAlignAvatar">Centrar avatar en el lienzo</button>
-                </div>
-                <label class="wc-studio__label" for="wcCanvasZoom">Zoom del lienzo (${canvasUserZoomPct}%)</label>
-                <input type="range" id="wcCanvasZoom" min="55" max="130" value="${canvasUserZoomPct}" class="wc-studio__range">
-            </div>
-        `;
-    }
-
     function centerTextsX() {
         const cx = W / 2;
         layout.titleX = cx;
@@ -1321,66 +1898,6 @@
         toast('Avatar centrado', 'success');
     }
 
-    function bindSidebarCommonActions(box) {
-        box.querySelector('#wcAlignTextsX')?.addEventListener('click', centerTextsX);
-        box.querySelector('#wcStackTexts')?.addEventListener('click', stackTitleNameSubtitle);
-        box.querySelector('#wcAlignAvatar')?.addEventListener('click', centerAvatarOnCanvas);
-        const z = box.querySelector('#wcCanvasZoom');
-        const zLabel = box.querySelector('label[for="wcCanvasZoom"]');
-        z?.addEventListener('input', (e) => {
-            canvasUserZoomPct = Number(e.target.value) || 100;
-            applyCanvasUserZoom();
-            if (zLabel) zLabel.textContent = `Zoom del lienzo (${canvasUserZoomPct}%)`;
-        });
-    }
-
-    function renderSidebar() {
-        const box = rootEl.querySelector('#wcStudioSideContent');
-        if (!box) return;
-
-        if (activeTool === 'avatar') {
-            box.innerHTML = `
-                ${sidebarEditBlock()}
-                <label class="wc-studio__label">Radio del avatar (${Math.round(layout.avatarR)} px)</label>
-                <input type="range" id="wcAvatarRadius" min="48" max="130" value="${Math.round(layout.avatarR)}" class="wc-studio__range">
-                <p class="wc-studio__hint">Con esta herramienta solo se arrastra el <strong>avatar</strong>. Guías <strong>magenta</strong> al alinear.</p>
-            `;
-            bindSidebarCommonActions(box);
-            box.querySelector('#wcAvatarRadius')?.addEventListener('input', (e) => {
-                layout.avatarR = Number(e.target.value) || 78;
-                syncDomFromLayout();
-            });
-            return;
-        }
-
-        if (activeTool === 'bg') {
-            box.innerHTML = `
-                ${sidebarEditBlock()}
-                <p class="wc-studio__hint">Arrastra el <strong>fondo</strong> (zona sin capas) o usa los sliders.</p>
-                <label class="wc-studio__label">Encuadre horizontal</label>
-                <input type="range" id="wcBgFx" min="0" max="100" value="${Math.round(layout.bgFocalX * 100)}" class="wc-studio__range">
-                <label class="wc-studio__label">Encuadre vertical</label>
-                <input type="range" id="wcBgFy" min="0" max="100" value="${Math.round(layout.bgFocalY * 100)}" class="wc-studio__range">
-            `;
-            bindSidebarCommonActions(box);
-            box.querySelector('#wcBgFx')?.addEventListener('input', (e) => {
-                layout.bgFocalX = (Number(e.target.value) || 0) / 100;
-                syncDomFromLayout();
-            });
-            box.querySelector('#wcBgFy')?.addEventListener('input', (e) => {
-                layout.bgFocalY = (Number(e.target.value) || 0) / 100;
-                syncDomFromLayout();
-            });
-            return;
-        }
-
-        box.innerHTML = `
-            ${sidebarEditBlock()}
-            <p class="wc-studio__hint">Arrastra capas o <strong>doble clic</strong> en un texto para editar ({user}, etc.). Guías <strong>magenta</strong> al centrar. <strong>Esc</strong> termina edición o quita la selección.</p>
-        `;
-        bindSidebarCommonActions(box);
-    }
-
     function open(opts) {
         optsRef = opts;
         ensureRoot();
@@ -1393,13 +1910,23 @@
             img.src = av || 'https://cdn.discordapp.com/embed/avatars/0.png';
         }
         clearGuides();
+        layerHidden.clear();
+        layerLocked.clear();
+        resetHistory();
         canvasUserZoomPct = 100;
         applyCanvasUserZoom();
+        updateZoomPills();
         activeTool = 'select';
-        rootEl.querySelectorAll('.wc-studio__tool').forEach((b) => b.classList.toggle('is-active', b.dataset.tool === 'select'));
-        syncDomFromLayout();
-        renderSidebar();
+        rightPanelTab = 'layers';
+        rootEl.querySelectorAll('.wc-studio__panel-tab').forEach((t) => {
+            t.classList.toggle('is-active', t.dataset.panelTab === 'layers');
+        });
+        setActiveTool('select');
+        syncDomFromLayout({ skipHistory: true });
+        renderRightPanel();
         setSelectedLayer(null);
+        updateOverlayToggles();
+        updateStatusBar();
         const st = rootEl.querySelector('#wcStudioUploadStatus');
         if (st) st.textContent = '';
 

@@ -50,6 +50,9 @@ function resolveWelcomePreviewMediaUrl(raw) {
     }
     return u;
 }
+if (typeof window !== 'undefined') {
+    window.resolveWelcomePreviewMediaUrl = resolveWelcomePreviewMediaUrl;
+}
 
 /** Canales de texto del servidor activo (para insertar {#nombre} en embeds). */
 let panelGuildTextChannels = [];
