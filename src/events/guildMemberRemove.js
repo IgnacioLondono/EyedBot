@@ -1,6 +1,5 @@
-const path = require('path');
 const welcomeStore = require('../utils/welcome-config-store');
-const { resolveWelcomeUploadFile } = require('../utils/welcome-upload-resolve');
+const { applyWelcomeMediaToEmbed } = require('../utils/welcome-upload-resolve');
 
 function applyTemplate(text, member) {
     const uid = member?.user?.id ?? member?.id;
@@ -39,29 +38,13 @@ module.exports = {
 
         const files = [];
         if (goodbyeConfig?.imageUrl) {
-            const localImagePath = resolveWelcomeUploadFile(goodbyeConfig.imageUrl);
-            if (localImagePath) {
-                const attachmentName = path.basename(localImagePath);
-                embed.setImage(`attachment://${attachmentName}`);
-                files.push({ attachment: localImagePath, name: attachmentName });
-            } else {
-                const imgUrl = String(goodbyeConfig.imageUrl || '').trim();
-                if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
-            }
+            applyWelcomeMediaToEmbed(embed, goodbyeConfig.imageUrl, files, 'image');
         }
 
         if (goodbyeConfig?.thumbnailMode === 'avatar') {
             embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
         } else if (goodbyeConfig?.thumbnailMode === 'url' && goodbyeConfig?.thumbnailUrl) {
-            const thumbLocal = resolveWelcomeUploadFile(goodbyeConfig.thumbnailUrl);
-            if (thumbLocal) {
-                const tn = path.basename(thumbLocal);
-                embed.setThumbnail(`attachment://thumb_${tn}`);
-                files.push({ attachment: thumbLocal, name: `thumb_${tn}` });
-            } else {
-                const u = String(goodbyeConfig.thumbnailUrl || '').trim();
-                if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
-            }
+            applyWelcomeMediaToEmbed(embed, goodbyeConfig.thumbnailUrl, files, 'thumbnail');
         }
 
         await channel.send({ embeds: [embed], files }).catch(() => null);

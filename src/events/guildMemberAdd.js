@@ -1,9 +1,8 @@
 const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
-const { resolveWelcomeUploadFile } = require('../utils/welcome-upload-resolve');
+const { resolveWelcomeUploadFile, applyWelcomeMediaToEmbed } = require('../utils/welcome-upload-resolve');
 const { AttachmentBuilder } = require('discord.js');
-const path = require('path');
 
 // Queue welcome sends by channel so simultaneous joins are processed one by one.
 const welcomeSendQueues = new Map();
@@ -125,33 +124,13 @@ module.exports = {
             if (welcomeConfig.footer) embed.setFooter({ text: applyTemplate(welcomeConfig.footer, member) });
             const files = [];
             if (welcomeConfig.imageUrl) {
-                const localImagePath = resolveWelcomeUploadFile(welcomeConfig.imageUrl);
-                if (localImagePath) {
-                    const attachmentName = path.basename(localImagePath);
-                    embed.setImage(`attachment://${attachmentName}`);
-                    files.push({ attachment: localImagePath, name: attachmentName });
-                } else {
-                    const imgUrl = String(welcomeConfig.imageUrl || '').trim();
-                    // Discord solo acepta URLs http(s) públicas; rutas /uploads/ requieren archivo local (adjunto).
-                    if (/^https?:\/\//i.test(imgUrl)) {
-                        embed.setImage(imgUrl);
-                    }
-                }
+                applyWelcomeMediaToEmbed(embed, welcomeConfig.imageUrl, files, 'image');
             }
 
             if (welcomeConfig.thumbnailMode === 'avatar') {
                 embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
             } else if (welcomeConfig.thumbnailMode === 'url' && welcomeConfig.thumbnailUrl) {
-                const thumbLocal = resolveWelcomeUploadFile(welcomeConfig.thumbnailUrl);
-                if (thumbLocal) {
-                    const thumbName = path.basename(thumbLocal);
-                    const thumbAttachName = `thumb_${thumbName}`;
-                    embed.setThumbnail(`attachment://${thumbAttachName}`);
-                    files.push({ attachment: thumbLocal, name: thumbAttachName });
-                } else {
-                    const u = String(welcomeConfig.thumbnailUrl || '').trim();
-                    if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
-                }
+                applyWelcomeMediaToEmbed(embed, welcomeConfig.thumbnailUrl, files, 'thumbnail');
             }
 
             await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files, allowedMentions })).catch(() => null);

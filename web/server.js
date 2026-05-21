@@ -14,7 +14,8 @@ const db = require('../src/utils/database');
 const welcomeStore = require('../src/utils/welcome-config-store');
 const {
     canonicalWelcomeMediaUrl,
-    resolveWelcomeUploadFile: resolveLocalUploadFile
+    resolveWelcomeUploadFile: resolveLocalUploadFile,
+    applyWelcomeMediaToEmbed
 } = require('../src/utils/welcome-upload-resolve');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../src/utils/welcome-card');
 const verifyStore = require('../src/utils/verify-config-store');
@@ -1167,10 +1168,22 @@ function sanitizeHexColor6(val, fallback) {
     return /^[0-9a-fA-F]{6}$/.test(h) ? h.toLowerCase() : fallback;
 }
 
-function normalizeGreetingConfigInput(body = {}, mode, userId) {
+function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) {
     const fallback = mode === 'goodbye'
         ? { title: 'Hasta pronto', message: '{username} ha salido de **{server}**.' }
         : { title: '¡Bienvenido!', message: '¡Hola {user}! Bienvenido a **{server}**.' };
+
+    const rawImage = String(body.imageUrl ?? '').trim();
+    let imageUrl = canonicalWelcomeMediaUrl(body.imageUrl);
+    if (!imageUrl && existing?.imageUrl && /^(blob:|data:)/i.test(rawImage)) {
+        imageUrl = canonicalWelcomeMediaUrl(existing.imageUrl);
+    }
+
+    const rawThumb = String(body.thumbnailUrl ?? '').trim();
+    let thumbnailUrl = canonicalWelcomeMediaUrl(body.thumbnailUrl);
+    if (!thumbnailUrl && existing?.thumbnailUrl && /^(blob:|data:)/i.test(rawThumb)) {
+        thumbnailUrl = canonicalWelcomeMediaUrl(existing.thumbnailUrl);
+    }
 
     const base = {
         enabled: body.enabled !== false,
@@ -1180,9 +1193,9 @@ function normalizeGreetingConfigInput(body = {}, mode, userId) {
         message: String(body.message || fallback.message).slice(0, 2000),
         color: String(body.color || (mode === 'goodbye' ? 'ff5f9e' : '7c4dff')).replace('#', '').slice(0, 6),
         footer: String(body.footer || '').slice(0, 300),
-        imageUrl: canonicalWelcomeMediaUrl(body.imageUrl).slice(0, 1000),
+        imageUrl: imageUrl.slice(0, 1000),
         thumbnailMode: ['none', 'avatar', 'url'].includes(String(body.thumbnailMode || 'avatar')) ? String(body.thumbnailMode) : 'avatar',
-        thumbnailUrl: canonicalWelcomeMediaUrl(body.thumbnailUrl).slice(0, 1000),
+        thumbnailUrl: thumbnailUrl.slice(0, 1000),
         dmEnabled: body.dmEnabled === true,
         dmMessage: String(body.dmMessage || '').slice(0, 1000),
         updatedAt: new Date().toISOString(),
@@ -1225,15 +1238,7 @@ function buildVerifyEmbedFromConfig(cfg) {
     if (cfg.footer) embed.setFooter({ text: cfg.footer });
     const files = [];
     if (cfg.imageUrl) {
-        const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
-        if (localImagePath) {
-            const attachmentName = path.basename(localImagePath);
-            embed.setImage(`attachment://${attachmentName}`);
-            files.push({ attachment: localImagePath, name: attachmentName });
-        } else {
-            const imgUrl = String(cfg.imageUrl || '').trim();
-            if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
-        }
+        applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, 'image');
     }
     return { embed, files };
 }
@@ -3499,8 +3504,8 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
         fs.writeFileSync(outputPath, file.buffer);
 
         const publicPath = `/uploads/welcome/${fileName}`;
-        const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
-        res.json({ success: true, url: publicUrl, path: publicPath });
+        const publicUrl = buildPublicUploadUrl(req, publicPath);
+        res.json({ success: true, url: publicUrl, path: publicPath, publicUrl });
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
         res.status(500).json({ error: 'Error al subir imagen de bienvenida' });
@@ -3599,7 +3604,8 @@ app.post('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => 
         const body = req.body || {};
         if (!body.channelId) return res.status(400).json({ error: 'Debes seleccionar un canal de bienvenida' });
 
-        const config = normalizeGreetingConfigInput(body, 'welcome', req.session.user?.id);
+        const existing = await welcomeStore.getWelcomeConfig(guildId);
+        const config = normalizeGreetingConfigInput(body, 'welcome', req.session.user?.id, existing);
 
         await welcomeStore.setWelcomeConfig(guildId, config);
         await welcomeStore.setWelcomeChannelId(guildId, config.channelId);
@@ -3665,28 +3671,10 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (cfg?.imageUrl) {
-            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
-            if (localImagePath) {
-                const attachmentName = path.basename(localImagePath);
-                embed.setImage(`attachment://${attachmentName}`);
-                files.push({ attachment: localImagePath, name: attachmentName });
-            } else {
-                const imgUrl = String(cfg.imageUrl || '').trim();
-                if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
-            }
-        }
+        if (cfg?.imageUrl) applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, 'image');
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-            const thumbLocal = resolveLocalUploadFile(cfg.thumbnailUrl);
-            if (thumbLocal) {
-                const tn = path.basename(thumbLocal);
-                embed.setThumbnail(`attachment://thumb_${tn}`);
-                files.push({ attachment: thumbLocal, name: `thumb_${tn}` });
-            } else {
-                const u = String(cfg.thumbnailUrl || '').trim();
-                if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
-            }
+        else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+            applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, 'thumbnail');
         }
 
         await channel.send({ content, embeds: [embed], files, allowedMentions });
@@ -3783,7 +3771,8 @@ app.post('/api/guild/:guildId/goodbye-config', requireAuth, async (req, res) => 
         const body = req.body || {};
         if (!body.channelId) return res.status(400).json({ error: 'Debes seleccionar un canal de despedida' });
 
-        const config = normalizeGreetingConfigInput(body, 'goodbye', req.session.user?.id);
+        const existing = await welcomeStore.getGoodbyeConfig(guildId);
+        const config = normalizeGreetingConfigInput(body, 'goodbye', req.session.user?.id, existing);
 
         await welcomeStore.setGoodbyeConfig(guildId, config);
         await welcomeStore.setGoodbyeChannelId(guildId, config.channelId);
@@ -3821,28 +3810,10 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (cfg?.imageUrl) {
-            const localImagePath = resolveLocalUploadFile(cfg.imageUrl);
-            if (localImagePath) {
-                const attachmentName = path.basename(localImagePath);
-                embed.setImage(`attachment://${attachmentName}`);
-                files.push({ attachment: localImagePath, name: attachmentName });
-            } else {
-                const imgUrl = String(cfg.imageUrl || '').trim();
-                if (/^https?:\/\//i.test(imgUrl)) embed.setImage(imgUrl);
-            }
-        }
+        if (cfg?.imageUrl) applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, 'image');
         if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-        if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-            const thumbLocal = resolveLocalUploadFile(cfg.thumbnailUrl);
-            if (thumbLocal) {
-                const tn = path.basename(thumbLocal);
-                embed.setThumbnail(`attachment://thumb_${tn}`);
-                files.push({ attachment: thumbLocal, name: `thumb_${tn}` });
-            } else {
-                const u = String(cfg.thumbnailUrl || '').trim();
-                if (/^https?:\/\//i.test(u)) embed.setThumbnail(u);
-            }
+        else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+            applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, 'thumbnail');
         }
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;

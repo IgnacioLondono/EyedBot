@@ -12087,7 +12087,8 @@ async function uploadWelcomeEditedImage(guildId, opts = {}) {
             return false;
         }
 
-        if (imageUrlInput) imageUrlInput.value = data.url;
+        const persisted = data.path || data.url || '';
+        if (imageUrlInput) imageUrlInput.value = persisted;
         if (status) status.textContent = 'Imagen subida y aplicada';
         if (!suppressSuccessToast) showToast(getGreetingPanelMeta(currentGreetingMode).uploadSuccess, 'success');
         welcomeCropVisualCache = { src: '', img: null };
@@ -12124,12 +12125,23 @@ async function processAndUploadWelcomeStudioBackground(guildId, file) {
     }
 
     const imageUrlInput = document.getElementById('welcomeImageUrl');
-    if (imageUrlInput) imageUrlInput.value = data.url;
+    const persisted = data.path || data.url || '';
+    if (imageUrlInput) imageUrlInput.value = persisted;
     clearWelcomeImagePendingPreview();
     const status = document.getElementById('welcomeImageUploadStatus');
     if (status) status.textContent = 'Imagen aplicada desde el editor';
 
-    return data.url;
+    return persisted;
+}
+
+function getWelcomeFormMediaUrl(fieldId) {
+    const raw = String(document.getElementById(fieldId)?.value || '').trim();
+    if (/^(blob:|data:)/i.test(raw)) {
+        const cfg = getCurrentGreetingConfig(currentGreetingMode) || {};
+        const key = fieldId === 'welcomeThumbnailUrl' ? 'thumbnailUrl' : 'imageUrl';
+        return String(cfg[key] || '').trim();
+    }
+    return raw;
 }
 
 function collectWelcomeConfigFromForm() {
@@ -12143,9 +12155,9 @@ function collectWelcomeConfigFromForm() {
         message: document.getElementById('welcomeMessage')?.value || meta.defaultMessage,
         color: (document.getElementById('welcomeColor')?.value || `#${meta.defaultColor}`).replace('#', ''),
         footer: document.getElementById('welcomeFooter')?.value || meta.defaultFooter,
-        imageUrl: document.getElementById('welcomeImageUrl')?.value || '',
+        imageUrl: getWelcomeFormMediaUrl('welcomeImageUrl'),
         thumbnailMode: document.getElementById('welcomeThumbnailMode')?.value || 'avatar',
-        thumbnailUrl: document.getElementById('welcomeThumbnailUrl')?.value || '',
+        thumbnailUrl: getWelcomeFormMediaUrl('welcomeThumbnailUrl'),
         dmEnabled: document.getElementById('welcomeDmEnabled')?.checked ?? false,
         dmMessage: document.getElementById('welcomeDmMessage')?.value || ''
     };
@@ -12170,9 +12182,13 @@ function collectWelcomeConfigFromForm() {
 
 async function saveWelcomeConfig(guildId, showSuccessToast = true) {
     const meta = getGreetingPanelMeta(currentGreetingMode);
+    const urlFieldRaw = String(document.getElementById('welcomeImageUrl')?.value || '').trim();
     if (welcomeImageFile) {
         const uploaded = await uploadWelcomeEditedImage(guildId, { suppressSuccessToast: true });
         if (!uploaded) return false;
+    } else if (/^(blob:|data:)/i.test(urlFieldRaw)) {
+        showToast('Tienes una imagen pendiente: selecciona el archivo de nuevo y pulsa «Subir imagen» antes de guardar.', 'warning');
+        return false;
     }
 
     const payload = collectWelcomeConfigFromForm();
