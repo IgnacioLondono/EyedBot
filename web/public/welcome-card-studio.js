@@ -1,24 +1,16 @@
 /**
- * Editor visual a pantalla completa para la tarjeta de bienvenida (PNG).
- * Depende de: fetchWithCredentials, showToast, applyWelcomePreviewTemplate, resizeImageFile (app.js).
+ * Eyed Studio v3 — Editor de tarjeta de bienvenida (reescritura completa).
+ * API: WelcomeCardStudio.mergeCardLayout, .open, .close
  */
-(function (win) {
+(function (global) {
     'use strict';
 
     const W = 920;
     const H = 520;
-    const SNAP = 14;
-    const DRAG_THRESHOLD = 8;
-
-    const LAYER_TO_RAW = {
-        title: 'title',
-        name: 'cardNameTemplate',
-        subtitle: 'message',
-        overlay: 'cardOverlayText'
-    };
-
-    let editingTextLayer = null;
-    let textPreviewDebounceTimer = null;
+    const SNAP = 12;
+    const DRAG_MIN = 6;
+    const HISTORY_MAX = 50;
+    const PREVIEW_DEBOUNCE_MS = 480;
 
     const DEFAULT_LAYOUT = {
         bgFocalX: 0.5,
@@ -36,6 +28,69 @@
         overlayY: 498
     };
 
+    const LAYERS = [
+        { id: 'avatar', label: 'Avatar', kind: 'avatar' },
+        { id: 'title', label: 'Título', kind: 'text' },
+        { id: 'name', label: 'Nombre', kind: 'text' },
+        { id: 'subtitle', label: 'Subtítulo', kind: 'text' },
+        { id: 'overlay', label: 'Texto extra', kind: 'text' }
+    ];
+
+    const PRESETS = {
+        classic: { name: 'Centrado clásico', layout: { ...DEFAULT_LAYOUT } },
+        hero: {
+            name: 'Hero superior',
+            layout: { ...DEFAULT_LAYOUT, avatarCy: 132, titleY: 240, nameY: 304, subtitleY: 360 }
+        },
+        bottom: {
+            name: 'Bloque inferior',
+            layout: {
+                ...DEFAULT_LAYOUT,
+                avatarCy: 110,
+                titleY: 298,
+                nameY: 352,
+                subtitleY: 402,
+                bgFocalY: 0.38
+            }
+        },
+        editorial: {
+            name: 'Editorial lateral',
+            layout: {
+                ...DEFAULT_LAYOUT,
+                avatarCx: 200,
+                avatarCy: 200,
+                titleX: 540,
+                titleY: 210,
+                nameX: 540,
+                nameY: 278,
+                subtitleX: 540,
+                subtitleY: 338,
+                overlayX: 860,
+                overlayY: 490
+            }
+        }
+    };
+
+    const SWATCHES = ['ffffff', 'f8fafc', 'fde047', '4ade80', '22d3ee', '60a5fa', 'a78bfa', 'f472b6', 'fb923c', '94a3b8'];
+
+    let root = null;
+    let opts = null;
+    let layout = { ...DEFAULT_LAYOUT };
+    let tool = 'move';
+    let section = 'design';
+    let selectedId = 'title';
+    let zoomPct = 100;
+    let snapOn = true;
+    let gridOn = false;
+    let safeOn = true;
+    let hidden = new Set();
+    let locked = new Set();
+    let past = [];
+    let future = [];
+    let editingId = null;
+    let previewTimer = null;
+    let previewUrl = '';
+
     function clamp(n, a, b) {
         return Math.min(b, Math.max(a, n));
     }
@@ -43,272 +98,162 @@
     function mergeCardLayout(raw) {
         const d = { ...DEFAULT_LAYOUT };
         if (!raw || typeof raw !== 'object') return d;
-        const num = (v, def, min, max) => {
+        const n = (v, def, min, max) => {
             const x = Number(v);
             return Number.isFinite(x) ? clamp(x, min, max) : def;
         };
         return {
-            bgFocalX: num(raw.bgFocalX, d.bgFocalX, 0, 1),
-            bgFocalY: num(raw.bgFocalY, d.bgFocalY, 0, 1),
-            avatarCx: num(raw.avatarCx, d.avatarCx, 0, W),
-            avatarCy: num(raw.avatarCy, d.avatarCy, 0, H),
-            avatarR: num(raw.avatarR, d.avatarR, 36, 150),
-            titleX: num(raw.titleX, d.titleX, 0, W),
-            titleY: num(raw.titleY, d.titleY, 0, H),
-            nameX: num(raw.nameX, d.nameX, 0, W),
-            nameY: num(raw.nameY, d.nameY, 0, H),
-            subtitleX: num(raw.subtitleX, d.subtitleX, 0, W),
-            subtitleY: num(raw.subtitleY, d.subtitleY, 0, H),
-            overlayX: num(raw.overlayX, d.overlayX, 0, W),
-            overlayY: num(raw.overlayY, d.overlayY, 0, H)
+            bgFocalX: n(raw.bgFocalX, d.bgFocalX, 0, 1),
+            bgFocalY: n(raw.bgFocalY, d.bgFocalY, 0, 1),
+            avatarCx: n(raw.avatarCx, d.avatarCx, 0, W),
+            avatarCy: n(raw.avatarCy, d.avatarCy, 0, H),
+            avatarR: n(raw.avatarR, d.avatarR, 36, 150),
+            titleX: n(raw.titleX, d.titleX, 0, W),
+            titleY: n(raw.titleY, d.titleY, 0, H),
+            nameX: n(raw.nameX, d.nameX, 0, W),
+            nameY: n(raw.nameY, d.nameY, 0, H),
+            subtitleX: n(raw.subtitleX, d.subtitleX, 0, W),
+            subtitleY: n(raw.subtitleY, d.subtitleY, 0, H),
+            overlayX: n(raw.overlayX, d.overlayX, 0, W),
+            overlayY: n(raw.overlayY, d.overlayY, 0, H)
         };
     }
 
-    let rootEl = null;
-    let optsRef = null;
-    let layout = { ...DEFAULT_LAYOUT };
-    let activeTool = 'select';
-    let selectedLayer = null;
-    let canvasUserZoomPct = 100;
-    let rightPanelTab = 'layers';
-    let snapEnabled = true;
-    let showGrid = false;
-    let showSafeZone = true;
-    const layerHidden = new Set();
-    const layerLocked = new Set();
-    let historyPast = [];
-    let historyFuture = [];
-    const HISTORY_MAX = 48;
-    let historyDragSnapshot = null;
+    function toast(msg, type) {
+        if (typeof global.showToast === 'function') global.showToast(msg, type);
+    }
 
-    const LAYER_ORDER = ['overlay', 'subtitle', 'name', 'title', 'avatar'];
-    const LAYER_ICONS = { avatar: '👤', title: 'T', name: 'N', subtitle: 'S', overlay: '◇' };
+    function esc(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
-    const LAYOUT_PRESETS = {
-        classic: {
-            label: 'Centrado clásico',
-            layout: { ...DEFAULT_LAYOUT }
-        },
-        hero: {
-            label: 'Avatar destacado',
-            layout: {
-                ...DEFAULT_LAYOUT,
-                avatarCy: 140,
-                titleY: 248,
-                nameY: 312,
-                subtitleY: 368
-            }
-        },
-        lower: {
-            label: 'Textos abajo',
-            layout: {
-                ...DEFAULT_LAYOUT,
-                avatarCy: 120,
-                titleY: 300,
-                nameY: 352,
-                subtitleY: 400,
-                bgFocalY: 0.35
-            }
-        },
-        corner: {
-            label: 'Esquina dinámica',
-            layout: {
-                ...DEFAULT_LAYOUT,
-                avatarCx: 180,
-                avatarCy: 160,
-                titleX: 520,
-                titleY: 200,
-                nameX: 520,
-                nameY: 268,
-                subtitleX: 520,
-                subtitleY: 330,
-                overlayX: 880,
-                overlayY: 480
-            }
+    function pushHistory() {
+        past.push(JSON.stringify(layout));
+        if (past.length > HISTORY_MAX) past.shift();
+        future = [];
+        syncHistoryBtns();
+    }
+
+    function undo() {
+        if (!past.length) return toast('Nada que deshacer', 'warning');
+        future.push(JSON.stringify(layout));
+        layout = mergeCardLayout(JSON.parse(past.pop()));
+        paint();
+        syncHistoryBtns();
+        schedulePreview();
+    }
+
+    function redo() {
+        if (!future.length) return toast('Nada que rehacer', 'warning');
+        past.push(JSON.stringify(layout));
+        layout = mergeCardLayout(JSON.parse(future.pop()));
+        paint();
+        syncHistoryBtns();
+        schedulePreview();
+    }
+
+    function syncHistoryBtns() {
+        root?.querySelector('#esUndo')?.toggleAttribute('disabled', past.length === 0);
+        root?.querySelector('#esRedo')?.toggleAttribute('disabled', future.length === 0);
+    }
+
+    function coords(id) {
+        if (id === 'avatar') return { x: layout.avatarCx, y: layout.avatarCy };
+        if (id === 'title') return { x: layout.titleX, y: layout.titleY };
+        if (id === 'name') return { x: layout.nameX, y: layout.nameY };
+        if (id === 'subtitle') return { x: layout.subtitleX, y: layout.subtitleY };
+        if (id === 'overlay') return { x: layout.overlayX, y: layout.overlayY };
+        return { x: 0, y: 0 };
+    }
+
+    function setCoords(id, x, y) {
+        if (id === 'avatar') {
+            layout.avatarCx = clamp(x, layout.avatarR + 8, W - layout.avatarR - 8);
+            layout.avatarCy = clamp(y, layout.avatarR + 8, H - layout.avatarR - 8);
+        } else if (id === 'title') {
+            layout.titleX = clamp(x, 32, W - 32);
+            layout.titleY = clamp(y, 12, H - 80);
+        } else if (id === 'name') {
+            layout.nameX = clamp(x, 32, W - 32);
+            layout.nameY = clamp(y, 12, H - 64);
+        } else if (id === 'subtitle') {
+            layout.subtitleX = clamp(x, 32, W - 32);
+            layout.subtitleY = clamp(y, 12, H - 28);
+        } else if (id === 'overlay') {
+            layout.overlayX = clamp(x, 40, W - 8);
+            layout.overlayY = clamp(y, 14, H - 8);
         }
-    };
-
-    function applyCanvasUserZoom() {
-        if (rootEl) rootEl.style.setProperty('--wc-user-zoom', String(canvasUserZoomPct / 100));
     }
 
-    function hideTextFormatMenu() {
-        const m = rootEl?.querySelector('#wcTextFormatMenu');
-        if (!m) return;
-        m.hidden = true;
-        m.innerHTML = '';
-    }
-
-    function hideContextMenu() {
-        hideTextFormatMenu();
-        const menu = rootEl?.querySelector('#wcContextMenu');
-        if (!menu) return;
-        menu.hidden = true;
-        menu.innerHTML = '';
-    }
-
-    function recordHistoryBeforeChange() {
-        historyPast.push(JSON.stringify(layout));
-        if (historyPast.length > HISTORY_MAX) historyPast.shift();
-        historyFuture = [];
-        updateHistoryButtons();
-    }
-
-    function undoHistory() {
-        if (!historyPast.length) {
-            toast('No hay más pasos para deshacer', 'warning');
-            return;
+    function snapVal(v, targets) {
+        if (!snapOn) return { v, hit: null };
+        for (const t of targets) {
+            if (Math.abs(v - t) <= SNAP) return { v: t, hit: t };
         }
-        historyFuture.push(JSON.stringify(layout));
-        layout = mergeCardLayout(JSON.parse(historyPast.pop()));
-        syncDomFromLayout({ skipHistory: true });
-        renderRightPanel();
-        updateHistoryButtons();
-        toast('Deshecho', 'success');
+        return { v, hit: null };
     }
 
-    function redoHistory() {
-        if (!historyFuture.length) {
-            toast('No hay más pasos para rehacer', 'warning');
-            return;
-        }
-        historyPast.push(JSON.stringify(layout));
-        layout = mergeCardLayout(JSON.parse(historyFuture.pop()));
-        syncDomFromLayout({ skipHistory: true });
-        renderRightPanel();
-        updateHistoryButtons();
-        toast('Rehecho', 'success');
+    function snapMove(id, x, y) {
+        const peersX = [W / 2];
+        const peersY = [H / 2];
+        LAYERS.forEach((L) => {
+            if (L.id === id) return;
+            const c = coords(L.id);
+            peersX.push(c.x);
+            peersY.push(c.y);
+        });
+        const sx = snapVal(x, peersX);
+        const sy = snapVal(y, peersY);
+        return { x: sx.v, y: sy.v, guidesX: sx.hit != null ? [sx.hit] : [], guidesY: sy.hit != null ? [sy.hit] : [] };
     }
 
-    function updateHistoryButtons() {
-        const undoBtn = rootEl?.querySelector('#wcStudioUndo');
-        const redoBtn = rootEl?.querySelector('#wcStudioRedo');
-        if (undoBtn) undoBtn.disabled = historyPast.length === 0;
-        if (redoBtn) redoBtn.disabled = historyFuture.length === 0;
+    function drawGuides(gx, gy) {
+        const svg = root?.querySelector('#esGuides');
+        if (!svg) return;
+        const parts = [];
+        (gx || []).forEach((x) => parts.push(`<line class="eyestudio__guide" x1="${x}" y1="0" x2="${x}" y2="${H}"/>`));
+        (gy || []).forEach((y) => parts.push(`<line class="eyestudio__guide" x1="0" y1="${y}" x2="${W}" y2="${y}"/>`));
+        svg.innerHTML = parts.join('');
     }
 
-    function resetHistory() {
-        historyPast = [];
-        historyFuture = [];
-        updateHistoryButtons();
+    function clearGuides() {
+        const svg = root?.querySelector('#esGuides');
+        if (svg) svg.innerHTML = '';
     }
 
-    function applyLayoutPreset(key) {
-        const preset = LAYOUT_PRESETS[key];
-        if (!preset) return;
-        recordHistoryBeforeChange();
-        layout = mergeCardLayout(preset.layout);
-        syncDomFromLayout({ skipHistory: true });
-        renderRightPanel();
-        toast(`Plantilla «${preset.label}» aplicada`, 'success');
+    function styleFromConfig() {
+        const cfg = opts?.getWelcomeConfig?.() || {};
+        return {
+            accent: `#${String(cfg.cardAccentColor || '4ade80').replace('#', '')}`,
+            title: `#${String(cfg.cardTitleColor || 'ffffff').replace('#', '')}`,
+            name: `#${String(cfg.cardNameColor || 'f8fafc').replace('#', '')}`,
+            sub: `#${String(cfg.cardSubtitleColor || 'e2e8f0').replace('#', '')}`,
+            overlay: `#${String(cfg.cardOverlayColor || 'ffffff').replace('#', '')}`,
+            font: String(cfg.cardFontKey || 'system')
+        };
     }
 
-    function updateStatusBar() {
-        const el = rootEl?.querySelector('#wcStudioStatus');
-        if (!el) return;
-        const layerLabel = selectedLayer ? LAYER_LABELS[selectedLayer] || selectedLayer : 'Ninguna';
-        const toolNames = { select: 'Selección', avatar: 'Avatar', bg: 'Fondo' };
-        el.innerHTML = `
-            <span>Herramienta: <strong>${toolNames[activeTool] || activeTool}</strong></span>
-            <span>Capa: <strong>${layerLabel}</strong></span>
-            <span>Encuadre: <strong>${Math.round(layout.bgFocalX * 100)}% · ${Math.round(layout.bgFocalY * 100)}%</strong></span>
-            <span>Zoom: <strong>${canvasUserZoomPct}%</strong></span>
-        `;
+    function fontFamily(key) {
+        const map = {
+            system: '"Plus Jakarta Sans", Arial, sans-serif',
+            serif: '"Cormorant Garamond", Georgia, serif',
+            mono: 'Consolas, monospace',
+            rounded: 'Verdana, sans-serif',
+            elegant: '"Cormorant Garamond", "Times New Roman", serif'
+        };
+        return map[key] || map.system;
     }
 
-    function updateOverlayToggles() {
-        rootEl?.querySelector('#wcToggleGrid')?.classList.toggle('is-on', showGrid);
-        rootEl?.querySelector('#wcToggleSafe')?.classList.toggle('is-on', showSafeZone);
-        rootEl?.querySelector('#wcToggleSnap')?.classList.toggle('is-on', snapEnabled);
-        rootEl?.querySelector('#wcStudioGrid')?.classList.toggle('is-visible', showGrid);
-        rootEl?.querySelector('#wcStudioSafe')?.classList.toggle('is-visible', showSafeZone);
-    }
-
-    function studioKeyHandler(ev) {
-        if (!rootEl?.classList.contains('is-open')) return;
-
-        const mod = ev.ctrlKey || ev.metaKey;
-        if (mod && ev.key.toLowerCase() === 'z' && !ev.shiftKey) {
-            ev.preventDefault();
-            undoHistory();
-            return;
-        }
-        if (mod && (ev.key.toLowerCase() === 'y' || (ev.key.toLowerCase() === 'z' && ev.shiftKey))) {
-            ev.preventDefault();
-            redoHistory();
-            return;
-        }
-        if (mod && ev.key.toLowerCase() === 's') {
-            ev.preventDefault();
-            saveAndClose();
-            return;
-        }
-
-        if (selectedLayer && !editingTextLayer && !ev.target.closest('input, textarea, select, [contenteditable="true"]')) {
-            const step = ev.shiftKey ? 10 : 1;
-            if (ev.key === 'ArrowLeft') {
-                ev.preventDefault();
-                recordHistoryBeforeChange();
-                nudgeLayer(selectedLayer, -step, 0);
-                return;
-            }
-            if (ev.key === 'ArrowRight') {
-                ev.preventDefault();
-                recordHistoryBeforeChange();
-                nudgeLayer(selectedLayer, step, 0);
-                return;
-            }
-            if (ev.key === 'ArrowUp') {
-                ev.preventDefault();
-                recordHistoryBeforeChange();
-                nudgeLayer(selectedLayer, 0, -step);
-                return;
-            }
-            if (ev.key === 'ArrowDown') {
-                ev.preventDefault();
-                recordHistoryBeforeChange();
-                nudgeLayer(selectedLayer, 0, step);
-                return;
-            }
-        }
-
-        if (ev.key !== 'Escape') return;
-        const tfm = rootEl.querySelector('#wcTextFormatMenu');
-        if (tfm && !tfm.hidden) {
-            hideTextFormatMenu();
-            return;
-        }
-        const menu = rootEl.querySelector('#wcContextMenu');
-        if (menu && !menu.hidden) {
-            hideContextMenu();
-            return;
-        }
-        if (editingTextLayer) {
-            commitActiveTextEditIfAny();
-            return;
-        }
-        setSelectedLayer(null);
-        clearGuides();
-    }
-
-    const LAYER_LABELS = {
-        avatar: 'Avatar',
-        title: 'Título',
-        name: 'Nombre / línea central',
-        subtitle: 'Subtítulo',
-        overlay: 'Texto extra (esquina)'
-    };
-
-    const WC_SWATCH_COLORS = ['ffffff', 'f8fafc', 'fca5a5', 'fdba74', 'fde047', '4ade80', '22d3ee', '60a5fa', 'a78bfa', 'f472b6', 'e2e8f0', '334155'];
-
-    function parseMarkupSegs(input) {
-        const s = String(input ?? '');
-        const segments = [];
+    function parseMarkup(src) {
+        const s = String(src ?? '');
+        const out = [];
         let color = null;
         let buf = '';
         const flush = () => {
-            if (!buf) return;
-            segments.push({ text: buf, color });
+            if (buf) out.push({ t: buf, c: color });
             buf = '';
         };
         const re = /\[\[#([0-9a-fA-F]{6})\]\]|\[\[\/\]\]/gi;
@@ -327,1416 +272,89 @@
         }
         buf += s.slice(last);
         flush();
-        return segments.length ? segments : [{ text: s, color: null }];
+        return out.length ? out : [{ t: s, c: null }];
     }
 
-    function stripColorMarkup(input) {
-        return String(input || '')
-            .replace(/\[\[#([0-9a-fA-F]{6})\]\]/gi, '')
-            .replace(/\[\[\/\]\]/g, '');
-    }
-
-    function escHtml(t) {
-        return String(t)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-    }
-
-    function markupToHtml(src) {
-        return parseMarkupSegs(src)
+    function markupHtml(src) {
+        return parseMarkup(src)
             .map((seg) => {
-                const inner = escHtml(seg.text || '').replace(/\n/g, '<br>');
-                if (seg.color && /^[0-9a-f]{6}$/i.test(seg.color)) {
-                    const h = seg.color.toLowerCase();
-                    return `<span class="wc-rich" data-wc-c="${h}" style="color:#${h}">${inner}</span>`;
+                const inner = esc(seg.t).replace(/\n/g, '<br>');
+                if (seg.c && /^[0-9a-f]{6}$/.test(seg.c)) {
+                    return `<span class="eyestudio-rich" data-c="${seg.c}" style="color:#${seg.c}">${inner}</span>`;
                 }
                 return inner;
             })
             .join('');
     }
 
-    function htmlToMarkup(root) {
-        function walk(node) {
-            if (node.nodeType === 3) return String(node.textContent || '').replace(/\u00a0/g, ' ');
-            if (node.nodeType !== 1) return '';
-            const el = node;
-            if (el.tagName === 'BR') return '\n';
-            if (el.classList && el.classList.contains('wc-rich')) {
-                const hex = String(el.getAttribute('data-wc-c') || '').toLowerCase();
+    function htmlToMarkup(node) {
+        function walk(n) {
+            if (n.nodeType === 3) return String(n.textContent || '').replace(/\u00a0/g, ' ');
+            if (n.nodeType !== 1) return '';
+            if (n.tagName === 'BR') return '\n';
+            if (n.classList?.contains('eyestudio-rich')) {
+                const hex = String(n.getAttribute('data-c') || '').toLowerCase();
                 let inner = '';
-                for (const c of el.childNodes) inner += walk(c);
+                for (const c of n.childNodes) inner += walk(c);
                 if (/^[0-9a-f]{6}$/.test(hex) && inner) return `[[#${hex}]]${inner}[[/]]`;
                 return inner;
             }
-            let out = '';
-            for (const c of el.childNodes) out += walk(c);
-            return out;
+            let o = '';
+            for (const c of n.childNodes) o += walk(c);
+            return o;
         }
-        let res = '';
-        for (const c of root.childNodes) res += walk(c);
-        return res;
+        let r = '';
+        for (const c of node.childNodes) r += walk(c);
+        return r;
     }
 
-    function getEditingTextLayerEl() {
-        return editingTextLayer ? rootEl?.querySelector(`[data-drag="${editingTextLayer}"]`) : null;
-    }
-
-    function wrapSelectionWithColor(hex) {
-        const h = String(hex || '').replace('#', '').toLowerCase();
-        if (!/^[0-9a-f]{6}$/.test(h)) return;
-        const layer = getEditingTextLayerEl();
-        if (!layer) return;
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || !layer.contains(sel.anchorNode) || !layer.contains(sel.focusNode)) {
-            toast('Selecciona un fragmento de texto primero', 'warning');
-            return;
-        }
-        layer.focus();
-        const range = sel.getRangeAt(0);
-        const span = document.createElement('span');
-        span.className = 'wc-rich';
-        span.setAttribute('data-wc-c', h);
-        span.style.color = `#${h}`;
-        try {
-            range.surroundContents(span);
-        } catch {
-            const frag = range.extractContents();
-            span.appendChild(frag);
-            range.insertNode(span);
-        }
-        sel.removeAllRanges();
-        const nr = document.createRange();
-        nr.selectNodeContents(span);
-        nr.collapse(false);
-        sel.addRange(nr);
-        layer.dispatchEvent(new Event('input', { bubbles: true }));
-        toast('Color aplicado al fragmento', 'success');
-    }
-
-    function unwrapSelectionColor() {
-        const layer = getEditingTextLayerEl();
-        if (!layer) return;
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return;
-        let node = sel.anchorNode;
-        if (node.nodeType === 3) node = node.parentElement;
-        const span = node && node.closest && node.closest('span.wc-rich');
-        if (!span || !layer.contains(span)) {
-            toast('Coloca el cursor dentro de un color aplicado', 'warning');
-            return;
-        }
-        const parent = span.parentNode;
-        if (!parent) return;
-        while (span.firstChild) parent.insertBefore(span.firstChild, span);
-        parent.removeChild(span);
-        layer.dispatchEvent(new Event('input', { bubbles: true }));
-        toast('Color quitado del fragmento', 'success');
-    }
-
-    function insertVarAtCaret(token) {
-        const layer = getEditingTextLayerEl();
-        if (!layer) return;
-        layer.focus();
-        const sel = window.getSelection();
-        if (!sel.rangeCount) return;
-        const r = sel.getRangeAt(0);
-        r.deleteContents();
-        const tn = document.createTextNode(token);
-        r.insertNode(tn);
-        r.setStartAfter(tn);
-        r.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(r);
-        layer.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    function buildTextFormatMenuHtml(hasSelection) {
-        const sw = WC_SWATCH_COLORS.map(
-            (c) =>
-                `<button type="button" class="wc-txtfmt__sw" data-tfmt="color" data-hex="${c}" title="#${c}" style="--sw:#${c}"></button>`
-        ).join('');
-        const colorBlock = hasSelection
-            ? `
-            <div class="wc-txtfmt__heading">Color del fragmento</div>
-            <div class="wc-txtfmt__swatches">${sw}</div>
-            <label class="wc-txtfmt__colorpick"><span>Otro color</span><input type="color" id="wcTxtFmtColorPick" value="#ffffff"></label>
-            <button type="button" class="wc-txtfmt__btn" data-tfmt="remove-color">Quitar color del fragmento</button>
-            <div class="wc-txtfmt__sep"></div>`
-            : '<p class="wc-txtfmt__hint">Selecciona texto para aplicar color.</p><div class="wc-txtfmt__sep"></div>';
-        return `
-            ${colorBlock}
-            <div class="wc-txtfmt__heading">Insertar variable</div>
-            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{user}">{user} — mención</button>
-            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{username}">{username}</button>
-            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{server}">{server}</button>
-            <button type="button" class="wc-txtfmt__btn" data-tfmt="var" data-token="{memberCount}">{memberCount}</button>
-            <p class="wc-txtfmt__foot">Los colores se guardan como [[#RRGGBB]]texto[[/]]. En subtítulo multilínea la PNG usa un solo color.</p>
-        `;
-    }
-
-    function positionTextFormatMenu(menu, clientX, clientY) {
-        menu.style.left = '0px';
-        menu.style.top = '0px';
-        menu.hidden = false;
-        const w = menu.offsetWidth;
-        const h = menu.offsetHeight;
-        let x = clientX + 2;
-        let y = clientY + 2;
-        const maxX = window.innerWidth - w - 8;
-        const maxY = window.innerHeight - h - 8;
-        if (x > maxX) x = Math.max(8, maxX);
-        if (y > maxY) y = Math.max(8, maxY);
-        menu.style.left = `${x}px`;
-        menu.style.top = `${y}px`;
-    }
-
-    function showTextFormatMenu(clientX, clientY, hasSelection) {
-        hideContextMenu();
-        const menu = rootEl?.querySelector('#wcTextFormatMenu');
-        if (!menu) return;
-        menu.innerHTML = buildTextFormatMenuHtml(hasSelection);
-        positionTextFormatMenu(menu, clientX, clientY);
-        menu.focus({ preventScroll: true });
-        const pick = menu.querySelector('#wcTxtFmtColorPick');
-        pick?.addEventListener('input', () => {
-            const v = String(pick.value || '').replace('#', '').toLowerCase();
-            if (/^[0-9a-f]{6}$/.test(v)) wrapSelectionWithColor(v);
-            hideTextFormatMenu();
-        });
-    }
-
-    function runTextFormatAction(btn) {
-        const kind = btn.dataset.tfmt;
-        if (kind === 'color') wrapSelectionWithColor(btn.dataset.hex || '');
-        else if (kind === 'remove-color') unwrapSelectionColor();
-        else if (kind === 'var') insertVarAtCaret(btn.dataset.token || '');
-        hideTextFormatMenu();
-    }
-
-    function onTextFormatMenuClick(ev) {
-        const menu = rootEl?.querySelector('#wcTextFormatMenu');
-        if (!menu || menu.hidden) return;
-        const btn = ev.target.closest('button[data-tfmt]');
-        if (!btn || !menu.contains(btn)) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        runTextFormatAction(btn);
-    }
-
-    function setActiveTool(tool) {
-        activeTool = tool || 'select';
-        rootEl?.querySelectorAll('.wc-studio__tool[data-tool]').forEach((b) => {
-            b.classList.toggle('is-active', b.dataset.tool === activeTool);
-        });
-        if (activeTool === 'bg' || activeTool === 'avatar') {
-            rightPanelTab = 'adjust';
-            rootEl?.querySelectorAll('.wc-studio__panel-tab').forEach((t) => {
-                t.classList.toggle('is-active', t.dataset.panelTab === rightPanelTab);
-            });
-        }
-        renderRightPanel();
-        updateStatusBar();
-    }
-
-    function resetLayerToDefault(key) {
-        const d = DEFAULT_LAYOUT;
-        if (key === 'avatar') {
-            layout.avatarCx = d.avatarCx;
-            layout.avatarCy = d.avatarCy;
-            layout.avatarR = d.avatarR;
-        } else if (key === 'title') {
-            layout.titleX = d.titleX;
-            layout.titleY = d.titleY;
-        } else if (key === 'name') {
-            layout.nameX = d.nameX;
-            layout.nameY = d.nameY;
-        } else if (key === 'subtitle') {
-            layout.subtitleX = d.subtitleX;
-            layout.subtitleY = d.subtitleY;
-        } else if (key === 'overlay') {
-            layout.overlayX = d.overlayX;
-            layout.overlayY = d.overlayY;
-        }
-        syncDomFromLayout();
-    }
-
-    function centerLayerX(key) {
-        const cx = W / 2;
-        if (key === 'title') layout.titleX = cx;
-        else if (key === 'name') layout.nameX = cx;
-        else if (key === 'subtitle') layout.subtitleX = cx;
-        else if (key === 'overlay') layout.overlayX = cx;
-        else if (key === 'avatar') layout.avatarCx = cx;
-        syncDomFromLayout();
-    }
-
-    function centerLayerY(key) {
-        if (key === 'title') layout.titleY = Math.round(H * 0.36);
-        else if (key === 'name') layout.nameY = Math.round(H * 0.48);
-        else if (key === 'subtitle') layout.subtitleY = Math.round(H * 0.6);
-        else if (key === 'avatar') layout.avatarCy = Math.round(H * 0.32);
-        else if (key === 'overlay') layout.overlayY = H - 36;
-        syncDomFromLayout();
-    }
-
-    function nudgeLayer(key, dx, dy) {
-        if (key === 'avatar') {
-            layout.avatarCx = clamp(layout.avatarCx + dx, layout.avatarR + 8, W - layout.avatarR - 8);
-            layout.avatarCy = clamp(layout.avatarCy + dy, layout.avatarR + 8, H - layout.avatarR - 8);
-        } else if (key === 'title') {
-            layout.titleX = clamp(layout.titleX + dx, 40, W - 40);
-            layout.titleY = clamp(layout.titleY + dy, 16, H - 100);
-        } else if (key === 'name') {
-            layout.nameX = clamp(layout.nameX + dx, 40, W - 40);
-            layout.nameY = clamp(layout.nameY + dy, 16, H - 80);
-        } else if (key === 'subtitle') {
-            layout.subtitleX = clamp(layout.subtitleX + dx, 40, W - 40);
-            layout.subtitleY = clamp(layout.subtitleY + dy, 16, H - 36);
-        } else if (key === 'overlay') {
-            layout.overlayX = clamp(layout.overlayX + dx, 48, W - 4);
-            layout.overlayY = clamp(layout.overlayY + dy, 18, H - 4);
-        }
-        syncDomFromLayout();
-    }
-
-    function distributeTextsVertically() {
-        const cx = W / 2;
-        layout.titleX = cx;
-        layout.nameX = cx;
-        layout.subtitleX = cx;
-        layout.titleY = 218;
-        layout.nameY = 292;
-        layout.subtitleY = 366;
-        syncDomFromLayout();
-        toast('Textos distribuidos en vertical', 'success');
-    }
-
-    function mirrorLayoutHorizontal() {
-        layout.titleX = W - layout.titleX;
-        layout.nameX = W - layout.nameX;
-        layout.subtitleX = W - layout.subtitleX;
-        layout.avatarCx = W - layout.avatarCx;
-        layout.overlayX = W - layout.overlayX;
-        syncDomFromLayout();
-        toast('Diseño reflejado en horizontal', 'success');
-    }
-
-    function setBgFocal(fx, fy) {
-        layout.bgFocalX = clamp(Number(fx) || 0.5, 0, 1);
-        layout.bgFocalY = clamp(Number(fy) || 0.5, 0, 1);
-        syncDomFromLayout();
-        renderRightPanel();
-    }
-
-    function flashCenterGuides() {
-        renderGuides([W / 2], [H / 2]);
-        window.setTimeout(() => {
-            if (rootEl?.classList.contains('is-open')) clearGuides();
-        }, 1400);
-    }
-
-    async function copyLayoutJson() {
-        try {
-            await navigator.clipboard.writeText(JSON.stringify(layout, null, 2));
-            toast('Posiciones copiadas al portapapeles (JSON)', 'success');
-        } catch {
-            toast('No se pudo copiar (permiso del navegador)', 'error');
-        }
-    }
-
-    async function pasteLayoutJson() {
-        try {
-            const raw = await navigator.clipboard.readText();
-            const parsed = JSON.parse(raw);
-            layout = mergeCardLayout(parsed);
-            syncDomFromLayout();
-            renderRightPanel();
-            toast('Posiciones pegadas desde JSON', 'success');
-        } catch {
-            toast('Portapapeles vacío o JSON inválido', 'error');
-        }
-    }
-
-    function buildContextMenuHtml(layerKey) {
-        const layerLabel = layerKey ? LAYER_LABELS[layerKey] || layerKey : null;
-        const layerBlock =
-            layerKey && layerLabel
-                ? `
-            <div class="wc-ctx__heading">Capa: ${layerLabel}</div>
-            <button type="button" class="wc-ctx__item" data-action="layer-select" data-layer="${layerKey}">Seleccionar esta capa</button>
-            <button type="button" class="wc-ctx__item" data-action="layer-center-x" data-layer="${layerKey}">Centrar en horizontal (X)</button>
-            <button type="button" class="wc-ctx__item" data-action="layer-center-y" data-layer="${layerKey}">Centrar en vertical (Y sugerido)</button>
-            <button type="button" class="wc-ctx__item" data-action="layer-reset" data-layer="${layerKey}">Restaurar posición por defecto de la capa</button>
-            <div class="wc-ctx__subhead">Mover la capa (px)</div>
-            <div class="wc-ctx__grid4">
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="-10">↑</button>
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="-10" data-dy="0">←</button>
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="10" data-dy="0">→</button>
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="10">↓</button>
-            </div>
-            <div class="wc-ctx__grid4">
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="-1">▴</button>
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="-1" data-dy="0">◂</button>
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="1" data-dy="0">▸</button>
-                <button type="button" class="wc-ctx__mini" data-action="nudge" data-layer="${layerKey}" data-dx="0" data-dy="1">▾</button>
-            </div>
-            <div class="wc-ctx__sep"></div>`
-                : `
-            <div class="wc-ctx__hint">Clic derecho sobre una capa para opciones de esa capa.</div>
-            <div class="wc-ctx__sep"></div>`;
-
-        return `
-            <div class="wc-ctx__heading">Herramientas</div>
-            <button type="button" class="wc-ctx__item" data-action="tool-select">Seleccionar y mover capas</button>
-            <button type="button" class="wc-ctx__item" data-action="tool-avatar">Solo avatar (radio y arrastre)</button>
-            <button type="button" class="wc-ctx__item" data-action="tool-bg">Encuadre del fondo</button>
-            <div class="wc-ctx__sep"></div>
-            ${layerBlock}
-            <div class="wc-ctx__heading">Alineación global</div>
-            <button type="button" class="wc-ctx__item" data-action="align-texts-x">Centrar textos en horizontal</button>
-            <button type="button" class="wc-ctx__item" data-action="stack-texts">Apilar título · nombre · subtítulo</button>
-            <button type="button" class="wc-ctx__item" data-action="distribute-texts-y">Distribuir textos en vertical (3 bandas)</button>
-            <button type="button" class="wc-ctx__item" data-action="center-avatar">Centrar avatar en el lienzo</button>
-            <button type="button" class="wc-ctx__item" data-action="mirror-h">Reflejar todo en horizontal (espejo)</button>
-            <div class="wc-ctx__sep"></div>
-            <div class="wc-ctx__heading">Avatar — tamaño rápido</div>
-            <div class="wc-ctx__row">
-                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="56">S</button>
-                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="72">M</button>
-                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="88">L</button>
-                <button type="button" class="wc-ctx__pill" data-action="avatar-r" data-r="104">XL</button>
-            </div>
-            <div class="wc-ctx__sep"></div>
-            <div class="wc-ctx__heading">Fondo — punto de encuadre</div>
-            <button type="button" class="wc-ctx__item" data-action="bg-focal" data-fx="0.5" data-fy="0.5">Centro</button>
-            <div class="wc-ctx__row2">
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0" data-fy="0">↖</button>
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0.5" data-fy="0">↑</button>
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="1" data-fy="0">↗</button>
-            </div>
-            <div class="wc-ctx__row2">
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0" data-fy="0.5">←</button>
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="1" data-fy="0.5">→</button>
-            </div>
-            <div class="wc-ctx__row2">
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0" data-fy="1">↙</button>
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="0.5" data-fy="1">↓</button>
-                <button type="button" class="wc-ctx__pill" data-action="bg-focal" data-fx="1" data-fy="1">↘</button>
-            </div>
-            <div class="wc-ctx__sep"></div>
-            <div class="wc-ctx__heading">Zoom del lienzo</div>
-            <div class="wc-ctx__row">
-                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="70">70%</button>
-                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="85">85%</button>
-                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="100">100%</button>
-                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="115">115%</button>
-                <button type="button" class="wc-ctx__pill" data-action="zoom" data-z="130">130%</button>
-            </div>
-            <div class="wc-ctx__sep"></div>
-            <div class="wc-ctx__heading">Portapapeles</div>
-            <button type="button" class="wc-ctx__item" data-action="copy-layout">Copiar posiciones (JSON)</button>
-            <button type="button" class="wc-ctx__item" data-action="paste-layout">Pegar posiciones (JSON)</button>
-            <div class="wc-ctx__sep"></div>
-            <div class="wc-ctx__heading">Guías y vista</div>
-            <button type="button" class="wc-ctx__item" data-action="flash-guides">Mostrar cruz en centro (1,4 s)</button>
-            <button type="button" class="wc-ctx__item" data-action="clear-selection">Quitar selección de capa (Esc)</button>
-            <div class="wc-ctx__sep"></div>
-            <div class="wc-ctx__heading">Archivo y editor</div>
-            <button type="button" class="wc-ctx__item" data-action="upload-bg">Subir imagen de fondo…</button>
-            <button type="button" class="wc-ctx__item wc-ctx__item--warn" data-action="reset-all">Restablecer todo el diseño</button>
-            <button type="button" class="wc-ctx__item wc-ctx__item--accent" data-action="save-design">Guardar diseño y volver</button>
-            <button type="button" class="wc-ctx__item" data-action="close-studio">Cerrar sin guardar cambios del lienzo</button>
-            <p class="wc-ctx__foot">Clic fuera o Esc cierra este menú.</p>
-        `;
-    }
-
-    function positionContextMenu(menu, clientX, clientY) {
-        menu.style.left = '0px';
-        menu.style.top = '0px';
-        menu.hidden = false;
-        const w = menu.offsetWidth;
-        const h = menu.offsetHeight;
-        let x = clientX + 2;
-        let y = clientY + 2;
-        const maxX = window.innerWidth - w - 8;
-        const maxY = window.innerHeight - h - 8;
-        if (x > maxX) x = Math.max(8, maxX);
-        if (y > maxY) y = Math.max(8, maxY);
-        menu.style.left = `${x}px`;
-        menu.style.top = `${y}px`;
-    }
-
-    function showContextMenu(clientX, clientY, layerKey) {
-        hideTextFormatMenu();
-        const menu = rootEl?.querySelector('#wcContextMenu');
-        if (!menu) return;
-        menu.innerHTML = buildContextMenuHtml(layerKey);
-        positionContextMenu(menu, clientX, clientY);
-        menu.focus({ preventScroll: true });
-    }
-
-    function runContextAction(btn) {
-        const action = btn.dataset.action;
-        const layer = btn.dataset.layer;
-
-        switch (action) {
-            case 'tool-select':
-                setActiveTool('select');
-                break;
-            case 'tool-avatar':
-                setActiveTool('avatar');
-                break;
-            case 'tool-bg':
-                setActiveTool('bg');
-                break;
-            case 'layer-select':
-                if (layer) setSelectedLayer(layer);
-                break;
-            case 'layer-center-x':
-                if (layer) centerLayerX(layer);
-                break;
-            case 'layer-center-y':
-                if (layer) centerLayerY(layer);
-                break;
-            case 'layer-reset':
-                if (layer) {
-                    resetLayerToDefault(layer);
-                    toast('Capa restaurada', 'success');
-                }
-                break;
-            case 'nudge':
-                if (layer) {
-                    nudgeLayer(layer, Number(btn.dataset.dx) || 0, Number(btn.dataset.dy) || 0);
-                }
-                break;
-            case 'align-texts-x':
-                centerTextsX();
-                break;
-            case 'stack-texts':
-                stackTitleNameSubtitle();
-                break;
-            case 'distribute-texts-y':
-                distributeTextsVertically();
-                break;
-            case 'center-avatar':
-                centerAvatarOnCanvas();
-                break;
-            case 'mirror-h':
-                mirrorLayoutHorizontal();
-                break;
-            case 'avatar-r': {
-                const r = Number(btn.dataset.r);
-                if (Number.isFinite(r)) {
-                    layout.avatarR = clamp(r, 36, 150);
-                    syncDomFromLayout();
-                    renderRightPanel();
-                    toast(`Radio del avatar: ${Math.round(layout.avatarR)} px`, 'success');
-                }
-                break;
-            }
-            case 'bg-focal':
-                setBgFocal(btn.dataset.fx, btn.dataset.fy);
-                toast('Encuadre del fondo actualizado', 'success');
-                break;
-            case 'zoom': {
-                const z = Number(btn.dataset.z);
-                if (Number.isFinite(z)) {
-                    canvasUserZoomPct = clamp(z, 55, 130);
-                    applyCanvasUserZoom();
-                    renderRightPanel();
-                }
-                break;
-            }
-            case 'copy-layout':
-                copyLayoutJson();
-                break;
-            case 'paste-layout':
-                pasteLayoutJson();
-                break;
-            case 'flash-guides':
-                flashCenterGuides();
-                break;
-            case 'clear-selection':
-                setSelectedLayer(null);
-                clearGuides();
-                break;
-            case 'upload-bg':
-                rootEl?.querySelector('#wcStudioBgFile')?.click();
-                break;
-            case 'reset-all':
-                layout = { ...DEFAULT_LAYOUT };
-                canvasUserZoomPct = 100;
-                applyCanvasUserZoom();
-                syncDomFromLayout();
-                clearGuides();
-                renderRightPanel();
-                toast('Diseño restablecido', 'success');
-                break;
-            case 'save-design':
-                saveAndClose();
-                break;
-            case 'close-studio':
-                close();
-                break;
-            default:
-                break;
-        }
-    }
-
-    function onStudioContextMenu(ev) {
-        if (!rootEl?.classList.contains('is-open')) return;
-        if (ev.target.closest('#wcStudioPanel')) return;
-        if (ev.target.closest('#wcContextMenu')) return;
-        if (ev.target.closest('#wcTextFormatMenu')) return;
-        const editLayer = ev.target.closest('.wc-layer--editing');
-        if (editLayer && (ev.target === editLayer || editLayer.contains(ev.target))) {
-            ev.preventDefault();
-            const sel = window.getSelection();
-            const hasSel =
-                sel &&
-                !sel.isCollapsed &&
-                editLayer.contains(sel.anchorNode) &&
-                editLayer.contains(sel.focusNode);
-            showTextFormatMenu(ev.clientX, ev.clientY, Boolean(hasSel));
-            return;
-        }
-        ev.preventDefault();
-        const layerEl = ev.target.closest('[data-drag]');
-        const layerKey = layerEl?.dataset?.drag && LAYER_LABELS[layerEl.dataset.drag] ? layerEl.dataset.drag : null;
-        showContextMenu(ev.clientX, ev.clientY, layerKey);
-    }
-
-    function onDocumentClickCloseContext(ev) {
-        if (!rootEl?.classList.contains('is-open')) return;
-        const menu = rootEl.querySelector('#wcContextMenu');
-        const tfm = rootEl.querySelector('#wcTextFormatMenu');
-        if (tfm && !tfm.hidden) {
-            if (!tfm.contains(ev.target)) hideTextFormatMenu();
-        }
-        if (menu && !menu.hidden) {
-            if (!menu.contains(ev.target)) hideContextMenu();
-        }
-    }
-
-    function onContextMenuClick(ev) {
-        const menu = rootEl?.querySelector('#wcContextMenu');
-        if (!menu || menu.hidden) return;
-        const btn = ev.target.closest('button[data-action]');
-        if (!btn || !menu.contains(btn)) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        runContextAction(btn);
-        hideContextMenu();
-    }
-
-    function bindContextMenuShell() {
-        if (rootEl.dataset.ctxMenuBound) return;
-        rootEl.dataset.ctxMenuBound = '1';
-        rootEl.addEventListener('contextmenu', onStudioContextMenu);
-        rootEl.addEventListener('click', onContextMenuClick);
-        rootEl.addEventListener('click', onTextFormatMenuClick);
-        rootEl.addEventListener('pointerdown', (ev) => {
-            if (ev.target.closest('#wcContextMenu') || ev.target.closest('#wcTextFormatMenu')) ev.stopPropagation();
-        }, true);
-        document.addEventListener('click', onDocumentClickCloseContext, true);
-        window.addEventListener('resize', hideContextMenu);
-    }
-
-    function ensureRoot() {
-        if (rootEl) return rootEl;
-        rootEl = document.createElement('div');
-        rootEl.id = 'welcomeCardStudio';
-        rootEl.className = 'wc-studio';
-        rootEl.setAttribute('aria-hidden', 'true');
-        rootEl.innerHTML = `
-            <header class="wc-studio__topbar">
-                <div class="wc-studio__brand">
-                    <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioClose" aria-label="Cerrar editor">← Volver</button>
-                    <div class="wc-studio__logo" aria-hidden="true">WC</div>
-                    <div class="wc-studio__titlewrap">
-                        <h2 class="wc-studio__title">Studio de bienvenida</h2>
-                        <p class="wc-studio__subtitle">Tarjeta 920×520 · Editor profesional</p>
-                    </div>
-                </div>
-                <div class="wc-studio__top-center">
-                    <span class="wc-studio__chip">Lienzo <strong>${W}×${H}</strong></span>
-                    <span class="wc-studio__chip">Variables <strong>{user}</strong> <strong>{server}</strong></span>
-                </div>
-                <div class="wc-studio__actions">
-                    <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioUndo" title="Deshacer (Ctrl+Z)" disabled>↶</button>
-                    <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioRedo" title="Rehacer (Ctrl+Y)" disabled>↷</button>
-                    <input type="file" id="wcStudioBgFile" accept="image/*" class="wc-studio__file-input" aria-hidden="true" tabindex="-1">
-                    <button type="button" class="wc-studio__btn wc-studio__btn--accent" id="wcStudioUploadBg" title="Subir imagen de fondo">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        Fondo
-                    </button>
-                    <span class="wc-studio__upload-status" id="wcStudioUploadStatus" aria-live="polite"></span>
-                    <button type="button" class="wc-studio__btn wc-studio__btn--ghost" id="wcStudioReset">Restablecer</button>
-                    <button type="button" class="wc-studio__btn wc-studio__btn--primary" id="wcStudioSave">Guardar diseño</button>
-                </div>
-            </header>
-            <div class="wc-studio__body">
-                <aside class="wc-studio__toolbar" aria-label="Herramientas">
-                    <div class="wc-studio__toolbar-group">
-                        <span class="wc-studio__toolbar-label">Herramientas</span>
-                        <button type="button" class="wc-studio__tool is-active" data-tool="select" title="Seleccionar (V)">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
-                        </button>
-                        <button type="button" class="wc-studio__tool" data-tool="avatar" title="Avatar">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
-                        </button>
-                        <button type="button" class="wc-studio__tool" data-tool="bg" title="Encuadre fondo">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                        </button>
-                    </div>
-                    <div class="wc-studio__toolbar-divider"></div>
-                    <div class="wc-studio__toolbar-group">
-                        <span class="wc-studio__toolbar-label">Alinear</span>
-                        <button type="button" class="wc-studio__tool" data-action="align-texts-x" title="Centrar textos">≡</button>
-                        <button type="button" class="wc-studio__tool" data-action="mirror-h" title="Espejo horizontal">⇋</button>
-                    </div>
-                </aside>
-                <div class="wc-studio__workspace">
-                    <div class="wc-studio__canvas-toolbar">
-                        <div class="wc-studio__canvas-tools">
-                            <label class="wc-studio__toggle is-on" id="wcToggleSnap"><input type="checkbox" checked> Snap</label>
-                            <label class="wc-studio__toggle" id="wcToggleGrid"><input type="checkbox"> Cuadrícula</label>
-                            <label class="wc-studio__toggle is-on" id="wcToggleSafe"><input type="checkbox" checked> Zona segura</label>
-                        </div>
-                        <div class="wc-studio__zoom-pills" role="group" aria-label="Zoom">
-                            <button type="button" class="wc-studio__zoom-pill" data-zoom="70">70%</button>
-                            <button type="button" class="wc-studio__zoom-pill" data-zoom="85">85%</button>
-                            <button type="button" class="wc-studio__zoom-pill is-active" data-zoom="100">100%</button>
-                            <button type="button" class="wc-studio__zoom-pill" data-zoom="115">115%</button>
-                        </div>
-                    </div>
-                    <div class="wc-studio__canvas-wrap">
-                        <div class="wc-studio__zoom-outer" id="wcStudioZoomOuter">
-                            <div class="wc-studio__canvas-scaler">
-                                <div class="wc-studio__stage" id="wcStudioStage" style="width:${W}px;height:${H}px;">
-                                    <div class="wc-stage-bg" id="wcStageBg"></div>
-                                    <div class="wc-studio__grid-overlay" id="wcStudioGrid" aria-hidden="true"></div>
-                                    <div class="wc-studio__safe-overlay is-visible" id="wcStudioSafe" aria-hidden="true"></div>
-                                    <div class="wc-stage-vignette" aria-hidden="true"></div>
-                                    <div class="wc-layer wc-layer--avatar" id="wcLayerAvatar" data-drag="avatar" tabindex="0" role="button" aria-label="Avatar">
-                                        <div class="wc-avatar-ring" id="wcAvatarRing"></div>
-                                        <img class="wc-avatar-img" id="wcAvatarImg" alt="" width="160" height="160" draggable="false" />
-                                    </div>
-                                    <div class="wc-layer wc-layer--text wc-layer--title" id="wcLayerTitle" data-drag="title" tabindex="0"></div>
-                                    <div class="wc-layer wc-layer--text wc-layer--name" id="wcLayerName" data-drag="name" tabindex="0"></div>
-                                    <div class="wc-layer wc-layer--text wc-layer--subtitle" id="wcLayerSubtitle" data-drag="subtitle" tabindex="0"></div>
-                                    <div class="wc-layer wc-layer--text wc-layer--overlay" id="wcLayerOverlay" data-drag="overlay" tabindex="0"></div>
-                                    <svg class="wc-studio-guides" id="wcStudioGuides" viewBox="0 0 ${W} ${H}" aria-hidden="true"></svg>
-                                    <div class="wc-studio__stage-frame" aria-hidden="true"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <aside class="wc-studio__panel" id="wcStudioPanel">
-                    <div class="wc-studio__panel-tabs" role="tablist">
-                        <button type="button" class="wc-studio__panel-tab is-active" data-panel-tab="layers" role="tab">Capas</button>
-                        <button type="button" class="wc-studio__panel-tab" data-panel-tab="design" role="tab">Diseño</button>
-                        <button type="button" class="wc-studio__panel-tab" data-panel-tab="adjust" role="tab">Ajustes</button>
-                    </div>
-                    <div class="wc-studio__panel-body" id="wcStudioPanelBody"></div>
-                </aside>
-            </div>
-            <footer class="wc-studio__statusbar" id="wcStudioStatus" aria-live="polite"></footer>
-            <div id="wcContextMenu" class="wc-ctx" role="menu" hidden tabindex="-1"></div>
-            <div id="wcTextFormatMenu" class="wc-txtfmt" role="menu" hidden tabindex="-1"></div>
-        `;
-        document.body.appendChild(rootEl);
-        applyCanvasUserZoom();
-        document.addEventListener('keydown', studioKeyHandler);
-        bindChrome();
-        bindContextMenuShell();
-        return rootEl;
-    }
-
-    function toast(msg, type) {
-        if (typeof win.showToast === 'function') win.showToast(msg, type);
-    }
-
-    function clearGuides() {
-        const svg = rootEl?.querySelector('#wcStudioGuides');
-        if (svg) svg.innerHTML = '';
-    }
-
-    function renderGuides(verticalXs, horizontalYs) {
-        const svg = rootEl?.querySelector('#wcStudioGuides');
-        if (!svg) return;
-        const parts = [];
-        const vset = new Set(verticalXs.filter((x) => Number.isFinite(x)));
-        const hset = new Set(horizontalYs.filter((y) => Number.isFinite(y)));
-        vset.forEach((x) => {
-            parts.push(`<line class="wc-guide-line wc-guide-line--v" x1="${x}" y1="0" x2="${x}" y2="${H}" />`);
-        });
-        hset.forEach((y) => {
-            parts.push(`<line class="wc-guide-line wc-guide-line--h" x1="0" y1="${y}" x2="${W}" y2="${y}" />`);
-        });
-        if (vset.has(W / 2) && hset.has(H / 2)) {
-            parts.push(`<circle class="wc-guide-crosshair" cx="${W / 2}" cy="${H / 2}" r="6" />`);
-        }
-        svg.innerHTML = parts.join('');
-    }
-
-    function snapScalar(val, targets) {
-        if (!snapEnabled) return { value: val, hit: null };
-        let best = val;
-        let hit = null;
-        for (const t of targets) {
-            if (Math.abs(val - t) <= SNAP) {
-                best = t;
-                hit = t;
-                break;
-            }
-        }
-        return { value: best, hit };
-    }
-
-    /** Alineaciones X compartidas entre textos + centro lienzo + avatar. */
-    function snapXForLayer(key, x) {
-        const peers = [W / 2];
-        if (key !== 'title') peers.push(layout.titleX);
-        if (key !== 'name') peers.push(layout.nameX);
-        if (key !== 'subtitle') peers.push(layout.subtitleX);
-        if (key !== 'avatar') peers.push(layout.avatarCx);
-        const r = snapScalar(x, peers);
-        const guides = [];
-        if (r.hit != null) guides.push(r.hit);
-        return { x: r.value, guides };
-    }
-
-    function snapYForLayer(key, y) {
-        const peers = [H / 2];
-        if (key !== 'title') peers.push(layout.titleY);
-        if (key !== 'name') peers.push(layout.nameY);
-        if (key !== 'subtitle') peers.push(layout.subtitleY);
-        if (key !== 'avatar') peers.push(layout.avatarCy);
-        const r = snapScalar(y, peers);
-        const guides = [];
-        if (r.hit != null) guides.push(r.hit);
-        return { y: r.value, guides };
-    }
-
-    function snapOverlay(x, y) {
-        const xTargets = [W - 24, W / 2, 24];
-        const yTargets = [H - 20, H / 2, 24];
-        const sx = snapScalar(x, xTargets);
-        const sy = snapScalar(y, yTargets);
-        const gv = sx.hit != null ? [sx.hit] : [];
-        const gh = sy.hit != null ? [sy.hit] : [];
-        return { x: sx.value, y: sy.value, gv, gh };
-    }
-
-    function setSelectedLayer(key) {
-        selectedLayer = key;
-        rootEl?.querySelectorAll('.wc-layer').forEach((el) => {
-            const k = el.dataset.drag;
-            el.classList.toggle('wc-layer--selected', key != null && k === key);
-            el.classList.toggle('wc-layer--hidden', layerHidden.has(k));
-            el.classList.toggle('wc-layer--locked', layerLocked.has(k));
-        });
-        renderLayersList();
-        renderPropertiesInspector();
-        updateStatusBar();
-    }
-
-    function toggleLayerVisibility(key) {
-        if (layerHidden.has(key)) layerHidden.delete(key);
-        else layerHidden.add(key);
-        setSelectedLayer(selectedLayer);
-    }
-
-    function toggleLayerLock(key) {
-        if (layerLocked.has(key)) layerLocked.delete(key);
-        else layerLocked.add(key);
-        setSelectedLayer(selectedLayer);
-    }
-
-    function setLayerPositionFromInputs(key, x, y) {
-        if (!key || layerLocked.has(key)) return;
-        recordHistoryBeforeChange();
-        if (key === 'avatar') {
-            layout.avatarCx = clamp(x, layout.avatarR + 8, W - layout.avatarR - 8);
-            layout.avatarCy = clamp(y, layout.avatarR + 8, H - layout.avatarR - 8);
-        } else if (key === 'title') {
-            layout.titleX = clamp(x, 40, W - 40);
-            layout.titleY = clamp(y, 16, H - 100);
-        } else if (key === 'name') {
-            layout.nameX = clamp(x, 40, W - 40);
-            layout.nameY = clamp(y, 16, H - 80);
-        } else if (key === 'subtitle') {
-            layout.subtitleX = clamp(x, 40, W - 40);
-            layout.subtitleY = clamp(y, 16, H - 36);
-        } else if (key === 'overlay') {
-            layout.overlayX = clamp(x, 48, W - 4);
-            layout.overlayY = clamp(y, 18, H - 4);
-        }
-        syncDomFromLayout({ skipHistory: true });
-        renderPropertiesInspector();
-    }
-
-    function bindChrome() {
-        rootEl.querySelector('#wcStudioClose')?.addEventListener('click', close);
-        rootEl.querySelector('#wcStudioSave')?.addEventListener('click', saveAndClose);
-        rootEl.querySelector('#wcStudioUndo')?.addEventListener('click', undoHistory);
-        rootEl.querySelector('#wcStudioRedo')?.addEventListener('click', redoHistory);
-        rootEl.querySelector('#wcStudioReset')?.addEventListener('click', () => {
-            recordHistoryBeforeChange();
-            layout = { ...DEFAULT_LAYOUT };
-            canvasUserZoomPct = 100;
-            applyCanvasUserZoom();
-            syncDomFromLayout({ skipHistory: true });
-            clearGuides();
-            renderRightPanel();
-            updateZoomPills();
-            toast('Posiciones por defecto', 'success');
-        });
-        rootEl.querySelectorAll('.wc-studio__tool[data-tool]').forEach((btn) => {
-            btn.addEventListener('click', () => setActiveTool(btn.dataset.tool || 'select'));
-        });
-        rootEl.querySelector('[data-action="align-texts-x"]')?.addEventListener('click', () => {
-            recordHistoryBeforeChange();
-            centerTextsX();
-        });
-        rootEl.querySelector('[data-action="mirror-h"]')?.addEventListener('click', () => {
-            recordHistoryBeforeChange();
-            mirrorLayoutHorizontal();
-        });
-
-        rootEl.querySelector('#wcToggleSnap')?.addEventListener('click', (e) => {
-            if (e.target.tagName === 'INPUT') return;
-            snapEnabled = !snapEnabled;
-            const inp = rootEl.querySelector('#wcToggleSnap input');
-            if (inp) inp.checked = snapEnabled;
-            updateOverlayToggles();
-        });
-        rootEl.querySelector('#wcToggleSnap input')?.addEventListener('change', (e) => {
-            snapEnabled = e.target.checked;
-            updateOverlayToggles();
-        });
-        rootEl.querySelector('#wcToggleGrid')?.addEventListener('click', (e) => {
-            if (e.target.tagName === 'INPUT') return;
-            showGrid = !showGrid;
-            const inp = rootEl.querySelector('#wcToggleGrid input');
-            if (inp) inp.checked = showGrid;
-            updateOverlayToggles();
-        });
-        rootEl.querySelector('#wcToggleGrid input')?.addEventListener('change', (e) => {
-            showGrid = e.target.checked;
-            updateOverlayToggles();
-        });
-        rootEl.querySelector('#wcToggleSafe')?.addEventListener('click', (e) => {
-            if (e.target.tagName === 'INPUT') return;
-            showSafeZone = !showSafeZone;
-            const inp = rootEl.querySelector('#wcToggleSafe input');
-            if (inp) inp.checked = showSafeZone;
-            updateOverlayToggles();
-        });
-        rootEl.querySelector('#wcToggleSafe input')?.addEventListener('change', (e) => {
-            showSafeZone = e.target.checked;
-            updateOverlayToggles();
-        });
-
-        rootEl.querySelectorAll('.wc-studio__zoom-pill').forEach((pill) => {
-            pill.addEventListener('click', () => {
-                const z = Number(pill.dataset.zoom);
-                if (!Number.isFinite(z)) return;
-                canvasUserZoomPct = clamp(z, 55, 130);
-                applyCanvasUserZoom();
-                updateZoomPills();
-                updateStatusBar();
-            });
-        });
-
-        rootEl.querySelectorAll('.wc-studio__panel-tab').forEach((tab) => {
-            tab.addEventListener('click', () => {
-                rightPanelTab = tab.dataset.panelTab || 'layers';
-                rootEl.querySelectorAll('.wc-studio__panel-tab').forEach((t) => {
-                    t.classList.toggle('is-active', t.dataset.panelTab === rightPanelTab);
-                });
-                renderRightPanel();
-            });
-        });
-
-        const stage = rootEl.querySelector('#wcStudioStage');
-        stage.addEventListener('pointerdown', onStagePointerDown);
-        stage.addEventListener('pointerdown', (ev) => {
-            if (ev.target === stage || ev.target.id === 'wcStageBg' || ev.target.id === 'wcStudioGuides' || ev.target.classList.contains('wc-stage-vignette')) {
-                if (activeTool !== 'bg') setSelectedLayer(null);
-            }
-        });
-
-        const fileInput = rootEl.querySelector('#wcStudioBgFile');
-        const uploadBtn = rootEl.querySelector('#wcStudioUploadBg');
-        uploadBtn?.addEventListener('click', () => fileInput?.click());
-        fileInput?.addEventListener('change', onBackgroundFileSelected);
-        updateOverlayToggles();
-    }
-
-    function updateZoomPills() {
-        rootEl?.querySelectorAll('.wc-studio__zoom-pill').forEach((pill) => {
-            pill.classList.toggle('is-active', Number(pill.dataset.zoom) === canvasUserZoomPct);
-        });
-    }
-
-    function getLayerCoords(key) {
-        if (key === 'avatar') return { x: layout.avatarCx, y: layout.avatarCy };
-        if (key === 'title') return { x: layout.titleX, y: layout.titleY };
-        if (key === 'name') return { x: layout.nameX, y: layout.nameY };
-        if (key === 'subtitle') return { x: layout.subtitleX, y: layout.subtitleY };
-        if (key === 'overlay') return { x: layout.overlayX, y: layout.overlayY };
-        return { x: 0, y: 0 };
-    }
-
-    function renderLayersList() {
-        const host = rootEl?.querySelector('#wcStudioLayersList');
-        if (!host) return;
-        host.innerHTML = LAYER_ORDER.map((key) => {
-            const selected = selectedLayer === key;
-            const hidden = layerHidden.has(key);
-            const locked = layerLocked.has(key);
-            return `
-                <li class="wc-studio__layer-item${selected ? ' is-selected' : ''}" data-layer-pick="${key}">
-                    <span class="wc-studio__layer-icon">${LAYER_ICONS[key] || '·'}</span>
-                    <span class="wc-studio__layer-name">${LAYER_LABELS[key] || key}</span>
-                    <button type="button" class="wc-studio__layer-mini${hidden ? ' is-off' : ''}" data-layer-vis="${key}" title="Mostrar/ocultar">${hidden ? '○' : '●'}</button>
-                    <button type="button" class="wc-studio__layer-mini${locked ? '' : ' is-off'}" data-layer-lock="${key}" title="Bloquear">${locked ? '🔒' : '🔓'}</button>
-                </li>
-            `;
-        }).join('');
-
-        host.querySelectorAll('[data-layer-pick]').forEach((row) => {
-            row.addEventListener('click', (ev) => {
-                if (ev.target.closest('[data-layer-vis],[data-layer-lock]')) return;
-                setSelectedLayer(row.dataset.layerPick);
-                setActiveTool(row.dataset.layerPick === 'avatar' ? 'avatar' : 'select');
-            });
-        });
-        host.querySelectorAll('[data-layer-vis]').forEach((btn) => {
-            btn.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                toggleLayerVisibility(btn.dataset.layerVis);
-            });
-        });
-        host.querySelectorAll('[data-layer-lock]').forEach((btn) => {
-            btn.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                toggleLayerLock(btn.dataset.layerLock);
-            });
-        });
-    }
-
-    function renderPropertiesInspector() {
-        const box = rootEl?.querySelector('#wcStudioProps');
-        if (!box) return;
-        if (!selectedLayer) {
-            box.innerHTML = '<p class="wc-studio__hint">Selecciona una capa en la lista para editar posición exacta (px).</p>';
-            return;
-        }
-        const c = getLayerCoords(selectedLayer);
-        const locked = layerLocked.has(selectedLayer);
-        box.innerHTML = `
-            <div class="wc-studio__props-grid">
-                <div class="wc-studio__field">
-                    <label class="wc-studio__label">Posición X</label>
-                    <input type="number" class="wc-studio__input" id="wcPropX" min="0" max="${W}" value="${Math.round(c.x)}" ${locked ? 'disabled' : ''}>
-                </div>
-                <div class="wc-studio__field">
-                    <label class="wc-studio__label">Posición Y</label>
-                    <input type="number" class="wc-studio__input" id="wcPropY" min="0" max="${H}" value="${Math.round(c.y)}" ${locked ? 'disabled' : ''}>
-                </div>
-            </div>
-            ${selectedLayer === 'avatar' ? `
-                <label class="wc-studio__label" style="margin-top:0.65rem">Radio avatar (${Math.round(layout.avatarR)} px)</label>
-                <input type="range" id="wcPropAvatarR" min="48" max="130" value="${Math.round(layout.avatarR)}" class="wc-studio__range" ${locked ? 'disabled' : ''}>
-            ` : ''}
-            <p class="wc-studio__hint">Flechas del teclado: mover 1 px · Shift: 10 px</p>
-        `;
-        const applyXY = () => {
-            const x = Number(box.querySelector('#wcPropX')?.value);
-            const y = Number(box.querySelector('#wcPropY')?.value);
-            if (Number.isFinite(x) && Number.isFinite(y)) setLayerPositionFromInputs(selectedLayer, x, y);
+    function previewTexts() {
+        if (typeof opts?.getPreviewLines === 'function') return opts.getPreviewLines();
+        const raw = opts?.getRawCardTexts?.() || {};
+        return {
+            title: raw.title || '¡Bienvenido!',
+            name: raw.cardNameTemplate || '{username}',
+            sub: raw.message || '',
+            overlay: raw.cardOverlayText || ''
         };
-        box.querySelector('#wcPropX')?.addEventListener('change', applyXY);
-        box.querySelector('#wcPropY')?.addEventListener('change', applyXY);
-        box.querySelector('#wcPropAvatarR')?.addEventListener('input', (e) => {
-            recordHistoryBeforeChange();
-            layout.avatarR = Number(e.target.value) || 78;
-            syncDomFromLayout({ skipHistory: true });
-            renderPropertiesInspector();
-        });
     }
 
-    function renderRightPanel() {
-        const body = rootEl?.querySelector('#wcStudioPanelBody');
-        if (!body) return;
-
-        if (rightPanelTab === 'layers') {
-            body.innerHTML = `
-                <div class="wc-studio__section">
-                    <h4 class="wc-studio__section-title">Capas</h4>
-                    <ul class="wc-studio__layer-list" id="wcStudioLayersList"></ul>
-                </div>
-                <div class="wc-studio__section">
-                    <h4 class="wc-studio__section-title">Transformar</h4>
-                    <div id="wcStudioProps"></div>
-                </div>
-                <div class="wc-studio__section">
-                    <h4 class="wc-studio__section-title">Atajos</h4>
-                    <div class="wc-studio__kbd-row">
-                        <span class="wc-studio__kbd">Ctrl+Z</span><span class="wc-studio__kbd">Ctrl+Y</span>
-                        <span class="wc-studio__kbd">Ctrl+S</span><span class="wc-studio__kbd">Esc</span>
-                    </div>
-                    <p class="wc-studio__hint">Doble clic en texto para editar · Clic derecho: menú contextual y color de fragmento.</p>
-                </div>
-            `;
-            renderLayersList();
-            renderPropertiesInspector();
-            return;
-        }
-
-        if (rightPanelTab === 'design') {
-            const presets = Object.entries(LAYOUT_PRESETS)
-                .map(([k, p]) => `<button type="button" class="wc-studio__preset" data-preset="${k}">${p.label}</button>`)
-                .join('');
-            body.innerHTML = `
-                <div class="wc-studio__section">
-                    <h4 class="wc-studio__section-title">Plantillas</h4>
-                    <div class="wc-studio__preset-grid">${presets}</div>
-                </div>
-                <div class="wc-studio__section">
-                    <h4 class="wc-studio__section-title">Alineación</h4>
-                    <div class="wc-studio__btn-stack">
-                        <button type="button" class="wc-studio__side-btn" id="wcAlignTextsX">Centrar textos (horizontal)</button>
-                        <button type="button" class="wc-studio__side-btn" id="wcStackTexts">Apilar título · nombre · subtítulo</button>
-                        <button type="button" class="wc-studio__side-btn" id="wcDistributeTexts">Distribuir en vertical</button>
-                        <button type="button" class="wc-studio__side-btn" id="wcAlignAvatar">Centrar avatar</button>
-                        <button type="button" class="wc-studio__side-btn" id="wcMirrorH">Espejo horizontal</button>
-                    </div>
-                </div>
-            `;
-            body.querySelectorAll('[data-preset]').forEach((btn) => {
-                btn.addEventListener('click', () => applyLayoutPreset(btn.dataset.preset));
-            });
-            body.querySelector('#wcAlignTextsX')?.addEventListener('click', () => { recordHistoryBeforeChange(); centerTextsX(); });
-            body.querySelector('#wcStackTexts')?.addEventListener('click', () => { recordHistoryBeforeChange(); stackTitleNameSubtitle(); });
-            body.querySelector('#wcDistributeTexts')?.addEventListener('click', () => { recordHistoryBeforeChange(); distributeTextsVertically(); });
-            body.querySelector('#wcAlignAvatar')?.addEventListener('click', () => { recordHistoryBeforeChange(); centerAvatarOnCanvas(); });
-            body.querySelector('#wcMirrorH')?.addEventListener('click', () => { recordHistoryBeforeChange(); mirrorLayoutHorizontal(); });
-            return;
-        }
-
-        body.innerHTML = `
-            <div class="wc-studio__section">
-                <h4 class="wc-studio__section-title">Herramienta activa</h4>
-                <p class="wc-studio__hint">${activeTool === 'bg' ? 'Arrastra el fondo o usa los sliders de encuadre.' : activeTool === 'avatar' ? 'Arrastra solo el avatar y ajusta el radio.' : 'Selecciona capas y arrástralas con snap inteligente.'}</p>
-            </div>
-            ${activeTool === 'bg' ? `
-            <div class="wc-studio__section">
-                <label class="wc-studio__label">Encuadre horizontal</label>
-                <input type="range" id="wcBgFx" min="0" max="100" value="${Math.round(layout.bgFocalX * 100)}" class="wc-studio__range">
-                <label class="wc-studio__label">Encuadre vertical</label>
-                <input type="range" id="wcBgFy" min="0" max="100" value="${Math.round(layout.bgFocalY * 100)}" class="wc-studio__range">
-            </div>` : ''}
-            ${activeTool === 'avatar' ? `
-            <div class="wc-studio__section">
-                <label class="wc-studio__label">Radio del avatar (${Math.round(layout.avatarR)} px)</label>
-                <input type="range" id="wcAvatarRadius" min="48" max="130" value="${Math.round(layout.avatarR)}" class="wc-studio__range">
-            </div>` : ''}
-            <div class="wc-studio__section">
-                <label class="wc-studio__label" for="wcCanvasZoom">Zoom (${canvasUserZoomPct}%)</label>
-                <input type="range" id="wcCanvasZoom" min="55" max="130" value="${canvasUserZoomPct}" class="wc-studio__range">
-            </div>
-            <div class="wc-studio__section">
-                <h4 class="wc-studio__section-title">Portapapeles</h4>
-                <div class="wc-studio__btn-stack">
-                    <button type="button" class="wc-studio__side-btn" id="wcCopyLayout">Copiar layout (JSON)</button>
-                    <button type="button" class="wc-studio__side-btn" id="wcPasteLayout">Pegar layout (JSON)</button>
-                </div>
-            </div>
-        `;
-        body.querySelector('#wcBgFx')?.addEventListener('input', (e) => {
-            layout.bgFocalX = (Number(e.target.value) || 0) / 100;
-            syncDomFromLayout();
-        });
-        body.querySelector('#wcBgFy')?.addEventListener('input', (e) => {
-            layout.bgFocalY = (Number(e.target.value) || 0) / 100;
-            syncDomFromLayout();
-        });
-        body.querySelector('#wcAvatarRadius')?.addEventListener('input', (e) => {
-            layout.avatarR = Number(e.target.value) || 78;
-            syncDomFromLayout();
-        });
-        body.querySelector('#wcCanvasZoom')?.addEventListener('input', (e) => {
-            canvasUserZoomPct = Number(e.target.value) || 100;
-            applyCanvasUserZoom();
-            updateZoomPills();
-            updateStatusBar();
-        });
-        body.querySelector('#wcCopyLayout')?.addEventListener('click', copyLayoutJson);
-        body.querySelector('#wcPasteLayout')?.addEventListener('click', () => {
-            recordHistoryBeforeChange();
-            pasteLayoutJson();
-        });
-    }
-
-    async function onBackgroundFileSelected(ev) {
-        const file = ev.target.files?.[0];
-        ev.target.value = '';
-        if (!file || !String(file.type || '').startsWith('image/')) {
-            toast('Elige un archivo de imagen', 'warning');
-            return;
-        }
-        const status = rootEl.querySelector('#wcStudioUploadStatus');
-        if (!optsRef?.processAndUploadBackground) {
-            toast('No hay procesador de imagen disponible.', 'error');
-            return;
-        }
-        if (status) status.textContent = 'Procesando y subiendo…';
-        uploadBtnBusy(true);
-        try {
-            const url = await optsRef.processAndUploadBackground(file);
-            applyBgImage(url);
-            if (optsRef?.onBackgroundUploaded) optsRef.onBackgroundUploaded(url);
-            toast('Fondo procesado y subido', 'success');
-            if (status) status.textContent = 'Listo';
-        } catch (err) {
-            console.error(err);
-            toast(err?.message || 'Error al subir el fondo', 'error');
-            if (status) status.textContent = '';
-        } finally {
-            uploadBtnBusy(false);
-        }
-    }
-
-    function uploadBtnBusy(busy) {
-        const b = rootEl?.querySelector('#wcStudioUploadBg');
-        if (b) {
-            b.disabled = busy;
-            b.classList.toggle('is-loading', busy);
-        }
-    }
-
-    function stageScale() {
-        const stage = rootEl.querySelector('#wcStudioStage');
-        if (!stage) return 1;
-        const r = stage.getBoundingClientRect();
-        return W / r.width;
-    }
-
-    function onStagePointerDown(ev) {
-        if (activeTool !== 'bg') return;
-        const stage = rootEl.querySelector('#wcStudioStage');
-        if (!stage || ev.target.closest('[data-drag]')) return;
-        if (!ev.target.closest('#wcStudioStage')) return;
-        ev.preventDefault();
-        historyDragSnapshot = JSON.stringify(layout);
-        const start = { x: ev.clientX, y: ev.clientY, fx: layout.bgFocalX, fy: layout.bgFocalY };
-        let moved = false;
-        const onMove = (e) => {
-            moved = true;
-            const dx = (e.clientX - start.x) / 400;
-            const dy = (e.clientY - start.y) / 250;
-            layout.bgFocalX = clamp(start.fx - dx, 0, 1);
-            layout.bgFocalY = clamp(start.fy - dy, 0, 1);
-            syncDomFromLayout();
+    function applyTextsToDom() {
+        const lines = previewTexts();
+        const st = styleFromConfig();
+        const ff = fontFamily(st.font);
+        const map = {
+            title: { el: '#esTitle', html: lines.title, color: st.title, size: '2rem', weight: '800' },
+            name: { el: '#esName', html: lines.name, color: st.name, size: '1.35rem', weight: '600' },
+            subtitle: { el: '#esSub', html: lines.sub, color: st.sub, size: '1.05rem', weight: '500', italic: true },
+            overlay: { el: '#esOverlay', html: lines.overlay, color: st.overlay, size: '0.95rem', weight: '700' }
         };
-        const onUp = () => {
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-            if (moved && historyDragSnapshot && historyDragSnapshot !== JSON.stringify(layout)) {
-                historyPast.push(historyDragSnapshot);
-                if (historyPast.length > HISTORY_MAX) historyPast.shift();
-                historyFuture = [];
-                updateHistoryButtons();
+        Object.entries(map).forEach(([id, cfg]) => {
+            const node = root?.querySelector(cfg.el);
+            if (!node) return;
+            node.innerHTML = markupHtml(cfg.html);
+            node.style.color = cfg.color;
+            node.style.fontFamily = ff;
+            node.style.fontSize = cfg.size;
+            node.style.fontWeight = cfg.weight;
+            if (cfg.italic) node.style.fontStyle = 'italic';
+            if (id === 'overlay') {
+                const empty = !String(cfg.html || '').replace(/\[\[\/\]\]|\[\[#([0-9a-fA-F]{6})\]\]/gi, '').trim();
+                node.classList.toggle('eyestudio__overlay-empty', empty);
             }
-            historyDragSnapshot = null;
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-    }
-
-    function bindLayerDrag(el, key) {
-        el.addEventListener('pointerdown', (ev) => {
-            if (ev.pointerType === 'mouse' && ev.button !== 0) return;
-            if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') return;
-            if (activeTool === 'bg') return;
-            if (activeTool === 'avatar' && key !== 'avatar') return;
-            if (layerLocked.has(key) || layerHidden.has(key)) {
-                toast('Capa bloqueada u oculta', 'warning');
-                return;
-            }
-
-            ev.preventDefault();
-            ev.stopPropagation();
-            setSelectedLayer(key);
-
-            const sc = stageScale();
-            const start = {
-                x: ev.clientX,
-                y: ev.clientY,
-                layout: { ...layout }
-            };
-            let moved = false;
-
-            const onMove = (e) => {
-                if (!moved) {
-                    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < DRAG_THRESHOLD) return;
-                    moved = true;
-                }
-                const dx = (e.clientX - start.x) * sc;
-                const dy = (e.clientY - start.y) * sc;
-                const verticalGuides = [];
-                const horizontalGuides = [];
-
-                if (key === 'avatar') {
-                    let cx = clamp(start.layout.avatarCx + dx, layout.avatarR + 8, W - layout.avatarR - 8);
-                    let cy = clamp(start.layout.avatarCy + dy, layout.avatarR + 8, H - layout.avatarR - 8);
-                    const sx = snapXForLayer('avatar', cx);
-                    const sy = snapYForLayer('avatar', cy);
-                    cx = sx.x;
-                    cy = sy.y;
-                    verticalGuides.push(...sx.guides);
-                    horizontalGuides.push(...sy.guides);
-                    layout.avatarCx = cx;
-                    layout.avatarCy = cy;
-                } else if (key === 'title') {
-                    let tx = clamp(start.layout.titleX + dx, 40, W - 40);
-                    let ty = clamp(start.layout.titleY + dy, 16, H - 100);
-                    const sx = snapXForLayer('title', tx);
-                    const sy = snapYForLayer('title', ty);
-                    tx = sx.x;
-                    ty = sy.y;
-                    verticalGuides.push(...sx.guides);
-                    horizontalGuides.push(...sy.guides);
-                    layout.titleX = tx;
-                    layout.titleY = ty;
-                } else if (key === 'name') {
-                    let nx = clamp(start.layout.nameX + dx, 40, W - 40);
-                    let ny = clamp(start.layout.nameY + dy, 16, H - 80);
-                    const sx = snapXForLayer('name', nx);
-                    const sy = snapYForLayer('name', ny);
-                    nx = sx.x;
-                    ny = sy.y;
-                    verticalGuides.push(...sx.guides);
-                    horizontalGuides.push(...sy.guides);
-                    layout.nameX = nx;
-                    layout.nameY = ny;
-                } else if (key === 'subtitle') {
-                    let sx0 = clamp(start.layout.subtitleX + dx, 40, W - 40);
-                    let sy0 = clamp(start.layout.subtitleY + dy, 16, H - 36);
-                    const sx = snapXForLayer('subtitle', sx0);
-                    const sy = snapYForLayer('subtitle', sy0);
-                    sx0 = sx.x;
-                    sy0 = sy.y;
-                    verticalGuides.push(...sx.guides);
-                    horizontalGuides.push(...sy.guides);
-                    layout.subtitleX = sx0;
-                    layout.subtitleY = sy0;
-                } else if (key === 'overlay') {
-                    let ox = clamp(start.layout.overlayX + dx, 48, W - 4);
-                    let oy = clamp(start.layout.overlayY + dy, 18, H - 4);
-                    const so = snapOverlay(ox, oy);
-                    ox = so.x;
-                    oy = so.y;
-                    verticalGuides.push(...so.gv);
-                    horizontalGuides.push(...so.gh);
-                    layout.overlayX = ox;
-                    layout.overlayY = oy;
-                }
-
-                syncDomFromLayout();
-                renderGuides(verticalGuides, horizontalGuides);
-            };
-            const onUp = () => {
-                window.removeEventListener('pointermove', onMove);
-                window.removeEventListener('pointerup', onUp);
-                if (moved) {
-                    clearGuides();
-                    if (historyDragSnapshot && historyDragSnapshot !== JSON.stringify(layout)) {
-                        historyPast.push(historyDragSnapshot);
-                        if (historyPast.length > HISTORY_MAX) historyPast.shift();
-                        historyFuture = [];
-                        updateHistoryButtons();
-                    }
-                }
-                historyDragSnapshot = null;
-            };
-            historyDragSnapshot = JSON.stringify(layout);
-            window.addEventListener('pointermove', onMove);
-            window.addEventListener('pointerup', onUp);
         });
+        const ring = root?.querySelector('#esAvatarRing');
+        if (ring) ring.style.background = `linear-gradient(135deg, ${st.accent}, ${st.accent}88)`;
     }
 
-    function syncDomFromLayout(opts = {}) {
-        const bg = rootEl.querySelector('#wcStageBg');
-        if (bg) {
-            bg.style.backgroundPosition = `${layout.bgFocalX * 100}% ${layout.bgFocalY * 100}%`;
-        }
-
-        const av = rootEl.querySelector('#wcLayerAvatar');
-        if (av) {
-            const r = layout.avatarR;
-            av.style.left = `${layout.avatarCx}px`;
-            av.style.top = `${layout.avatarCy}px`;
-            av.style.width = `${r * 2}px`;
-            av.style.height = `${r * 2}px`;
-        }
-
-        const ring = rootEl.querySelector('#wcAvatarRing');
-        if (ring) {
-            const r = layout.avatarR;
-            ring.style.width = `${(r + Math.max(3, r * 0.07)) * 2}px`;
-            ring.style.height = `${(r + Math.max(3, r * 0.07)) * 2}px`;
-        }
-
-        const title = rootEl.querySelector('#wcLayerTitle');
-        const name = rootEl.querySelector('#wcLayerName');
-        const sub = rootEl.querySelector('#wcLayerSubtitle');
-        const ov = rootEl.querySelector('#wcLayerOverlay');
-        if (title) {
-            title.style.left = `${layout.titleX}px`;
-            title.style.top = `${layout.titleY}px`;
-        }
-        if (name) {
-            name.style.left = `${layout.nameX}px`;
-            name.style.top = `${layout.nameY}px`;
-        }
-        if (sub) {
-            sub.style.left = `${layout.subtitleX}px`;
-            sub.style.top = `${layout.subtitleY}px`;
-        }
-        if (ov) {
-            ov.style.left = 'auto';
-            ov.style.top = 'auto';
-            ov.style.right = `${W - layout.overlayX}px`;
-            ov.style.bottom = `${H - layout.overlayY}px`;
-        }
-        if (selectedLayer) {
-            rootEl?.querySelectorAll('.wc-layer').forEach((el) => {
-                const k = el.dataset.drag;
-                el.classList.toggle('wc-layer--selected', k === selectedLayer);
-                el.classList.toggle('wc-layer--hidden', layerHidden.has(k));
-                el.classList.toggle('wc-layer--locked', layerLocked.has(k));
-            });
-        }
-        updateStatusBar();
-    }
-
-    function resolveStudioBgUrl(raw) {
+    function resolveBgUrl(raw) {
         const u = String(raw || '').trim();
         if (!u) return '';
         if (/^(https?:|blob:|data:)/i.test(u)) return u;
-        if (u.startsWith('/') && typeof win.resolveWelcomePreviewMediaUrl === 'function') {
-            return win.resolveWelcomePreviewMediaUrl(u);
-        }
+        if (typeof global.resolveWelcomePreviewMediaUrl === 'function') return global.resolveWelcomePreviewMediaUrl(u);
         if (u.startsWith('/')) {
             try {
-                return new URL(u, win.location.origin).href;
+                return new URL(u, global.location.origin).href;
             } catch {
                 return u;
             }
@@ -1744,229 +362,739 @@
         return u;
     }
 
-    function applyBgImage(url) {
-        const bg = rootEl.querySelector('#wcStageBg');
+    function applyBackground() {
+        const bg = root?.querySelector('#esBg');
         if (!bg) return;
-        const loadUrl = resolveStudioBgUrl(url);
-        if (loadUrl) {
-            bg.style.background = '';
-            bg.style.backgroundImage = `url("${loadUrl.replace(/"/g, '\\"')}")`;
+        const url = resolveBgUrl(opts?.getBgUrl?.() || '');
+        if (url) {
+            bg.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
             bg.style.backgroundSize = 'cover';
             bg.style.backgroundRepeat = 'no-repeat';
         } else {
             bg.style.backgroundImage = 'none';
-            bg.style.background = 'linear-gradient(135deg, #38bdf8 0%, #a78bfa 50%, #34d399 100%)';
+            bg.style.background = 'linear-gradient(135deg, #1e3a5f, #4c1d95, #065f46)';
+        }
+        bg.style.backgroundPosition = `${layout.bgFocalX * 100}% ${layout.bgFocalY * 100}%`;
+    }
+
+    function paint() {
+        applyBackground();
+        applyTextsToDom();
+        const av = root?.querySelector('#esAvatar');
+        const r = layout.avatarR;
+        if (av) {
+            av.style.left = `${layout.avatarCx}px`;
+            av.style.top = `${layout.avatarCy}px`;
+            av.style.width = `${r * 2}px`;
+            av.style.height = `${r * 2}px`;
+        }
+        const ring = root?.querySelector('#esAvatarRing');
+        if (ring) {
+            const pad = r + Math.max(3, r * 0.08);
+            ring.style.width = `${pad * 2}px`;
+            ring.style.height = `${pad * 2}px`;
+        }
+        [['title', '#esTitle'], ['name', '#esName'], ['subtitle', '#esSub']].forEach(([id, sel]) => {
+            const el = root?.querySelector(sel);
+            const c = coords(id);
+            if (el) {
+                el.style.left = `${c.x}px`;
+                el.style.top = `${c.y}px`;
+            }
+        });
+        const ov = root?.querySelector('#esOverlay');
+        if (ov) {
+            ov.style.left = 'auto';
+            ov.style.top = 'auto';
+            ov.style.right = `${W - layout.overlayX}px`;
+            ov.style.bottom = `${H - layout.overlayY}px`;
+        }
+        const domMap = {
+            avatar: '#esAvatar',
+            title: '#esTitle',
+            name: '#esName',
+            subtitle: '#esSub',
+            overlay: '#esOverlay'
+        };
+        LAYERS.forEach((L) => {
+            const dom = root?.querySelector(domMap[L.id]);
+            if (!dom) return;
+            dom.classList.toggle('is-selected', selectedId === L.id);
+            dom.classList.toggle('is-hidden', hidden.has(L.id));
+            dom.classList.toggle('is-locked', locked.has(L.id));
+        });
+        renderInspector();
+        renderLayers();
+        updateFooter();
+        schedulePreview();
+    }
+
+    function updateFooter() {
+        const f = root?.querySelector('#esFooter');
+        if (!f) return;
+        const L = LAYERS.find((x) => x.id === selectedId);
+        f.innerHTML = `
+            <span>Capa: <strong>${L ? L.label : '—'}</strong></span>
+            <span>Zoom: <strong>${zoomPct}%</strong></span>
+            <span>Fondo: <strong>${Math.round(layout.bgFocalX * 100)}% · ${Math.round(layout.bgFocalY * 100)}%</strong></span>
+        `;
+    }
+
+    function buildPreviewPayload() {
+        const cfg = opts?.getWelcomeConfig?.() || {};
+        const raw = opts?.getRawCardTexts?.() || {};
+        return {
+            ...cfg,
+            welcomeStyle: 'card',
+            cardLayout: { ...layout },
+            title: raw.title,
+            message: raw.message,
+            cardNameTemplate: raw.cardNameTemplate,
+            cardOverlayText: raw.cardOverlayText,
+            imageUrl: opts?.getBgUrl?.() || cfg.imageUrl || ''
+        };
+    }
+
+    async function fetchLivePreview() {
+        const guildId = opts?.guildId;
+        const img = root?.querySelector('#esPreviewImg');
+        const loading = root?.querySelector('#esPreviewLoading');
+        if (!guildId || !img || typeof global.fetchWithCredentials !== 'function') return;
+        if (loading) loading.hidden = false;
+        img.style.opacity = '0.35';
+        try {
+            const res = await global.fetchWithCredentials(`/api/guild/${guildId}/welcome-card-preview`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(buildPreviewPayload())
+            });
+            if (!res.ok) throw new Error('preview failed');
+            const blob = await res.blob();
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = URL.createObjectURL(blob);
+            img.src = previewUrl;
+            img.onload = () => {
+                img.style.opacity = '1';
+                if (loading) loading.hidden = true;
+            };
+        } catch {
+            if (loading) {
+                loading.textContent = 'Vista previa no disponible';
+                loading.hidden = false;
+            }
+            img.style.opacity = '0.5';
         }
     }
 
-    function applyTexts(lines) {
-        const title = rootEl.querySelector('#wcLayerTitle');
-        const name = rootEl.querySelector('#wcLayerName');
-        const sub = rootEl.querySelector('#wcLayerSubtitle');
-        const ov = rootEl.querySelector('#wcLayerOverlay');
-        if (title) title.innerHTML = markupToHtml(String(lines.title || ''));
-        if (name) name.innerHTML = markupToHtml(String(lines.name || ''));
-        if (sub) sub.innerHTML = markupToHtml(String(lines.sub || ''));
-        if (ov) {
-            const ovLine = String(lines.overlay || '');
-            const hasOverlay = stripColorMarkup(ovLine).replace(/\s+/g, ' ').trim().length > 0;
-            if (hasOverlay) {
-                ov.innerHTML = markupToHtml(ovLine);
-                ov.classList.remove('wc-layer--overlay-empty');
-                ov.style.display = '';
-            } else {
-                ov.innerHTML = '';
-                ov.classList.add('wc-layer--overlay-empty');
-                ov.style.display = 'block';
+    function schedulePreview() {
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(fetchLivePreview, PREVIEW_DEBOUNCE_MS);
+    }
+
+    function renderLayers() {
+        const list = root?.querySelector('#esLayerList');
+        if (!list) return;
+        list.innerHTML = LAYERS.slice()
+            .reverse()
+            .map((L) => {
+                const sel = selectedId === L.id;
+                const hid = hidden.has(L.id);
+                const loc = locked.has(L.id);
+                return `
+                    <li class="eyestudio__layer${sel ? ' is-selected' : ''}" data-pick="${L.id}">
+                        <span class="eyestudio__layer-dot"></span>
+                        <span class="eyestudio__layer-name">${L.label}</span>
+                        <span class="eyestudio__layer-actions">
+                            <button type="button" class="eyestudio__icon-btn" data-vis="${L.id}" title="Visibilidad">${hid ? '○' : '●'}</button>
+                            <button type="button" class="eyestudio__icon-btn" data-lock="${L.id}" title="Bloqueo">${loc ? '🔒' : '🔓'}</button>
+                        </span>
+                    </li>`;
+            })
+            .join('');
+        list.querySelectorAll('[data-pick]').forEach((row) => {
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('[data-vis],[data-lock]')) return;
+                selectedId = row.dataset.pick;
+                paint();
+            });
+        });
+        list.querySelectorAll('[data-vis]').forEach((b) => {
+            b.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = b.dataset.vis;
+                if (hidden.has(id)) hidden.delete(id);
+                else hidden.add(id);
+                paint();
+            });
+        });
+        list.querySelectorAll('[data-lock]').forEach((b) => {
+            b.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = b.dataset.lock;
+                if (locked.has(id)) locked.delete(id);
+                else locked.add(id);
+                paint();
+            });
+        });
+    }
+
+    function renderInspector() {
+        const box = root?.querySelector('#esInspector');
+        if (!box) return;
+        const c = coords(selectedId);
+        const isBg = tool === 'bg' || section === 'background';
+        const isText = ['title', 'name', 'subtitle', 'overlay'].includes(selectedId);
+        const raw = opts?.getRawCardTexts?.() || {};
+
+        let html = '';
+
+        if (section === 'content' || (section === 'design' && isText)) {
+            const fieldMap = {
+                title: { label: 'Título', key: 'title', val: raw.title },
+                name: { label: 'Línea central', key: 'cardNameTemplate', val: raw.cardNameTemplate },
+                subtitle: { label: 'Subtítulo', key: 'message', val: raw.message },
+                overlay: { label: 'Texto extra', key: 'cardOverlayText', val: raw.cardOverlayText }
+            };
+            const f = fieldMap[selectedId] || fieldMap.title;
+            html += `
+                <div class="eyestudio__field">
+                    <label class="eyestudio__label">${f.label}</label>
+                    <textarea class="eyestudio__textarea" id="esTextField" data-key="${f.key}">${esc(f.val || '')}</textarea>
+                    <p class="eyestudio__hint">Variables: {user} {username} {server} {memberCount}. Color parcial: [[#RRGGBB]]texto[[/]]</p>
+                </div>
+                <div class="eyestudio__field">
+                    <span class="eyestudio__label">Color rápido (selección en canvas con clic derecho)</span>
+                    <div class="eyestudio__swatches">${SWATCHES.map((h) => `<button type="button" class="eyestudio__swatch" data-hex="${h}" style="background:#${h}" title="#${h}"></button>`).join('')}</div>
+                </div>`;
+        }
+
+        if (section === 'design' || section === 'layers') {
+            html += `
+                <div class="eyestudio__field">
+                    <span class="eyestudio__label">Posición (${selectedId})</span>
+                    <div class="eyestudio__grid2">
+                        <div><label class="eyestudio__label">X</label><input type="number" class="eyestudio__input" id="esPosX" value="${Math.round(c.x)}" min="0" max="${W}"></div>
+                        <div><label class="eyestudio__label">Y</label><input type="number" class="eyestudio__input" id="esPosY" value="${Math.round(c.y)}" min="0" max="${H}"></div>
+                    </div>
+                </div>`;
+            if (selectedId === 'avatar') {
+                html += `
+                    <div class="eyestudio__field">
+                        <label class="eyestudio__label">Radio avatar (${Math.round(layout.avatarR)} px)</label>
+                        <input type="range" class="eyestudio__range" id="esAvatarR" min="48" max="130" value="${Math.round(layout.avatarR)}">
+                    </div>`;
             }
         }
+
+        if (section === 'background' || isBg) {
+            html += `
+                <div class="eyestudio__field">
+                    <label class="eyestudio__label">Encuadre horizontal</label>
+                    <input type="range" class="eyestudio__range" id="esBgX" min="0" max="100" value="${Math.round(layout.bgFocalX * 100)}">
+                </div>
+                <div class="eyestudio__field">
+                    <label class="eyestudio__label">Encuadre vertical</label>
+                    <input type="range" class="eyestudio__range" id="esBgY" min="0" max="100" value="${Math.round(layout.bgFocalY * 100)}">
+                </div>
+                <p class="eyestudio__hint">Arrastra el fondo en el lienzo con la herramienta Fondo activa.</p>`;
+        }
+
+        if (section === 'design') {
+            html += `<div class="eyestudio__divider"></div>
+                <p class="eyestudio__hint">Atajos: Ctrl+Z deshacer · Ctrl+Y rehacer · Ctrl+S guardar · Flechas mover capa</p>`;
+        }
+
+        box.innerHTML = html || '<p class="eyestudio__hint">Elige una sección en el panel izquierdo.</p>';
+
+        box.querySelector('#esTextField')?.addEventListener('input', (e) => {
+            const key = e.target.dataset.key;
+            const val = e.target.value;
+            const next = { ...raw, [key]: val };
+            opts?.onCardTextsUpdated?.(next);
+            applyTextsToDom();
+            schedulePreview();
+        });
+
+        const applyPos = () => {
+            pushHistory();
+            setCoords(selectedId, Number(box.querySelector('#esPosX')?.value), Number(box.querySelector('#esPosY')?.value));
+            paint();
+        };
+        box.querySelector('#esPosX')?.addEventListener('change', applyPos);
+        box.querySelector('#esPosY')?.addEventListener('change', applyPos);
+        box.querySelector('#esAvatarR')?.addEventListener('input', (e) => {
+            layout.avatarR = Number(e.target.value) || 78;
+            paint();
+        });
+        box.querySelector('#esBgX')?.addEventListener('input', (e) => {
+            layout.bgFocalX = Number(e.target.value) / 100;
+            paint();
+        });
+        box.querySelector('#esBgY')?.addEventListener('input', (e) => {
+            layout.bgFocalY = Number(e.target.value) / 100;
+            paint();
+        });
     }
 
-    function onTextLayerInput() {
-        if (!optsRef?.onCardTextsUpdated || !optsRef.getRawCardTexts || !editingTextLayer) return;
-        window.clearTimeout(textPreviewDebounceTimer);
-        textPreviewDebounceTimer = window.setTimeout(() => {
-            textPreviewDebounceTimer = null;
-            const rawField = LAYER_TO_RAW[editingTextLayer];
-            const el = rootEl?.querySelector(`[data-drag="${editingTextLayer}"]`);
-            if (!rawField || !el) return;
-            const raw = { ...optsRef.getRawCardTexts() };
-            raw[rawField] = htmlToMarkup(el).replace(/\r\n/g, '\n');
-            optsRef.onCardTextsUpdated(raw, optsRef.guildId);
-        }, 420);
+    function mount() {
+        if (root) return root;
+        root = document.createElement('div');
+        root.id = 'eyedWelcomeStudio';
+        root.className = 'eyestudio';
+        root.setAttribute('aria-hidden', 'true');
+        root.innerHTML = `
+            <header class="eyestudio__header">
+                <div class="eyestudio__brand">
+                    <div class="eyestudio__mark">ES</div>
+                    <div>
+                        <h1>Eyed Studio</h1>
+                        <p>Diseño de tarjeta de bienvenida</p>
+                    </div>
+                </div>
+                <div class="eyestudio__header-meta">
+                    <span class="eyestudio__pill">Lienzo <strong>${W}×${H}</strong></span>
+                    <span class="eyestudio__pill">Salida <strong>PNG</strong></span>
+                </div>
+                <div class="eyestudio__header-actions">
+                    <button type="button" class="eyestudio__btn eyestudio__btn--ghost" id="esClose">Cerrar</button>
+                    <button type="button" class="eyestudio__btn eyestudio__btn--ghost" id="esUndo" disabled title="Ctrl+Z">Deshacer</button>
+                    <button type="button" class="eyestudio__btn eyestudio__btn--ghost" id="esRedo" disabled title="Ctrl+Y">Rehacer</button>
+                    <input type="file" id="esBgFile" class="eyestudio__file" accept="image/*">
+                    <button type="button" class="eyestudio__btn eyestudio__btn--accent" id="esUploadBg">Subir fondo</button>
+                    <span class="eyestudio__status-inline" id="esUploadStatus"></span>
+                    <button type="button" class="eyestudio__btn eyestudio__btn--primary" id="esSave">Guardar y aplicar</button>
+                </div>
+            </header>
+            <div class="eyestudio__body">
+                <nav class="eyestudio__nav">
+                    <div class="eyestudio__nav-section">
+                        <p class="eyestudio__nav-title">Espacios</p>
+                        <button type="button" class="eyestudio__nav-btn is-active" data-section="design"><span class="eyestudio__nav-icon">◫</span> Diseño</button>
+                        <button type="button" class="eyestudio__nav-btn" data-section="content"><span class="eyestudio__nav-icon">T</span> Contenido</button>
+                        <button type="button" class="eyestudio__nav-btn" data-section="background"><span class="eyestudio__nav-icon">▣</span> Fondo</button>
+                        <button type="button" class="eyestudio__nav-btn" data-section="layers"><span class="eyestudio__nav-icon">☰</span> Capas</button>
+                    </div>
+                    <div class="eyestudio__nav-section">
+                        <p class="eyestudio__nav-title">Herramientas</p>
+                        <button type="button" class="eyestudio__nav-btn is-active" data-tool="move"><span class="eyestudio__nav-icon">↖</span> Mover</button>
+                        <button type="button" class="eyestudio__nav-btn" data-tool="bg"><span class="eyestudio__nav-icon">⤢</span> Fondo</button>
+                    </div>
+                    <div class="eyestudio__nav-section">
+                        <p class="eyestudio__nav-title">Plantillas</p>
+                        <div class="eyestudio__preset-grid" id="esPresets"></div>
+                    </div>
+                    <div class="eyestudio__nav-section" style="flex:1;min-height:0">
+                        <p class="eyestudio__nav-title">Capas</p>
+                        <ul class="eyestudio__layer-list" id="esLayerList"></ul>
+                    </div>
+                </nav>
+                <div class="eyestudio__workspace">
+                    <div class="eyestudio__workspace-bar">
+                        <div class="eyestudio__toggles">
+                            <label class="eyestudio__toggle is-on" id="esSnapToggle"><input type="checkbox" checked> Snap</label>
+                            <label class="eyestudio__toggle" id="esGridToggle"><input type="checkbox"> Cuadrícula</label>
+                            <label class="eyestudio__toggle is-on" id="esSafeToggle"><input type="checkbox" checked> Zona segura</label>
+                        </div>
+                        <div class="eyestudio__zoom-group" id="esZoomGroup"></div>
+                    </div>
+                    <div class="eyestudio__workspace-main">
+                        <div class="eyestudio__canvas-panel">
+                            <div class="eyestudio__panel-head"><span>Editor</span><strong>Arrastra · Doble clic texto</strong></div>
+                            <div class="eyestudio__canvas-scroll">
+                                <div class="eyestudio__canvas-zoom" id="esCanvasZoom">
+                                    <div class="eyestudio__stage-wrap">
+                                        <div class="eyestudio__stage" id="esStage">
+                                            <div class="eyestudio__stage-bg" id="esBg"></div>
+                                            <div class="eyestudio__stage-grid" id="esGrid"></div>
+                                            <div class="eyestudio__stage-safe is-on" id="esSafe"></div>
+                                            <div class="eyestudio__stage-vignette"></div>
+                                            <div class="eyestudio__el eyestudio__el--avatar" id="esAvatar" data-layer="avatar">
+                                                <div class="eyestudio__avatar-ring" id="esAvatarRing"></div>
+                                                <img class="eyestudio__avatar-img" id="esAvatarImg" alt="" draggable="false">
+                                            </div>
+                                            <div class="eyestudio__el eyestudio__el--text eyestudio__el--title" id="esTitle" data-layer="title"></div>
+                                            <div class="eyestudio__el eyestudio__el--text eyestudio__el--name" id="esName" data-layer="name"></div>
+                                            <div class="eyestudio__el eyestudio__el--text eyestudio__el--sub" id="esSub" data-layer="subtitle"></div>
+                                            <div class="eyestudio__el eyestudio__el--text eyestudio__el--overlay" id="esOverlay" data-layer="overlay"></div>
+                                            <svg class="eyestudio__guides" id="esGuides" viewBox="0 0 ${W} ${H}"></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="eyestudio__preview-panel">
+                            <div class="eyestudio__panel-head"><span>Vista Discord</span><strong>PNG real</strong></div>
+                            <div class="eyestudio__preview-body">
+                                <span class="eyestudio__preview-loading" id="esPreviewLoading">Generando vista previa…</span>
+                                <img class="eyestudio__preview-img" id="esPreviewImg" alt="Vista previa PNG" decoding="async">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <aside class="eyestudio__inspector">
+                    <div class="eyestudio__panel-head" style="padding:0.65rem 0.85rem;border-bottom:1px solid var(--es-border)"><strong>Inspector</strong></div>
+                    <div class="eyestudio__inspector-scroll" id="esInspector"></div>
+                </aside>
+            </div>
+            <footer class="eyestudio__footer" id="esFooter"></footer>
+            <div id="esFormatMenu" class="eyestudio-menu" hidden></div>
+        `;
+        document.body.appendChild(root);
+
+        const presets = root.querySelector('#esPresets');
+        Object.entries(PRESETS).forEach(([k, p]) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'eyestudio__preset';
+            b.dataset.preset = k;
+            b.textContent = p.name;
+            b.addEventListener('click', () => {
+                pushHistory();
+                layout = mergeCardLayout(p.layout);
+                paint();
+                toast(`Plantilla «${p.name}»`, 'success');
+            });
+            presets.appendChild(b);
+        });
+
+        [70, 85, 100, 115].forEach((z) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = `eyestudio__btn eyestudio__btn--ghost${z === 100 ? ' is-active' : ''}`;
+            b.dataset.zoom = String(z);
+            b.textContent = `${z}%`;
+            b.addEventListener('click', () => {
+                zoomPct = z;
+                root.style.setProperty('--es-zoom', String(zoomPct / 100));
+                root.querySelectorAll('#esZoomGroup .eyestudio__btn').forEach((x) => x.classList.toggle('is-active', Number(x.dataset.zoom) === z));
+                updateFooter();
+            });
+            root.querySelector('#esZoomGroup').appendChild(b);
+        });
+
+        bindEvents();
+        return root;
     }
 
-    function finishTextLayerEdit(el, layerKey) {
-        if (!el || !layerKey || !LAYER_TO_RAW[layerKey] || !optsRef?.getRawCardTexts) return;
-        if (el.contentEditable !== 'true') return;
-        const rawField = LAYER_TO_RAW[layerKey];
-        let val = htmlToMarkup(el).replace(/\r\n/g, '\n');
-        if (layerKey === 'overlay') val = val.trim();
-        const raw = { ...optsRef.getRawCardTexts() };
-        raw[rawField] = val;
-        el.contentEditable = 'false';
-        el.classList.remove('wc-layer--editing');
-        editingTextLayer = null;
-        window.clearTimeout(textPreviewDebounceTimer);
-        textPreviewDebounceTimer = null;
-        optsRef.onCardTextsUpdated?.(raw, optsRef.guildId);
-        if (typeof optsRef.getPreviewLines === 'function') applyTexts(optsRef.getPreviewLines());
+    function stageScale() {
+        const st = root?.querySelector('#esStage');
+        if (!st) return 1;
+        const r = st.getBoundingClientRect();
+        return r.width > 0 ? W / r.width : 1;
     }
 
-    function commitActiveTextEditIfAny() {
-        if (!editingTextLayer || !rootEl) return;
-        const key = editingTextLayer;
-        const el = rootEl.querySelector(`[data-drag="${key}"]`);
-        if (!el || el.contentEditable !== 'true') return;
-        el.removeEventListener('input', onTextLayerInput);
-        finishTextLayerEdit(el, key);
+    function bindDrag(el, id) {
+        el.addEventListener('pointerdown', (ev) => {
+            if (ev.button !== 0 && ev.pointerType === 'mouse') return;
+            if (locked.has(id) || hidden.has(id)) return toast('Capa bloqueada u oculta', 'warning');
+            if (tool === 'bg') return;
+            if (el.isContentEditable) return;
+            ev.preventDefault();
+            selectedId = id;
+            const snap0 = JSON.stringify(layout);
+            const start = { px: ev.clientX, py: ev.clientY, ...coords(id) };
+            let moved = false;
+            const onMove = (e) => {
+                const dx = (e.clientX - start.px) * stageScale();
+                const dy = (e.clientY - start.py) * stageScale();
+                if (!moved && Math.hypot(dx, dy) < DRAG_MIN) return;
+                moved = true;
+                const s = snapMove(id, start.x + dx, start.y + dy);
+                setCoords(id, s.x, s.y);
+                paint();
+                drawGuides(s.guidesX, s.guidesY);
+            };
+            const onUp = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+                clearGuides();
+                if (moved && snap0 !== JSON.stringify(layout)) {
+                    past.push(snap0);
+                    if (past.length > HISTORY_MAX) past.shift();
+                    future = [];
+                    syncHistoryBtns();
+                }
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        });
+        el.addEventListener('dblclick', (ev) => {
+            if (!['title', 'name', 'subtitle', 'overlay'].includes(id)) return;
+            ev.preventDefault();
+            startTextEdit(el, id);
+        });
     }
 
-    function beginTextLayerEdit(layerKey) {
-        if (layerKey === 'avatar' || !LAYER_TO_RAW[layerKey] || !optsRef?.getRawCardTexts) return;
-        commitActiveTextEditIfAny();
-        const el = rootEl.querySelector(`[data-drag="${layerKey}"]`);
-        if (!el) return;
-        const rawField = LAYER_TO_RAW[layerKey];
-        const raw = optsRef.getRawCardTexts();
+    function bindBgDrag() {
+        const stage = root?.querySelector('#esStage');
+        stage?.addEventListener('pointerdown', (ev) => {
+            if (tool !== 'bg') return;
+            if (ev.target.closest('[data-layer]') && ev.target.id !== 'esBg') return;
+            ev.preventDefault();
+            const snap0 = JSON.stringify(layout);
+            const start = { x: ev.clientX, y: ev.clientY, fx: layout.bgFocalX, fy: layout.bgFocalY };
+            let moved = false;
+            const onMove = (e) => {
+                moved = true;
+                layout.bgFocalX = clamp(start.fx - (e.clientX - start.x) / 420, 0, 1);
+                layout.bgFocalY = clamp(start.fy - (e.clientY - start.y) / 260, 0, 1);
+                paint();
+            };
+            const onUp = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+                if (moved && snap0 !== JSON.stringify(layout)) {
+                    past.push(snap0);
+                    syncHistoryBtns();
+                }
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        });
+    }
+
+    function startTextEdit(el, id) {
+        if (locked.has(id)) return;
+        editingId = id;
         el.contentEditable = 'true';
-        el.classList.add('wc-layer--editing');
-        el.classList.remove('wc-layer--overlay-empty');
-        el.innerHTML = markupToHtml(raw[rawField] != null ? String(raw[rawField]) : '');
-        editingTextLayer = layerKey;
+        el.classList.add('is-editing');
         el.focus();
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        const sel = window.getSelection();
-        if (sel) {
-            sel.removeAllRanges();
-            sel.addRange(range);
-        }
-        el.addEventListener('input', onTextLayerInput);
-        el.addEventListener(
-            'blur',
-            (ev) => {
-                const t = ev.target;
-                t.removeEventListener('input', onTextLayerInput);
-                window.clearTimeout(textPreviewDebounceTimer);
-                textPreviewDebounceTimer = null;
-                finishTextLayerEdit(t, t.dataset.drag || layerKey);
-            },
-            { once: true }
-        );
+        const onBlur = () => {
+            el.contentEditable = 'false';
+            el.classList.remove('is-editing');
+            editingId = null;
+            const keyMap = { title: 'title', name: 'cardNameTemplate', subtitle: 'message', overlay: 'cardOverlayText' };
+            const key = keyMap[id];
+            const raw = opts?.getRawCardTexts?.() || {};
+            raw[key] = htmlToMarkup(el);
+            opts?.onCardTextsUpdated?.(raw);
+            schedulePreview();
+            el.removeEventListener('blur', onBlur);
+        };
+        el.addEventListener('blur', onBlur);
     }
 
-    function bindTextLayerEditing() {
-        ['title', 'name', 'subtitle', 'overlay'].forEach((key) => {
-            const el = rootEl.querySelector(`[data-drag="${key}"]`);
-            if (!el || el.dataset.wcTextDblBound) return;
-            el.dataset.wcTextDblBound = '1';
-            el.addEventListener('dblclick', (ev) => {
+    function showFormatMenu(x, y, hasSel) {
+        const menu = root?.querySelector('#esFormatMenu');
+        if (!menu) return;
+        menu.innerHTML = `
+            <div class="eyestudio-menu__title">Formato</div>
+            ${hasSel ? `<div class="eyestudio__swatches" style="padding:0.4rem">${SWATCHES.map((h) => `<button type="button" class="eyestudio__swatch" data-pick="${h}" style="background:#${h}"></button>`).join('')}</div>` : '<p class="eyestudio__hint" style="padding:0.5rem">Selecciona texto para colorear</p>'}
+            <button type="button" class="eyestudio-menu__item" data-ins="{user}">Insertar {user}</button>
+            <button type="button" class="eyestudio-menu__item" data-ins="{username}">Insertar {username}</button>
+        `;
+        menu.hidden = false;
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.querySelectorAll('[data-pick]').forEach((b) => {
+            b.addEventListener('click', () => wrapColor(b.dataset.pick));
+        });
+        menu.querySelectorAll('[data-ins]').forEach((b) => {
+            b.addEventListener('click', () => insertToken(b.dataset.ins));
+        });
+    }
+
+    function wrapColor(hex) {
+        const el = editingId ? root?.querySelector(`#es${editingId === 'subtitle' ? 'Sub' : editingId.charAt(0).toUpperCase() + editingId.slice(1)}`) : null;
+        if (!el) return;
+        const sel = global.getSelection();
+        if (!sel?.rangeCount || sel.isCollapsed) return toast('Selecciona texto', 'warning');
+        const range = sel.getRangeAt(0);
+        const span = document.createElement('span');
+        span.className = 'eyestudio-rich';
+        span.setAttribute('data-c', hex);
+        span.style.color = `#${hex}`;
+        try {
+            range.surroundContents(span);
+        } catch {
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+        }
+        opts?.onCardTextsUpdated?.({ ...opts.getRawCardTexts(), ...getTextPatchFromDom() });
+        root.querySelector('#esFormatMenu').hidden = true;
+    }
+
+    function insertToken(tok) {
+        document.execCommand('insertText', false, tok);
+        root.querySelector('#esFormatMenu').hidden = true;
+    }
+
+    function getTextPatchFromDom() {
+        return {
+            title: htmlToMarkup(root.querySelector('#esTitle')),
+            cardNameTemplate: htmlToMarkup(root.querySelector('#esName')),
+            message: htmlToMarkup(root.querySelector('#esSub')),
+            cardOverlayText: htmlToMarkup(root.querySelector('#esOverlay'))
+        };
+    }
+
+    function bindEvents() {
+        root.querySelector('#esClose').addEventListener('click', close);
+        root.querySelector('#esSave').addEventListener('click', save);
+        root.querySelector('#esUndo').addEventListener('click', undo);
+        root.querySelector('#esRedo').addEventListener('click', redo);
+        root.querySelector('#esUploadBg').addEventListener('click', () => root.querySelector('#esBgFile').click());
+        root.querySelector('#esBgFile').addEventListener('change', async (ev) => {
+            const file = ev.target.files?.[0];
+            ev.target.value = '';
+            if (!file?.type?.startsWith('image/')) return toast('Elige una imagen', 'warning');
+            const st = root.querySelector('#esUploadStatus');
+            if (st) st.textContent = 'Subiendo…';
+            try {
+                await opts?.processAndUploadBackground?.(file);
+                opts?.onBackgroundUploaded?.();
+                applyBackground();
+                schedulePreview();
+                if (st) st.textContent = 'Listo';
+                toast('Fondo actualizado', 'success');
+            } catch (err) {
+                if (st) st.textContent = '';
+                toast(err?.message || 'Error al subir', 'error');
+            }
+        });
+
+        root.querySelectorAll('[data-section]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                section = btn.dataset.section;
+                root.querySelectorAll('[data-section]').forEach((b) => b.classList.toggle('is-active', b === btn));
+                renderInspector();
+            });
+        });
+        root.querySelectorAll('[data-tool]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                tool = btn.dataset.tool;
+                root.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('is-active', b === btn));
+                if (tool === 'bg') section = 'background';
+                renderInspector();
+            });
+        });
+
+        const bindToggle = (labId, overlayId, get, set) => {
+            const lab = root.querySelector(labId);
+            const inp = lab?.querySelector('input');
+            const overlay = overlayId ? root.querySelector(overlayId) : null;
+            const apply = (on) => {
+                set(on);
+                if (inp) inp.checked = on;
+                lab?.classList.toggle('is-on', on);
+                overlay?.classList.toggle('is-on', on);
+            };
+            apply(get());
+            lab?.addEventListener('click', (e) => {
+                if (e.target === inp) return;
+                apply(!get());
+            });
+            inp?.addEventListener('change', (e) => apply(e.target.checked));
+        };
+        bindToggle('#esSnapToggle', null, () => snapOn, (v) => { snapOn = v; });
+        bindToggle('#esGridToggle', '#esGrid', () => gridOn, (v) => { gridOn = v; });
+        bindToggle('#esSafeToggle', '#esSafe', () => safeOn, (v) => { safeOn = v; });
+
+        LAYERS.forEach((L) => {
+            const sel = L.id === 'avatar' ? '#esAvatar' : `#es${L.id === 'subtitle' ? 'Sub' : L.id.charAt(0).toUpperCase() + L.id.slice(1)}`;
+            const el = root.querySelector(sel);
+            if (el) bindDrag(el, L.id);
+        });
+        bindBgDrag();
+
+        root.addEventListener('contextmenu', (ev) => {
+            const edit = ev.target.closest('.is-editing');
+            if (edit) {
                 ev.preventDefault();
-                ev.stopPropagation();
-                if (activeTool === 'bg' || activeTool === 'avatar') return;
-                beginTextLayerEdit(key);
-            });
+                const sel = global.getSelection();
+                showFormatMenu(ev.clientX, ev.clientY, sel && !sel.isCollapsed);
+            }
         });
-    }
-
-    function centerTextsX() {
-        const cx = W / 2;
-        layout.titleX = cx;
-        layout.nameX = cx;
-        layout.subtitleX = cx;
-        syncDomFromLayout();
-        toast('Textos centrados en X', 'success');
-    }
-
-    function stackTitleNameSubtitle() {
-        const cx = W / 2;
-        layout.titleX = cx;
-        layout.nameX = cx;
-        layout.subtitleX = cx;
-        layout.titleY = 232;
-        layout.nameY = 296;
-        layout.subtitleY = 352;
-        syncDomFromLayout();
-        toast('Bloque de textos reapilado', 'success');
-    }
-
-    function centerAvatarOnCanvas() {
-        layout.avatarCx = W / 2;
-        layout.avatarCy = Math.round(H * 0.32);
-        syncDomFromLayout();
-        toast('Avatar centrado', 'success');
-    }
-
-    function open(opts) {
-        optsRef = opts;
-        ensureRoot();
-        layout = mergeCardLayout(opts.getWelcomeConfig().cardLayout);
-        applyBgImage(opts.getBgUrl() || '');
-        applyTexts(opts.getPreviewLines());
-        const av = opts.getAvatarUrl?.() || '';
-        const img = rootEl.querySelector('#wcAvatarImg');
-        if (img) {
-            img.src = av || 'https://cdn.discordapp.com/embed/avatars/0.png';
-        }
-        clearGuides();
-        layerHidden.clear();
-        layerLocked.clear();
-        resetHistory();
-        canvasUserZoomPct = 100;
-        applyCanvasUserZoom();
-        updateZoomPills();
-        activeTool = 'select';
-        rightPanelTab = 'layers';
-        rootEl.querySelectorAll('.wc-studio__panel-tab').forEach((t) => {
-            t.classList.toggle('is-active', t.dataset.panelTab === 'layers');
+        document.addEventListener('click', (ev) => {
+            if (!root?.classList.contains('is-open')) return;
+            const menu = root.querySelector('#esFormatMenu');
+            if (menu && !menu.hidden && !menu.contains(ev.target)) menu.hidden = true;
         });
-        setActiveTool('select');
-        syncDomFromLayout({ skipHistory: true });
-        renderRightPanel();
-        setSelectedLayer(null);
-        updateOverlayToggles();
-        updateStatusBar();
-        const st = rootEl.querySelector('#wcStudioUploadStatus');
-        if (st) st.textContent = '';
 
-        if (!rootEl.dataset.layersBound) {
-            rootEl.dataset.layersBound = '1';
-            ['avatar', 'title', 'name', 'subtitle', 'overlay'].forEach((k) => {
-                const el = rootEl.querySelector(`[data-drag="${k}"]`);
-                if (el) bindLayerDrag(el, k);
-            });
-            bindTextLayerEditing();
+        document.addEventListener('keydown', onKey);
+    }
+
+    function onKey(ev) {
+        if (!root?.classList.contains('is-open')) return;
+        const mod = ev.ctrlKey || ev.metaKey;
+        if (mod && ev.key.toLowerCase() === 'z' && !ev.shiftKey) {
+            ev.preventDefault();
+            undo();
+            return;
         }
+        if (mod && (ev.key.toLowerCase() === 'y' || (ev.key === 'z' && ev.shiftKey))) {
+            ev.preventDefault();
+            redo();
+            return;
+        }
+        if (mod && ev.key.toLowerCase() === 's') {
+            ev.preventDefault();
+            save();
+            return;
+        }
+        if (editingId || ev.target.closest('input, textarea, select')) return;
+        const step = ev.shiftKey ? 10 : 1;
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(ev.key)) {
+            ev.preventDefault();
+            pushHistory();
+            const c = coords(selectedId);
+            if (ev.key === 'ArrowLeft') setCoords(selectedId, c.x - step, c.y);
+            if (ev.key === 'ArrowRight') setCoords(selectedId, c.x + step, c.y);
+            if (ev.key === 'ArrowUp') setCoords(selectedId, c.x, c.y - step);
+            if (ev.key === 'ArrowDown') setCoords(selectedId, c.x, c.y + step);
+            paint();
+        }
+        if (ev.key === 'Escape') {
+            clearGuides();
+            root.querySelector('#esFormatMenu').hidden = true;
+        }
+    }
 
-        rootEl.classList.add('is-open');
-        rootEl.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('wc-studio-open');
+    function open(o) {
+        opts = o;
+        mount();
+        layout = mergeCardLayout(o.getWelcomeConfig?.()?.cardLayout);
+        hidden = new Set();
+        locked = new Set();
+        past = [];
+        future = [];
+        tool = 'move';
+        section = 'design';
+        selectedId = 'title';
+        zoomPct = 100;
+        snapOn = true;
+        gridOn = false;
+        safeOn = true;
+        root.style.setProperty('--es-zoom', '1');
+        const img = root.querySelector('#esAvatarImg');
+        if (img) img.src = o.getAvatarUrl?.() || 'https://cdn.discordapp.com/embed/avatars/0.png';
+        root.classList.add('is-open');
+        root.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('eyestudio-open');
+        paint();
+        syncHistoryBtns();
+        schedulePreview();
     }
 
     function close() {
-        if (!rootEl) return;
-        commitActiveTextEditIfAny();
-        hideContextMenu();
-        clearGuides();
-        setSelectedLayer(null);
-        rootEl.classList.remove('is-open');
-        rootEl.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('wc-studio-open');
-        optsRef?.onClose?.();
+        if (!root) return;
+        root.classList.remove('is-open');
+        root.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('eyestudio-open');
+        clearTimeout(previewTimer);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = '';
+        opts?.onClose?.();
+        opts = null;
     }
 
-    function saveAndClose() {
-        commitActiveTextEditIfAny();
-        clearGuides();
-        if (optsRef?.applyCardLayout) {
-            optsRef.applyCardLayout({ ...layout });
-        }
-        toast('Diseño aplicado. Pulsa «Guardar Bienvenida» en el panel para enviarlo al servidor.', 'success');
+    function save() {
+        opts?.applyCardLayout?.({ ...layout });
+        toast('Diseño aplicado. Guarda la bienvenida en el panel.', 'success');
         close();
     }
 
-    win.WelcomeCardStudio = {
+    global.WelcomeCardStudio = {
         mergeCardLayout,
         open,
         close

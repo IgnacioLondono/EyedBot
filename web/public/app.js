@@ -11411,7 +11411,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                             <h4 id="greeting-section-welcome-style" class="greeting-card__title">Estilo de bienvenida</h4>
                             <button type="button" id="welcomeOpenStudioBtn" class="btn btn-primary wc-studio-launch-btn" style="display:none;" title="Editor profesional a pantalla completa">
                                 <span class="wc-studio-launch-icon" aria-hidden="true">✦</span>
-                                Editor profesional
+                                Abrir Eyed Studio
                             </button>
                         </div>
                         <p class="greeting-card__hint greeting-card__hint--style" data-welcome-style-hint>La bienvenida se envía como un <strong>embed</strong> clásico de Discord (borde de color, miniatura e imagen).</p>
