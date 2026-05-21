@@ -440,17 +440,55 @@
         `;
     }
 
+    function readTextsFromDom() {
+        if (!root?.classList.contains('is-open')) return null;
+        const titleEl = root.querySelector('#esTitle');
+        const nameEl = root.querySelector('#esName');
+        const subEl = root.querySelector('#esSub');
+        const ovEl = root.querySelector('#esOverlay');
+        if (!titleEl || !nameEl) return null;
+        return {
+            previewHeadline: htmlToMarkup(titleEl),
+            previewDisplayName: htmlToMarkup(nameEl),
+            previewSubtitle: subEl ? htmlToMarkup(subEl) : '',
+            previewOverlay: ovEl ? htmlToMarkup(ovEl) : ''
+        };
+    }
+
+    function readStyleFromForm() {
+        const hex = (id, fallback) =>
+            String(document.getElementById(id)?.value || fallback)
+                .replace('#', '')
+                .trim();
+        return {
+            cardAccentColor: hex('welcomeCardAccent', '#4ade80'),
+            cardTitleColor: hex('welcomeCardTitle', '#ffffff'),
+            cardNameColor: hex('welcomeCardName', '#f8fafc'),
+            cardSubtitleColor: hex('welcomeCardSubtitle', '#e2e8f0'),
+            cardOverlayColor: hex('welcomeCardOverlayColor', '#ffffff'),
+            cardFontKey: document.getElementById('welcomeCardFont')?.value || 'system'
+        };
+    }
+
     function buildPreviewPayload() {
         const cfg = opts?.getWelcomeConfig?.() || {};
         const raw = opts?.getRawCardTexts?.() || {};
+        const domTexts = readTextsFromDom();
+        const lines = previewTexts();
+        const formStyle = readStyleFromForm();
         return {
             ...cfg,
+            ...formStyle,
             welcomeStyle: 'card',
             cardLayout: { ...layout },
-            title: raw.title,
-            message: raw.message,
-            cardNameTemplate: raw.cardNameTemplate,
-            cardOverlayText: raw.cardOverlayText,
+            title: raw.title ?? cfg.title ?? '',
+            message: raw.message ?? cfg.message ?? '',
+            cardNameTemplate: raw.cardNameTemplate ?? cfg.cardNameTemplate ?? '{username}',
+            cardOverlayText: raw.cardOverlayText ?? cfg.cardOverlayText ?? '',
+            previewHeadline: domTexts?.previewHeadline ?? lines.title ?? '',
+            previewDisplayName: domTexts?.previewDisplayName ?? lines.name ?? '',
+            previewSubtitle: domTexts?.previewSubtitle ?? lines.sub ?? '',
+            previewOverlay: domTexts?.previewOverlay ?? lines.overlay ?? '',
             imageUrl: opts?.getBgUrl?.() || cfg.imageUrl || ''
         };
     }

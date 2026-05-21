@@ -50,11 +50,11 @@ function mergeCardLayout(raw) {
 
 /** Fuentes del sistema (sin comillas internas). */
 const FONT_STACKS = {
-    system: { title: 'bold 44px Arial', name: '26px Arial', sub: 'italic 20px Arial', overlay: 'bold 17px Arial' },
-    serif: { title: 'bold 44px Georgia', name: '26px Georgia', sub: 'italic 20px Georgia', overlay: 'bold 17px Georgia' },
-    mono: { title: 'bold 40px Consolas', name: '24px Consolas', sub: 'italic 18px Consolas', overlay: 'bold 16px Consolas' },
-    rounded: { title: 'bold 44px Verdana', name: '26px Verdana', sub: 'italic 20px Verdana', overlay: 'bold 17px Verdana' },
-    elegant: { title: 'bold 44px Times New Roman', name: '26px Times New Roman', sub: 'italic 20px Times New Roman', overlay: 'bold 17px Times New Roman' }
+    system: { title: 'bold 44px sans-serif', name: 'bold 26px sans-serif', sub: 'italic 20px sans-serif', overlay: 'bold 17px sans-serif' },
+    serif: { title: 'bold 44px Georgia, serif', name: 'bold 26px Georgia, serif', sub: 'italic 20px Georgia, serif', overlay: 'bold 17px Georgia, serif' },
+    mono: { title: 'bold 40px Consolas, monospace', name: 'bold 24px Consolas, monospace', sub: 'italic 18px Consolas, monospace', overlay: 'bold 16px Consolas, monospace' },
+    rounded: { title: 'bold 44px Verdana, sans-serif', name: 'bold 26px Verdana, sans-serif', sub: 'italic 20px Verdana, sans-serif', overlay: 'bold 17px Verdana, sans-serif' },
+    elegant: { title: 'bold 44px "Times New Roman", serif', name: 'bold 26px "Times New Roman", serif', sub: 'italic 20px "Times New Roman", serif', overlay: 'bold 17px "Times New Roman", serif' }
 };
 
 function resolveFonts(fontKey) {
@@ -146,13 +146,15 @@ function drawBackgroundImage(ctx, img, focalX, focalY) {
     ctx.drawImage(img, ox, oy, dw, dh);
 }
 
-function drawStrokedText(ctx, text, x, y, fillHex, strokeRgba = 'rgba(0,0,0,0.72)') {
+function drawStrokedText(ctx, text, x, y, fillHex, strokeRgba = 'rgba(0,0,0,0.85)') {
     const t = String(text || '');
     if (!t) return;
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 6;
     ctx.strokeStyle = strokeRgba;
+    ctx.strokeText(t, x, y);
+    ctx.lineWidth = 4;
     ctx.strokeText(t, x, y);
     ctx.fillStyle = rgbFill(fillHex);
     ctx.fillText(t, x, y);
@@ -329,9 +331,10 @@ async function renderWelcomeCardPng(opts = {}) {
         drawBackgroundImage(ctx, bgImg, layout.bgFocalX, layout.bgFocalY);
     }
 
-    const vignette = ctx.createLinearGradient(0, H * 0.35, 0, H);
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.4)');
+    const vignette = ctx.createLinearGradient(0, H * 0.2, 0, H);
+    vignette.addColorStop(0, 'rgba(0,0,0,0.08)');
+    vignette.addColorStop(0.45, 'rgba(0,0,0,0.35)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, W, H);
 
@@ -384,8 +387,6 @@ async function renderWelcomeCardPng(opts = {}) {
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
-
-    ctx.beginPath();
 
     const headlineSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.headline || 'Bienvenido')), 80);
     const displayNameSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.displayName || 'Usuario')), 80);

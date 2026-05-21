@@ -3767,15 +3767,33 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
         const subtitleTpl =
             messageRaw || '¡Hola {user}! Bienvenido a **{server}**. Eres el miembro #{memberCount}.';
 
+        const hasResolvedHeadline = body.previewHeadline != null && String(body.previewHeadline).trim() !== '';
+        const hasResolvedName = body.previewDisplayName != null && String(body.previewDisplayName).trim() !== '';
+        const hasResolvedSub = body.previewSubtitle != null && String(body.previewSubtitle).trim() !== '';
+        const hasResolvedOverlay = body.previewOverlay != null && String(body.previewOverlay).trim() !== '';
+
+        const headline = hasResolvedHeadline
+            ? String(body.previewHeadline)
+            : applyWelcomeTemplate(titleRaw || '¡Bienvenido!', tplMember);
+        const displayName = hasResolvedName
+            ? String(body.previewDisplayName)
+            : applyWelcomeTemplate(nameTpl, tplMember);
+        const subtitle = hasResolvedSub
+            ? String(body.previewSubtitle)
+            : applyWelcomeTemplate(subtitleTpl, tplMember);
+        const overlayText = hasResolvedOverlay
+            ? String(body.previewOverlay)
+            : applyWelcomeTemplate(String(body.cardOverlayText || ''), tplMember);
+
         const buffer = await renderWelcomeCardPng({
             avatarUrl,
             backgroundUrl: bg.backgroundUrl || null,
             backgroundFilePath: bg.backgroundFilePath || null,
             backgroundBuffer: bg.backgroundBuffer || null,
-            headline: applyWelcomeTemplate(titleRaw || '¡Bienvenido!', tplMember),
-            displayName: applyWelcomeTemplate(nameTpl, tplMember),
-            subtitle: applyWelcomeTemplate(subtitleTpl, tplMember),
-            overlayText: applyWelcomeTemplate(String(body.cardOverlayText || ''), tplMember),
+            headline,
+            displayName,
+            subtitle,
+            overlayText,
             overlayHex: sanitizeHexColor6(body.cardOverlayColor, 'ffffff'),
             fontKey: ['system', 'serif', 'mono', 'rounded', 'elegant'].includes(String(body.cardFontKey || '').toLowerCase())
                 ? String(body.cardFontKey).toLowerCase()
