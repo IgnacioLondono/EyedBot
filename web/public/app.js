@@ -1056,6 +1056,8 @@ function switchServerPane(paneId, button = null) {
             if (tabBtn) tabBtn.click();
         });
     }
+
+    window.EyedBotMobile?.onServerPaneChange?.(paneId);
 }
 
 function handleServerSideAction(button) {
@@ -1256,6 +1258,7 @@ async function confirmServerSwitcherSelection() {
     }
 }
 
+window.showSection = showSection;
 window.openServerSwitcherModal = openServerSwitcherModal;
 window.closeServerSwitcherModal = closeServerSwitcherModal;
 window.moveServerSwitcher = moveServerSwitcher;
@@ -3333,6 +3336,8 @@ function showSection(sectionId, options = {}) {
     if (!options.skipHistory) {
         pushPanelHistory(sectionId);
     }
+
+    window.EyedBotMobile?.onSectionChange?.(sectionId);
 }
 
 // Cargar servidores
