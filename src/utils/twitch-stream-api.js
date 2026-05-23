@@ -110,10 +110,49 @@ function extractTwitchLoginFromUrlOrName(source = {}) {
     return String(source.name || '').trim().replace(/^@/, '');
 }
 
+function getTwitchClientCredentials() {
+    return {
+        clientId: String(process.env.TWITCH_CLIENT_ID || '').trim(),
+        clientSecret: String(process.env.TWITCH_CLIENT_SECRET || '').trim()
+    };
+}
+
+async function twitchAppHelixRequest(path, options = {}) {
+    const { clientId, clientSecret } = getTwitchClientCredentials();
+    if (!clientId || !clientSecret) return null;
+
+    const token = await getTwitchAppAccessToken(clientId, clientSecret);
+    if (!token) return null;
+
+    const cleanPath = String(path || '').replace(/^\//, '');
+    const url = new URL(`https://api.twitch.tv/helix/${cleanPath}`);
+    const params = options.searchParams || {};
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) {
+            for (const entry of value) url.searchParams.append(key, String(entry));
+        } else {
+            url.searchParams.set(key, String(value));
+        }
+    }
+
+    return fetchJsonWithTimeout(url.toString(), {
+        method: options.method || 'GET',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Client-Id': clientId,
+            'Content-Type': 'application/json'
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined
+    });
+}
+
 module.exports = {
     fetchTwitchLiveByLogin,
     extractTwitchLoginFromUrlOrName,
     resolveTwitchThumbnailTemplate,
+    getTwitchClientCredentials,
+    twitchAppHelixRequest,
     cacheBustPreviewUrl(url) {
         const raw = String(url || '').trim();
         if (!raw) return '';

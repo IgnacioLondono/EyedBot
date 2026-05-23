@@ -5,10 +5,33 @@ const {
     extractTwitchLoginFromUrlOrName,
     cacheBustPreviewUrl
 } = require('./twitch-stream-api');
+const {
+    parseFeedLatestItem,
+    deriveYouTubeFeedUrl,
+    extractYouTubeChannelIdFromUrl,
+    extractTikTokUsernameFromSource,
+    looksLikeLiveStreamTitle
+} = require('./stream-alert-feed');
+const {
+    resolveYouTubeChannelId,
+    fetchYouTubeChannelLiveViaApi
+} = require('./stream-youtube-api');
 
-const STREAM_ALERT_CHECK_MS = Math.max(30_000, Number.parseInt(process.env.STREAM_ALERT_CHECK_MS || '120000', 10));
+function isAnyStreamPushConfigured() {
+    try {
+        return require('./twitch-eventsub').isTwitchEventSubConfigured()
+            || require('./youtube-websub').isYouTubeWebSubConfigured()
+            || require('./feed-websub').isFeedWebSubConfigured();
+    } catch {
+        return false;
+    }
+}
+
+function resolveStreamAlertCheckMs() {
+    const fallback = isAnyStreamPushConfigured() ? '900000' : '120000';
+    return Math.max(120_000, Number.parseInt(process.env.STREAM_ALERT_CHECK_MS || fallback, 10));
+}
 const FETCH_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.STREAM_ALERT_FETCH_TIMEOUT_MS || '12000', 10));
-const YOUTUBE_API_KEY = String(process.env.YOUTUBE_API_KEY || '').trim();
 
 let intervalRef = null;
 let running = false;
@@ -20,71 +43,6 @@ function applyTemplate(template = '', values = {}) {
         const value = values[key];
         return value === undefined || value === null ? '' : String(value);
     });
-}
-
-function parseXmlTag(xml = '', tagName = '') {
-    const safe = String(tagName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`<${safe}[^>]*>([\\s\\S]*?)</${safe}>`, 'i');
-    const match = String(xml || '').match(regex);
-    return match?.[1] ? String(match[1]).trim() : '';
-}
-
-function decodeXmlEntities(text = '') {
-    return String(text || '')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'");
-}
-
-function extractFirstLink(block = '') {
-    const attrMatch = String(block || '').match(/<link[^>]*href=["']([^"']+)["'][^>]*>/i);
-    if (attrMatch?.[1]) return attrMatch[1];
-
-    const textMatch = String(block || '').match(/<link[^>]*>([\s\S]*?)<\/link>/i);
-    if (textMatch?.[1]) return decodeXmlEntities(textMatch[1].trim());
-    return '';
-}
-
-function extractFirstThumbnail(block = '') {
-    const mediaMatch = String(block || '').match(/<media:thumbnail[^>]*url=["']([^"']+)["'][^>]*>/i);
-    if (mediaMatch?.[1]) return mediaMatch[1];
-
-    const enclosureMatch = String(block || '').match(/<enclosure[^>]*url=["']([^"']+)["'][^>]*>/i);
-    if (enclosureMatch?.[1]) return enclosureMatch[1];
-
-    const imgMatch = String(block || '').match(/<img[^>]*src=["']([^"']+)["'][^>]*>/i);
-    if (imgMatch?.[1]) return imgMatch[1];
-
-    return '';
-}
-
-function parseFeedLatestItem(xml = '') {
-    const raw = String(xml || '');
-    const itemMatch = raw.match(/<item[\s\S]*?<\/item>/i);
-    const entryMatch = raw.match(/<entry[\s\S]*?<\/entry>/i);
-    const block = itemMatch?.[0] || entryMatch?.[0] || '';
-    if (!block) return null;
-
-    const guid = parseXmlTag(block, 'guid') || parseXmlTag(block, 'id');
-    const title = decodeXmlEntities(parseXmlTag(block, 'title'));
-    const description = decodeXmlEntities(parseXmlTag(block, 'description') || parseXmlTag(block, 'summary'));
-    const link = decodeXmlEntities(extractFirstLink(block));
-    const thumbnail = decodeXmlEntities(extractFirstThumbnail(block));
-    const publishedAt = parseXmlTag(block, 'pubDate') || parseXmlTag(block, 'published') || parseXmlTag(block, 'updated');
-
-    const itemId = guid || link || `${title}:${publishedAt}`;
-    if (!itemId) return null;
-
-    return {
-        itemId: String(itemId).slice(0, 500),
-        title: String(title || 'Nuevo directo'),
-        description: String(description || '').slice(0, 1500),
-        url: String(link || ''),
-        imageUrl: String(thumbnail || ''),
-        publishedAt: String(publishedAt || '')
-    };
 }
 
 async function fetchWithTimeout(url) {
@@ -105,46 +63,6 @@ async function fetchWithTimeout(url) {
     }
 }
 
-async function fetchJsonWithTimeout(url, options = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-        const response = await fetch(url, {
-            method: options.method || 'GET',
-            signal: controller.signal,
-            headers: {
-                'User-Agent': 'EyedBot/1.0 (stream-alerts)',
-                ...(options.headers || {})
-            },
-            body: options.body
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return await response.json();
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
-function deriveYouTubeFeedUrl(source) {
-    const directFeed = String(source.feedUrl || '').trim();
-    if (directFeed) return directFeed;
-
-    const rawUrl = String(source.url || '').trim();
-    if (!rawUrl) return '';
-
-    const channelIdMatch = rawUrl.match(/(?:channel\/)([A-Za-z0-9_-]{10,})/i);
-    if (channelIdMatch?.[1]) {
-        return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelIdMatch[1]}`;
-    }
-
-    const queryIdMatch = rawUrl.match(/[?&]channel_id=([A-Za-z0-9_-]{10,})/i);
-    if (queryIdMatch?.[1]) {
-        return `https://www.youtube.com/feeds/videos.xml?channel_id=${queryIdMatch[1]}`;
-    }
-
-    return '';
-}
-
 function resolveFeedUrl(source) {
     if (String(source.platform) === 'youtube') {
         return deriveYouTubeFeedUrl(source);
@@ -153,69 +71,52 @@ function resolveFeedUrl(source) {
     return String(source.feedUrl || '').trim();
 }
 
-function extractYouTubeChannelId(source) {
-    const rawUrl = String(source.url || '').trim();
-    if (!rawUrl) return '';
+function isYouTubeHandledByWebSub() {
+    try {
+        return require('./youtube-websub').isYouTubeWebSubConfigured();
+    } catch {
+        return false;
+    }
+}
 
-    const channelIdMatch = rawUrl.match(/(?:channel\/)([A-Za-z0-9_-]{10,})/i);
-    if (channelIdMatch?.[1]) return channelIdMatch[1];
-
-    const queryIdMatch = rawUrl.match(/[?&]channel_id=([A-Za-z0-9_-]{10,})/i);
-    if (queryIdMatch?.[1]) return queryIdMatch[1];
-
-    return '';
+function isTikTokHandledByPush() {
+    try {
+        const feedWebSub = require('./feed-websub').isFeedWebSubConfigured();
+        return feedWebSub;
+    } catch {
+        return false;
+    }
 }
 
 async function resolveYouTubeLive(source) {
-    if (!YOUTUBE_API_KEY) return null;
-
-    const channelId = extractYouTubeChannelId(source);
+    const channelId = extractYouTubeChannelIdFromUrl(source.url || '')
+        || extractYouTubeChannelIdFromUrl(deriveYouTubeFeedUrl(source))
+        || await resolveYouTubeChannelId(source);
     if (!channelId) return null;
 
-    try {
-        const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
-        searchUrl.searchParams.set('part', 'id,snippet');
-        searchUrl.searchParams.set('channelId', channelId);
-        searchUrl.searchParams.set('eventType', 'live');
-        searchUrl.searchParams.set('type', 'video');
-        searchUrl.searchParams.set('order', 'date');
-        searchUrl.searchParams.set('maxResults', '1');
-        searchUrl.searchParams.set('key', YOUTUBE_API_KEY);
-        const searchData = await fetchJsonWithTimeout(searchUrl.toString());
-        const liveItem = Array.isArray(searchData?.items) ? searchData.items[0] : null;
-        if (!liveItem?.id?.videoId) return null;
+    const liveInfo = await fetchYouTubeChannelLiveViaApi(channelId, source.name);
+    if (!liveInfo) return null;
 
-        const videoId = String(liveItem.id.videoId);
-        const stateKey = `youtube:${channelId}`;
-        const wasLive = liveState.get(stateKey) === true;
-        liveState.set(stateKey, true);
+    const videoId = String(liveInfo.videoId || '');
+    const stateKey = `youtube:${channelId}`;
+    const wasLive = liveState.get(stateKey) === true;
+    liveState.set(stateKey, true);
 
-        let sessionId = liveSessionState.get(stateKey);
-        if (!sessionId || !sessionId.includes(videoId)) {
-            sessionId = `youtube-live-${channelId}-${videoId}`;
-            liveSessionState.set(stateKey, sessionId);
-        }
-
-        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        const title = String(liveItem?.snippet?.title || `${source.name || 'Canal'} en directo`).trim();
-        const channelTitle = String(liveItem?.snippet?.channelTitle || source.name || '').trim();
-        const thumbnail = liveItem?.snippet?.thumbnails?.high?.url
-            || liveItem?.snippet?.thumbnails?.medium?.url
-            || liveItem?.snippet?.thumbnails?.default?.url
-            || '';
-
-        return {
-            itemId: sessionId,
-            title,
-            description: channelTitle ? `${channelTitle} está en directo en YouTube` : 'Directo activo en YouTube',
-            url: videoUrl,
-            imageUrl: thumbnail || String(source.imageUrl || '').trim(),
-            publishedAt: String(liveItem?.snippet?.publishedAt || new Date().toISOString()),
-            skipIfAlreadySeen: wasLive
-        };
-    } catch {
-        return null;
+    let sessionId = liveSessionState.get(stateKey);
+    if (!sessionId || (videoId && !sessionId.includes(videoId))) {
+        sessionId = `youtube-live-${channelId}-${videoId || Date.now()}`;
+        liveSessionState.set(stateKey, sessionId);
     }
+
+    return {
+        itemId: sessionId,
+        title: liveInfo.title,
+        description: liveInfo.description,
+        url: liveInfo.url,
+        imageUrl: liveInfo.imageUrl || String(source.imageUrl || '').trim(),
+        publishedAt: liveInfo.publishedAt,
+        skipIfAlreadySeen: wasLive
+    };
 }
 
 async function resolveTwitchLiveViaApi(source) {
@@ -241,15 +142,15 @@ async function resolveTwitchLiveViaApi(source) {
         }
 
         const staticFallback = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
-        const previewUrl = live.previewUrl || staticFallback;
         const customFallback = String(source.imageUrl || '').trim();
+        const previewRaw = live.previewUrl || customFallback || staticFallback;
 
         return {
             itemId: sessionId,
             title: live.title || String(`${source.name || login} está en directo`),
             description: `En vivo en Twitch (${live.gameName || 'Sin categoría'})${live.viewerCount ? ` · ~${live.viewerCount} espectadores` : ''}`,
             url: String(source.url || `https://twitch.tv/${login}`),
-            imageUrl: previewUrl || customFallback || staticFallback,
+            imageUrl: cacheBustPreviewUrl(previewRaw),
             publishedAt: String(live.startedAt || new Date().toISOString()),
             skipIfAlreadySeen: wasLive
         };
@@ -302,7 +203,7 @@ async function resolveTwitchLive(source) {
             title: liveTitle || `${source.name || login} está en directo`,
             description: `En vivo en Twitch (${uptimeRaw.trim()})`,
             url: String(source.url || `https://twitch.tv/${login}`),
-            imageUrl: customImg || staticFallback,
+            imageUrl: cacheBustPreviewUrl(customImg || staticFallback),
             publishedAt: new Date().toISOString(),
             skipIfAlreadySeen: wasLive
         };
@@ -311,16 +212,35 @@ async function resolveTwitchLive(source) {
     }
 }
 
+function isTwitchHandledByEventSub() {
+    try {
+        return require('./twitch-eventsub').isTwitchEventSubConfigured();
+    } catch {
+        return false;
+    }
+}
+
 async function resolveLatestItemFromSource(source) {
     if (source.enabled === false) return null;
 
     if (String(source.platform) === 'twitch' && !String(source.feedUrl || '').trim()) {
+        if (isTwitchHandledByEventSub()) return null;
         return resolveTwitchLive(source);
     }
 
-    if (String(source.platform) === 'youtube') {
-        const youtubeLive = await resolveYouTubeLive(source);
-        if (youtubeLive) return youtubeLive;
+    const platform = String(source.platform || '').toLowerCase();
+
+    if (platform === 'youtube') {
+        if (!isYouTubeHandledByWebSub()) {
+            const youtubeLive = await resolveYouTubeLive(source);
+            if (youtubeLive) return youtubeLive;
+        }
+        return null;
+    }
+
+    if (platform === 'tiktok') {
+        if (isTikTokHandledByPush() && String(source.feedUrl || '').trim()) return null;
+        return null;
     }
 
     const feedUrl = resolveFeedUrl(source);
@@ -332,6 +252,35 @@ async function resolveLatestItemFromSource(source) {
     } catch {
         return null;
     }
+}
+
+function isLiveStreamSessionItem(source, item) {
+    const itemId = String(item?.itemId || '');
+    const plat = String(source?.platform || '').toLowerCase();
+    if (plat === 'twitch') return itemId.startsWith('twitch-live-');
+    if (plat === 'youtube') return itemId.startsWith('youtube-live-');
+    if (plat === 'tiktok') return itemId.startsWith('tiktok-live-');
+    return false;
+}
+
+function resolveEmbedPreviewUrl(source, item) {
+    let imageUrl = String(item?.imageUrl || source?.imageUrl || '').trim();
+    const plat = String(source?.platform || '').toLowerCase();
+
+    if (!imageUrl && plat === 'twitch') {
+        const login = extractTwitchLoginFromUrlOrName(source);
+        if (login) {
+            imageUrl = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+        }
+    }
+
+    if (!imageUrl && plat === 'youtube' && item?.url) {
+        const videoId = String(item.url).match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1];
+        if (videoId) imageUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+    }
+
+    if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) return '';
+    return cacheBustPreviewUrl(imageUrl);
 }
 
 function buildEmbed(config, source, item) {
@@ -357,12 +306,9 @@ function buildEmbed(config, source, item) {
     const url = String(item.url || source.url || '').trim();
     if (url) embed.setURL(url);
 
-    let imageUrl = String(item.imageUrl || source.imageUrl || '').trim();
-    if (imageUrl) imageUrl = cacheBustPreviewUrl(imageUrl);
-
-    const embedLarge = config.embedLargePreview !== false;
+    const imageUrl = resolveEmbedPreviewUrl(source, item);
     if (imageUrl) {
-        if (embedLarge) embed.setImage(imageUrl);
+        if (config.embedLargePreview === true) embed.setImage(imageUrl);
         else embed.setThumbnail(imageUrl);
     }
 
@@ -405,7 +351,7 @@ async function processGuildConfig(client, guildId, config) {
 
         const currentLast = String(source.lastItemId || '');
         if (!currentLast) {
-            if (String(source.platform || '').toLowerCase() === 'twitch') {
+            if (isLiveStreamSessionItem(source, item)) {
                 const posted = await postAlert(client, guildId, config, source, item).catch(() => false);
                 if (posted) {
                     source.lastItemId = item.itemId;
@@ -454,14 +400,189 @@ async function runStreamAlertSweep(client) {
     }
 }
 
+async function dispatchStreamAlertToMatchingSources(client, matcher, item) {
+    const all = await streamAlertStore.listAllStreamAlertConfigs();
+
+    for (const entry of all) {
+        const guildId = String(entry.guildId || '');
+        const config = entry.config;
+        if (!guildId || !config || config.enabled !== true || !config.channelId) continue;
+
+        let updated = false;
+        for (const source of config.sources || []) {
+            if (!source || source.enabled === false) continue;
+            if (!matcher(source)) continue;
+            if (String(source.lastItemId || '') === item.itemId) continue;
+
+            const posted = await postAlert(client, guildId, config, source, item).catch(() => false);
+            if (!posted) continue;
+
+            source.lastItemId = item.itemId;
+            source.lastPostedAt = new Date().toISOString();
+            updated = true;
+        }
+
+        if (updated) {
+            config.updatedAt = new Date().toISOString();
+            await streamAlertStore.setStreamAlertConfig(guildId, config);
+        }
+    }
+}
+
+async function handleYouTubeLiveEvent(client, event = {}) {
+    if (!client) return;
+
+    const channelId = String(event.channelId || '').trim();
+    const videoId = String(event.videoId || '').trim();
+    const sessionId = videoId && channelId
+        ? `youtube-live-${channelId}-${videoId}`
+        : `youtube-live-${channelId || 'unknown'}-${Date.now()}`;
+
+    const item = {
+        itemId: sessionId,
+        title: event.title || 'Directo en YouTube',
+        description: event.description || 'En vivo en YouTube',
+        url: event.url || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : ''),
+        imageUrl: event.imageUrl || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : ''),
+        publishedAt: event.publishedAt || new Date().toISOString()
+    };
+
+    await dispatchStreamAlertToMatchingSources(client, (source) => {
+        if (String(source.platform || '').toLowerCase() !== 'youtube') return false;
+        const sourceChannelId = extractYouTubeChannelIdFromUrl(source.url || '')
+            || extractYouTubeChannelIdFromUrl(deriveYouTubeFeedUrl(source));
+        if (channelId && sourceChannelId) return sourceChannelId === channelId;
+        if (videoId && source.url && source.url.includes(videoId)) return true;
+        return !channelId && !sourceChannelId;
+    }, item);
+}
+
+async function handleTikTokLiveEvent(client, event = {}) {
+    if (!client) return;
+
+    const username = String(event.username || '').toLowerCase();
+    if (!username) return;
+
+    const sessionId = `tiktok-live-${username}-${event.roomId || Date.now()}`;
+    const item = {
+        itemId: sessionId,
+        title: event.title || `${username} está en directo`,
+        description: 'En vivo en TikTok',
+        url: event.url || `https://www.tiktok.com/@${username}/live`,
+        imageUrl: event.imageUrl || '',
+        publishedAt: new Date().toISOString()
+    };
+
+    await dispatchStreamAlertToMatchingSources(client, (source) => {
+        if (String(source.platform || '').toLowerCase() !== 'tiktok') return false;
+        const sourceUser = extractTikTokUsernameFromSource(source);
+        return sourceUser === username;
+    }, item);
+}
+
+async function handleFeedPushEvent(client, payload = {}) {
+    if (!client) return;
+
+    const topicUrl = String(payload.topicUrl || '').trim();
+    const entry = payload.item;
+    if (!entry?.itemId) return;
+
+    const normalizedTopic = (() => {
+        try {
+            return topicUrl ? new URL(topicUrl).toString() : '';
+        } catch {
+            return topicUrl;
+        }
+    })();
+
+    await dispatchStreamAlertToMatchingSources(client, (source) => {
+        const platform = String(source.platform || '').toLowerCase();
+        if (!['tiktok', 'custom'].includes(platform)) return false;
+
+        const feedUrl = String(source.feedUrl || '').trim();
+        if (!feedUrl) return false;
+
+        let topicMatches = true;
+        if (normalizedTopic) {
+            try {
+                topicMatches = new URL(feedUrl).toString() === normalizedTopic;
+            } catch {
+                topicMatches = feedUrl === normalizedTopic;
+            }
+        }
+        if (!topicMatches) return false;
+
+        if (platform === 'tiktok') {
+            const username = extractTikTokUsernameFromSource(source);
+            const urlOk = username && entry.url && entry.url.toLowerCase().includes(username);
+            return looksLikeLiveStreamTitle(entry.title) || urlOk || /\/live\b/i.test(entry.url || '');
+        }
+
+        return true;
+    }, {
+        itemId: entry.itemId,
+        title: entry.title,
+        description: entry.description
+            || (looksLikeLiveStreamTitle(entry.title) ? 'En directo' : 'Nueva publicación en el feed'),
+        url: entry.url,
+        imageUrl: entry.imageUrl,
+        publishedAt: entry.publishedAt
+    });
+}
+
+async function handleTwitchStreamOnlineEvent(client, event = {}) {
+    if (!client) return;
+
+    const login = String(event.login || '').toLowerCase();
+    if (!login) return;
+
+    const { fetchTwitchLiveByLogin, extractTwitchLoginFromUrlOrName, cacheBustPreviewUrl } = require('./twitch-stream-api');
+    const live = await fetchTwitchLiveByLogin(login).catch(() => null);
+    const streamId = String(event.streamId || live?.streamId || Date.now());
+    const sessionId = `twitch-live-${login}-${streamId}`;
+    const staticFallback = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+    const previewRaw = live?.previewUrl || staticFallback;
+
+    const item = {
+        itemId: sessionId,
+        title: live?.title || `${event.broadcasterDisplayName || login} está en directo`,
+        description: live
+            ? `En vivo en Twitch (${live.gameName || 'Sin categoría'})${live.viewerCount ? ` · ~${live.viewerCount} espectadores` : ''}`
+            : 'En vivo en Twitch',
+        url: `https://twitch.tv/${login}`,
+        imageUrl: cacheBustPreviewUrl(previewRaw),
+        publishedAt: String(event.startedAt || live?.startedAt || new Date().toISOString())
+    };
+
+    await dispatchStreamAlertToMatchingSources(client, (source) => {
+        if (String(source.platform || '').toLowerCase() !== 'twitch') return false;
+        const sourceLogin = extractTwitchLoginFromUrlOrName(source);
+        return sourceLogin.toLowerCase() === login;
+    }, item);
+}
+
 function startStreamAlertScheduler(client) {
     if (!client || intervalRef) return;
+    const checkMs = resolveStreamAlertCheckMs();
+
     intervalRef = setInterval(() => {
         runStreamAlertSweep(client).catch(() => null);
-    }, STREAM_ALERT_CHECK_MS);
+    }, checkMs);
 
     runStreamAlertSweep(client).catch(() => null);
-    console.log(`📡 Stream alerts scheduler activo cada ${Math.round(STREAM_ALERT_CHECK_MS / 1000)}s`);
+    const pushActive = isAnyStreamPushConfigured();
+    if (pushActive) {
+        console.log(`📡 Directos push: Twitch/YouTube/feed WebSub activos. Respaldo cada ${Math.round(checkMs / 1000)}s`);
+    } else {
+        console.log(`📡 Stream alerts scheduler cada ${Math.round(checkMs / 1000)}s (configura WEB_PUBLIC_ORIGIN HTTPS para push instantáneo)`);
+    }
+
+    try {
+        const { startTikTokLiveMonitor } = require('./tiktok-live-monitor');
+        startTikTokLiveMonitor(client);
+    } catch (err) {
+        console.warn('TikTok live monitor no iniciado:', err?.message || err);
+    }
 }
 
 function stopStreamAlertScheduler() {
@@ -469,11 +590,21 @@ function stopStreamAlertScheduler() {
         clearInterval(intervalRef);
         intervalRef = null;
     }
+    try {
+        const { stopTikTokLiveMonitor } = require('./tiktok-live-monitor');
+        stopTikTokLiveMonitor();
+    } catch {
+        // ignore
+    }
 }
 
 module.exports = {
     startStreamAlertScheduler,
     stopStreamAlertScheduler,
     runStreamAlertSweep,
-    buildStreamAlertEmbed: buildEmbed
+    buildStreamAlertEmbed: buildEmbed,
+    handleTwitchStreamOnlineEvent,
+    handleYouTubeLiveEvent,
+    handleTikTokLiveEvent,
+    handleFeedPushEvent
 };

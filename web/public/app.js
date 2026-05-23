@@ -4976,35 +4976,32 @@ function bindDpxTabs(container, options = {}) {
     }
 }
 
-/** Subpestañas dentro de Notificaciones → Directos (no usar data-dpx-tab para no mezclar con el panel principal). */
-function bindStreamDirectosSubtabs(rootEl, guildId) {
+/** Pestañas Canales / Configuración en Directos. */
+function bindStreamDirectosViewTabs(rootEl, guildId) {
     if (!rootEl) return;
-    const tabs = Array.from(rootEl.querySelectorAll('[data-stream-subtab]'));
-    const panels = Array.from(rootEl.querySelectorAll('[data-stream-subpanel]'));
+    const tabs = Array.from(rootEl.querySelectorAll('[data-stream-view]'));
+    const panels = Array.from(rootEl.querySelectorAll('[data-stream-view-panel]'));
     if (!tabs.length || !panels.length) return;
 
     const storageKey = panelTabStorageKey('notifications-stream', guildId);
-    const tabKeys = new Set(tabs.map((t) => t.getAttribute('data-stream-subtab')).filter(Boolean));
+    const tabKeys = new Set(tabs.map((t) => t.getAttribute('data-stream-view')).filter(Boolean));
 
     const activate = (key) => {
         if (!key || !tabKeys.has(key)) return;
-        tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-stream-subtab') === key));
-        panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-stream-subpanel') === key));
+        tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-stream-view') === key));
+        panels.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-stream-view-panel') === key));
         try {
             sessionStorage.setItem(storageKey, key);
         } catch (_) { /* noop */ }
     };
 
     tabs.forEach((tab) => {
-        tab.addEventListener('click', () => activate(tab.getAttribute('data-stream-subtab')));
+        tab.addEventListener('click', () => activate(tab.getAttribute('data-stream-view')));
     });
 
     const storedKey = readPanelStoredTab('notifications-stream', guildId, null, tabKeys);
-    if (storedKey) {
-        activate(storedKey);
-    } else if (!tabs.some((t) => t.classList.contains('is-active'))) {
-        activate(tabs[0].getAttribute('data-stream-subtab'));
-    }
+    if (storedKey) activate(storedKey);
+    else if (!tabs.some((t) => t.classList.contains('is-active'))) activate('channels');
 }
 
 function dpxIcon(name = '', className = 'dpx-icon') {
@@ -5028,6 +5025,8 @@ function dpxIcon(name = '', className = 'dpx-icon') {
         sword: '<path d="M14 2l4 4-8 8M10 14l-4-4M5 13l2 2M14 2l-8 8M4 16l4-4"/><path d="M3 17l2-2 1 1-2 2H3z"/>',
         info: '<circle cx="10" cy="10" r="7.5"/><path d="M10 9v4.5M10 6.2v.5"/>',
         close: '<path d="M4 4l12 12M16 4L4 16"/>',
+        edit: '<path d="M12.5 3.5l4 4-8 8-4-4 8-8z"/>',
+        check: '<path d="M4 10l4 4 8-8"/>',
         twitch: '<path d="M4 3l-1 4v10h3v3h3l3-3h3l4-4V3H4zm3 2h10v8l-3 3h-3l-3 3v-3H7V5z"/><path d="M10 7v5M13 7v5"/>',
         youtube: '<rect x="2.5" y="4.5" width="15" height="11" rx="3"/><path d="M8.5 8l4 2.2-4 2.1z" fill="currentColor" stroke="none"/>',
         tiktok: '<path d="M13 3v8.5a3.5 3.5 0 11-3.5-3.5"/><path d="M13 3c.5 2 2 3.5 4 3.5"/>',
@@ -5802,14 +5801,15 @@ async function loadSecurityPanel(guildId) {
 /**
  * Lógica del editor de avisos de directo (Twitch, YouTube, etc.) en la pestaña Directos.
  */
-function initStreamAlertEditor(guildId, initialSourceRows) {
+function initStreamAlertEditor(guildId, initialSourceRows, editorOpts = {}) {
     const raw = Array.isArray(initialSourceRows) ? initialSourceRows.slice(0, 20) : [];
+    const streamLimitPerPlatform = Number(editorOpts.streamLimitPerPlatform) || 10;
     const streamState = {
-        sources: raw.length
-            ? raw.map((s) => ({ ...s }))
-            : [{ id: `src_${Date.now()}`, enabled: true, platform: 'youtube', name: 'Canal principal', url: '', feedUrl: '', imageUrl: '' }]
+        sources: raw.map((s) => ({ ...s, _previewUrl: s._previewUrl || '' })),
+        modalEditIndex: -1
     };
     let streamSourcesSearchQuery = '';
+    let selectedRowIndexes = new Set();
 
     const platformIconNames = { twitch: 'twitch', youtube: 'youtube', tiktok: 'tiktok', custom: 'rss' };
     const platformLabels = { twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok', custom: 'Custom / RSS' };
@@ -5817,7 +5817,7 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
     const streamUrlPlaceholders = {
         twitch: 'https://www.twitch.tv/usuario',
         youtube: 'https://www.youtube.com/channel/UC… o /@usuario',
-        tiktok: 'URL del perfil o feed RSS alternativo',
+        tiktok: 'https://www.tiktok.com/@usuario (o feed RSS/WebSub)',
         custom: 'https://ejemplo.com/página-con-feed'
     };
 
@@ -5828,222 +5828,302 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
         return String(name || '').replace(/^@/, '').trim().toLowerCase();
     }
 
-    function applyPlatformHintsToCard(card) {
-        if (!card) return;
-        const platform = card.querySelector('.stream-source-platform')?.value || 'custom';
-        const urlInput = card.querySelector('.stream-source-url');
-        const feedInput = card.querySelector('.stream-source-feed');
-        const imgLabel = card.querySelector('.stream-source-image-label');
-        if (urlInput) urlInput.placeholder = streamUrlPlaceholders[platform] || streamUrlPlaceholders.custom;
-        if (feedInput) {
-            feedInput.placeholder = platform === 'youtube'
-                ? 'Opcional: feed XML del canal'
-                : 'Opcional: https://…/feed.xml o Atom';
-        }
-        if (imgLabel) {
-            imgLabel.textContent = platform === 'twitch'
-                ? 'Imagen si no hay API de Twitch (opcional)'
-                : 'Imagen fallback / miniatura fija (opcional)';
-        }
-
-        const badge = card.querySelector('.dpx-platform-badge');
-        if (badge) {
-            const iconName = platformIconNames[platform] || 'rss';
-            badge.className = `dpx-platform-badge platform-${platform}`;
-            badge.innerHTML = dpxIcon(iconName, 'dpx-platform-icon');
-        }
-        const meta = card.querySelector('.dpx-source-meta');
-        if (meta) meta.textContent = platformLabels[platform] || 'Custom / RSS';
-        const headName = card.querySelector('.stream-source-head-name');
-        const nameInput = card.querySelector('.stream-source-name');
-        if (headName && nameInput) {
-            const n = String(nameInput.value || '').trim();
-            headName.textContent = n || 'Nueva fuente';
-        }
-    }
-
-    const bumpTwitchPreviews = debounce(() => {
-        document.querySelectorAll('#streamSourcesList .stream-source-card').forEach((card) => {
-            refreshTwitchCardPreview(card);
-        });
-    }, 480);
-
-    async function refreshTwitchCardPreview(card) {
-        const row = card.querySelector('[data-twitch-preview-row]');
-        if (!row) return;
-
-        const platform = card.querySelector('.stream-source-platform')?.value;
-        if (platform !== 'twitch') {
-            row.style.display = 'none';
-            return;
-        }
-
-        row.style.display = '';
-        const url = card.querySelector('.stream-source-url')?.value || '';
-        const name = card.querySelector('.stream-source-name')?.value || '';
-        const login = extractTwitchLoginClient(url, name);
-
-        const img = card.querySelector('.stream-twitch-preview-img');
-        const badge = card.querySelector('.stream-twitch-preview-badge');
-        const hint = card.querySelector('.stream-twitch-preview-hint');
-
-        if (!login) {
-            if (img) img.removeAttribute('src');
-            if (badge) {
-                badge.textContent = '';
-                badge.classList.remove('is-live');
-            }
-            if (hint) hint.textContent = 'Indica la URL de Twitch o el nombre del canal para cargar la miniatura.';
-            return;
-        }
-
-        if (hint) hint.textContent = 'Cargando vista previa…';
-        try {
-            const qs = new URLSearchParams({ login });
-            const response = await fetchWithCredentials(`/api/guild/${guildId}/twitch-live-preview?${qs.toString()}`);
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.error || 'Error');
-
-            if (img && data.previewUrl) img.src = data.previewUrl;
-            if (badge) {
-                badge.textContent = data.live ? 'EN VIVO' : 'Sin emisión';
-                badge.classList.toggle('is-live', !!data.live);
-            }
-            if (hint) {
-                if (data.live && data.title) hint.textContent = data.title;
-                else if (data.live) hint.textContent = 'Directo activo.';
-                else hint.textContent = 'Canal sin directo ahora (miniatura estática de Twitch).';
-            }
-        } catch {
-            if (img) img.removeAttribute('src');
-            if (badge) {
-                badge.textContent = '';
-                badge.classList.remove('is-live');
-            }
-            if (hint) {
-                hint.textContent = 'No se pudo cargar la miniatura. Configura TWITCH_CLIENT_ID y TWITCH_CLIENT_SECRET en el servidor.';
-            }
-        }
-    }
-
-    const sourceCardHtml = (source, index) => {
+    function extractSourceHandle(source) {
         const platform = String(source.platform || 'custom');
-        const platformLabel = platformLabels[platform] || 'Custom';
+        const url = String(source.url || '');
+        const name = String(source.name || '').replace(/^@/, '');
+        if (platform === 'twitch') {
+            const login = extractTwitchLoginClient(url, name);
+            return login ? login : name || 'twitch';
+        }
+        if (platform === 'youtube') {
+            const handle = url.match(/youtube\.com\/@([A-Za-z0-9._-]+)/i)?.[1];
+            if (handle) return `@${handle}`;
+            const ch = url.match(/channel\/([A-Za-z0-9_-]+)/i)?.[1];
+            return ch ? ch.slice(0, 12) + '…' : (name || 'youtube');
+        }
+        if (platform === 'tiktok') {
+            const user = url.match(/tiktok\.com\/@([A-Za-z0-9._-]+)/i)?.[1];
+            return user ? `@${user}` : (name ? `@${name}` : 'tiktok');
+        }
+        return name || 'feed';
+    }
+
+    function getDiscordChannelLabel() {
+        const sel = document.getElementById('streamAlertsChannel');
+        if (!sel || !sel.value) return 'Sin canal';
+        const opt = sel.options[sel.selectedIndex];
+        return opt ? opt.textContent.trim() : 'Sin canal';
+    }
+
+    function countPlatform(platform, excludeIndex = -1) {
+        return streamState.sources.filter(
+            (s, i) => i !== excludeIndex && String(s.platform) === platform && s.enabled !== false
+        ).length;
+    }
+
+    function updateUsageStatsCard() {
+        const card = document.getElementById('streamUsageStatsCard');
+        if (!card) return;
+        const rows = [
+            { key: 'twitch', label: 'Notificaciones Twitch', cls: '' },
+            { key: 'youtube', label: 'Notificaciones YouTube', cls: 'is-youtube' },
+            { key: 'tiktok', label: 'Notificaciones TikTok', cls: 'is-tiktok' }
+        ];
+        const inner = rows.map(({ key, label, cls }) => {
+            const n = countPlatform(key);
+            const pct = Math.min(100, (n / streamLimitPerPlatform) * 100);
+            return `
+            <div class="sc-stream-stat-row">
+                <div class="sc-stream-stat-head"><strong>${label}</strong><span>${n} / ${streamLimitPerPlatform}</span></div>
+                <div class="sc-stream-stat-bar ${cls}"><span style="width:${pct}%"></span></div>
+            </div>`;
+        }).join('');
+        card.innerHTML = `<h3>Uso</h3>${inner}`;
+    }
+
+    function updateDeleteSelectedUi() {
+        const btn = document.getElementById('streamDeleteSelectedBtn');
+        const n = selectedRowIndexes.size;
+        if (btn) {
+            btn.disabled = n === 0;
+            btn.textContent = `Eliminar seleccionados (${n})`;
+        }
+    }
+
+    function sourceTableRowHtml(source, index) {
+        const platform = String(source.platform || 'custom');
         const platformIconName = platformIconNames[platform] || 'rss';
-        const urlPh = streamUrlPlaceholders[platform] || streamUrlPlaceholders.custom;
-        const feedPh = platform === 'youtube' ? 'Opcional: feed XML del canal' : 'Opcional: https://…/feed.xml';
-        const imgLabelText = platform === 'twitch'
-            ? 'Imagen si no hay API de Twitch (opcional)'
-            : 'Imagen fallback / miniatura fija (opcional)';
+        const displayName = String(source.name || 'Sin nombre').trim() || 'Sin nombre';
+        const handle = extractSourceHandle(source);
+        const channelLabel = getDiscordChannelLabel();
+        const lastLabel = source.lastPostedAt ? formatRelativeTime(source.lastPostedAt) : 'Nunca';
+        const paused = source.enabled === false;
+        const preview = source._previewUrl || source.imageUrl || '';
+        const avatarInner = preview && platform === 'twitch'
+            ? `<img src="${escapeHtmlForValue(preview)}" alt="">`
+            : dpxIcon(platformIconName, 'dpx-icon');
+
         return `
-        <div class="stream-source-card dpx-item-card" data-index="${index}">
-            <div class="dpx-item-head">
-                <div class="dpx-item-head-title">
-                    <span class="dpx-platform-badge platform-${platform}">${dpxIcon(platformIconName, 'dpx-platform-icon')}</span>
-                    <span class="stream-source-head-name">${escapeHtml(source.name || 'Nueva fuente')}</span>
-                    <span class="dpx-source-meta">${escapeHtml(platformLabel)}</span>
-                </div>
-                <div style="display:inline-flex; align-items:center; gap:0.5rem;">
-                    <label class="dpx-toggle" style="padding:0.4rem 0.7rem;">
-                        <input type="checkbox" class="stream-source-enabled" ${source.enabled !== false ? 'checked' : ''}>
-                        <span class="dpx-toggle-switch"></span>
-                        <span class="dpx-toggle-info"><strong style="font-size:0.78rem;">${source.enabled !== false ? 'Activa' : 'Pausada'}</strong></span>
-                    </label>
-                    <button type="button" class="dpx-icon-btn stream-remove-source-btn" data-remove-index="${index}">${dpxIcon('close')} Quitar</button>
-                </div>
-            </div>
-            <div class="dpx-field-grid">
-                <div class="dpx-field">
-                    <label>Plataforma</label>
-                    <select class="form-control stream-source-platform">
-                        <option value="twitch" ${platform === 'twitch' ? 'selected' : ''}>Twitch</option>
-                        <option value="youtube" ${platform === 'youtube' ? 'selected' : ''}>YouTube</option>
-                        <option value="tiktok" ${platform === 'tiktok' ? 'selected' : ''}>TikTok</option>
-                        <option value="custom" ${platform === 'custom' ? 'selected' : ''}>Custom / RSS</option>
-                    </select>
-                </div>
-                <div class="dpx-field">
-                    <label>Nombre</label>
-                    <input type="text" class="form-control stream-source-name" value="${escapeHtmlForValue(source.name || '')}" placeholder="Nombre visible en el aviso">
-                </div>
-                <div class="dpx-field is-full">
-                    <label>URL canal / perfil</label>
-                    <input type="url" class="form-control stream-source-url" value="${escapeHtmlForValue(source.url || '')}" placeholder="${escapeHtmlForValue(urlPh)}">
-                </div>
-                <div class="dpx-field is-full">
-                    <label>Feed RSS / Atom (opcional)</label>
-                    <input type="url" class="form-control stream-source-feed" value="${escapeHtmlForValue(source.feedUrl || '')}" placeholder="${escapeHtmlForValue(feedPh)}">
-                </div>
-                <div class="dpx-field is-full">
-                    <label class="stream-source-image-label">${escapeHtml(imgLabelText)}</label>
-                    <input type="url" class="form-control stream-source-image" value="${escapeHtmlForValue(source.imageUrl || '')}" placeholder="https://.../image.jpg">
-                </div>
-            </div>
-            <div class="stream-twitch-preview-row" data-twitch-preview-row style="display:none;">
-                <div class="stream-twitch-preview-inner">
-                    <div class="stream-twitch-preview-thumb-wrap">
-                        <img class="stream-twitch-preview-img" alt="Miniatura Twitch" width="320" height="180" loading="lazy" decoding="async" />
-                        <span class="stream-twitch-preview-badge" aria-live="polite"></span>
+        <tr class="sc-stream-row${paused ? ' is-paused' : ''}" data-index="${index}" data-search="${escapeHtml(`${displayName} ${handle} ${platform} ${source.url || ''}`.toLowerCase())}">
+            <td><input type="checkbox" class="sc-stream-row-check" data-row-index="${index}" aria-label="Seleccionar"></td>
+            <td>
+                <div class="sc-stream-name-cell">
+                    <div class="sc-stream-avatar platform-${platform}">${avatarInner}</div>
+                    <div>
+                        <span class="sc-stream-display-name">${escapeHtml(displayName)}</span>
+                        <span class="sc-stream-handle">${dpxIcon(platformIconName, 'dpx-icon')} ${escapeHtml(handle)}</span>
                     </div>
-                    <p class="stream-twitch-preview-hint"></p>
                 </div>
-            </div>
-            <input type="hidden" class="stream-source-id" value="${escapeHtmlForValue(source.id || `src_${Date.now()}_${index}`)}">
-        </div>
-        `;
-    };
+            </td>
+            <td><span class="sc-stream-channel-pill" title="${escapeHtml(channelLabel)}">${escapeHtml(channelLabel)}</span></td>
+            <td class="sc-stream-last">${escapeHtml(lastLabel)}</td>
+            <td style="text-align:right"><button type="button" class="sc-stream-edit-btn" data-edit-index="${index}" aria-label="Editar">${dpxIcon('edit', 'dpx-icon')}</button></td>
+        </tr>`;
+    }
 
     function renderStreamSources() {
-        const listEl = document.getElementById('streamSourcesList');
-        if (!listEl) return;
+        const tbody = document.getElementById('streamSourcesList');
+        const emptyEl = document.getElementById('streamSourcesEmpty');
+        if (!tbody) return;
 
-        listEl.innerHTML = streamState.sources.map((source, index) => sourceCardHtml(source, index)).join('');
-        listEl.querySelectorAll('.stream-remove-source-btn').forEach((button) => {
-            button.addEventListener('click', () => {
-                const index = Number.parseInt(button.getAttribute('data-remove-index') || '-1', 10);
-                if (index < 0) return;
-                streamState.sources.splice(index, 1);
-                if (!streamState.sources.length) {
-                    streamState.sources.push({ id: `src_${Date.now()}`, enabled: true, platform: 'custom', name: 'Fuente', url: '', feedUrl: '', imageUrl: '' });
-                }
-                renderStreamSources();
+        selectedRowIndexes = new Set();
+        tbody.innerHTML = streamState.sources.map((source, index) => sourceTableRowHtml(source, index)).join('');
+
+        if (emptyEl) emptyEl.hidden = streamState.sources.length > 0;
+
+        tbody.querySelectorAll('.sc-stream-edit-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const idx = Number.parseInt(btn.getAttribute('data-edit-index') || '-1', 10);
+                if (idx >= 0) openStreamModal(idx);
             });
         });
 
-        listEl.querySelectorAll('.stream-source-card').forEach((card) => applyPlatformHintsToCard(card));
+        tbody.querySelectorAll('.sc-stream-row-check').forEach((cb) => {
+            cb.addEventListener('change', () => {
+                const idx = Number.parseInt(cb.getAttribute('data-row-index') || '-1', 10);
+                if (idx < 0) return;
+                if (cb.checked) selectedRowIndexes.add(idx);
+                else selectedRowIndexes.delete(idx);
+                updateDeleteSelectedUi();
+            });
+        });
 
         applyStreamSourcesFilter(streamSourcesSearchQuery);
-        bumpTwitchPreviews();
+        updateUsageStatsCard();
+        updateDeleteSelectedUi();
+        refreshAllTwitchPreviews();
     }
 
     function applyStreamSourcesFilter(query = '') {
         const normalizedQuery = String(query || '').trim().toLowerCase();
-        document.querySelectorAll('#streamSourcesList .stream-source-card').forEach((card) => {
+        document.querySelectorAll('#streamSourcesList .sc-stream-row').forEach((row) => {
             if (!normalizedQuery) {
-                card.style.display = 'block';
+                row.style.display = '';
                 return;
             }
-
-            const name = String(card.querySelector('.stream-source-name')?.value || '').toLowerCase();
-            const url = String(card.querySelector('.stream-source-url')?.value || '').toLowerCase();
-            const feed = String(card.querySelector('.stream-source-feed')?.value || '').toLowerCase();
-            const platform = String(card.querySelector('.stream-source-platform')?.value || '').toLowerCase();
-            const haystack = `${name} ${url} ${feed} ${platform}`;
-            card.style.display = haystack.includes(normalizedQuery) ? 'block' : 'none';
+            const haystack = row.getAttribute('data-search') || '';
+            row.style.display = haystack.includes(normalizedQuery) ? '' : 'none';
         });
     }
 
     function collectStreamSourcesFromDom() {
-        const cards = Array.from(document.querySelectorAll('#streamSourcesList .stream-source-card'));
-        return cards.map((card, index) => ({
-            id: card.querySelector('.stream-source-id')?.value || `src_${Date.now()}_${index}`,
-            enabled: card.querySelector('.stream-source-enabled')?.checked ?? true,
-            platform: card.querySelector('.stream-source-platform')?.value || 'custom',
-            name: card.querySelector('.stream-source-name')?.value || 'Fuente',
-            url: card.querySelector('.stream-source-url')?.value || '',
-            feedUrl: card.querySelector('.stream-source-feed')?.value || '',
-            imageUrl: card.querySelector('.stream-source-image')?.value || ''
+        return streamState.sources.map((source) => ({
+            id: source.id,
+            enabled: source.enabled !== false,
+            platform: source.platform || 'custom',
+            name: source.name || 'Fuente',
+            url: source.url || '',
+            feedUrl: source.feedUrl || '',
+            imageUrl: source.imageUrl || '',
+            lastItemId: source.lastItemId || '',
+            lastPostedAt: source.lastPostedAt || ''
         }));
+    }
+
+    async function refreshModalTwitchPreview() {
+        const row = document.getElementById('streamModalTwitchPreview');
+        const platform = document.getElementById('streamModalPlatform')?.value;
+        if (!row || platform !== 'twitch') {
+            if (row) row.style.display = 'none';
+            return;
+        }
+        row.style.display = '';
+        const url = document.getElementById('streamModalUrl')?.value || '';
+        const name = document.getElementById('streamModalName')?.value || '';
+        const login = extractTwitchLoginClient(url, name);
+        const img = document.getElementById('streamModalTwitchImg');
+        const badge = document.getElementById('streamModalTwitchBadge');
+        const hint = document.getElementById('streamModalTwitchHint');
+        if (!login) {
+            if (img) img.removeAttribute('src');
+            if (badge) { badge.textContent = ''; badge.classList.remove('is-live'); }
+            if (hint) hint.textContent = 'Indica la URL de Twitch.';
+            return;
+        }
+        if (hint) hint.textContent = 'Cargando…';
+        try {
+            const qs = new URLSearchParams({ login });
+            const response = await fetchWithCredentials(`/api/guild/${guildId}/twitch-live-preview?${qs}`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error();
+            if (img && data.previewUrl) img.src = data.previewUrl;
+            if (badge) {
+                badge.textContent = data.live ? 'EN VIVO' : 'Offline';
+                badge.classList.toggle('is-live', !!data.live);
+            }
+            if (hint) hint.textContent = data.live && data.title ? data.title : (data.live ? 'En directo' : 'Sin emisión ahora');
+        } catch {
+            if (img) img.src = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg?t=${Date.now()}`;
+            if (hint) hint.textContent = 'Vista previa estática';
+        }
+    }
+
+    const bumpModalTwitchPreview = debounce(refreshModalTwitchPreview, 450);
+
+    async function refreshAllTwitchPreviews() {
+        for (let i = 0; i < streamState.sources.length; i++) {
+            const source = streamState.sources[i];
+            if (String(source.platform) !== 'twitch') continue;
+            const login = extractTwitchLoginClient(source.url, source.name);
+            if (!login) continue;
+            try {
+                const qs = new URLSearchParams({ login });
+                const response = await fetchWithCredentials(`/api/guild/${guildId}/twitch-live-preview?${qs}`);
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.previewUrl) {
+                    source._previewUrl = data.previewUrl;
+                }
+            } catch {
+                source._previewUrl = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+            }
+        }
+        const tbody = document.getElementById('streamSourcesList');
+        if (tbody && streamState.sources.length) {
+            tbody.innerHTML = streamState.sources.map((s, i) => sourceTableRowHtml(s, i)).join('');
+            tbody.querySelectorAll('.sc-stream-edit-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const idx = Number.parseInt(btn.getAttribute('data-edit-index') || '-1', 10);
+                    if (idx >= 0) openStreamModal(idx);
+                });
+            });
+            tbody.querySelectorAll('.sc-stream-row-check').forEach((cb) => {
+                cb.addEventListener('change', () => {
+                    const idx = Number.parseInt(cb.getAttribute('data-row-index') || '-1', 10);
+                    if (idx < 0) return;
+                    if (cb.checked) selectedRowIndexes.add(idx);
+                    else selectedRowIndexes.delete(idx);
+                    updateDeleteSelectedUi();
+                });
+            });
+            applyStreamSourcesFilter(streamSourcesSearchQuery);
+        }
+    }
+
+    function openStreamModal(editIndex = -1) {
+        const backdrop = document.getElementById('streamSourceModalBackdrop');
+        if (!backdrop) return;
+        streamState.modalEditIndex = editIndex;
+        const isEdit = editIndex >= 0;
+        const source = isEdit ? streamState.sources[editIndex] : {
+            id: `src_${Date.now()}`,
+            enabled: true,
+            platform: 'twitch',
+            name: '',
+            url: '',
+            feedUrl: '',
+            imageUrl: ''
+        };
+
+        document.getElementById('streamSourceModalTitle').textContent = isEdit ? 'Editar notificación' : 'Nueva notificación';
+        document.getElementById('streamModalPlatform').value = source.platform || 'twitch';
+        document.getElementById('streamModalName').value = source.name || '';
+        document.getElementById('streamModalUrl').value = source.url || '';
+        document.getElementById('streamModalFeed').value = source.feedUrl || '';
+        document.getElementById('streamModalImage').value = source.imageUrl || '';
+        document.getElementById('streamModalEnabled').checked = source.enabled !== false;
+
+        const platform = source.platform || 'twitch';
+        document.getElementById('streamModalUrl').placeholder = streamUrlPlaceholders[platform] || streamUrlPlaceholders.custom;
+        backdrop.hidden = false;
+        refreshModalTwitchPreview();
+    }
+
+    function closeStreamModal() {
+        const backdrop = document.getElementById('streamSourceModalBackdrop');
+        if (backdrop) backdrop.hidden = true;
+        streamState.modalEditIndex = -1;
+    }
+
+    function saveStreamModal() {
+        const platform = document.getElementById('streamModalPlatform')?.value || 'twitch';
+        const isEdit = streamState.modalEditIndex >= 0;
+        const prev = isEdit ? streamState.sources[streamState.modalEditIndex] : null;
+        const excludeIdx = isEdit ? streamState.modalEditIndex : -1;
+        const count = countPlatform(platform, excludeIdx);
+        if (count >= streamLimitPerPlatform) {
+            showToast(`Límite de ${streamLimitPerPlatform} notificaciones ${platformLabels[platform] || platform}`, 'warning');
+            return;
+        }
+
+        const entry = {
+            id: isEdit ? prev.id : `src_${Date.now()}`,
+            enabled: document.getElementById('streamModalEnabled')?.checked !== false,
+            platform,
+            name: document.getElementById('streamModalName')?.value?.trim() || 'Canal',
+            url: document.getElementById('streamModalUrl')?.value?.trim() || '',
+            feedUrl: document.getElementById('streamModalFeed')?.value?.trim() || '',
+            imageUrl: document.getElementById('streamModalImage')?.value?.trim() || '',
+            lastItemId: prev?.lastItemId || '',
+            lastPostedAt: prev?.lastPostedAt || '',
+            _previewUrl: prev?._previewUrl || ''
+        };
+
+        if (isEdit) streamState.sources[streamState.modalEditIndex] = entry;
+        else streamState.sources.push(entry);
+
+        closeStreamModal();
+        renderStreamSources();
     }
 
     function collectStreamConfigPayload() {
@@ -6055,35 +6135,12 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
             descriptionTemplate: document.getElementById('streamAlertsDescriptionTemplate')?.value || '{title}\n{url}',
             color: (document.getElementById('streamAlertsColor')?.value || '#7c4dff').replace('#', ''),
             footerText: document.getElementById('streamAlertsFooter')?.value || 'EyedBot Stream Alerts',
-            embedLargePreview: document.getElementById('streamAlertsEmbedLargePreview')?.checked ?? true,
+            embedLargePreview: document.getElementById('streamAlertsEmbedLargePreview')?.checked === true,
             sources: collectStreamSourcesFromDom()
         };
     }
 
     renderStreamSources();
-
-    const streamSourcesListEl = document.getElementById('streamSourcesList');
-    if (streamSourcesListEl && !streamSourcesListEl.dataset.twitchPreviewDelegated) {
-        streamSourcesListEl.dataset.twitchPreviewDelegated = '1';
-        streamSourcesListEl.addEventListener('change', (event) => {
-            const target = event.target;
-            if (target && target.classList && target.classList.contains('stream-source-platform')) {
-                applyPlatformHintsToCard(target.closest('.stream-source-card'));
-                bumpTwitchPreviews();
-            }
-        });
-        streamSourcesListEl.addEventListener('input', (event) => {
-            const target = event.target;
-            if (!target || !target.classList) return;
-            if (target.classList.contains('stream-source-name')) {
-                applyPlatformHintsToCard(target.closest('.stream-source-card'));
-            }
-            if (
-                target.classList.contains('stream-source-url')
-                || target.classList.contains('stream-source-name')
-            ) bumpTwitchPreviews();
-        });
-    }
 
     const streamSourcesSearchInput = document.getElementById('streamSourcesSearch');
     if (streamSourcesSearchInput) {
@@ -6093,21 +6150,51 @@ function initStreamAlertEditor(guildId, initialSourceRows) {
         });
     }
 
-    const addSourceBtn = document.getElementById('addStreamSourceBtn');
-    if (addSourceBtn) {
-        addSourceBtn.addEventListener('click', () => {
-            streamState.sources.push({
-                id: `src_${Date.now()}_${streamState.sources.length}`,
-                enabled: true,
-                platform: 'custom',
-                name: 'Nueva fuente',
-                url: '',
-                feedUrl: '',
-                imageUrl: ''
-            });
-            renderStreamSources();
-        });
+    const streamAlertsChannelSel = document.getElementById('streamAlertsChannel');
+    if (streamAlertsChannelSel) {
+        streamAlertsChannelSel.addEventListener('change', () => renderStreamSources());
     }
+
+    ['streamCreateNotificationBtn', 'streamCreateNotificationBtnEmpty'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', () => openStreamModal(-1));
+    });
+
+    document.getElementById('streamSourceModalClose')?.addEventListener('click', closeStreamModal);
+    document.getElementById('streamSourceModalCancel')?.addEventListener('click', closeStreamModal);
+    document.getElementById('streamSourceModalSave')?.addEventListener('click', saveStreamModal);
+    document.getElementById('streamSourceModalBackdrop')?.addEventListener('click', (e) => {
+        if (e.target?.id === 'streamSourceModalBackdrop') closeStreamModal();
+    });
+
+    document.getElementById('streamModalPlatform')?.addEventListener('change', () => {
+        const p = document.getElementById('streamModalPlatform')?.value || 'custom';
+        const urlIn = document.getElementById('streamModalUrl');
+        if (urlIn) urlIn.placeholder = streamUrlPlaceholders[p] || streamUrlPlaceholders.custom;
+        bumpModalTwitchPreview();
+    });
+    document.getElementById('streamModalUrl')?.addEventListener('input', bumpModalTwitchPreview);
+    document.getElementById('streamModalName')?.addEventListener('input', bumpModalTwitchPreview);
+
+    document.getElementById('streamSelectAllRows')?.addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        document.querySelectorAll('#streamSourcesList .sc-stream-row-check').forEach((cb) => {
+            cb.checked = checked;
+            const idx = Number.parseInt(cb.getAttribute('data-row-index') || '-1', 10);
+            if (idx < 0) return;
+            if (checked) selectedRowIndexes.add(idx);
+            else selectedRowIndexes.delete(idx);
+        });
+        updateDeleteSelectedUi();
+    });
+
+    document.getElementById('streamDeleteSelectedBtn')?.addEventListener('click', () => {
+        if (!selectedRowIndexes.size) return;
+        const toRemove = Array.from(selectedRowIndexes).sort((a, b) => b - a);
+        toRemove.forEach((idx) => streamState.sources.splice(idx, 1));
+        selectedRowIndexes.clear();
+        renderStreamSources();
+    });
 
     const saveStreamBtn = document.getElementById('saveStreamDirectosBtn');
     if (saveStreamBtn) {
@@ -6191,7 +6278,7 @@ async function loadNotificationsPanel(guildId) {
         descriptionTemplate: '{title}\n{url}',
         color: '7c4dff',
         footerText: 'EyedBot Stream Alerts',
-        embedLargePreview: true,
+        embedLargePreview: false,
         sources: []
     };
     let streamConfig = { ...defaultStream };
@@ -6211,7 +6298,11 @@ async function loadNotificationsPanel(guildId) {
             streamConfig = {
                 ...defaultStream,
                 ...s,
-                embedLargePreview: s.embedLargePreview !== false,
+                embedLargePreview: s.embedLargePreview === true,
+                streamPush: s.streamPush && typeof s.streamPush === 'object' ? s.streamPush : null,
+                twitchEventSub: s.twitchEventSub && typeof s.twitchEventSub === 'object'
+                    ? s.twitchEventSub
+                    : (s.streamPush?.twitch || null),
                 sources: Array.isArray(s.sources) ? s.sources : defaultStream.sources
             };
         } catch (e) {
@@ -6225,6 +6316,22 @@ async function loadNotificationsPanel(guildId) {
 
     const streamSources = Array.isArray(streamConfig.sources) ? streamConfig.sources.slice(0, 20) : [];
     const streamSourcesEnabled = streamSources.filter((s) => s.enabled !== false).length;
+    const streamLimitPerPlatform = 10;
+    const streamCountTwitch = streamSources.filter((s) => String(s.platform) === 'twitch' && s.enabled !== false).length;
+    const streamCountYoutube = streamSources.filter((s) => String(s.platform) === 'youtube' && s.enabled !== false).length;
+    const streamCountTiktok = streamSources.filter((s) => String(s.platform) === 'tiktok' && s.enabled !== false).length;
+    const streamPushTipsHtml = (() => {
+        const sp = streamConfig.streamPush || {};
+        if (!sp.publicOriginConfigured) {
+            return `<div class="dpx-tip dpx-tip-warn" style="margin-top:0.75rem;">${dpxIcon('alert')}<div>Push instantáneo: configura <code>WEB_PUBLIC_ORIGIN</code> HTTPS en el servidor.</div></div>`;
+        }
+        const rows = [];
+        if (sp.twitch?.configured) rows.push(`Twitch EventSub activo`);
+        if (sp.youtube?.configured) rows.push(`YouTube WebSub activo`);
+        if (sp.feed?.configured) rows.push(`Feed WebSub (TikTok/RSS) activo`);
+        if (!rows.length) rows.push('Completa credenciales en el .env del servidor');
+        return `<div class="dpx-tip" style="margin-top:0.75rem;">${dpxIcon('check')}<div>${rows.join(' · ')}</div></div>`;
+    })();
 
     const channelName = (channels.find((c) => String(c.id) === String(prefs.notifyChannelId)) || {}).name || '—';
     const eventsActive = ['joinLeave', 'moderationActions', 'ticketAlerts', 'levelingAlerts', 'streamAlerts', 'dailyDigest'].filter((k) => prefs[k]).length;
@@ -6307,86 +6414,172 @@ async function loadNotificationsPanel(guildId) {
             </section>
 
             <section class="dpx-tab-panel" data-dpx-panel="stream-directos">
-                <div class="dpx-section stream-directos-section">
-                    <div class="dpx-section-head">
-                        <div class="dpx-section-head-text">
-                            <h4>Avisos de directo</h4>
-                            <p>Twitch usa la miniatura en vivo de la API cuando el canal está emitiendo; YouTube y RSS usan la miniatura del vídeo o del feed. Configura canal de destino, plantilla del embed y fuentes.</p>
+                <div id="streamDirectosRoot" class="stream-directos-root sc-stream-page">
+                    <div class="sc-stream-view-tabs" role="tablist">
+                        <button type="button" class="sc-stream-view-tab is-active" data-stream-view="channels" role="tab">${dpxIcon('broadcast', 'dpx-icon')} Canales</button>
+                        <button type="button" class="sc-stream-view-tab" data-stream-view="settings" role="tab">${dpxIcon('layout', 'dpx-icon')} Configuración</button>
+                    </div>
+
+                    <div class="sc-stream-view is-active" data-stream-view-panel="channels">
+                        <div class="sc-stream-hero-grid">
+                            <div class="sc-stream-intro-card">
+                                <h3>Avisos de directo</h3>
+                                <p>Recibe un mensaje en Discord cuando un creador empiece a transmitir en Twitch, YouTube o TikTok.</p>
+                                <a href="#" class="sc-learn-link" onclick="return false;">Más información</a>
+                                <button type="button" class="sc-stream-btn-primary" id="streamCreateNotificationBtn">${dpxIcon('plus', 'dpx-icon')} Crear notificación</button>
+                            </div>
+                            <div class="sc-stream-stats-card" id="streamUsageStatsCard">
+                                <h3>Uso</h3>
+                                <div class="sc-stream-stat-row">
+                                    <div class="sc-stream-stat-head"><strong>Notificaciones Twitch</strong><span>${streamCountTwitch} / ${streamLimitPerPlatform}</span></div>
+                                    <div class="sc-stream-stat-bar"><span style="width:${Math.min(100, (streamCountTwitch / streamLimitPerPlatform) * 100)}%"></span></div>
+                                </div>
+                                <div class="sc-stream-stat-row">
+                                    <div class="sc-stream-stat-head"><strong>Notificaciones YouTube</strong><span>${streamCountYoutube} / ${streamLimitPerPlatform}</span></div>
+                                    <div class="sc-stream-stat-bar is-youtube"><span style="width:${Math.min(100, (streamCountYoutube / streamLimitPerPlatform) * 100)}%"></span></div>
+                                </div>
+                                <div class="sc-stream-stat-row">
+                                    <div class="sc-stream-stat-head"><strong>Notificaciones TikTok</strong><span>${streamCountTiktok} / ${streamLimitPerPlatform}</span></div>
+                                    <div class="sc-stream-stat-bar is-tiktok"><span style="width:${Math.min(100, (streamCountTiktok / streamLimitPerPlatform) * 100)}%"></span></div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="dpx-actions" style="flex-wrap:wrap;">
-                            <button type="button" class="btn btn-secondary" id="testStreamAlertsBtn">Enviar prueba</button>
-                            <button type="button" class="btn btn-primary" id="saveStreamDirectosBtn">Guardar directos y fuentes</button>
+
+                        <div class="sc-stream-toolbar">
+                            <div class="dpx-field">
+                                <label class="sc-stream-toolbar-label" for="streamAlertsChannel">Canal de Discord</label>
+                                <select id="streamAlertsChannel" class="form-control">
+                                    <option value="">Selecciona canal</option>
+                                    ${streamChannelOptionsHtml}
+                                </select>
+                            </div>
+                            <label class="dpx-toggle" style="padding:0.5rem 0;">
+                                <input type="checkbox" id="streamAlertsEnabled" ${streamConfig.enabled ? 'checked' : ''}>
+                                <span class="dpx-toggle-switch"></span>
+                                <span class="dpx-toggle-info"><strong>Activar avisos</strong></span>
+                            </label>
+                        </div>
+
+                        <div class="sc-stream-table-panel">
+                            <div class="sc-stream-table-toolbar">
+                                <div class="sc-stream-search-wrap">
+                                    ${dpxIcon('search', 'dpx-icon')}
+                                    <input type="search" id="streamSourcesSearch" placeholder="Buscar notificaciones" autocomplete="off">
+                                </div>
+                                <button type="button" class="sc-stream-delete-selected" id="streamDeleteSelectedBtn" disabled>Eliminar seleccionados (0)</button>
+                            </div>
+                            <table class="sc-stream-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="streamSelectAllRows" aria-label="Seleccionar todos"></th>
+                                        <th>Nombre</th>
+                                        <th>Canal</th>
+                                        <th>Último aviso</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="streamSourcesList"></tbody>
+                            </table>
+                            <div class="sc-stream-empty" id="streamSourcesEmpty" ${streamSources.length ? 'hidden' : ''}>
+                                ${dpxIcon('broadcast', 'dpx-icon')}
+                                <h4>Sin notificaciones</h4>
+                                <p>Añade un canal de Twitch, YouTube o TikTok para avisar cuando empiece un directo.</p>
+                                <button type="button" class="sc-stream-btn-primary" id="streamCreateNotificationBtnEmpty">Crear notificación</button>
+                            </div>
                         </div>
                     </div>
 
-                    <div id="streamDirectosRoot" class="stream-directos-root">
-                        <div class="dpx-stream-subtabs" role="tablist">
-                            <button type="button" class="dpx-stream-subtab is-active" data-stream-subtab="general" role="tab">${dpxIcon('antenna', 'dpx-icon')} General</button>
-                            <button type="button" class="dpx-stream-subtab" data-stream-subtab="embed" role="tab">${dpxIcon('layout', 'dpx-icon')} Plantilla del embed</button>
-                            <button type="button" class="dpx-stream-subtab" data-stream-subtab="sources" role="tab">${dpxIcon('broadcast', 'dpx-icon')} Fuentes</button>
+                    <div class="sc-stream-view" data-stream-view-panel="settings">
+                        <div class="sc-stream-intro-card" style="margin-bottom:1rem;">
+                            <h3>Plantilla y opciones</h3>
+                            <p>Personaliza el embed que se publica en Discord y las opciones avanzadas.</p>
                         </div>
-
-                        <div class="stream-directos-subpanel is-active" data-stream-subpanel="general">
-                            <div class="dpx-toggle-grid">
-                                ${dpxRenderToggle({ id: 'streamAlertsEnabled', checked: !!streamConfig.enabled, title: 'Activar avisos de directo', description: 'El bot comprueba las fuentes cada pocos minutos y publica cuando hay directo o novedad en el feed.' })}
-                                ${dpxRenderToggle({ id: 'streamAlertsEmbedLargePreview', checked: streamConfig.embedLargePreview !== false, title: 'Miniatura grande en el embed', description: 'Muestra la imagen del directo como imagen principal del embed (recomendado). Si lo desactivas, se usa thumbnail pequeño.' })}
-                            </div>
-                            <div class="dpx-field-grid" style="margin-top:1rem;">
-                                <div class="dpx-field">
-                                    <label for="streamAlertsChannel">Canal donde se publica el aviso</label>
-                                    <select id="streamAlertsChannel" class="form-control">
-                                        <option value="">Selecciona canal de texto</option>
-                                        ${streamChannelOptionsHtml}
-                                    </select>
-                                    <small>Puede coincidir con el canal de notificaciones generales o ser uno dedicado a directos.</small>
-                                </div>
-                                <div class="dpx-field">
-                                    <label for="streamAlertsColor">Color del embed</label>
-                                    <input type="color" id="streamAlertsColor" class="form-control color-input" value="#${String(streamConfig.color || '7c4dff').replace('#', '')}">
-                                </div>
-                                <div class="dpx-field is-full">
-                                    <label for="streamAlertsMentionText">Mensaje encima del embed (opcional)</label>
-                                    <input type="text" id="streamAlertsMentionText" class="form-control" value="${escapeHtmlForValue(streamConfig.mentionText || '')}" placeholder="@everyone o rol · ¡En directo!">
-                                </div>
-                            </div>
-                            <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>Para el mismo mensaje en el canal global de notificaciones, activa en la pestaña <strong>Eventos</strong> el toggle «Avisos de directo».</div></div>
+                        <div class="dpx-toggle-grid">
+                            ${dpxRenderToggle({ id: 'streamAlertsEmbedLargePreview', checked: streamConfig.embedLargePreview === true, title: 'Imagen grande en el embed', description: 'Por defecto la miniatura va en la esquina (thumbnail).' })}
                         </div>
-
-                        <div class="stream-directos-subpanel" data-stream-subpanel="embed">
-                            <div class="dpx-field-grid">
-                                <div class="dpx-field is-full">
-                                    <label for="streamAlertsTitleTemplate">Título del embed</label>
-                                    <input type="text" id="streamAlertsTitleTemplate" class="form-control" value="${escapeHtmlForValue(streamConfig.titleTemplate || '🔴 {platform}: {name} en directo')}" placeholder="🔴 {platform}: {name} en directo">
-                                    <small>El título final prioriza el título real del directo cuando existe.</small>
-                                </div>
-                                <div class="dpx-field is-full">
-                                    <label for="streamAlertsDescriptionTemplate">Cuerpo del embed</label>
-                                    <textarea id="streamAlertsDescriptionTemplate" class="form-control" rows="4">${escapeHtmlForValue(streamConfig.descriptionTemplate || '{title}\n{url}')}</textarea>
-                                </div>
-                                <div class="dpx-field is-full">
-                                    <label for="streamAlertsFooter">Pie del embed (footer)</label>
-                                    <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot — Directos')}">
-                                </div>
+                        <div class="dpx-field-grid" style="margin-top:1rem;">
+                            <div class="dpx-field">
+                                <label for="streamAlertsColor">Color del embed</label>
+                                <input type="color" id="streamAlertsColor" class="form-control color-input" value="#${String(streamConfig.color || '7c4dff').replace('#', '')}">
                             </div>
-                            <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>Variables: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code>.</div></div>
+                            <div class="dpx-field is-full">
+                                <label for="streamAlertsMentionText">Mensaje encima del embed</label>
+                                <input type="text" id="streamAlertsMentionText" class="form-control" value="${escapeHtmlForValue(streamConfig.mentionText || '')}" placeholder="@everyone · ¡En directo!">
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="streamAlertsTitleTemplate">Título del embed</label>
+                                <input type="text" id="streamAlertsTitleTemplate" class="form-control" value="${escapeHtmlForValue(streamConfig.titleTemplate || '🔴 {platform}: {name} en directo')}">
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="streamAlertsDescriptionTemplate">Cuerpo</label>
+                                <textarea id="streamAlertsDescriptionTemplate" class="form-control" rows="3">${escapeHtmlForValue(streamConfig.descriptionTemplate || '{title}\n{url}')}</textarea>
+                            </div>
+                            <div class="dpx-field is-full">
+                                <label for="streamAlertsFooter">Pie (footer)</label>
+                                <input type="text" id="streamAlertsFooter" class="form-control" value="${escapeHtmlForValue(streamConfig.footerText || 'EyedBot — Directos')}">
+                            </div>
                         </div>
+                        ${streamPushTipsHtml}
+                        <div class="sc-stream-settings-actions">
+                            <button type="button" class="btn btn-secondary" id="testStreamAlertsBtn">Enviar prueba</button>
+                            <button type="button" class="btn btn-primary" id="saveStreamDirectosBtn">Guardar cambios</button>
+                        </div>
+                        <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div>Variables: <code>{platform}</code>, <code>{name}</code>, <code>{title}</code>, <code>{url}</code>, <code>{description}</code></div></div>
+                    </div>
 
-                        <div class="stream-directos-subpanel" data-stream-subpanel="sources">
-                            <div class="dpx-section-head" style="margin-bottom:0.75rem;padding:0;border:none;">
-                                <div class="dpx-section-head-text">
-                                    <h5 style="margin:0;font-size:1rem;">Lista de fuentes</h5>
-                                    <p style="margin:0.25rem 0 0 0;font-size:0.85rem;color:var(--text-secondary);">Hasta 20 entradas. En Twitch verás la miniatura en vivo al configurar la URL.</p>
-                                </div>
-                                <button type="button" class="btn btn-secondary" id="addStreamSourceBtn">Añadir fuente</button>
+                    <div class="sc-stream-modal-backdrop" id="streamSourceModalBackdrop" hidden>
+                        <div class="sc-stream-modal" role="dialog" aria-labelledby="streamSourceModalTitle">
+                            <div class="sc-stream-modal-head">
+                                <h3 id="streamSourceModalTitle">Nueva notificación</h3>
+                                <button type="button" class="sc-stream-modal-close" id="streamSourceModalClose" aria-label="Cerrar">${dpxIcon('close', 'dpx-icon')}</button>
                             </div>
-                            <div class="dpx-field-grid" style="margin-bottom:0.75rem;">
-                                <div class="dpx-field is-full">
-                                    <label for="streamSourcesSearch">Buscar en la lista</label>
-                                    <input type="text" id="streamSourcesSearch" class="form-control" placeholder="Nombre, URL o plataforma…">
+                            <div class="sc-stream-modal-body">
+                                <div class="dpx-field-grid">
+                                    <div class="dpx-field">
+                                        <label>Plataforma</label>
+                                        <select class="form-control" id="streamModalPlatform">
+                                            <option value="twitch">Twitch</option>
+                                            <option value="youtube">YouTube</option>
+                                            <option value="tiktok">TikTok</option>
+                                            <option value="custom">Custom / RSS</option>
+                                        </select>
+                                    </div>
+                                    <div class="dpx-field">
+                                        <label>Nombre visible</label>
+                                        <input type="text" class="form-control" id="streamModalName" placeholder="Nombre del creador">
+                                    </div>
+                                    <div class="dpx-field is-full">
+                                        <label>URL del canal</label>
+                                        <input type="url" class="form-control" id="streamModalUrl" placeholder="https://…">
+                                    </div>
+                                    <div class="dpx-field is-full">
+                                        <label>Feed RSS (opcional)</label>
+                                        <input type="url" class="form-control" id="streamModalFeed" placeholder="https://…/feed.xml">
+                                    </div>
+                                    <div class="dpx-field is-full" id="streamModalImageRow">
+                                        <label>Imagen fallback (opcional)</label>
+                                        <input type="url" class="form-control" id="streamModalImage" placeholder="https://…/image.jpg">
+                                    </div>
                                 </div>
+                                <div class="stream-twitch-preview-row" id="streamModalTwitchPreview" style="display:none;margin-top:0.75rem;">
+                                    <div class="stream-twitch-preview-inner">
+                                        <div class="stream-twitch-preview-thumb-wrap">
+                                            <img class="stream-twitch-preview-img" id="streamModalTwitchImg" alt="" width="320" height="180">
+                                            <span class="stream-twitch-preview-badge" id="streamModalTwitchBadge"></span>
+                                        </div>
+                                        <p class="stream-twitch-preview-hint" id="streamModalTwitchHint"></p>
+                                    </div>
+                                </div>
+                                <label class="dpx-toggle" style="margin-top:0.75rem;">
+                                    <input type="checkbox" id="streamModalEnabled" checked>
+                                    <span class="dpx-toggle-switch"></span>
+                                    <span class="dpx-toggle-info"><strong>Notificación activa</strong></span>
+                                </label>
                             </div>
-                            <div id="streamSourcesList" class="dpx-item-list"></div>
-                            <div class="dpx-tip" style="margin-top:1rem;">${dpxIcon('info')}<div><strong>Twitch:</strong> URL <code>twitch.tv/usuario</code> (requiere <code>TWITCH_CLIENT_ID</code> y <code>TWITCH_CLIENT_SECRET</code> en el servidor para miniatura en vivo). <strong>YouTube:</strong> URL de canal con ID o feed RSS; con <code>YOUTUBE_API_KEY</code> se detecta directo. <strong>TikTok / custom:</strong> feed Atom/RSS.</div></div>
+                            <div class="sc-stream-modal-foot">
+                                <button type="button" class="btn btn-secondary" id="streamSourceModalCancel">Cancelar</button>
+                                <button type="button" class="btn btn-primary sc-stream-btn-primary" id="streamSourceModalSave">Guardar</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -6417,8 +6610,11 @@ async function loadNotificationsPanel(guildId) {
 
     bindDpxTabs(container, { persistTabStorageKey: panelTabStorageKey('notifications', guildId) });
 
-    initStreamAlertEditor(guildId, streamConfig.sources);
-    bindStreamDirectosSubtabs(container.querySelector('#streamDirectosRoot'), guildId);
+    initStreamAlertEditor(guildId, streamConfig.sources, {
+        channels,
+        streamLimitPerPlatform
+    });
+    bindStreamDirectosViewTabs(container.querySelector('#streamDirectosRoot'), guildId);
 
     const saveBtn = document.getElementById('saveNotificationsBtn');
     const testBtn = document.getElementById('testNotificationsBtn');

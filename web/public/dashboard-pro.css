@@ -9995,9 +9995,477 @@ mark.receipt-highlight {
     gap: 0.7rem;
 }
 
-/* ——— Directos: subpestañas y vista previa Twitch ——— */
+/* ——— Directos estilo Streamcord ——— */
+.sc-stream-page {
+    --sc-purple: #9146ff;
+    --sc-purple-dim: rgba(145, 70, 255, 0.35);
+    --sc-card: rgba(22, 25, 35, 0.92);
+    --sc-border: rgba(255, 255, 255, 0.08);
+    margin-top: 0.5rem;
+}
+
+.sc-stream-view-tabs {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--sc-border);
+    padding-bottom: 0;
+}
+
+.sc-stream-view-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 1rem;
+    margin-bottom: -1px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.sc-stream-view-tab:hover {
+    color: var(--text-primary);
+}
+
+.sc-stream-view-tab.is-active {
+    color: var(--text-primary);
+    border-bottom-color: var(--sc-purple);
+}
+
+.sc-stream-view {
+    display: none;
+}
+
+.sc-stream-view.is-active {
+    display: block;
+}
+
+.sc-stream-hero-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+@media (max-width: 900px) {
+    .sc-stream-hero-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sc-stream-intro-card,
+.sc-stream-stats-card {
+    background: var(--sc-card);
+    border: 1px solid var(--sc-border);
+    border-radius: 12px;
+    padding: 1.35rem 1.5rem;
+}
+
+.sc-stream-intro-card h3,
+.sc-stream-stats-card h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sc-stream-intro-card p {
+    margin: 0 0 1rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    max-width: 42ch;
+}
+
+.sc-stream-intro-card .sc-learn-link {
+    display: inline-block;
+    margin-bottom: 1rem;
+    font-size: 0.82rem;
+    color: var(--sc-purple);
+    text-decoration: none;
+}
+
+.sc-stream-intro-card .sc-learn-link:hover {
+    text-decoration: underline;
+}
+
+.sc-stream-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--sc-purple);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.12s ease;
+}
+
+.sc-stream-btn-primary:hover {
+    filter: brightness(1.08);
+}
+
+.sc-stream-stat-row {
+    margin-bottom: 1rem;
+}
+
+.sc-stream-stat-row:last-child {
+    margin-bottom: 0;
+}
+
+.sc-stream-stat-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.sc-stream-stat-head strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.sc-stream-stat-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+
+.sc-stream-stat-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--sc-purple);
+    transition: width 0.25s ease;
+}
+
+.sc-stream-stat-bar.is-youtube > span {
+    background: #ff3030;
+}
+
+.sc-stream-stat-bar.is-tiktok > span {
+    background: linear-gradient(90deg, #25f4ee, #fe2c55);
+}
+
+.sc-stream-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    background: var(--sc-card);
+    border: 1px solid var(--sc-border);
+    border-radius: 10px;
+}
+
+.sc-stream-toolbar .dpx-field {
+    margin: 0;
+    min-width: 200px;
+    flex: 1;
+}
+
+.sc-stream-toolbar label.sc-stream-toolbar-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.sc-stream-table-panel {
+    background: var(--sc-card);
+    border: 1px solid var(--sc-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.sc-stream-table-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--sc-border);
+}
+
+.sc-stream-search-wrap {
+    flex: 1;
+    position: relative;
+}
+
+.sc-stream-search-wrap .dpx-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.sc-stream-search-wrap input {
+    width: 100%;
+    padding: 0.55rem 0.85rem 0.55rem 2.35rem;
+    border-radius: 8px;
+    border: 1px solid var(--sc-border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text-primary);
+    font-size: 0.88rem;
+}
+
+.sc-stream-delete-selected {
+    border: none;
+    background: transparent;
+    color: #f87171;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    opacity: 0.85;
+}
+
+.sc-stream-delete-selected:hover:not(:disabled) {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.sc-stream-delete-selected:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.sc-stream-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.sc-stream-table thead th {
+    text-align: left;
+    padding: 0.65rem 1rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--sc-border);
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.sc-stream-table thead th:first-child {
+    width: 40px;
+    padding-left: 1.15rem;
+}
+
+.sc-stream-table thead th:last-child {
+    width: 48px;
+    text-align: right;
+    padding-right: 1.15rem;
+}
+
+.sc-stream-table tbody tr {
+    border-bottom: 1px solid var(--sc-border);
+    transition: background 0.12s ease;
+}
+
+.sc-stream-table tbody tr:hover {
+    background: rgba(145, 70, 255, 0.06);
+}
+
+.sc-stream-table tbody tr.is-paused {
+    opacity: 0.55;
+}
+
+.sc-stream-table tbody td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+}
+
+.sc-stream-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.sc-stream-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sc-purple);
+}
+
+.sc-stream-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.sc-stream-avatar .dpx-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    color: #fff;
+}
+
+.sc-stream-avatar.platform-youtube { background: #ff3030; }
+.sc-stream-avatar.platform-tiktok { background: #111; }
+.sc-stream-avatar.platform-custom { background: #555; }
+
+.sc-stream-display-name {
+    display: block;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+}
+
+.sc-stream-handle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.sc-stream-handle .dpx-icon {
+    width: 0.85rem;
+    height: 0.85rem;
+    opacity: 0.9;
+}
+
+.sc-stream-channel-pill {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sc-stream-last {
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    white-space: nowrap;
+}
+
+.sc-stream-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.sc-stream-edit-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.sc-stream-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--text-secondary);
+}
+
+.sc-stream-empty h4 {
+    margin: 0.75rem 0 0.35rem;
+    color: var(--text-primary);
+}
+
+.sc-stream-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+}
+
+.sc-stream-modal-backdrop[hidden] {
+    display: none !important;
+}
+
+.sc-stream-modal {
+    width: min(520px, 100%);
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #161923;
+    border: 1px solid var(--sc-border);
+    border-radius: 14px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.sc-stream-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1.25rem;
+    border-bottom: 1px solid var(--sc-border);
+}
+
+.sc-stream-modal-head h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.sc-stream-modal-close {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.sc-stream-modal-body {
+    padding: 1.15rem 1.25rem;
+}
+
+.sc-stream-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--sc-border);
+}
+
+.sc-stream-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
 .stream-directos-root {
-    margin-top: 0.75rem;
+    margin-top: 0;
 }
 
 .dpx-stream-subtabs {

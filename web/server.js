@@ -60,6 +60,61 @@ const { sanitizeDifficulty, sanitizeXpMultiplier, getProgress } = require('../sr
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
+const {
+    handleTwitchEventSubHttpRequest,
+    isTwitchEventSubConfigured,
+    resolveCallbackUrl: resolveTwitchCallbackUrl
+} = require('../src/utils/twitch-eventsub');
+const {
+    handleYouTubeWebSubHttpRequest,
+    isYouTubeWebSubConfigured,
+    resolveCallbackUrl: resolveYouTubeCallbackUrl
+} = require('../src/utils/youtube-websub');
+const {
+    handleFeedWebSubHttpRequest,
+    isFeedWebSubConfigured,
+    resolveCallbackUrl: resolveFeedCallbackUrl
+} = require('../src/utils/feed-websub');
+const { scheduleAllStreamPushSync } = require('../src/utils/stream-push-sync');
+const { isStreamPushConfigured } = require('../src/utils/stream-push-common');
+
+app.post(
+    '/webhooks/twitch/eventsub',
+    express.raw({ type: 'application/json' }),
+    handleTwitchEventSubHttpRequest
+);
+
+app.get('/webhooks/youtube/websub', handleYouTubeWebSubHttpRequest);
+app.post(
+    '/webhooks/youtube/websub',
+    express.raw({ type: 'application/json' }),
+    handleYouTubeWebSubHttpRequest
+);
+
+app.get('/webhooks/feed/websub', handleFeedWebSubHttpRequest);
+app.post(
+    '/webhooks/feed/websub',
+    express.raw({ type: 'application/json' }),
+    handleFeedWebSubHttpRequest
+);
+
+function buildStreamPushStatus() {
+    return {
+        publicOriginConfigured: isStreamPushConfigured(),
+        twitch: {
+            configured: isTwitchEventSubConfigured(),
+            callbackUrl: resolveTwitchCallbackUrl() || null
+        },
+        youtube: {
+            configured: isYouTubeWebSubConfigured(),
+            callbackUrl: resolveYouTubeCallbackUrl() || null
+        },
+        feed: {
+            configured: isFeedWebSubConfigured(),
+            callbackUrl: resolveFeedCallbackUrl() || null
+        }
+    };
+}
 
 app.get('/health', (req, res) => {
     res.status(200).json({ ok: true, service: 'web-panel' });
@@ -718,6 +773,11 @@ function buildWeeklyTimeline(sinceDate, daily = {}) {
 // Función para inyectar el cliente del bot
 function setBotClient(client) {
     botClient = client;
+    const twitchEventSub = require('../src/utils/twitch-eventsub');
+    const { setDiscordClient } = require('../src/utils/stream-push-runtime');
+    setDiscordClient(client);
+    twitchEventSub.setDiscordClient(client);
+    if (client) scheduleAllStreamPushSync();
 }
 
 // Rutas de autenticación
@@ -2569,7 +2629,7 @@ function normalizeStreamAlertConfigInput(body = {}, current = null, userId = 'un
     const embedLargeFromBody = body.embedLargePreview;
     const embedLargePreview = typeof embedLargeFromBody === 'boolean'
         ? embedLargeFromBody
-        : (base.embedLargePreview !== false);
+        : (base.embedLargePreview === true);
 
     return {
         enabled: body.enabled === true,
@@ -2696,8 +2756,13 @@ app.get('/api/guild/:guildId/twitch-live-preview', requireAuth, async (req, res)
             return res.status(400).json({ error: 'Indica el canal de Twitch (login o URL twitch.tv/…)' });
         }
 
-        const live = await fetchTwitchLiveByLogin(login);
         const staticFallback = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+        let live = null;
+        try {
+            live = await fetchTwitchLiveByLogin(login);
+        } catch {
+            live = null;
+        }
         const rawPreview = live?.previewUrl || staticFallback;
         const previewUrl = cacheBustPreviewUrl(rawPreview);
 
@@ -2707,10 +2772,27 @@ app.get('/api/guild/:guildId/twitch-live-preview', requireAuth, async (req, res)
             previewUrl,
             title: live?.title || '',
             gameName: live?.gameName || '',
-            viewerCount: Number(live?.viewerCount || 0)
+            viewerCount: Number(live?.viewerCount || 0),
+            apiConfigured: Boolean(
+                String(process.env.TWITCH_CLIENT_ID || '').trim()
+                && String(process.env.TWITCH_CLIENT_SECRET || '').trim()
+            )
         });
     } catch (error) {
         console.error('Error twitch-live-preview:', error);
+        const login = String(req.query.login || '').trim().replace(/^@/, '').toLowerCase();
+        if (login) {
+            const staticFallback = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-1280x720.jpg`;
+            return res.json({
+                login,
+                live: false,
+                previewUrl: cacheBustPreviewUrl(staticFallback),
+                title: '',
+                gameName: '',
+                viewerCount: 0,
+                apiConfigured: false
+            });
+        }
         res.status(500).json({ error: 'No se pudo obtener la vista previa' });
     }
 });
@@ -2722,7 +2804,11 @@ app.get('/api/guild/:guildId/stream-alert-config', requireAuth, async (req, res)
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
         const config = await streamAlertStore.getStreamAlertConfig(guildId);
-        res.json(config || streamAlertStore.defaultConfig());
+        res.json({
+            ...(config || streamAlertStore.defaultConfig()),
+            streamPush: buildStreamPushStatus(),
+            twitchEventSub: buildStreamPushStatus().twitch
+        });
     } catch (error) {
         console.error('Error obteniendo stream alert config:', error);
         res.status(500).json({ error: 'Error al obtener configuración de stream alerts' });
@@ -2743,7 +2829,13 @@ app.post('/api/guild/:guildId/stream-alert-config', requireAuth, async (req, res
         }
 
         await streamAlertStore.setStreamAlertConfig(guildId, config);
-        res.json({ success: true, config });
+        scheduleAllStreamPushSync();
+        res.json({
+            success: true,
+            config,
+            streamPush: buildStreamPushStatus(),
+            twitchEventSub: buildStreamPushStatus().twitch
+        });
     } catch (error) {
         console.error('Error guardando stream alert config:', error);
         res.status(500).json({ error: 'Error al guardar configuración de stream alerts' });
@@ -4896,6 +4988,15 @@ app.get('/dashboard', (req, res) => {
 // Iniciar servidor con manejo de errores
 const server = app.listen(PORT, () => {
     console.log(`🌐 Panel web iniciado en http://localhost:${PORT}`);
+    const push = buildStreamPushStatus();
+    if (push.publicOriginConfigured) {
+        console.log('📡 Directos push (HTTPS):');
+        if (push.twitch.configured) console.log(`   Twitch EventSub → ${push.twitch.callbackUrl}`);
+        if (push.youtube.configured) console.log(`   YouTube WebSub → ${push.youtube.callbackUrl}`);
+        if (push.feed.configured) console.log(`   Feed WebSub (TikTok/custom) → ${push.feed.callbackUrl}`);
+    } else {
+        console.log('ℹ️ Directos instantáneos: configura WEB_PUBLIC_ORIGIN=https://tu-dominio en .env');
+    }
 }).on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
         console.error(`❌ Error: El puerto ${PORT} ya está en uso`);
