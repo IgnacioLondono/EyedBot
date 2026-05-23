@@ -3251,6 +3251,7 @@ app.post('/api/guild/:guildId/free-games/config', requireAuth, async (req, res) 
             color: String(body.color || current.color || '4ccb81').replace('#', '').slice(0, 6),
             footerText: String(body.footerText || current.footerText || 'EyedBot · Juegos gratis').slice(0, 200),
             notifiedIds: current.notifiedIds || [],
+            embedMessages: current.embedMessages || [],
             updatedBy: req.session.user?.id || 'unknown'
         });
 
@@ -3359,6 +3360,69 @@ app.post('/api/guild/:guildId/free-games/test', requireAuth, async (req, res) =>
     } catch (error) {
         console.error('Error enviando free-games test:', error);
         res.status(500).json({ error: 'Error al enviar prueba' });
+    }
+});
+
+app.post('/api/guild/:guildId/free-games/refresh-embeds', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const current = await freeGamesStore.getFreeGamesConfig(guildId);
+        const body = req.body || {};
+        const config = freeGamesStore.normalizeConfig({
+            ...current,
+            channelId: String(body.channelId || current.channelId || '').trim(),
+            mentionText: String(body.mentionText ?? current.mentionText ?? '').slice(0, 300),
+            sources: body.sources && typeof body.sources === 'object' ? body.sources : current.sources,
+            color: String(body.color || current.color || '4ccb81').replace('#', '').slice(0, 6),
+            footerText: String(body.footerText || current.footerText || 'EyedBot · Juegos gratis').slice(0, 200),
+            notifiedIds: current.notifiedIds || [],
+            embedMessages: current.embedMessages || [],
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+
+        if (!config.channelId) {
+            return res.status(400).json({ error: 'Selecciona un canal de notificaciones' });
+        }
+
+        const channel = guild.channels.cache.get(config.channelId)
+            || await guild.channels.fetch(config.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(400).json({ error: 'Canal inválido' });
+        }
+
+        const perms = channel.permissionsFor(guild.members.me);
+        if (!perms?.has(['ViewChannel', 'SendMessages', 'EmbedLinks', 'ReadMessageHistory'])) {
+            return res.status(403).json({ error: 'El bot no tiene permisos para leer y editar mensajes en ese canal' });
+        }
+
+        const result = await freeGamesService.refreshFreeGameEmbedsInChannel(
+            channel,
+            config,
+            botClient.user.id,
+            { scanLimit: 100 }
+        );
+
+        const saved = await freeGamesStore.setFreeGamesConfig(guildId, {
+            ...config,
+            embedMessages: config.embedMessages || [],
+            updatedAt: new Date().toISOString()
+        });
+
+        res.json({
+            success: true,
+            ...result,
+            config: saved
+        });
+    } catch (error) {
+        console.error('Error actualizando embeds free-games:', error);
+        res.status(500).json({ error: error.message || 'No se pudieron actualizar los embeds' });
     }
 });
 

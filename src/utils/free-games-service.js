@@ -412,6 +412,94 @@ function buildFreeGameEmbed(game, cfg = {}) {
     return embed;
 }
 
+function normalizeGameTitle(title) {
+    return String(title || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function isFreeGameBotEmbed(embed, config = {}) {
+    if (!embed) return false;
+    const footer = String(embed.footer?.text || '').toLowerCase();
+    const cfgFooter = String(config.footerText || 'EyedBot · Juegos gratis').toLowerCase();
+    if (footer && (footer.includes('juegos gratis') || footer === cfgFooter)) return true;
+    return String(embed.title || '').startsWith('🎮');
+}
+
+function upsertEmbedMessage(config, entry) {
+    const list = Array.isArray(config.embedMessages) ? [...config.embedMessages] : [];
+    const idx = list.findIndex((row) => row.gameId === entry.gameId && row.channelId === entry.channelId);
+    if (idx >= 0) list[idx] = entry;
+    else list.push(entry);
+    config.embedMessages = list.slice(-200);
+}
+
+/**
+ * Edita mensajes del bot en el canal de avisos con datos y enlaces actuales.
+ */
+async function refreshFreeGameEmbedsInChannel(channel, config, botUserId, options = {}) {
+    if (!channel?.messages?.fetch || !botUserId) {
+        throw new Error('Canal o bot no disponible');
+    }
+
+    const includeEpic = config.sources?.epic !== false;
+    const includeSteam = config.sources?.steam !== false;
+    const games = await fetchAllFreeGames({ includeEpic, includeSteam, force: true });
+    const gamesById = new Map(games.map((g) => [g.id, g]));
+    const gamesByTitle = new Map(games.map((g) => [normalizeGameTitle(g.title), g]));
+
+    const updatedIds = new Set();
+    let updated = 0;
+    let failed = 0;
+    let notMatched = 0;
+
+    const stored = Array.isArray(config.embedMessages) ? config.embedMessages : [];
+    for (const row of stored) {
+        if (String(row.channelId) !== String(channel.id)) continue;
+        const game = gamesById.get(row.gameId);
+        if (!game) continue;
+        try {
+            const msg = await channel.messages.fetch(row.messageId).catch(() => null);
+            if (!msg) continue;
+            await msg.edit({ embeds: [buildFreeGameEmbed(game, config)] });
+            updated += 1;
+            updatedIds.add(msg.id);
+        } catch {
+            failed += 1;
+        }
+    }
+
+    const scanLimit = Math.min(100, Math.max(20, Number(options.scanLimit) || 100));
+    const messages = await channel.messages.fetch({ limit: scanLimit });
+
+    for (const msg of messages.values()) {
+        if (msg.author?.id !== botUserId) continue;
+        if (updatedIds.has(msg.id)) continue;
+        const embed = msg.embeds?.[0];
+        if (!isFreeGameBotEmbed(embed, config)) continue;
+
+        const titleKey = normalizeGameTitle(String(embed.title || '').replace(/^🎮\s*/, ''));
+        const game = gamesByTitle.get(titleKey);
+        if (!game) {
+            notMatched += 1;
+            continue;
+        }
+
+        try {
+            await msg.edit({ embeds: [buildFreeGameEmbed(game, config)] });
+            upsertEmbedMessage(config, {
+                gameId: game.id,
+                messageId: msg.id,
+                channelId: channel.id
+            });
+            updated += 1;
+            updatedIds.add(msg.id);
+        } catch {
+            failed += 1;
+        }
+    }
+
+    return { updated, failed, notMatched, scanned: messages.size, gamesAvailable: games.length };
+}
+
 // ============================================================
 // Scheduler
 // ============================================================
@@ -439,16 +527,25 @@ async function processGuildConfig(client, guildId, config) {
     if (!newOnes.length) return;
 
     const mention = String(config.mentionText || '').trim();
+    const embedMessages = Array.isArray(config.embedMessages) ? [...config.embedMessages] : [];
 
     for (const game of newOnes) {
         try {
             const embed = buildFreeGameEmbed(game, config);
-            await channel.send({
+            const sent = await channel.send({
                 content: mention || undefined,
                 embeds: [embed],
                 allowedMentions: { parse: ['users', 'roles', 'everyone'] }
             });
             notified.add(game.id);
+            if (sent?.id) {
+                const idx = embedMessages.findIndex(
+                    (row) => row.gameId === game.id && row.channelId === channel.id
+                );
+                const entry = { gameId: game.id, messageId: sent.id, channelId: channel.id };
+                if (idx >= 0) embedMessages[idx] = entry;
+                else embedMessages.push(entry);
+            }
         } catch (err) {
             console.warn(`Error enviando juego gratis a ${guildId}/${config.channelId}:`, err.message);
         }
@@ -458,6 +555,7 @@ async function processGuildConfig(client, guildId, config) {
     const updated = {
         ...config,
         notifiedIds: Array.from(notified).slice(-400),
+        embedMessages: embedMessages.slice(-200),
         updatedAt: new Date().toISOString()
     };
     await freeGamesStore.setFreeGamesConfig(guildId, updated).catch(() => null);
@@ -503,6 +601,7 @@ module.exports = {
     fetchEpicFreeGames,
     fetchSteamFreeGames,
     buildFreeGameEmbed,
+    refreshFreeGameEmbedsInChannel,
     resolveEpicStoreSlug,
     buildEpicStoreUrl,
     startFreeGamesScheduler,

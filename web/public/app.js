@@ -15305,7 +15305,9 @@ const _freeGamesState = {
     games: [],
     channels: [],
     fetchedAt: null,
-    loadingPreview: false
+    loadingPreview: false,
+    activeTab: 'catalog',
+    searchQuery: ''
 };
 
 async function openFreeGamesPane() {
@@ -15340,159 +15342,245 @@ async function openFreeGamesPane() {
     }
 }
 
+function getFreeGamesStats() {
+    const games = _freeGamesState.games || [];
+    const epic = games.filter((g) => g.source === 'epic' && !g.isUpcoming).length;
+    const steam = games.filter((g) => g.source === 'steam' && !g.isUpcoming).length;
+    const upcoming = games.filter((g) => g.isUpcoming).length;
+    return { total: games.length, epic, steam, upcoming };
+}
+
 function renderFreeGamesPane() {
     const container = document.getElementById('freeGamesContainer');
     if (!container) return;
     const cfg = _freeGamesState.config || {};
     const channels = _freeGamesState.channels || [];
+    const stats = getFreeGamesStats();
+    const tab = _freeGamesState.activeTab || 'catalog';
 
     const channelOptions = channels
         .map((c) => `<option value="${c.id}" ${c.id === cfg.channelId ? 'selected' : ''}>#${escapeHtml(c.name)}</option>`)
         .join('');
 
     const color = String(cfg.color || '4ccb81').replace('#', '');
+    const channelLabel = cfg.channelId
+        ? (channels.find((c) => c.id === cfg.channelId)?.name ? `#${channels.find((c) => c.id === cfg.channelId).name}` : 'Canal configurado')
+        : 'Sin canal';
+
     const freeGamesHeroHtml = dpxRenderHero({
-        kicker: 'Avisos',
-        title: 'Juegos gratis — Epic Games & Steam',
-        description: 'Configura un canal para recibir notificaciones automáticas cuando aparezca un juego gratis. Mostramos la imagen, el precio original, el descuento y el tiempo restante.',
+        kicker: 'Promociones',
+        title: 'Juegos gratis',
+        description: 'Avisos automáticos de Epic Games y Steam con embed enriquecido, enlaces corregidos y herramientas para actualizar mensajes ya publicados.',
         accent: '#7ef0b4',
         glow1: 'rgba(80,230,160,0.18)',
         glow2: 'rgba(124,77,255,0.18)',
         iconName: 'leaf',
-        actionsHtml: `<span class="dpx-status-chip ${cfg.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${cfg.enabled ? 'Activo' : 'Desactivado'}</span>`
+        actionsHtml: `
+            <span class="dpx-status-chip ${cfg.enabled ? 'is-on' : 'is-off'}"><span class="dot"></span>${cfg.enabled ? 'Activo' : 'Desactivado'}</span>
+            <span class="fg-studio-channel-pill">${escapeHtml(channelLabel)}</span>`
     });
 
     container.innerHTML = `
-        <div class="dpx-panel">
+        <div class="dpx-panel fg-studio">
             ${freeGamesHeroHtml}
-        <div class="fg-layout">
-            <!-- Columna izquierda: Configuracion -->
-            <div class="fg-config">
-                <div class="fg-section">
-                    <h4 class="fg-section-title">
-                        <span class="fg-dot"></span>
-                        Configuración
-                    </h4>
 
-                    <div class="form-group fg-enable-block">
-                        <label class="fg-switch-label">
-                            <span class="fg-switch" aria-hidden="true"><span class="fg-switch-knob"></span></span>
-                            <span class="fg-switch-copy">
-                                <span id="fgEnabledBadge" class="fg-status-badge ${cfg.enabled ? 'is-on' : 'is-off'}">${cfg.enabled ? 'Activado' : 'Desactivado'}</span>
-                                <span class="fg-switch-title" id="fgSwitchTitle">Notificaciones de juegos gratis</span>
-                                <span class="fg-switch-hint">El bot solo publicará en el canal si está activado y guardas la configuración.</span>
-                            </span>
-                            <input type="checkbox" id="fgEnabled" class="fg-switch-input" role="switch" aria-checked="${cfg.enabled ? 'true' : 'false'}" aria-labelledby="fgSwitchTitle fgEnabledBadge" ${cfg.enabled ? 'checked' : ''}>
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="fgChannel">Canal de notificaciones</label>
-                        <select id="fgChannel" class="form-control">
-                            <option value="">— Selecciona un canal —</option>
-                            ${channelOptions}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="fgMention">Mención opcional</label>
-                        <input type="text" id="fgMention" class="form-control" placeholder="@everyone, <@&ROL_ID> o vacío"
-                            value="${escapeHtml(cfg.mentionText || '')}" maxlength="300">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Plataformas</label>
-                        <div class="fg-sources">
-                            <label class="fg-source-chip epic ${cfg.sources?.epic !== false ? 'is-active' : ''}">
-                                <input type="checkbox" id="fgEpic" ${cfg.sources?.epic !== false ? 'checked' : ''}>
-                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h16v14l-8 5-8-5V3z"/></svg>
-                                <span>Epic Games</span>
-                            </label>
-                            <label class="fg-source-chip steam ${cfg.sources?.steam !== false ? 'is-active' : ''}">
-                                <input type="checkbox" id="fgSteam" ${cfg.sources?.steam !== false ? 'checked' : ''}>
-                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill-opacity="0.15"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="16" cy="9" r="3" fill="currentColor"/><circle cx="9" cy="15" r="2" fill="currentColor"/></svg>
-                                <span>Steam</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="fgColor">Color del embed</label>
-                            <div class="fg-color-picker">
-                                <input type="color" id="fgColor" value="#${color}">
-                                <input type="text" id="fgColorHex" class="form-control" value="#${color}" maxlength="7">
-                            </div>
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="fgFooter">Texto del footer</label>
-                            <input type="text" id="fgFooter" class="form-control" placeholder="EyedBot · Juegos gratis"
-                                value="${escapeHtml(cfg.footerText || 'EyedBot · Juegos gratis')}" maxlength="200">
-                        </div>
-                    </div>
-
-                    <div class="fg-actions">
-                        <button type="button" id="fgSaveBtn" class="btn btn-primary">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                            <span>Guardar configuración</span>
-                        </button>
-                        <button type="button" id="fgTestBtn" class="btn btn-ghost">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12A10 10 0 1 1 11.5 2"></path><path d="M22 2L12 12"></path><polyline points="16 2 22 2 22 8"></polyline></svg>
-                            <span>Enviar prueba al canal</span>
-                        </button>
-                    </div>
+            <div class="fg-studio-stats">
+                <div class="fg-studio-stat">
+                    <span class="fg-studio-stat-value">${stats.total}</span>
+                    <span class="fg-studio-stat-label">En catálogo</span>
                 </div>
-
-                <div class="fg-info-card">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-                    <div>
-                        <strong>¿Cómo funciona?</strong>
-                        <p>Cada 30 minutos comprobamos Epic Games y Steam. Cuando detectamos un juego nuevo al 100% de descuento, enviamos automáticamente un embed con toda la información al canal configurado.</p>
-                    </div>
+                <div class="fg-studio-stat is-epic">
+                    <span class="fg-studio-stat-value">${stats.epic}</span>
+                    <span class="fg-studio-stat-label">Epic Games</span>
+                </div>
+                <div class="fg-studio-stat is-steam">
+                    <span class="fg-studio-stat-value">${stats.steam}</span>
+                    <span class="fg-studio-stat-label">Steam</span>
+                </div>
+                <div class="fg-studio-stat is-muted">
+                    <span class="fg-studio-stat-value">${stats.upcoming}</span>
+                    <span class="fg-studio-stat-label">Próximamente</span>
                 </div>
             </div>
 
-            <!-- Columna derecha: Preview de juegos actuales -->
-            <div class="fg-preview">
-                <div class="fg-preview-head">
-                    <div>
-                        <h4 class="fg-section-title">
-                            <span class="fg-dot fg-dot-live"></span>
-                            Juegos gratis ahora mismo
-                        </h4>
-                        <p class="fg-preview-sub">Así se verá la notificación en tu canal.</p>
-                    </div>
-                    <button type="button" id="fgRefreshBtn" class="btn btn-ghost btn-sm" title="Actualizar lista">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>
-                    </button>
-                </div>
+            <nav class="fg-studio-tabs" aria-label="Secciones juegos gratis">
+                <button type="button" class="fg-studio-tab ${tab === 'catalog' ? 'is-active' : ''}" data-fg-tab="catalog">Catálogo en vivo</button>
+                <button type="button" class="fg-studio-tab ${tab === 'settings' ? 'is-active' : ''}" data-fg-tab="settings">Configuración</button>
+            </nav>
 
-                <div id="fgGamesList" class="fg-games-list">
+            <section class="fg-studio-panel ${tab === 'catalog' ? '' : 'is-hidden'}" id="fgTabCatalog" aria-labelledby="fg-tab-catalog">
+                <div class="fg-studio-toolbar">
+                    <div class="fg-studio-search-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+                        <input type="search" id="fgSearch" class="form-control" placeholder="Buscar juego, editor o tienda…" value="${escapeHtml(_freeGamesState.searchQuery || '')}">
+                    </div>
+                    <div class="fg-studio-toolbar-actions">
+                        <button type="button" id="fgRefreshBtn" class="btn btn-ghost btn-sm" title="Sincronizar catálogo">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg>
+                            <span>Sincronizar</span>
+                        </button>
+                        <button type="button" id="fgUpdateEmbedsBtn" class="btn btn-primary btn-sm" title="Editar embeds ya enviados en el canal">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                            <span>Actualizar embeds</span>
+                        </button>
+                    </div>
+                </div>
+                <p class="fg-studio-hint">Vista previa del embed que envía el bot. Usa <strong>Actualizar embeds</strong> para corregir enlaces y datos en mensajes ya publicados (últimos 100 del canal).</p>
+                <div id="fgGamesList" class="fg-games-list fg-studio-grid">
                     <div class="fg-loading">
                         <div class="loading-spinner"></div>
                         <p>Buscando juegos gratis...</p>
                     </div>
                 </div>
-            </div>
-        </div>
+            </section>
+
+            <section class="fg-studio-panel ${tab === 'settings' ? '' : 'is-hidden'}" id="fgTabSettings">
+                <div class="fg-layout fg-layout--settings">
+                    <div class="fg-config">
+                        <div class="fg-section">
+                            <h4 class="fg-section-title"><span class="fg-dot"></span> Publicación automática</h4>
+
+                            <div class="form-group fg-enable-block">
+                                <label class="fg-switch-label">
+                                    <span class="fg-switch" aria-hidden="true"><span class="fg-switch-knob"></span></span>
+                                    <span class="fg-switch-copy">
+                                        <span id="fgEnabledBadge" class="fg-status-badge ${cfg.enabled ? 'is-on' : 'is-off'}">${cfg.enabled ? 'Activado' : 'Desactivado'}</span>
+                                        <span class="fg-switch-title" id="fgSwitchTitle">Enviar avisos automáticos</span>
+                                        <span class="fg-switch-hint">Cada ~30 min el bot busca juegos al 100% de descuento y publica en el canal elegido.</span>
+                                    </span>
+                                    <input type="checkbox" id="fgEnabled" class="fg-switch-input" role="switch" ${cfg.enabled ? 'checked' : ''}>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="fgChannel">Canal de notificaciones</label>
+                                <select id="fgChannel" class="form-control">
+                                    <option value="">— Selecciona un canal —</option>
+                                    ${channelOptions}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="fgMention">Mención opcional</label>
+                                <input type="text" id="fgMention" class="form-control" placeholder="@everyone, <@&ROL_ID>"
+                                    value="${escapeHtml(cfg.mentionText || '')}" maxlength="300">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Plataformas</label>
+                                <div class="fg-sources">
+                                    <label class="fg-source-chip epic ${cfg.sources?.epic !== false ? 'is-active' : ''}">
+                                        <input type="checkbox" id="fgEpic" ${cfg.sources?.epic !== false ? 'checked' : ''}>
+                                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h16v14l-8 5-8-5V3z"/></svg>
+                                        <span>Epic Games</span>
+                                    </label>
+                                    <label class="fg-source-chip steam ${cfg.sources?.steam !== false ? 'is-active' : ''}">
+                                        <input type="checkbox" id="fgSteam" ${cfg.sources?.steam !== false ? 'checked' : ''}>
+                                        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill-opacity="0.15"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="16" cy="9" r="3" fill="currentColor"/><circle cx="9" cy="15" r="2" fill="currentColor"/></svg>
+                                        <span>Steam</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group" style="flex:1;">
+                                    <label for="fgColor">Color del embed</label>
+                                    <div class="fg-color-picker">
+                                        <input type="color" id="fgColor" value="#${color}">
+                                        <input type="text" id="fgColorHex" class="form-control" value="#${color}" maxlength="7">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="flex:1;">
+                                    <label for="fgFooter">Footer del embed</label>
+                                    <input type="text" id="fgFooter" class="form-control"
+                                        value="${escapeHtml(cfg.footerText || 'EyedBot · Juegos gratis')}" maxlength="200">
+                                </div>
+                            </div>
+
+                            <div class="fg-actions">
+                                <button type="button" id="fgSaveBtn" class="btn btn-primary">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                    <span>Guardar</span>
+                                </button>
+                                <button type="button" id="fgTestBtn" class="btn btn-ghost">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                                    <span>Enviar prueba</span>
+                                </button>
+                                <button type="button" id="fgUpdateEmbedsBtnSettings" class="btn btn-ghost">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                                    <span>Actualizar embeds</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fg-info-card fg-info-card--stack">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        <div>
+                            <strong>Actualizar embeds</strong>
+                            <p>Busca en el canal los mensajes del bot con avisos de juegos gratis y los edita con precios, imágenes y enlaces actuales (útil si Epic cambió URLs).</p>
+                        </div>
+                        <div>
+                            <strong>Permisos necesarios</strong>
+                            <p>El bot necesita ver el canal, enviar mensajes, insertar enlaces y leer historial de mensajes.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     `;
 
     wireFreeGamesControls();
+    if (_freeGamesState.games?.length) {
+        renderFreeGamesList();
+        updateFreeGamesStatsUi();
+    }
+}
+
+function updateFreeGamesStatsUi() {
+    const stats = getFreeGamesStats();
+    const root = document.querySelector('.fg-studio-stats');
+    if (!root) return;
+    const vals = root.querySelectorAll('.fg-studio-stat-value');
+    if (vals.length >= 4) {
+        vals[0].textContent = String(stats.total);
+        vals[1].textContent = String(stats.epic);
+        vals[2].textContent = String(stats.steam);
+        vals[3].textContent = String(stats.upcoming);
+    }
 }
 
 function wireFreeGamesControls() {
     const saveBtn = document.getElementById('fgSaveBtn');
     const testBtn = document.getElementById('fgTestBtn');
     const refreshBtn = document.getElementById('fgRefreshBtn');
+    const updateEmbedsBtn = document.getElementById('fgUpdateEmbedsBtn');
+    const updateEmbedsBtnSettings = document.getElementById('fgUpdateEmbedsBtnSettings');
+    const searchInput = document.getElementById('fgSearch');
     const colorInput = document.getElementById('fgColor');
     const colorHex = document.getElementById('fgColorHex');
     const epicChk = document.getElementById('fgEpic');
     const steamChk = document.getElementById('fgSteam');
 
+    document.querySelectorAll('.fg-studio-tab').forEach((tabBtn) => {
+        tabBtn.addEventListener('click', () => {
+            _freeGamesState.activeTab = tabBtn.dataset.fgTab || 'catalog';
+            renderFreeGamesPane();
+        });
+    });
+
     if (saveBtn) saveBtn.addEventListener('click', saveFreeGamesConfig);
     if (testBtn) testBtn.addEventListener('click', sendFreeGamesTest);
     if (refreshBtn) refreshBtn.addEventListener('click', () => fetchFreeGamesPreview(true));
+    if (updateEmbedsBtn) updateEmbedsBtn.addEventListener('click', refreshFreeGamesEmbeds);
+    if (updateEmbedsBtnSettings) updateEmbedsBtnSettings.addEventListener('click', refreshFreeGamesEmbeds);
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            _freeGamesState.searchQuery = String(searchInput.value || '').trim().toLowerCase();
+            renderFreeGamesList();
+        });
+    }
 
     if (colorInput && colorHex) {
         colorInput.addEventListener('input', () => { colorHex.value = colorInput.value; });
@@ -15578,6 +15666,60 @@ async function saveFreeGamesConfig() {
     }
 }
 
+async function refreshFreeGamesEmbeds() {
+    const guildId = _freeGamesState.guildId;
+    if (!guildId) return;
+    const body = collectFreeGamesInput();
+
+    if (!body.channelId) {
+        showToast('Selecciona un canal de notificaciones primero', 'error');
+        _freeGamesState.activeTab = 'settings';
+        renderFreeGamesPane();
+        return;
+    }
+
+    const confirmed = await showAppConfirm({
+        title: 'Actualizar embeds en el canal',
+        message: 'Se editarán los mensajes del bot con avisos de juegos gratis (hasta los últimos 100) usando datos y enlaces actuales. ¿Continuar?',
+        confirmLabel: 'Actualizar',
+        cancelLabel: 'Cancelar'
+    });
+    if (!confirmed) return;
+
+    const btnIds = ['fgUpdateEmbedsBtn', 'fgUpdateEmbedsBtnSettings'];
+    btnIds.forEach((id) => {
+        const btn = document.getElementById(id);
+        if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+    });
+
+    try {
+        const response = await fetchWithCredentials(`/api/guild/${guildId}/free-games/refresh-embeds`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.success) throw new Error(data?.error || 'No se pudieron actualizar');
+
+        if (data.config) _freeGamesState.config = data.config;
+
+        const msg = data.updated > 0
+            ? `${data.updated} embed(s) actualizado(s)${data.failed ? ` · ${data.failed} error(es)` : ''}`
+            : 'No se encontraron embeds del bot para actualizar en ese canal';
+        showToast(msg, data.updated > 0 ? 'success' : 'warning');
+
+        await fetchFreeGamesPreview(true);
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || 'Error al actualizar embeds', 'error');
+    } finally {
+        btnIds.forEach((id) => {
+            const btn = document.getElementById(id);
+            if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+        });
+    }
+}
+
 async function sendFreeGamesTest() {
     const guildId = _freeGamesState.guildId;
     if (!guildId) return;
@@ -15639,6 +15781,7 @@ async function fetchFreeGamesPreview(force = false) {
         _freeGamesState.games = data.games || [];
         _freeGamesState.fetchedAt = data.fetchedAt;
         renderFreeGamesList();
+        updateFreeGamesStatsUi();
     } catch (error) {
         console.error('Error cargando juegos gratis:', error);
         list.innerHTML = `
@@ -15652,17 +15795,26 @@ async function fetchFreeGamesPreview(force = false) {
     }
 }
 
+function filterFreeGamesList(games) {
+    const q = String(_freeGamesState.searchQuery || '').trim().toLowerCase();
+    if (!q) return games;
+    return games.filter((g) => {
+        const hay = `${g.title || ''} ${g.publisher || ''} ${g.sourceLabel || ''} ${g.source || ''}`.toLowerCase();
+        return hay.includes(q);
+    });
+}
+
 function renderFreeGamesList() {
     const list = document.getElementById('fgGamesList');
     if (!list) return;
 
-    const games = _freeGamesState.games || [];
+    const games = filterFreeGamesList(_freeGamesState.games || []);
     if (!games.length) {
         list.innerHTML = `
             <div class="fg-empty">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
-                <strong>No hay juegos gratis ahora mismo</strong>
-                <p>Revisaremos Epic Games y Steam cada 30 minutos. Te avisaremos en el canal configurado cuando aparezca alguno.</p>
+                <strong>${(_freeGamesState.games || []).length ? 'Ningún resultado' : 'No hay juegos gratis ahora mismo'}</strong>
+                <p>${(_freeGamesState.games || []).length ? 'Prueba otra búsqueda o sincroniza de nuevo.' : 'Revisaremos Epic Games y Steam cada 30 minutos y avisaremos en el canal configurado.'}</p>
             </div>`;
         return;
     }
@@ -15679,9 +15831,32 @@ function renderFreeGamesList() {
     }
 }
 
+function renderFreeGameDiscordPreview(game, cfg) {
+    const colorHex = String(cfg?.color || (game.source === 'epic' ? '2b90d9' : '4ccb81')).replace('#', '');
+    const priceLine = game.originalPriceMinor > 0
+        ? `~~${escapeHtml(game.originalPrice)}~~ → **GRATIS**`
+        : '**GRATIS**';
+    return `
+        <div class="fg-discord-preview">
+            <div class="fg-discord-preview-bar" style="background:#${escapeHtml(colorHex)}"></div>
+            <div class="fg-discord-preview-body">
+                <div class="fg-discord-preview-author">${escapeHtml(game.sourceLabel || '')}</div>
+                <div class="fg-discord-preview-title">🎮 ${escapeHtml(game.title || '')}</div>
+                <div class="fg-discord-preview-fields">
+                    <span><b>Precio</b> ${priceLine}</span>
+                    <span><b>Descuento</b> ${Number(game.discountPercent || 100)}%</span>
+                </div>
+                <div class="fg-discord-preview-link">Reclamar gratis →</div>
+                <div class="fg-discord-preview-footer">${escapeHtml(cfg?.footerText || 'EyedBot · Juegos gratis')}</div>
+            </div>
+        </div>`;
+}
+
 function renderFreeGameCard(game) {
     const sourceClass = game.source === 'epic' ? 'epic' : 'steam';
     const tags = Array.isArray(game.tags) ? game.tags.slice(0, 3) : [];
+    const cfg = _freeGamesState.config || {};
+    const embedPreview = renderFreeGameDiscordPreview(game, cfg);
 
     const countdownHtml = game.endsAt
         ? renderFreeGameCountdown(game)
@@ -15729,6 +15904,8 @@ function renderFreeGameCard(game) {
                 </div>
 
                 ${tags.length ? `<div class="fg-card-tags">${tags.map((t) => `<span class="fg-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+
+                ${embedPreview}
 
                 <a class="fg-card-cta" href="${escapeHtml(game.storeUrl || '#')}" target="_blank" rel="noopener">
                     <span>Reclamar gratis</span>

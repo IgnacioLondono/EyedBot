@@ -59,6 +59,7 @@ function defaultConfig() {
         color: '4ccb81',
         footerText: 'EyedBot · Juegos gratis',
         notifiedIds: [],
+        embedMessages: [],
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
     };
@@ -80,6 +81,16 @@ function normalizeConfig(raw = {}) {
         footerText: String(raw.footerText || base.footerText).slice(0, 200),
         notifiedIds: Array.isArray(raw.notifiedIds)
             ? raw.notifiedIds.map((x) => String(x)).filter(Boolean).slice(-400)
+            : [],
+        embedMessages: Array.isArray(raw.embedMessages)
+            ? raw.embedMessages
+                .map((row) => ({
+                    gameId: String(row?.gameId || '').trim(),
+                    messageId: String(row?.messageId || '').trim(),
+                    channelId: String(row?.channelId || '').trim()
+                }))
+                .filter((row) => row.gameId && row.messageId && row.channelId)
+                .slice(-200)
             : [],
         updatedAt: raw.updatedAt || new Date().toISOString(),
         updatedBy: String(raw.updatedBy || 'system')
