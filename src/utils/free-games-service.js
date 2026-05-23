@@ -78,6 +78,54 @@ function describeTimeLeft(endsAt) {
 // Epic Games
 // ============================================================
 
+function readEpicCustomAttrs(el) {
+    const attrs = {};
+    for (const a of el.customAttributes || []) {
+        if (a?.key) attrs[a.key] = String(a.value || '');
+    }
+    return attrs;
+}
+
+/** Slug limpio para la URL pública de la tienda (sin /home ni placeholders). */
+function cleanEpicSlug(raw) {
+    const s = String(raw || '').trim();
+    if (!s || s === '[]') return '';
+    return s.replace(/\/home$/i, '').replace(/^\/+|\/+$/g, '').split('/').filter(Boolean)[0] || '';
+}
+
+/**
+ * Epic suele poner en urlSlug códigos de promoción (megasale-mysterygame-…)
+ * que devuelven 404. Priorizamos pageSlug del offer y productSlug real.
+ */
+function resolveEpicStoreSlug(el) {
+    const attrs = readEpicCustomAttrs(el);
+
+    const offerPage = cleanEpicSlug(el.offerMappings?.[0]?.pageSlug);
+    if (offerPage) return offerPage;
+
+    const mapPage = cleanEpicSlug(el.catalogNs?.mappings?.[0]?.pageSlug);
+    if (mapPage) return mapPage;
+
+    const custom = cleanEpicSlug(attrs['com.epicgames.app.productSlug']);
+    if (custom) return custom;
+
+    const product = cleanEpicSlug(el.productSlug);
+    if (product) return product;
+
+    const urlSlug = cleanEpicSlug(el.urlSlug);
+    if (urlSlug && !/^megasale-/i.test(urlSlug) && !/mysterygame/i.test(urlSlug)) {
+        return urlSlug;
+    }
+
+    return '';
+}
+
+function buildEpicStoreUrl(el, locale = 'es-ES') {
+    const slug = resolveEpicStoreSlug(el);
+    if (!slug) return `https://store.epicgames.com/${locale}/free-games`;
+    return `https://store.epicgames.com/${locale}/p/${slug}`;
+}
+
 async function fetchEpicFreeGames() {
     const url = 'https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=es-ES&country=ES&allowCountries=ES';
     const res = await fetchWithTimeout(url);
@@ -110,14 +158,7 @@ async function fetchEpicFreeGames() {
             ) || el.keyImages?.[0];
             const thumb = (el.keyImages || []).find((k) => k.type === 'Thumbnail') || image;
 
-            const slug = (el.catalogNs?.mappings?.[0]?.pageSlug)
-                || el.offerMappings?.[0]?.pageSlug
-                || el.urlSlug
-                || el.productSlug
-                || '';
-            const storeUrl = slug
-                ? `https://store.epicgames.com/es-ES/p/${slug.replace(/\/home$/i, '')}`
-                : 'https://store.epicgames.com/es-ES/free-games';
+            const storeUrl = buildEpicStoreUrl(el, 'es-ES');
 
             games.push({
                 id: `epic_${el.id}`,
@@ -462,6 +503,8 @@ module.exports = {
     fetchEpicFreeGames,
     fetchSteamFreeGames,
     buildFreeGameEmbed,
+    resolveEpicStoreSlug,
+    buildEpicStoreUrl,
     startFreeGamesScheduler,
     stopFreeGamesScheduler,
     runFreeGamesSweep
