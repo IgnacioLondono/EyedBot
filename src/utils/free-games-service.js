@@ -9,6 +9,13 @@ const CHECK_MS = Math.max(5 * 60_000, Number.parseInt(process.env.FREE_GAMES_CHE
 const FETCH_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.FREE_GAMES_FETCH_TIMEOUT_MS || '15000', 10));
 
 const CACHE_MS = 10 * 60_000;
+
+/** Iconos de autor en embeds (deben ser PNG/JPG públicos; Discord no puede usar el CDN de Unreal). */
+const STORE_BRAND_ICON_URLS = {
+    epic: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/120px-Epic_Games_logo.svg.png',
+    steam: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/120px-Steam_icon_logo.svg.png'
+};
+
 let intervalRef = null;
 let running = false;
 const listCache = { data: null, expiresAt: 0 };
@@ -360,9 +367,7 @@ function buildFreeGameEmbed(game, cfg = {}) {
         .setURL(game.storeUrl)
         .setAuthor({
             name: game.sourceLabel,
-            iconURL: game.source === 'epic'
-                ? 'https://cdn2.unrealengine.com/Epic+Games+Node%2Fxlarge_whitetext_blackback_epiclogo_504x512_1529964470588-503x512-ad450cca4bf3fc4bf1bf0d4b05dcb9009dba7e4b.jpg'
-                : 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/steamworks_docs/english/SteamLogo_A.png'
+            iconURL: game.source === 'epic' ? STORE_BRAND_ICON_URLS.epic : STORE_BRAND_ICON_URLS.steam
         });
 
     const desc = [];
