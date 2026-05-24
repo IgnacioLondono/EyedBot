@@ -15942,3 +15942,185 @@ body {
     content-visibility: auto;
     contain-intrinsic-size: 520px 640px;
 }
+
+/* ============================================================
+   Playful Modern Colorful - Full UI refresh layer
+   ============================================================ */
+html.playful-modern {
+    --pm-surface-1: rgba(27, 20, 63, 0.88);
+    --pm-surface-2: rgba(16, 11, 41, 0.92);
+    --pm-glow-a: rgba(124, 90, 255, 0.33);
+    --pm-glow-b: rgba(255, 97, 199, 0.28);
+    --pm-glow-c: rgba(61, 232, 211, 0.22);
+}
+
+html.playful-modern .navbar {
+    border-bottom: 1px solid rgba(210, 172, 255, 0.2);
+    background: linear-gradient(180deg, rgba(18, 12, 46, 0.94), rgba(15, 10, 40, 0.78));
+}
+
+html.playful-modern .nav-link {
+    border-radius: 12px;
+    border: 1px solid transparent;
+}
+
+html.playful-modern .nav-link:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(208, 175, 255, 0.25);
+}
+
+html.playful-modern .nav-link.active {
+    background: linear-gradient(135deg, rgba(123, 92, 255, 0.24), rgba(255, 100, 202, 0.2));
+    border-color: rgba(189, 150, 255, 0.52);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+html.playful-modern .dashboard-home,
+html.playful-modern #controlCenterSection,
+html.playful-modern #commandsSection,
+html.playful-modern #embedSection,
+html.playful-modern #profileSettingsSection,
+html.playful-modern #statsSection,
+html.playful-modern #logsSection,
+html.playful-modern #nukeSection,
+html.playful-modern #serverSection {
+    background: linear-gradient(180deg, rgba(18, 12, 48, 0.56), rgba(13, 10, 35, 0.56));
+    border: 1px solid rgba(206, 172, 255, 0.16);
+    border-radius: 24px;
+    box-shadow: 0 22px 48px rgba(6, 5, 22, 0.44);
+    padding: clamp(0.65rem, 1.1vw, 1rem);
+}
+
+html.playful-modern .dpx-panel,
+html.playful-modern .server-pane-surface,
+html.playful-modern .overview-surface,
+html.playful-modern .commands-shell,
+html.playful-modern .embed-shell,
+html.playful-modern .settings-pane,
+html.playful-modern .owner-panel,
+html.playful-modern .ticket-manage-shell,
+html.playful-modern .levels-shell,
+html.playful-modern .fg-section,
+html.playful-modern .fg-preview,
+html.playful-modern .gacha-shell {
+    background: linear-gradient(180deg, var(--pm-surface-1), var(--pm-surface-2));
+    border: 1px solid rgba(209, 178, 255, 0.2);
+    box-shadow: 0 16px 36px rgba(4, 4, 20, 0.35);
+}
+
+html.playful-modern .dpx-hero,
+html.playful-modern .dashboard-hero,
+html.playful-modern .commands-hero,
+html.playful-modern .embed-hero,
+html.playful-modern .settings-hero {
+    border-radius: 20px;
+    border: 1px solid rgba(214, 180, 255, 0.25);
+    background:
+        radial-gradient(400px 220px at 80% -8%, var(--pm-glow-a), transparent 70%),
+        radial-gradient(420px 240px at 4% 0%, var(--pm-glow-b), transparent 72%),
+        linear-gradient(135deg, rgba(27, 20, 63, 0.94), rgba(15, 11, 36, 0.9));
+}
+
+html.playful-modern .dpx-status-chip,
+html.playful-modern .status-chip,
+html.playful-modern .owner-pill,
+html.playful-modern .fg-status-badge,
+html.playful-modern .badge {
+    border-radius: 999px;
+    border-color: rgba(217, 182, 255, 0.35);
+}
+
+html.playful-modern .guild-card,
+html.playful-modern .summary-card,
+html.playful-modern .command-card,
+html.playful-modern .about-rb3-card,
+html.playful-modern .levels-stat-card,
+html.playful-modern .ticket-manage-card,
+html.playful-modern .fg-card {
+    border: 1px solid rgba(209, 178, 255, 0.2);
+    background:
+        radial-gradient(220px 120px at 88% -20%, rgba(255, 95, 198, 0.14), transparent 70%),
+        linear-gradient(180deg, rgba(29, 21, 69, 0.88), rgba(16, 11, 41, 0.9));
+}
+
+html.playful-modern .guild-card:hover,
+html.playful-modern .summary-card:hover,
+html.playful-modern .command-card:hover,
+html.playful-modern .about-rb3-card:hover,
+html.playful-modern .fg-card:hover {
+    border-color: rgba(213, 182, 255, 0.4);
+    box-shadow: 0 16px 34px rgba(8, 8, 28, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+html.playful-modern .server-shell {
+    background: rgba(12, 8, 31, 0.42);
+    border-radius: 20px;
+}
+
+html.playful-modern .server-side-menu {
+    border-right: 1px solid rgba(210, 176, 255, 0.2);
+    background: linear-gradient(180deg, rgba(24, 17, 60, 0.92), rgba(13, 10, 36, 0.94));
+}
+
+html.playful-modern .side-menu-btn {
+    border-radius: 12px;
+    border: 1px solid transparent;
+}
+
+html.playful-modern .side-menu-btn:hover {
+    border-color: rgba(196, 162, 255, 0.3);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+html.playful-modern .side-menu-btn.active {
+    border-color: rgba(184, 146, 255, 0.58);
+    background: linear-gradient(135deg, rgba(122, 95, 255, 0.24), rgba(255, 94, 196, 0.2));
+}
+
+html.playful-modern .commands-toolbar,
+html.playful-modern .embed-toolbar,
+html.playful-modern .settings-toolbar,
+html.playful-modern .levels-toolbar,
+html.playful-modern .fg-studio-toolbar {
+    background: rgba(14, 10, 35, 0.68);
+    border: 1px solid rgba(205, 172, 255, 0.18);
+    border-radius: 14px;
+    padding: 0.6rem;
+}
+
+html.playful-modern table,
+html.playful-modern .sc-stream-table,
+html.playful-modern .owner-table,
+html.playful-modern .logs-table {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+html.playful-modern th {
+    background: rgba(106, 89, 236, 0.22);
+}
+
+html.playful-modern td {
+    background: rgba(20, 14, 49, 0.72);
+}
+
+html.playful-modern .toast {
+    border-radius: 14px;
+    border: 1px solid rgba(206, 172, 255, 0.24);
+    background: linear-gradient(180deg, rgba(29, 22, 64, 0.96), rgba(15, 11, 37, 0.96));
+}
+
+@media (max-width: 992px) {
+    html.playful-modern .dashboard-home,
+    html.playful-modern #controlCenterSection,
+    html.playful-modern #commandsSection,
+    html.playful-modern #embedSection,
+    html.playful-modern #profileSettingsSection,
+    html.playful-modern #statsSection,
+    html.playful-modern #logsSection,
+    html.playful-modern #nukeSection,
+    html.playful-modern #serverSection {
+        border-radius: 18px;
+        padding: 0.5rem;
+    }
+}

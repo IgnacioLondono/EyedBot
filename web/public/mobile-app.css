@@ -458,3 +458,52 @@ html.is-desktop .mobile-drawer-backdrop,
 html.is-desktop .mobile-server-topbar {
     display: none !important;
 }
+
+/* ============================================================
+   Playful Modern Colorful - Mobile refresh
+   ============================================================ */
+html.is-mobile.playful-modern body {
+    background:
+        radial-gradient(520px 260px at 102% -8%, rgba(255, 94, 199, 0.24), transparent 62%),
+        radial-gradient(620px 280px at -6% 8%, rgba(109, 114, 255, 0.25), transparent 56%),
+        linear-gradient(180deg, #0a0a16 0%, #1a0d36 62%, #0a0a16 100%);
+}
+
+html.is-mobile.playful-modern .navbar {
+    background: linear-gradient(180deg, rgba(20, 13, 48, 0.95), rgba(12, 9, 35, 0.86));
+    border-bottom-color: rgba(212, 180, 255, 0.22);
+}
+
+html.is-mobile.playful-modern .main-content {
+    padding-top: 0.75rem;
+}
+
+html.is-mobile.playful-modern .mobile-bottom-nav {
+    background: linear-gradient(180deg, rgba(26, 18, 58, 0.96), rgba(12, 9, 32, 0.98));
+    border-top-color: rgba(216, 182, 255, 0.25);
+    box-shadow: 0 -12px 30px rgba(4, 4, 16, 0.48);
+}
+
+html.is-mobile.playful-modern .mobile-bottom-nav__btn {
+    color: rgba(240, 230, 255, 0.58);
+}
+
+html.is-mobile.playful-modern .mobile-bottom-nav__btn.is-active {
+    color: #ffd7fb;
+}
+
+html.is-mobile.playful-modern .mobile-more-sheet,
+html.is-mobile.playful-modern .server-side-menu {
+    background: linear-gradient(180deg, rgba(31, 23, 70, 0.96), rgba(14, 10, 41, 0.97));
+    border-color: rgba(211, 179, 255, 0.2);
+}
+
+html.is-mobile.playful-modern .mobile-more-sheet__item {
+    background: linear-gradient(135deg, rgba(122, 86, 255, 0.18), rgba(255, 92, 196, 0.14));
+    border-color: rgba(212, 179, 255, 0.2);
+}
+
+html.is-mobile.playful-modern .mobile-server-topbar {
+    background: linear-gradient(135deg, rgba(30, 20, 66, 0.92), rgba(17, 12, 42, 0.92));
+    border-color: rgba(209, 176, 255, 0.22);
+}

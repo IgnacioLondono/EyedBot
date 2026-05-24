@@ -2349,6 +2349,9 @@ function restoreServerState(state) {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 DOMContentLoaded iniciado');
     try {
+        document.documentElement.classList.add('playful-modern');
+        document.body.classList.add('playful-modern-body');
+
         initAppDialog();
         console.log('✅ initAppDialog completado');
 
