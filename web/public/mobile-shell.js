@@ -306,7 +306,6 @@
         injectSettingsHint();
         watchGuildName();
         syncBottomNavActive();
-        doc.body.classList.add('playful-modern-mobile-shell');
 
         const discordLink = doc.getElementById('discordBtn');
         const mobileDiscord = doc.getElementById('mobileMoreDiscord');

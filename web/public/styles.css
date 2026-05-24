@@ -9,27 +9,27 @@
     --fuchsia: #ff78d1;
     --white: #ffffff;
 
-    --bg-primary: #080914;
-    --bg-secondary: #130a2b;
-    --bg-card: #1f1742;
-    --bg-card-hover: #2b1f57;
-    --bg-overlay: rgba(10, 7, 30, 0.86);
+    --bg-primary: #090512;
+    --bg-secondary: #150c26;
+    --bg-card: #1a1030;
+    --bg-card-hover: #241543;
+    --bg-overlay: rgba(12, 7, 24, 0.82);
 
-    --text-primary: #fcf9ff;
-    --text-secondary: #dcc7ff;
-    --text-muted: #b09cd9;
+    --text-primary: #f4eeff;
+    --text-secondary: #cbb7f6;
+    --text-muted: #a48fd0;
 
     --border-color: rgba(var(--border-rgb, 190, 155, 255), 0.28);
     --border-glow: rgba(var(--border-rgb, 190, 155, 255), 0.45);
 
     --accent-blue: var(--iris-400);
     --accent-gold: var(--fuchsia);
-    --accent-primary-rgb: 131, 92, 255;
-    --accent-secondary-rgb: 255, 102, 196;
-    --border-rgb: 206, 172, 255;
-    --bg-primary-rgb: 8, 9, 20;
-    --bg-secondary-rgb: 19, 10, 43;
-    --bg-card-rgb: 31, 23, 66;
+    --accent-primary-rgb: 154, 109, 255;
+    --accent-secondary-rgb: 255, 120, 209;
+    --border-rgb: 190, 155, 255;
+    --bg-primary-rgb: 9, 5, 18;
+    --bg-secondary-rgb: 21, 12, 38;
+    --bg-card-rgb: 26, 16, 48;
 
     --shadow-blue: 0 8px 32px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.24);
     --shadow-gold: 0 8px 32px rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.2);
@@ -51,14 +51,14 @@
     --theme-glow-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2);
     --theme-lines-opacity: 0.22;
 
-    --color-bg1: rgb(108, 42, 255);
-    --color-bg2: rgb(21, 56, 198);
-    --color1: 77, 132, 255;
-    --color2: 233, 96, 255;
-    --color3: 54, 231, 209;
-    --color4: 255, 118, 193;
-    --color5: 255, 182, 78;
-    --color-interactive: 120, 154, 255;
+    --color-bg1: rgb(64, 26, 173);
+    --color-bg2: rgb(14, 41, 146);
+    --color1: 56, 126, 255;
+    --color2: 164, 98, 255;
+    --color3: 94, 198, 255;
+    --color4: 76, 98, 255;
+    --color5: 132, 77, 255;
+    --color-interactive: 98, 121, 255;
     --circle-size: 80%;
     --blending: soft-light;
 }
@@ -6882,88 +6882,4 @@ iframe {
         padding-left: 0.55rem;
         padding-right: 0.55rem;
     }
-}
-
-/* ============================================================
-   Playful Modern Colorful - Global foundation overrides
-   ============================================================ */
-html.playful-modern body {
-    background:
-        radial-gradient(1100px 560px at 88% -8%, rgba(255, 95, 198, 0.2), transparent 58%),
-        radial-gradient(980px 540px at -8% 16%, rgba(88, 99, 255, 0.24), transparent 56%),
-        radial-gradient(760px 480px at 52% 112%, rgba(62, 235, 212, 0.16), transparent 56%),
-        linear-gradient(180deg, #090913 0%, #160a30 55%, #090913 100%);
-}
-
-html.playful-modern .main-content,
-html.playful-modern .section > .container {
-    position: relative;
-    z-index: 2;
-}
-
-html.playful-modern .container,
-html.playful-modern .card,
-html.playful-modern .module-card,
-html.playful-modern .settings-card,
-html.playful-modern .about-card,
-html.playful-modern .command-card,
-html.playful-modern .summary-card,
-html.playful-modern .guild-card,
-html.playful-modern .server-pane-surface {
-    border-radius: 18px;
-}
-
-html.playful-modern .btn {
-    border-radius: 12px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
-}
-
-html.playful-modern .btn:hover {
-    transform: translateY(-1px);
-}
-
-html.playful-modern .btn-primary {
-    background: linear-gradient(135deg, rgba(113, 88, 255, 0.95), rgba(255, 103, 198, 0.92));
-    border-color: rgba(255, 255, 255, 0.14);
-    box-shadow: 0 12px 28px rgba(103, 79, 235, 0.35);
-}
-
-html.playful-modern .btn-ghost,
-html.playful-modern .btn-secondary {
-    border-color: rgba(var(--border-rgb, 206, 172, 255), 0.36);
-    background: rgba(255, 255, 255, 0.05);
-}
-
-html.playful-modern .form-control,
-html.playful-modern input,
-html.playful-modern select,
-html.playful-modern textarea {
-    border-radius: 12px;
-    border-color: rgba(var(--border-rgb, 206, 172, 255), 0.34);
-    background: rgba(15, 10, 35, 0.9);
-    color: var(--text-primary);
-}
-
-html.playful-modern .form-control:focus,
-html.playful-modern input:focus,
-html.playful-modern select:focus,
-html.playful-modern textarea:focus {
-    border-color: rgba(121, 161, 255, 0.82);
-    box-shadow: 0 0 0 3px rgba(121, 161, 255, 0.16);
-}
-
-html.playful-modern .dropdown-menu,
-html.playful-modern .modal-content,
-html.playful-modern .app-dialog-panel {
-    border-radius: 16px;
-    border: 1px solid rgba(var(--border-rgb, 206, 172, 255), 0.3);
-    background: linear-gradient(180deg, rgba(24, 17, 54, 0.98), rgba(14, 11, 38, 0.98));
-    box-shadow: 0 20px 44px rgba(4, 3, 16, 0.48);
-}
-
-html.playful-modern .loading-spinner {
-    border-top-color: rgba(98, 224, 219, 0.95);
-    border-right-color: rgba(255, 96, 200, 0.9);
 }
