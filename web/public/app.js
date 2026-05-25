@@ -1775,6 +1775,18 @@ function injectPremiumSettingsPreview(paneId) {
     }
 }
 
+function getSettingsContentArea() {
+    return document.querySelector('#profileSettingsSection .settings-content');
+}
+
+function refreshSettingsPremiumContentLock() {
+    const contentArea = getSettingsContentArea();
+    const themePane = document.getElementById('settingsPaneTheme');
+    const locked = !hasPremiumAccess();
+    const isActiveTheme = currentSettingsPaneId === 'settingsPaneTheme' && themePane?.classList.contains('active');
+    contentArea?.classList.toggle('is-premium-theme-locked', locked && isActiveTheme);
+}
+
 function syncPremiumSettingsPaneLock(paneId) {
     const pane = document.getElementById(paneId);
     if (!pane || !isPremiumSettingsPane(paneId)) return;
@@ -1784,18 +1796,26 @@ function syncPremiumSettingsPaneLock(paneId) {
     if (!structure) return;
 
     const locked = !hasPremiumAccess();
+    const isActive = pane.classList.contains('active');
     pane.classList.toggle('is-premium-locked', locked);
 
-    let overlay = structure.surface.querySelector('.premium-lock-overlay');
-    if (locked) {
+    structure.surface.querySelector('.premium-lock-overlay')?.remove();
+
+    const contentArea = getSettingsContentArea();
+    let overlay = contentArea?.querySelector('.premium-lock-overlay--settings-full');
+    contentArea?.querySelectorAll('.premium-lock-overlay:not(.premium-lock-overlay--settings-full)').forEach((node) => node.remove());
+
+    refreshSettingsPremiumContentLock();
+
+    if (locked && isActive) {
         injectPremiumSettingsPreview(paneId);
-        if (!overlay) {
+        if (!overlay && contentArea) {
             overlay = document.createElement('div');
-            overlay.className = 'premium-lock-overlay';
+            overlay.className = 'premium-lock-overlay premium-lock-overlay--settings-full';
             overlay.innerHTML = buildPremiumOverlayHtml(cfg);
-            structure.surface.appendChild(overlay);
+            contentArea.appendChild(overlay);
             wirePremiumOverlayActions(overlay);
-        } else {
+        } else if (overlay) {
             const titleEl = overlay.querySelector('.premium-lock-title');
             const descEl = overlay.querySelector('.premium-lock-desc');
             if (titleEl) titleEl.textContent = cfg.title;
@@ -1803,12 +1823,14 @@ function syncPremiumSettingsPaneLock(paneId) {
         }
     } else {
         overlay?.remove();
+        refreshSettingsPremiumContentLock();
     }
 }
 
 function refreshPremiumLocks() {
     Object.keys(PREMIUM_PANE_CONFIG).forEach((paneId) => syncPremiumPaneLock(paneId));
     Object.keys(PREMIUM_SETTINGS_PANE_CONFIG).forEach((paneId) => syncPremiumSettingsPaneLock(paneId));
+    refreshSettingsPremiumContentLock();
 
     document.querySelectorAll('.settings-side-btn[data-settings-pane]').forEach((button) => {
         const paneId = button.dataset.settingsPane || '';
@@ -2578,6 +2600,13 @@ function switchSettingsPane(paneId, options = {}) {
     }
 
     currentSettingsPaneId = paneId;
+    refreshSettingsPremiumContentLock();
+    if (isPremiumSettingsPane(paneId)) {
+        syncPremiumSettingsPaneLock(paneId);
+    } else {
+        getSettingsContentArea()?.querySelector('.premium-lock-overlay--settings-full')?.remove();
+        refreshSettingsPremiumContentLock();
+    }
 
     document.querySelectorAll('.settings-pane').forEach((el) => {
         el.classList.toggle('active', el.id === paneId);
