@@ -249,7 +249,7 @@ const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID', '399740358101303316');
 const WEB_PUBLIC_ORIGIN = envValue('WEB_PUBLIC_ORIGIN') || envValue('PUBLIC_ORIGIN');
 const MP_ACCESS_TOKEN = envValue('MP_ACCESS_TOKEN');
 const MP_WEBHOOK_SECRET = envValue('MP_WEBHOOK_SECRET');
-const MP_REASON = envValue('MP_REASON', 'EyedBot Premium mensual');
+const MP_REASON = envValue('MP_REASON', 'EyedPlus+ mensual');
 const MP_BACK_URL = envValue('MP_BACK_URL');
 const MP_CURRENCY_ID = envValue('MP_CURRENCY_ID', 'USD');
 const MP_MONTHLY_AMOUNT_RAW = Number.parseFloat(envValue('MP_MONTHLY_AMOUNT', '9.99'));
@@ -1171,7 +1171,7 @@ async function requirePremium(req, res, next) {
         const subscription = await billingStore.getUserSubscription(userId);
         if (!billingStore.isPremiumActive(subscription)) {
             return res.status(402).json({
-                error: 'Premium requerido',
+                error: 'EyedPlus+ requerido',
                 code: 'premium_required',
                 billing: {
                     status: subscription?.status || 'inactive',

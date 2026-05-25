@@ -16296,11 +16296,12 @@ body {
     align-items: center;
     justify-content: center;
     margin-bottom: 1rem;
-    padding: 0.38rem 1.1rem;
+    padding: 0.38rem 0.85rem;
     border-radius: 999px;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     font-weight: 800;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
     color: #1a1208;
     background: linear-gradient(135deg, #ffe7b3, #f4c15d 55%, #e8a838);
     box-shadow: 0 0 32px rgba(244, 193, 93, 0.4);
@@ -16459,11 +16460,12 @@ body {
 
 .side-menu-premium-tag {
     margin-left: auto;
-    padding: 0.12rem 0.45rem;
+    padding: 0.12rem 0.4rem;
     border-radius: 999px;
-    font-size: 0.58rem;
+    font-size: 0.52rem;
     font-weight: 800;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
     color: #1a1208;
     background: linear-gradient(135deg, #ffe7b3, #f4c15d);
     flex-shrink: 0;

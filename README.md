@@ -133,26 +133,26 @@ MUSIC_BUFFERING_TIMEOUT_MS=7000
 MUSIC_ENABLED=false
 LAVALINK_ENABLED=false
 
-# Premium web con Mercado Pago (test mode)
+# EyedPlus+ (Mercado Pago, test mode)
 MP_ACCESS_TOKEN=TEST-xxxxxxxx
 MP_WEBHOOK_SECRET=xxxxxxxx
-MP_REASON=EyedBot Premium mensual
+MP_REASON=EyedPlus+ mensual
 MP_CURRENCY_ID=USD
 MP_MONTHLY_AMOUNT=9.99
 ```
 
-### 2.1 Premium web con Mercado Pago
+### 2.1 EyedPlus+ con Mercado Pago
 
-El panel ahora incluye suscripción premium para desbloquear módulos avanzados (tickets, anti-raid, gacha, juegos gratis y personalización).
+El panel incluye la suscripción **EyedPlus+** para desbloquear módulos avanzados (tickets, anti-raid, gacha, juegos gratis y personalización).
 
 Flujo recomendado en local (modo test):
 
 1. Crear un Access Token de prueba en Mercado Pago (`TEST-...`) y colocarlo en `MP_ACCESS_TOKEN`.
-2. Configurar `MP_MONTHLY_AMOUNT` y `MP_CURRENCY_ID` según tu plan premium.
+2. Configurar `MP_MONTHLY_AMOUNT` y `MP_CURRENCY_ID` según tu plan EyedPlus+.
 3. Levantar el bot/panel con `.env` configurado.
 4. Exponer el panel con HTTPS (o túnel) y configurar `WEB_PUBLIC_ORIGIN`.
 5. Configurar webhook de Mercado Pago apuntando a `/api/billing/webhook`.
-6. Iniciar checkout desde Configuraciones > Cuenta > Premium del panel.
+6. Iniciar checkout desde la pestaña **EyedPlus+** o Configuraciones > Cuenta.
 7. Confirmar que `/api/billing/status` cambie a `active` tras autorizar el cobro recurrente.
 
 ### 4. Música y Lavalink (opcional, desactivado)

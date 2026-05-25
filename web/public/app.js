@@ -228,6 +228,12 @@ let currentBillingState = {
 };
 let premiumUpsellLock = false;
 
+/** Marca de suscripción del panel (UI). */
+const EYED_PLUS_BRAND = 'EyedPlus+';
+const EYED_PLUS_ACTIVATE_LABEL = `Activar ${EYED_PLUS_BRAND}`;
+const EYED_PLUS_UNLOCK_HINT = `Activa ${EYED_PLUS_BRAND} para tickets, anti-raid, gacha, juegos gratis y personalización.`;
+const EYED_PLUS_ACTIVE_HINT = `Tienes acceso ${EYED_PLUS_BRAND} a módulos avanzados.`;
+
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 let lastThemeSettingsDiskJson = null;
 /** Data URL en JSON (legacy); IndexedDB lleva el archivo pesado */
@@ -1302,7 +1308,7 @@ async function fetchWithCredentials(url, options = {}) {
             }
             if (!premiumUpsellLock) {
                 premiumUpsellLock = true;
-                showToast('Este módulo es premium. Activa Mercado Pago para desbloquearlo.', 'warning');
+                showToast(`Este módulo requiere ${EYED_PLUS_BRAND}. Activa Mercado Pago para desbloquearlo.`, 'warning');
                 ensureBillingPanel();
                 setTimeout(() => {
                     premiumUpsellLock = false;
@@ -1345,10 +1351,10 @@ function renderBillingState() {
     if (isActive) {
         actionNode.textContent = currentBillingState?.cancelAtPeriodEnd
             ? 'Tu suscripción finalizará al terminar el período actual.'
-            : 'Tienes acceso premium a módulos avanzados.';
+            : EYED_PLUS_ACTIVE_HINT;
         manageBtn.hidden = false;
     } else {
-        actionNode.textContent = 'Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.';
+        actionNode.textContent = EYED_PLUS_UNLOCK_HINT;
         manageBtn.hidden = true;
     }
 
@@ -1363,8 +1369,8 @@ function renderBillingState() {
         node.textContent = isActive
             ? (currentBillingState?.cancelAtPeriodEnd
                 ? 'Tu suscripción finalizará al terminar el período actual.'
-                : 'Tienes acceso premium a módulos avanzados.')
-            : 'Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.';
+                : EYED_PLUS_ACTIVE_HINT)
+            : EYED_PLUS_UNLOCK_HINT;
     });
     document.querySelectorAll('[data-billing-manage]').forEach((node) => {
         node.hidden = !isActive;
@@ -1388,7 +1394,7 @@ function ensureBillingPanel() {
     wrapper.innerHTML = `
         <header class="billing-panel-head">
             <div>
-                <h4>Premium del panel</h4>
+                <h4>${EYED_PLUS_BRAND}</h4>
                 <p>Gestiona tu suscripción mensual con Mercado Pago.</p>
             </div>
             <span class="billing-badge" id="billingStatusValue" data-billing-status data-billing-state="inactive">Inactiva</span>
@@ -1398,9 +1404,9 @@ function ensureBillingPanel() {
                 <span>Periodo</span>
                 <strong id="billingPeriodValue" data-billing-period>Sin fecha</strong>
             </div>
-            <p id="billingActionHint" data-billing-hint>Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.</p>
+            <p id="billingActionHint" data-billing-hint>${EYED_PLUS_UNLOCK_HINT}</p>
             <div class="billing-actions">
-                <button type="button" id="billingUpgradeBtn" class="btn btn-primary">Activar Premium</button>
+                <button type="button" id="billingUpgradeBtn" class="btn btn-primary">${EYED_PLUS_ACTIVATE_LABEL}</button>
                 <button type="button" id="billingManageBtn" class="btn btn-secondary" data-billing-manage hidden>Cancelar suscripción</button>
             </div>
         </div>
@@ -1443,9 +1449,9 @@ function ensurePremiumSectionBillingPanel() {
                 <span>Periodo</span>
                 <strong data-billing-period>Sin fecha</strong>
             </div>
-            <p data-billing-hint>Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.</p>
+            <p data-billing-hint>${EYED_PLUS_UNLOCK_HINT}</p>
             <div class="billing-actions">
-                <button type="button" id="billingUpgradeBtnPremium" class="btn btn-primary">Activar Premium</button>
+                <button type="button" id="billingUpgradeBtnPremium" class="btn btn-primary">${EYED_PLUS_ACTIVATE_LABEL}</button>
                 <button type="button" id="billingManageBtnPremium" class="btn btn-secondary" data-billing-manage hidden>Cancelar suscripción</button>
             </div>
         </div>
@@ -1489,13 +1495,13 @@ async function startPremiumCheckout() {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.url) {
-            showToast(data.error || 'No se pudo iniciar el checkout premium', 'error');
+            showToast(data.error || `No se pudo iniciar el checkout de ${EYED_PLUS_BRAND}`, 'error');
             return;
         }
         window.location.assign(data.url);
     } catch (error) {
         console.error('Error iniciando checkout premium:', error);
-        showToast('Error iniciando pago premium', 'error');
+        showToast(`Error iniciando pago de ${EYED_PLUS_BRAND}`, 'error');
     }
 }
 
@@ -1514,7 +1520,7 @@ async function openBillingPortal() {
         handleActivePremiumPaneAfterBillingChange();
     } catch (error) {
         console.error('Error gestionando suscripción premium:', error);
-        showToast('Error gestionando suscripción premium', 'error');
+        showToast(`Error gestionando suscripción ${EYED_PLUS_BRAND}`, 'error');
     }
 }
 
@@ -1523,7 +1529,7 @@ function handleBillingQueryFeedback() {
     const billingState = String(params.get('billing') || '').trim().toLowerCase();
     if (!billingState) return;
     if (billingState === 'success') {
-        showToast('Pago completado. Actualizando estado premium...', 'success');
+        showToast(`Pago completado. Actualizando ${EYED_PLUS_BRAND}...`, 'success');
         void loadBillingStatus();
     }
     if (billingState === 'cancelled') showToast('Pago cancelado. Puedes reintentarlo cuando quieras.', 'warning');
@@ -1561,7 +1567,7 @@ const PREMIUM_SETTINGS_PANE_CONFIG = {
     settingsPaneTheme: {
         preview: 'theme',
         title: 'Personalización del panel',
-        hint: 'Temas, colores y fondos personalizados con suscripción Premium.'
+        hint: `Temas, colores y fondos personalizados con ${EYED_PLUS_BRAND}.`
     }
 };
 
@@ -1608,16 +1614,16 @@ function ensurePremiumLockStructure(pane) {
 }
 
 function buildPremiumOverlayHtml(meta = {}) {
-    const title = escapeHtml(meta.title || 'Módulo premium');
-    const hint = escapeHtml(meta.hint || 'Activa la suscripción para desbloquear este módulo.');
+    const title = escapeHtml(meta.title || `Módulo ${EYED_PLUS_BRAND}`);
+    const hint = escapeHtml(meta.hint || `Activa ${EYED_PLUS_BRAND} para desbloquear este módulo.`);
     return `
         <div class="premium-lock-card" role="dialog" aria-labelledby="premiumLockTitle">
-            <div class="premium-lock-badge" aria-hidden="true">PREMIUM</div>
+            <div class="premium-lock-badge" aria-hidden="true">${escapeHtml(EYED_PLUS_BRAND)}</div>
             <h3 id="premiumLockTitle" class="premium-lock-title">${title}</h3>
             <p class="premium-lock-desc">${hint}</p>
             <div class="premium-lock-actions">
-                <button type="button" class="btn btn-primary premium-lock-activate-btn">Activar Premium</button>
-                <button type="button" class="btn btn-secondary premium-lock-settings-btn">Ver planes</button>
+                <button type="button" class="btn btn-primary premium-lock-activate-btn">${escapeHtml(EYED_PLUS_ACTIVATE_LABEL)}</button>
+                <button type="button" class="btn btn-secondary premium-lock-settings-btn">Ver ${escapeHtml(EYED_PLUS_BRAND)}</button>
             </div>
         </div>
     `;
@@ -1919,7 +1925,7 @@ function guardPremiumThemeAccess() {
     if (canCustomizeTheme()) return true;
     enforceAllPremiumLocks();
     if (currentSettingsPaneId === 'settingsPaneTheme') {
-        showToast('Personalización premium bloqueada. Activa Premium para continuar.', 'warning');
+        showToast(`Personalización bloqueada. ${EYED_PLUS_ACTIVATE_LABEL} para continuar.`, 'warning');
     }
     return false;
 }
@@ -1938,7 +1944,7 @@ function refreshPremiumLocks() {
             if (!badge) {
                 badge = document.createElement('span');
                 badge.className = 'side-menu-premium-tag';
-                badge.textContent = 'PREMIUM';
+                badge.textContent = EYED_PLUS_BRAND;
                 button.appendChild(badge);
             }
         } else {
@@ -1957,7 +1963,7 @@ function refreshPremiumLocks() {
             if (!badge) {
                 badge = document.createElement('span');
                 badge.className = 'side-menu-premium-tag';
-                badge.textContent = 'PREMIUM';
+                badge.textContent = EYED_PLUS_BRAND;
                 button.appendChild(badge);
             }
         } else {
