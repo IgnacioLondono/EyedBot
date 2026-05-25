@@ -16011,3 +16011,229 @@ body {
     flex-wrap: wrap;
     gap: 0.55rem;
 }
+
+/* =====================================================================
+   Premium lock — contenido borroso + overlay PREMIUM
+   ===================================================================== */
+
+.server-pane.premium-lock-shell,
+.server-pane .premium-lock-shell {
+    position: relative;
+}
+
+.server-pane .premium-lock-body {
+    position: relative;
+    min-height: 280px;
+}
+
+.server-pane.is-premium-locked .premium-lock-content-host {
+    filter: blur(11px) saturate(0.9);
+    opacity: 0.72;
+    pointer-events: none;
+    user-select: none;
+    transform: scale(1.01);
+    transition: filter 0.35s ease, opacity 0.35s ease;
+}
+
+.server-pane.is-premium-locked .premium-lock-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 24;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background:
+        radial-gradient(ellipse 70% 55% at 50% 42%, rgba(124, 77, 255, 0.22), transparent 70%),
+        linear-gradient(180deg, rgba(8, 10, 24, 0.35), rgba(8, 10, 24, 0.72));
+    backdrop-filter: blur(2px);
+}
+
+.premium-lock-card {
+    width: min(420px, 100%);
+    padding: 1.35rem 1.45rem 1.25rem;
+    border-radius: 18px;
+    border: 1px solid rgba(244, 193, 93, 0.42);
+    background: linear-gradient(155deg, rgba(28, 22, 48, 0.96), rgba(12, 14, 32, 0.94));
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+    text-align: center;
+}
+
+.premium-lock-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+    padding: 0.28rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: #1a1208;
+    background: linear-gradient(135deg, #ffe7b3, #f4c15d 55%, #e8a838);
+    box-shadow: 0 0 24px rgba(244, 193, 93, 0.35);
+}
+
+.premium-lock-title {
+    margin: 0 0 0.45rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #f4f6ff;
+}
+
+.premium-lock-desc {
+    margin: 0 0 1rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: rgba(220, 226, 255, 0.82);
+}
+
+.premium-lock-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    justify-content: center;
+}
+
+.premium-lock-actions .btn {
+    min-width: 148px;
+}
+
+/* Vista previa (skeleton) detrás del blur */
+.premium-preview {
+    padding: 0.25rem 0;
+}
+
+.premium-preview-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+}
+
+.premium-preview-stat,
+.premium-preview-card,
+.premium-preview-row,
+.premium-preview-hero,
+.premium-preview-toolbar,
+.premium-preview-line,
+.premium-preview-tabs span {
+    border-radius: 12px;
+    background: linear-gradient(110deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.07));
+    background-size: 200% 100%;
+    animation: premiumPreviewShimmer 2.2s ease-in-out infinite;
+}
+
+.premium-preview-stat {
+    min-height: 72px;
+}
+
+.premium-preview-toolbar {
+    min-height: 42px;
+    margin-bottom: 0.75rem;
+}
+
+.premium-preview-list {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.premium-preview-row {
+    min-height: 52px;
+}
+
+.premium-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-bottom: 0.75rem;
+}
+
+.premium-preview-card {
+    min-height: 88px;
+}
+
+.premium-preview-card.wide {
+    grid-column: 1 / -1;
+    min-height: 110px;
+}
+
+.premium-preview-card.tall {
+    min-height: 140px;
+}
+
+.premium-preview-hero {
+    min-height: 120px;
+    margin-bottom: 0.75rem;
+}
+
+.premium-preview-form {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.premium-preview-line {
+    min-height: 14px;
+}
+
+.premium-preview-line.long { width: 92%; }
+.premium-preview-line.short { width: 48%; }
+
+.premium-preview-tabs {
+    display: flex;
+    gap: 0.45rem;
+    margin-bottom: 0.75rem;
+}
+
+.premium-preview-tabs span {
+    flex: 1;
+    min-height: 34px;
+}
+
+.premium-preview-table {
+    display: grid;
+    gap: 0.45rem;
+}
+
+@keyframes premiumPreviewShimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+/* Menú lateral: etiqueta PREMIUM */
+.side-menu-btn.is-premium-nav {
+    position: relative;
+}
+
+.side-menu-premium-tag {
+    margin-left: auto;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #1a1208;
+    background: linear-gradient(135deg, #ffe7b3, #f4c15d);
+    flex-shrink: 0;
+}
+
+.side-menu-btn.is-premium-locked-nav {
+    opacity: 0.88;
+}
+
+@media (max-width: 720px) {
+    .premium-lock-card {
+        padding: 1.1rem 1rem;
+    }
+
+    .premium-lock-actions .btn {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .premium-preview-grid {
+        grid-template-columns: 1fr;
+    }
+}

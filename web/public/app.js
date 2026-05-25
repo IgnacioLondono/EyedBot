@@ -1005,6 +1005,7 @@ function initializeServerConfigShell() {
     section.classList.add('server-config-shell');
     decorateServerConfigNavigation();
     applyServerConfigPaneMeta();
+    refreshPremiumLocks();
 }
 
 function activateServerSideButton(button) {
@@ -1064,6 +1065,15 @@ function switchServerPane(paneId, button = null) {
             const tabBtn = ac?.querySelector(`[data-dpx-tab="${tabKey}"]`);
             if (tabBtn) tabBtn.click();
         });
+    }
+
+    syncPremiumPaneLock(paneId);
+    if (isPremiumPane(paneId) && hasSelectedGuildContext()) {
+        if (hasPremiumAccess()) {
+            loadPremiumPaneData(paneId, currentServerGuildId);
+        } else {
+            injectPremiumPreview(paneId);
+        }
     }
 
     window.EyedBotMobile?.onServerPaneChange?.(paneId);
@@ -1285,6 +1295,10 @@ async function fetchWithCredentials(url, options = {}) {
     if (!isBillingEndpoint && (response.status === 402 || response.status === 403)) {
         const payload = await response.clone().json().catch(() => ({}));
         if (payload?.code === 'premium_required') {
+            if (isPremiumPane(currentServerPaneId)) {
+                syncPremiumPaneLock(currentServerPaneId);
+                injectPremiumPreview(currentServerPaneId);
+            }
             if (!premiumUpsellLock) {
                 premiumUpsellLock = true;
                 showToast('Este módulo es premium. Activa Mercado Pago para desbloquearlo.', 'warning');
@@ -1395,14 +1409,16 @@ async function loadBillingStatus() {
         if (!response.ok) return;
         const data = await response.json();
         currentBillingState = {
-            active: data?.active === true,
-            status: String(data?.status || 'inactive'),
+            active: isOwnerUser || data?.active === true,
+            status: isOwnerUser ? 'active' : String(data?.status || 'inactive'),
             customerId: String(data?.customerId || ''),
             subscriptionId: String(data?.subscriptionId || ''),
             currentPeriodEnd: data?.currentPeriodEnd || null,
             cancelAtPeriodEnd: data?.cancelAtPeriodEnd === true
         };
         renderBillingState();
+        refreshPremiumLocks();
+        handleActivePremiumPaneAfterBillingChange();
     } catch (error) {
         console.warn('No se pudo cargar estado premium:', error);
     }
@@ -1437,6 +1453,7 @@ async function openBillingPortal() {
         }
         showToast(data.message || 'Suscripción actualizada', 'success');
         await loadBillingStatus();
+        handleActivePremiumPaneAfterBillingChange();
     } catch (error) {
         console.error('Error gestionando suscripción premium:', error);
         showToast('Error gestionando suscripción premium', 'error');
@@ -1447,13 +1464,260 @@ function handleBillingQueryFeedback() {
     const params = new URLSearchParams(window.location.search || '');
     const billingState = String(params.get('billing') || '').trim().toLowerCase();
     if (!billingState) return;
-    if (billingState === 'success') showToast('Pago completado. Actualizando estado premium...', 'success');
+    if (billingState === 'success') {
+        showToast('Pago completado. Actualizando estado premium...', 'success');
+        void loadBillingStatus();
+    }
     if (billingState === 'cancelled') showToast('Pago cancelado. Puedes reintentarlo cuando quieras.', 'warning');
     if (billingState === 'portal_return') showToast('Suscripción actualizada.', 'success');
     params.delete('billing');
     const query = params.toString();
     const target = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     window.history.replaceState({}, '', target);
+}
+
+const PREMIUM_PANE_CONFIG = {
+    serverPaneTicketsManage: {
+        preview: 'tickets',
+        title: 'Gestión de tickets',
+        hint: 'Cola, historial y panel de soporte en tiempo real.'
+    },
+    serverPaneSecurity: {
+        preview: 'antiraid',
+        title: 'Centro anti-raid',
+        hint: 'Protección automática contra raids y spam masivo.'
+    },
+    serverPaneGacha: {
+        preview: 'gacha',
+        title: 'Gacha / economía',
+        hint: 'Rolls, tienda, mercado y ranking de tu servidor.'
+    }
+};
+
+function hasPremiumAccess() {
+    return isOwnerUser === true || currentBillingState?.active === true;
+}
+
+function isPremiumPane(paneId) {
+    return Boolean(PREMIUM_PANE_CONFIG[String(paneId || '')]);
+}
+
+function getPremiumContentHost(pane) {
+    if (!pane?.id) return null;
+    const cfg = PREMIUM_PANE_CONFIG[pane.id];
+    if (!cfg) return null;
+    if (pane.id === 'serverPaneTicketsManage') {
+        return pane.querySelector('#ticketManageContainer');
+    }
+    return pane.querySelector('.moderation-container');
+}
+
+function ensurePremiumLockStructure(pane) {
+    const surface = pane?.querySelector('.server-pane-surface');
+    const host = getPremiumContentHost(pane);
+    if (!surface || !host) return null;
+
+    surface.classList.add('premium-lock-shell');
+    host.classList.add('premium-lock-content-host');
+
+    let body = surface.querySelector('.premium-lock-body');
+    if (!body) {
+        body = document.createElement('div');
+        body.className = 'premium-lock-body';
+        const head = surface.querySelector('.server-pane-head');
+        if (head && head.nextSibling) {
+            surface.insertBefore(body, head.nextSibling);
+        } else {
+            surface.appendChild(body);
+        }
+        body.appendChild(host);
+    }
+
+    return { surface, body, host };
+}
+
+function buildPremiumOverlayHtml(meta = {}) {
+    const title = escapeHtml(meta.title || 'Módulo premium');
+    const hint = escapeHtml(meta.hint || 'Activa la suscripción para desbloquear este módulo.');
+    return `
+        <div class="premium-lock-card" role="dialog" aria-labelledby="premiumLockTitle">
+            <div class="premium-lock-badge" aria-hidden="true">PREMIUM</div>
+            <h3 id="premiumLockTitle" class="premium-lock-title">${title}</h3>
+            <p class="premium-lock-desc">${hint}</p>
+            <div class="premium-lock-actions">
+                <button type="button" class="btn btn-primary premium-lock-activate-btn">Activar Premium</button>
+                <button type="button" class="btn btn-secondary premium-lock-settings-btn">Ver planes</button>
+            </div>
+        </div>
+    `;
+}
+
+function wirePremiumOverlayActions(overlay) {
+    if (!overlay || overlay.dataset.wired === '1') return;
+    overlay.dataset.wired = '1';
+    overlay.querySelector('.premium-lock-activate-btn')?.addEventListener('click', () => {
+        void startPremiumCheckout();
+    });
+    overlay.querySelector('.premium-lock-settings-btn')?.addEventListener('click', () => {
+        showSection('profileSettingsSection');
+        ensureBillingPanel();
+        switchSettingsPane('settingsPaneAccount', { silent: true });
+    });
+}
+
+function getPremiumPreviewHtml(previewKey = '') {
+    if (previewKey === 'tickets') {
+        return `
+            <div class="premium-preview premium-preview--tickets" aria-hidden="true">
+                <div class="premium-preview-stats">
+                    <div class="premium-preview-stat"></div>
+                    <div class="premium-preview-stat"></div>
+                    <div class="premium-preview-stat"></div>
+                </div>
+                <div class="premium-preview-toolbar"></div>
+                <div class="premium-preview-list">
+                    <div class="premium-preview-row"></div>
+                    <div class="premium-preview-row"></div>
+                    <div class="premium-preview-row"></div>
+                    <div class="premium-preview-row"></div>
+                </div>
+            </div>
+        `;
+    }
+    if (previewKey === 'antiraid') {
+        return `
+            <div class="premium-preview premium-preview--antiraid" aria-hidden="true">
+                <div class="premium-preview-hero"></div>
+                <div class="premium-preview-grid">
+                    <div class="premium-preview-card"></div>
+                    <div class="premium-preview-card"></div>
+                    <div class="premium-preview-card wide"></div>
+                </div>
+                <div class="premium-preview-form">
+                    <div class="premium-preview-line long"></div>
+                    <div class="premium-preview-line"></div>
+                    <div class="premium-preview-line short"></div>
+                </div>
+            </div>
+        `;
+    }
+    return `
+        <div class="premium-preview premium-preview--gacha" aria-hidden="true">
+            <div class="premium-preview-tabs">
+                <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="premium-preview-grid">
+                <div class="premium-preview-card tall"></div>
+                <div class="premium-preview-card"></div>
+                <div class="premium-preview-card"></div>
+                <div class="premium-preview-card"></div>
+            </div>
+            <div class="premium-preview-table">
+                <div class="premium-preview-row"></div>
+                <div class="premium-preview-row"></div>
+                <div class="premium-preview-row"></div>
+            </div>
+        </div>
+    `;
+}
+
+function shouldReplaceWithPremiumPreview(host) {
+    if (!host) return true;
+    const text = String(host.textContent || '').trim();
+    if (!text) return true;
+    if (host.querySelector('.premium-preview')) return false;
+    if (host.querySelector('.loading, .tm-list-empty, [style*="error"]')) return true;
+    return false;
+}
+
+function injectPremiumPreview(paneId) {
+    const pane = document.getElementById(paneId);
+    const cfg = PREMIUM_PANE_CONFIG[paneId];
+    const structure = ensurePremiumLockStructure(pane);
+    if (!structure || !cfg) return;
+    if (shouldReplaceWithPremiumPreview(structure.host)) {
+        structure.host.innerHTML = getPremiumPreviewHtml(cfg.preview);
+    }
+}
+
+function syncPremiumPaneLock(paneId) {
+    const pane = document.getElementById(paneId);
+    if (!pane || !isPremiumPane(paneId)) return;
+
+    const cfg = PREMIUM_PANE_CONFIG[paneId];
+    const structure = ensurePremiumLockStructure(pane);
+    if (!structure) return;
+
+    const locked = !hasPremiumAccess();
+    pane.classList.toggle('is-premium-locked', locked);
+
+    let overlay = structure.body.querySelector('.premium-lock-overlay');
+    if (locked) {
+        injectPremiumPreview(paneId);
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'premium-lock-overlay';
+            overlay.innerHTML = buildPremiumOverlayHtml(cfg);
+            structure.body.appendChild(overlay);
+            wirePremiumOverlayActions(overlay);
+        } else {
+            const titleEl = overlay.querySelector('.premium-lock-title');
+            const descEl = overlay.querySelector('.premium-lock-desc');
+            if (titleEl) titleEl.textContent = cfg.title;
+            if (descEl) descEl.textContent = cfg.hint;
+        }
+    } else {
+        overlay?.remove();
+    }
+}
+
+function refreshPremiumLocks() {
+    Object.keys(PREMIUM_PANE_CONFIG).forEach((paneId) => syncPremiumPaneLock(paneId));
+
+    document.querySelectorAll('.side-menu-btn[data-server-pane]').forEach((button) => {
+        const paneId = button.dataset.serverPane || '';
+        const isPremium = isPremiumPane(paneId);
+        button.classList.toggle('is-premium-nav', isPremium);
+        button.classList.toggle('is-premium-locked-nav', isPremium && !hasPremiumAccess());
+
+        let badge = button.querySelector('.side-menu-premium-tag');
+        if (isPremium && !hasPremiumAccess()) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'side-menu-premium-tag';
+                badge.textContent = 'PREMIUM';
+                button.appendChild(badge);
+            }
+        } else {
+            badge?.remove();
+        }
+    });
+}
+
+function loadPremiumPaneData(paneId, guildId) {
+    const gid = String(guildId || currentServerGuildId || '').trim();
+    if (!gid || !hasPremiumAccess()) return;
+
+    if (paneId === 'serverPaneTicketsManage') {
+        openTicketsManagePane();
+        return;
+    }
+    if (paneId === 'serverPaneSecurity') {
+        void loadSecurityPanel(gid);
+        return;
+    }
+    if (paneId === 'serverPaneGacha') {
+        void loadGachaPanel(gid);
+    }
+}
+
+function handleActivePremiumPaneAfterBillingChange() {
+    refreshPremiumLocks();
+    const paneId = currentServerPaneId;
+    if (!isPremiumPane(paneId) || !hasSelectedGuildContext()) return;
+    if (hasPremiumAccess()) {
+        loadPremiumPaneData(paneId, currentServerGuildId);
+    }
 }
 
 const apiGetCache = new Map();
@@ -4981,7 +5245,7 @@ async function selectServerGuild(guildId, options = {}) {
     }
 
     try {
-        await Promise.all([
+        const loadTasks = [
             loadServerInfo(guildId),
             loadServerMembers(guildId),
             loadWelcomePanel(guildId),
@@ -4989,10 +5253,21 @@ async function selectServerGuild(guildId, options = {}) {
             loadLevelsPanel(guildId),
             loadVoiceCreatorPanel(guildId),
             loadAutomationPanel(guildId),
-            loadSecurityPanel(guildId),
-            loadNotificationsPanel(guildId),
-            loadGachaPanel(guildId)
-        ]);
+            loadNotificationsPanel(guildId)
+        ];
+        if (hasPremiumAccess()) {
+            loadTasks.push(loadSecurityPanel(guildId), loadGachaPanel(guildId));
+        } else {
+            injectPremiumPreview('serverPaneSecurity');
+            injectPremiumPreview('serverPaneGacha');
+            syncPremiumPaneLock('serverPaneSecurity');
+            syncPremiumPaneLock('serverPaneGacha');
+        }
+        await Promise.all(loadTasks);
+        refreshPremiumLocks();
+        if (isPremiumPane(currentServerPaneId) && hasPremiumAccess()) {
+            loadPremiumPaneData(currentServerPaneId, guildId);
+        }
         saveState();
     } finally {
         setServerSwitchingState(false);
@@ -5739,6 +6014,12 @@ async function loadAutomationPanel(guildId) {
 async function loadSecurityPanel(guildId) {
     const container = document.getElementById('securityContainer');
     if (!container) return;
+
+    if (!hasPremiumAccess()) {
+        injectPremiumPreview('serverPaneSecurity');
+        syncPremiumPaneLock('serverPaneSecurity');
+        return;
+    }
 
     try {
         const [infoResponse, channelsResponse, configResponse] = await Promise.all([
@@ -7016,6 +7297,12 @@ async function hydrateGachaCatalogThumbs(root) {
 async function loadGachaPanel(guildId) {
     const container = document.getElementById('gachaContainer');
     if (!container) return;
+
+    if (!hasPremiumAccess()) {
+        injectPremiumPreview('serverPaneGacha');
+        syncPremiumPaneLock('serverPaneGacha');
+        return;
+    }
 
     revokeGachaCatalogThumbBlobs(container);
 
@@ -13303,6 +13590,12 @@ let _ticketsManageState = {
 };
 
 function openTicketsManagePane() {
+    syncPremiumPaneLock('serverPaneTicketsManage');
+    if (!hasPremiumAccess()) {
+        injectPremiumPreview('serverPaneTicketsManage');
+        return;
+    }
+
     if (!hasSelectedGuildContext()) {
         const container = document.getElementById('ticketManageContainer');
         if (container) {
@@ -13443,6 +13736,11 @@ async function loadTicketsManage({ showLoader = false, force = false } = {}) {
         const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/overview`);
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
+            if (response.status === 402 || err?.code === 'premium_required') {
+                injectPremiumPreview('serverPaneTicketsManage');
+                syncPremiumPaneLock('serverPaneTicketsManage');
+                return;
+            }
             container.innerHTML = `
                 <div class="tm-list-empty">
                     <div class="tm-list-empty-icon">
