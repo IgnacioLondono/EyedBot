@@ -1067,7 +1067,6 @@ function switchServerPane(paneId, button = null) {
         });
     }
 
-    syncPremiumPaneLock(paneId);
     if (isPremiumPane(paneId) && hasSelectedGuildContext()) {
         if (hasPremiumAccess()) {
             loadPremiumPaneData(paneId, currentServerGuildId);
@@ -1075,6 +1074,7 @@ function switchServerPane(paneId, button = null) {
             injectPremiumPreview(paneId);
         }
     }
+    enforceAllPremiumLocks();
 
     window.EyedBotMobile?.onServerPaneChange?.(paneId);
 }
@@ -1296,8 +1296,7 @@ async function fetchWithCredentials(url, options = {}) {
         const payload = await response.clone().json().catch(() => ({}));
         if (payload?.code === 'premium_required') {
             if (isPremiumPane(currentServerPaneId)) {
-                syncPremiumPaneLock(currentServerPaneId);
-                injectPremiumPreview(currentServerPaneId);
+                enforceAllPremiumLocks();
             }
             if (!premiumUpsellLock) {
                 premiumUpsellLock = true;
@@ -1719,6 +1718,30 @@ function injectPremiumPreview(paneId) {
     }
 }
 
+function updatePremiumOverlayContent(overlay, cfg) {
+    if (!overlay || !cfg) return;
+    const titleEl = overlay.querySelector('.premium-lock-title');
+    const descEl = overlay.querySelector('.premium-lock-desc');
+    if (titleEl) titleEl.textContent = cfg.title;
+    if (descEl) descEl.textContent = cfg.hint;
+}
+
+function ensurePremiumOverlay(surface, cfg, visible) {
+    if (!surface || !cfg) return null;
+    let overlay = surface.querySelector(':scope > .premium-lock-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'premium-lock-overlay';
+        overlay.innerHTML = buildPremiumOverlayHtml(cfg);
+        surface.appendChild(overlay);
+        wirePremiumOverlayActions(overlay);
+    } else {
+        updatePremiumOverlayContent(overlay, cfg);
+    }
+    overlay.classList.toggle('is-overlay-visible', visible === true);
+    return overlay;
+}
+
 function syncPremiumPaneLock(paneId) {
     const pane = document.getElementById(paneId);
     if (!pane || !isPremiumPane(paneId)) return;
@@ -1728,26 +1751,22 @@ function syncPremiumPaneLock(paneId) {
     if (!structure) return;
 
     const locked = !hasPremiumAccess();
+    const isActive = pane.classList.contains('active');
     pane.classList.toggle('is-premium-locked', locked);
-    structure.body.querySelector('.premium-lock-overlay')?.remove();
 
-    let overlay = structure.surface.querySelector('.premium-lock-overlay');
     if (locked) {
-        injectPremiumPreview(paneId);
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.className = 'premium-lock-overlay';
-            overlay.innerHTML = buildPremiumOverlayHtml(cfg);
-            structure.surface.appendChild(overlay);
-            wirePremiumOverlayActions(overlay);
+        if (isActive) {
+            injectPremiumPreview(paneId);
+        }
+        ensurePremiumOverlay(structure.surface, cfg, isActive);
+        if (isActive) {
+            structure.host?.setAttribute('aria-hidden', 'true');
         } else {
-            const titleEl = overlay.querySelector('.premium-lock-title');
-            const descEl = overlay.querySelector('.premium-lock-desc');
-            if (titleEl) titleEl.textContent = cfg.title;
-            if (descEl) descEl.textContent = cfg.hint;
+            structure.host?.removeAttribute('aria-hidden');
         }
     } else {
-        overlay?.remove();
+        structure.surface.querySelector('.premium-lock-overlay')?.remove();
+        structure.host?.removeAttribute('aria-hidden');
     }
 }
 
@@ -1765,25 +1784,51 @@ function ensurePremiumSettingsLockStructure(pane) {
     return { surface, host };
 }
 
-function injectPremiumSettingsPreview(paneId) {
-    const pane = document.getElementById(paneId);
-    const cfg = PREMIUM_SETTINGS_PANE_CONFIG[paneId];
-    const structure = ensurePremiumSettingsLockStructure(pane);
-    if (!structure || !cfg) return;
-    if (!structure.host.querySelector('.settings-theme-studio') && shouldReplaceWithPremiumPreview(structure.host)) {
-        structure.host.innerHTML = getPremiumPreviewHtml(cfg.preview);
-    }
-}
+let themePaneBodyStashHtml = '';
 
 function getSettingsContentArea() {
     return document.querySelector('#profileSettingsSection .settings-content');
+}
+
+function lockThemePaneContent(host) {
+    if (!host || hasPremiumAccess()) return;
+    const shell = host.closest('.settings-pane-shell');
+    shell?.setAttribute('inert', '');
+    document.getElementById('themeLab')?.setAttribute('aria-hidden', 'true');
+
+    if (host.dataset.premiumLocked === '1') return;
+    if (host.querySelector('.settings-theme-studio')) {
+        themePaneBodyStashHtml = host.innerHTML;
+        host.dataset.premiumLocked = '1';
+        host.innerHTML = getPremiumPreviewHtml('theme');
+    } else if (shouldReplaceWithPremiumPreview(host)) {
+        host.dataset.premiumLocked = '1';
+        host.innerHTML = getPremiumPreviewHtml('theme');
+    }
+}
+
+function unlockThemePaneContent(host) {
+    if (!host) return;
+    const shell = host.closest('.settings-pane-shell');
+    shell?.removeAttribute('inert');
+    document.getElementById('themeLab')?.removeAttribute('aria-hidden');
+
+    if (host.dataset.premiumLocked !== '1') return;
+    if (themePaneBodyStashHtml) {
+        host.innerHTML = themePaneBodyStashHtml;
+        themePaneBodyStashHtml = '';
+    }
+    delete host.dataset.premiumLocked;
+    if (hasPremiumAccess()) {
+        syncThemeControls(themeSettings);
+    }
 }
 
 function refreshSettingsPremiumContentLock() {
     const contentArea = getSettingsContentArea();
     const themePane = document.getElementById('settingsPaneTheme');
     const locked = !hasPremiumAccess();
-    const isActiveTheme = currentSettingsPaneId === 'settingsPaneTheme' && themePane?.classList.contains('active');
+    const isActiveTheme = themePane?.classList.contains('active') && currentSettingsPaneId === 'settingsPaneTheme';
     contentArea?.classList.toggle('is-premium-theme-locked', locked && isActiveTheme);
 }
 
@@ -1799,38 +1844,62 @@ function syncPremiumSettingsPaneLock(paneId) {
     const isActive = pane.classList.contains('active');
     pane.classList.toggle('is-premium-locked', locked);
 
-    structure.surface.querySelector('.premium-lock-overlay')?.remove();
-
     const contentArea = getSettingsContentArea();
-    let overlay = contentArea?.querySelector('.premium-lock-overlay--settings-full');
-    contentArea?.querySelectorAll('.premium-lock-overlay:not(.premium-lock-overlay--settings-full)').forEach((node) => node.remove());
+    structure.surface.querySelector(':scope > .premium-lock-overlay')?.remove();
 
-    refreshSettingsPremiumContentLock();
-
-    if (locked && isActive) {
-        injectPremiumSettingsPreview(paneId);
-        if (!overlay && contentArea) {
-            overlay = document.createElement('div');
-            overlay.className = 'premium-lock-overlay premium-lock-overlay--settings-full';
-            overlay.innerHTML = buildPremiumOverlayHtml(cfg);
-            contentArea.appendChild(overlay);
-            wirePremiumOverlayActions(overlay);
-        } else if (overlay) {
-            const titleEl = overlay.querySelector('.premium-lock-title');
-            const descEl = overlay.querySelector('.premium-lock-desc');
-            if (titleEl) titleEl.textContent = cfg.title;
-            if (descEl) descEl.textContent = cfg.hint;
+    if (locked) {
+        lockThemePaneContent(structure.host);
+        if (contentArea) {
+            let overlay = contentArea.querySelector('.premium-lock-overlay--settings-full');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'premium-lock-overlay premium-lock-overlay--settings-full';
+                overlay.innerHTML = buildPremiumOverlayHtml(cfg);
+                contentArea.appendChild(overlay);
+                wirePremiumOverlayActions(overlay);
+            } else {
+                updatePremiumOverlayContent(overlay, cfg);
+            }
+            overlay.classList.toggle('is-overlay-visible', isActive);
         }
+        refreshSettingsPremiumContentLock();
     } else {
-        overlay?.remove();
+        unlockThemePaneContent(structure.host);
+        contentArea?.querySelector('.premium-lock-overlay--settings-full')?.remove();
         refreshSettingsPremiumContentLock();
     }
 }
 
-function refreshPremiumLocks() {
-    Object.keys(PREMIUM_PANE_CONFIG).forEach((paneId) => syncPremiumPaneLock(paneId));
-    Object.keys(PREMIUM_SETTINGS_PANE_CONFIG).forEach((paneId) => syncPremiumSettingsPaneLock(paneId));
+function enforceAllPremiumLocks() {
+    if (!hasPremiumAccess()) {
+        Object.keys(PREMIUM_SETTINGS_PANE_CONFIG).forEach((paneId) => syncPremiumSettingsPaneLock(paneId));
+        Object.keys(PREMIUM_PANE_CONFIG).forEach((paneId) => syncPremiumPaneLock(paneId));
+    } else {
+        Object.keys(PREMIUM_SETTINGS_PANE_CONFIG).forEach((paneId) => {
+            const host = document.getElementById(paneId)?.querySelector('.settings-pane-body');
+            unlockThemePaneContent(host);
+            syncPremiumSettingsPaneLock(paneId);
+        });
+        Object.keys(PREMIUM_PANE_CONFIG).forEach((paneId) => syncPremiumPaneLock(paneId));
+    }
     refreshSettingsPremiumContentLock();
+}
+
+function canCustomizeTheme() {
+    return hasPremiumAccess();
+}
+
+function guardPremiumThemeAccess() {
+    if (canCustomizeTheme()) return true;
+    enforceAllPremiumLocks();
+    if (currentSettingsPaneId === 'settingsPaneTheme') {
+        showToast('Personalización premium bloqueada. Activa Premium para continuar.', 'warning');
+    }
+    return false;
+}
+
+function refreshPremiumLocks() {
+    enforceAllPremiumLocks();
 
     document.querySelectorAll('.settings-side-btn[data-settings-pane]').forEach((button) => {
         const paneId = button.dataset.settingsPane || '';
@@ -1889,17 +1958,15 @@ function loadPremiumPaneData(paneId, guildId) {
 }
 
 function handleActivePremiumPaneAfterBillingChange() {
-    refreshPremiumLocks();
+    enforceAllPremiumLocks();
     const paneId = currentServerPaneId;
     if (isPremiumPane(paneId) && hasSelectedGuildContext() && hasPremiumAccess()) {
         loadPremiumPaneData(paneId, currentServerGuildId);
     }
     if (currentSettingsPaneId === 'settingsPaneTheme' && hasPremiumAccess()) {
-        const themePane = document.getElementById('settingsPaneTheme');
-        const host = themePane?.querySelector('.settings-pane-body');
-        if (host && !host.querySelector('.settings-theme-studio')) {
-            window.location.reload();
-        }
+        const host = document.getElementById('settingsPaneTheme')?.querySelector('.settings-pane-body');
+        unlockThemePaneContent(host);
+        syncThemeControls(themeSettings);
     }
 }
 
@@ -1921,6 +1988,7 @@ function debounce(fn, delay = 180) {
 /** Aplica el tema como máximo una vez por frame (sliders que disparan muchos `input`). */
 let _themeControlsApplyRaf = 0;
 function scheduleThemeControlsApply() {
+    if (!canCustomizeTheme()) return;
     if (_themeControlsApplyRaf) return;
     _themeControlsApplyRaf = requestAnimationFrame(() => {
         _themeControlsApplyRaf = 0;
@@ -2218,6 +2286,7 @@ function normalizeThemeSettings(input = {}) {
 }
 
 function saveThemeSettings(theme = themeSettings) {
+    if (!canCustomizeTheme()) return;
     const normalized = normalizeThemeSettings(theme);
     themeSettings = normalized;
     try {
@@ -2552,6 +2621,7 @@ function syncThemeControls(theme = themeSettings) {
 }
 
 function applyThemeSettings(theme = themeSettings, options = {}) {
+    if (options.persist !== false && !canCustomizeTheme()) return;
     const normalized = normalizeThemeSettings(theme);
     themeSettings = normalized;
     setThemeCssVariables(normalized);
@@ -2564,6 +2634,7 @@ function applyThemeSettings(theme = themeSettings, options = {}) {
 }
 
 function setThemePreset(presetId) {
+    if (!guardPremiumThemeAccess()) return;
     const preset = THEME_PRESETS[presetId] || THEME_PRESETS[THEME_DEFAULTS.preset];
     const cur = normalizeThemeSettings(themeSettings || {});
     applyThemeSettings({
@@ -2582,6 +2653,7 @@ function setThemePreset(presetId) {
 }
 
 async function resetThemeSettings() {
+    if (!guardPremiumThemeAccess()) return;
     await wallpaperIdbDelete().catch(() => {});
     revokeWallpaperObjectUrls();
     applyThemeSettings({ ...THEME_DEFAULTS }, { persist: true });
@@ -2594,19 +2666,7 @@ function switchSettingsPane(paneId, options = {}) {
     const pane = document.getElementById(paneId);
     if (!pane) return;
 
-    if (isPremiumSettingsPane(paneId) && !hasPremiumAccess()) {
-        syncPremiumSettingsPaneLock(paneId);
-        injectPremiumSettingsPreview(paneId);
-    }
-
     currentSettingsPaneId = paneId;
-    refreshSettingsPremiumContentLock();
-    if (isPremiumSettingsPane(paneId)) {
-        syncPremiumSettingsPaneLock(paneId);
-    } else {
-        getSettingsContentArea()?.querySelector('.premium-lock-overlay--settings-full')?.remove();
-        refreshSettingsPremiumContentLock();
-    }
 
     document.querySelectorAll('.settings-pane').forEach((el) => {
         el.classList.toggle('active', el.id === paneId);
@@ -2615,6 +2675,8 @@ function switchSettingsPane(paneId, options = {}) {
     document.querySelectorAll('.settings-side-btn').forEach((button) => {
         button.classList.toggle('active', button.dataset.settingsPane === paneId);
     });
+
+    enforceAllPremiumLocks();
 
     try {
         sessionStorage.setItem(SETTINGS_PANE_STORAGE_KEY, paneId);
@@ -2681,6 +2743,7 @@ function bindThemeControls() {
     const wpToggle = document.getElementById('themeWallpaperEnabled');
     if (wpToggle) {
         wpToggle.addEventListener('change', () => {
+            if (!guardPremiumThemeAccess()) return;
             applyThemeSettings(getThemeControlsState(), { persist: true });
         });
     }
@@ -2688,6 +2751,7 @@ function bindThemeControls() {
     const wpFile = document.getElementById('themeWallpaperFile');
     if (wpFile) {
         wpFile.addEventListener('change', async () => {
+            if (!guardPremiumThemeAccess()) return;
             const file = wpFile.files?.[0];
             if (!file) return;
 
@@ -2788,6 +2852,7 @@ function bindThemeControls() {
     const wpClear = document.getElementById('themeWallpaperClearBtn');
     if (wpClear) {
         wpClear.addEventListener('click', async () => {
+            if (!guardPremiumThemeAccess()) return;
             await wallpaperIdbDelete().catch(() => {});
             revokeWallpaperObjectUrls();
             applyThemeSettings(
@@ -2808,6 +2873,7 @@ function bindThemeControls() {
 
     document.querySelectorAll('.theme-preset-btn').forEach((button) => {
         button.addEventListener('click', () => {
+            if (!guardPremiumThemeAccess()) return;
             setThemePreset(button.dataset.themePreset || THEME_DEFAULTS.preset);
         });
     });
@@ -2815,6 +2881,7 @@ function bindThemeControls() {
     const saveButton = document.getElementById('themeSaveBtn');
     if (saveButton) {
         saveButton.addEventListener('click', () => {
+            if (!guardPremiumThemeAccess()) return;
             applyThemeSettings(getThemeControlsState(), { persist: true });
             showToast('Personalizacion guardada', 'success');
         });
@@ -2822,7 +2889,10 @@ function bindThemeControls() {
 
     const resetButton = document.getElementById('themeResetBtn');
     if (resetButton) {
-        resetButton.addEventListener('click', resetThemeSettings);
+        resetButton.addEventListener('click', () => {
+            if (!guardPremiumThemeAccess()) return;
+            void resetThemeSettings();
+        });
     }
 }
 
@@ -3981,7 +4051,6 @@ function showSection(sectionId, options = {}) {
     } else if (sectionId === 'profileSettingsSection') {
         updateProfileSettingsData();
         switchSettingsPane(currentSettingsPaneId, { silent: true });
-        refreshPremiumLocks();
     }
 
     if (sectionId === 'commandsSection') {
@@ -6220,8 +6289,7 @@ async function loadSecurityPanel(guildId) {
     if (!container) return;
 
     if (!hasPremiumAccess()) {
-        injectPremiumPreview('serverPaneSecurity');
-        syncPremiumPaneLock('serverPaneSecurity');
+        enforceAllPremiumLocks();
         return;
     }
 
@@ -7503,8 +7571,7 @@ async function loadGachaPanel(guildId) {
     if (!container) return;
 
     if (!hasPremiumAccess()) {
-        injectPremiumPreview('serverPaneGacha');
-        syncPremiumPaneLock('serverPaneGacha');
+        enforceAllPremiumLocks();
         return;
     }
 
@@ -13794,9 +13861,8 @@ let _ticketsManageState = {
 };
 
 function openTicketsManagePane() {
-    syncPremiumPaneLock('serverPaneTicketsManage');
     if (!hasPremiumAccess()) {
-        injectPremiumPreview('serverPaneTicketsManage');
+        enforceAllPremiumLocks();
         return;
     }
 
@@ -13941,8 +14007,7 @@ async function loadTicketsManage({ showLoader = false, force = false } = {}) {
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
             if (response.status === 402 || err?.code === 'premium_required') {
-                injectPremiumPreview('serverPaneTicketsManage');
-                syncPremiumPaneLock('serverPaneTicketsManage');
+                enforceAllPremiumLocks();
                 return;
             }
             container.innerHTML = `

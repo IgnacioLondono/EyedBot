@@ -16047,11 +16047,18 @@ body {
     transition: filter 0.35s ease, opacity 0.35s ease;
 }
 
+.premium-lock-overlay {
+    display: none;
+}
+
+.premium-lock-overlay.is-overlay-visible {
+    display: flex !important;
+}
+
 .server-pane.is-premium-locked .premium-lock-overlay {
     position: absolute;
     inset: 0;
     z-index: 40;
-    display: flex;
     align-items: center;
     justify-content: center;
     width: 100%;
@@ -16304,10 +16311,49 @@ body {
     filter: none;
 }
 
-/* Página EyedBot Premium */
-.premium-page-shell .premium-page-container {
+/* Página EyedBot Premium — full bleed y contenido centrado */
+.main-content:has(#premiumSection.active) {
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+}
+
+#premiumSection.section {
+    width: 100% !important;
+    height: calc(100vh - 70px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#premiumSection.section > .container.premium-page-container {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 1rem clamp(1rem, 3vw, 2rem) 1.35rem !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.premium-page-inner {
+    width: 100%;
     max-width: 1120px;
-    padding-top: 0.25rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    box-sizing: border-box;
 }
 
 .premium-page-hero {
@@ -16485,6 +16531,19 @@ body {
     min-height: 420px;
 }
 
+#profileSettingsSection .settings-pane#settingsPaneTheme.is-premium-locked .settings-pane-shell[inert] {
+    pointer-events: none;
+    user-select: none;
+}
+
+#profileSettingsSection .settings-pane#settingsPaneTheme.is-premium-locked .settings-pane-shell[inert] .premium-lock-overlay--settings-full.is-overlay-visible {
+    pointer-events: auto;
+}
+
+#profileSettingsSection .settings-pane#settingsPaneTheme.is-premium-locked .settings-theme-studio {
+    display: none !important;
+}
+
 #profileSettingsSection .settings-content.is-premium-theme-locked {
     overflow: hidden !important;
 }
@@ -16501,7 +16560,6 @@ body {
     position: absolute;
     inset: 0;
     z-index: 60;
-    display: flex;
     align-items: center;
     justify-content: center;
     padding: clamp(1.25rem, 4vw, 2.5rem);
