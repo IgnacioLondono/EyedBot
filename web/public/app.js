@@ -1347,9 +1347,27 @@ function renderBillingState() {
             : 'Tienes acceso premium a módulos avanzados.';
         manageBtn.hidden = false;
     } else {
-        actionNode.textContent = 'Activa premium para usar tickets, anti-raid, gacha y control de música.';
+        actionNode.textContent = 'Activa premium para tickets, anti-raid, gacha, música y personalización.';
         manageBtn.hidden = true;
     }
+
+    document.querySelectorAll('[data-billing-status]').forEach((node) => {
+        node.textContent = billingStatusLabel(status);
+        node.dataset.billingState = isActive ? 'active' : 'inactive';
+    });
+    document.querySelectorAll('[data-billing-period]').forEach((node) => {
+        node.textContent = isActive ? `Renueva el ${period}` : period;
+    });
+    document.querySelectorAll('[data-billing-hint]').forEach((node) => {
+        node.textContent = isActive
+            ? (currentBillingState?.cancelAtPeriodEnd
+                ? 'Tu suscripción finalizará al terminar el período actual.'
+                : 'Tienes acceso premium a módulos avanzados.')
+            : 'Activa premium para tickets, anti-raid, gacha, música y personalización.';
+    });
+    document.querySelectorAll('[data-billing-manage]').forEach((node) => {
+        node.hidden = !isActive;
+    });
 }
 
 function ensureBillingPanel() {
@@ -1372,22 +1390,23 @@ function ensureBillingPanel() {
                 <h4>Premium del panel</h4>
                 <p>Gestiona tu suscripción mensual con Mercado Pago.</p>
             </div>
-            <span class="billing-badge" id="billingStatusValue" data-billing-state="inactive">Inactiva</span>
+            <span class="billing-badge" id="billingStatusValue" data-billing-status data-billing-state="inactive">Inactiva</span>
         </header>
         <div class="billing-panel-body">
             <div class="billing-meta-row">
                 <span>Periodo</span>
-                <strong id="billingPeriodValue">Sin fecha</strong>
+                <strong id="billingPeriodValue" data-billing-period>Sin fecha</strong>
             </div>
-            <p id="billingActionHint">Activa premium para usar tickets, anti-raid, gacha y control de música.</p>
+            <p id="billingActionHint" data-billing-hint>Activa premium para tickets, anti-raid, gacha, música y personalización.</p>
             <div class="billing-actions">
                 <button type="button" id="billingUpgradeBtn" class="btn btn-primary">Activar Premium</button>
-                <button type="button" id="billingManageBtn" class="btn btn-secondary" hidden>Cancelar suscripción</button>
+                <button type="button" id="billingManageBtn" class="btn btn-secondary" data-billing-manage hidden>Cancelar suscripción</button>
             </div>
         </div>
     `;
 
     host.appendChild(wrapper);
+    ensurePremiumSectionBillingPanel();
     const upgradeBtn = document.getElementById('billingUpgradeBtn');
     const manageBtn = document.getElementById('billingManageBtn');
     if (upgradeBtn) {
@@ -1400,6 +1419,44 @@ function ensureBillingPanel() {
             void openBillingPortal();
         });
     }
+    renderBillingState();
+}
+
+function ensurePremiumSectionBillingPanel() {
+    const host = document.getElementById('premiumSectionBillingHost');
+    if (!host || document.getElementById('billingPanelCardPremium')) return;
+
+    const wrapper = document.createElement('article');
+    wrapper.id = 'billingPanelCardPremium';
+    wrapper.className = 'billing-panel-card billing-panel-card--page';
+    wrapper.innerHTML = `
+        <header class="billing-panel-head">
+            <div>
+                <h4>Tu suscripción</h4>
+                <p>Plan mensual con Mercado Pago. El estado se actualiza automáticamente.</p>
+            </div>
+            <span class="billing-badge" data-billing-status data-billing-state="inactive">Inactiva</span>
+        </header>
+        <div class="billing-panel-body">
+            <div class="billing-meta-row">
+                <span>Periodo</span>
+                <strong data-billing-period>Sin fecha</strong>
+            </div>
+            <p data-billing-hint>Activa premium para tickets, anti-raid, gacha, música y personalización.</p>
+            <div class="billing-actions">
+                <button type="button" id="billingUpgradeBtnPremium" class="btn btn-primary">Activar Premium</button>
+                <button type="button" id="billingManageBtnPremium" class="btn btn-secondary" data-billing-manage hidden>Cancelar suscripción</button>
+            </div>
+        </div>
+    `;
+    host.appendChild(wrapper);
+
+    document.getElementById('billingUpgradeBtnPremium')?.addEventListener('click', () => {
+        void startPremiumCheckout();
+    });
+    document.getElementById('billingManageBtnPremium')?.addEventListener('click', () => {
+        void openBillingPortal();
+    });
     renderBillingState();
 }
 
@@ -1494,6 +1551,14 @@ const PREMIUM_PANE_CONFIG = {
     }
 };
 
+const PREMIUM_SETTINGS_PANE_CONFIG = {
+    settingsPaneTheme: {
+        preview: 'theme',
+        title: 'Personalización del panel',
+        hint: 'Temas, colores y fondos personalizados con suscripción Premium.'
+    }
+};
+
 function hasPremiumAccess() {
     return isOwnerUser === true || currentBillingState?.active === true;
 }
@@ -1559,9 +1624,8 @@ function wirePremiumOverlayActions(overlay) {
         void startPremiumCheckout();
     });
     overlay.querySelector('.premium-lock-settings-btn')?.addEventListener('click', () => {
-        showSection('profileSettingsSection');
-        ensureBillingPanel();
-        switchSettingsPane('settingsPaneAccount', { silent: true });
+        showSection('premiumSection');
+        ensurePremiumSectionBillingPanel();
     });
 }
 
@@ -1597,6 +1661,21 @@ function getPremiumPreviewHtml(previewKey = '') {
                     <div class="premium-preview-line long"></div>
                     <div class="premium-preview-line"></div>
                     <div class="premium-preview-line short"></div>
+                </div>
+            </div>
+        `;
+    }
+    if (previewKey === 'theme') {
+        return `
+            <div class="premium-preview premium-preview--theme" aria-hidden="true">
+                <div class="premium-preview-hero"></div>
+                <div class="premium-preview-grid">
+                    <div class="premium-preview-card"></div>
+                    <div class="premium-preview-card"></div>
+                    <div class="premium-preview-card wide"></div>
+                </div>
+                <div class="premium-preview-tabs">
+                    <span></span><span></span><span></span>
                 </div>
             </div>
         `;
@@ -1650,15 +1729,71 @@ function syncPremiumPaneLock(paneId) {
 
     const locked = !hasPremiumAccess();
     pane.classList.toggle('is-premium-locked', locked);
+    structure.body.querySelector('.premium-lock-overlay')?.remove();
 
-    let overlay = structure.body.querySelector('.premium-lock-overlay');
+    let overlay = structure.surface.querySelector('.premium-lock-overlay');
     if (locked) {
         injectPremiumPreview(paneId);
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.className = 'premium-lock-overlay';
             overlay.innerHTML = buildPremiumOverlayHtml(cfg);
-            structure.body.appendChild(overlay);
+            structure.surface.appendChild(overlay);
+            wirePremiumOverlayActions(overlay);
+        } else {
+            const titleEl = overlay.querySelector('.premium-lock-title');
+            const descEl = overlay.querySelector('.premium-lock-desc');
+            if (titleEl) titleEl.textContent = cfg.title;
+            if (descEl) descEl.textContent = cfg.hint;
+        }
+    } else {
+        overlay?.remove();
+    }
+}
+
+function isPremiumSettingsPane(paneId) {
+    return Boolean(PREMIUM_SETTINGS_PANE_CONFIG[String(paneId || '')]);
+}
+
+function ensurePremiumSettingsLockStructure(pane) {
+    const surface = pane?.querySelector('.settings-pane-shell');
+    const host = pane?.querySelector('.settings-pane-body');
+    if (!surface || !host) return null;
+
+    surface.classList.add('premium-lock-shell');
+    host.classList.add('premium-lock-content-host');
+    return { surface, host };
+}
+
+function injectPremiumSettingsPreview(paneId) {
+    const pane = document.getElementById(paneId);
+    const cfg = PREMIUM_SETTINGS_PANE_CONFIG[paneId];
+    const structure = ensurePremiumSettingsLockStructure(pane);
+    if (!structure || !cfg) return;
+    if (!structure.host.querySelector('.settings-theme-studio') && shouldReplaceWithPremiumPreview(structure.host)) {
+        structure.host.innerHTML = getPremiumPreviewHtml(cfg.preview);
+    }
+}
+
+function syncPremiumSettingsPaneLock(paneId) {
+    const pane = document.getElementById(paneId);
+    if (!pane || !isPremiumSettingsPane(paneId)) return;
+
+    const cfg = PREMIUM_SETTINGS_PANE_CONFIG[paneId];
+    const structure = ensurePremiumSettingsLockStructure(pane);
+    if (!structure) return;
+
+    const locked = !hasPremiumAccess();
+    pane.classList.toggle('is-premium-locked', locked);
+
+    let overlay = structure.surface.querySelector('.premium-lock-overlay');
+    if (locked) {
+        injectPremiumSettingsPreview(paneId);
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'premium-lock-overlay';
+            overlay.innerHTML = buildPremiumOverlayHtml(cfg);
+            structure.surface.appendChild(overlay);
             wirePremiumOverlayActions(overlay);
         } else {
             const titleEl = overlay.querySelector('.premium-lock-title');
@@ -1673,6 +1808,26 @@ function syncPremiumPaneLock(paneId) {
 
 function refreshPremiumLocks() {
     Object.keys(PREMIUM_PANE_CONFIG).forEach((paneId) => syncPremiumPaneLock(paneId));
+    Object.keys(PREMIUM_SETTINGS_PANE_CONFIG).forEach((paneId) => syncPremiumSettingsPaneLock(paneId));
+
+    document.querySelectorAll('.settings-side-btn[data-settings-pane]').forEach((button) => {
+        const paneId = button.dataset.settingsPane || '';
+        const isPremium = isPremiumSettingsPane(paneId);
+        button.classList.toggle('is-premium-settings-nav', isPremium);
+        button.classList.toggle('is-premium-locked-nav', isPremium && !hasPremiumAccess());
+
+        let badge = button.querySelector('.side-menu-premium-tag');
+        if (isPremium && !hasPremiumAccess()) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'side-menu-premium-tag';
+                badge.textContent = 'PREMIUM';
+                button.appendChild(badge);
+            }
+        } else {
+            badge?.remove();
+        }
+    });
 
     document.querySelectorAll('.side-menu-btn[data-server-pane]').forEach((button) => {
         const paneId = button.dataset.serverPane || '';
@@ -1714,9 +1869,15 @@ function loadPremiumPaneData(paneId, guildId) {
 function handleActivePremiumPaneAfterBillingChange() {
     refreshPremiumLocks();
     const paneId = currentServerPaneId;
-    if (!isPremiumPane(paneId) || !hasSelectedGuildContext()) return;
-    if (hasPremiumAccess()) {
+    if (isPremiumPane(paneId) && hasSelectedGuildContext() && hasPremiumAccess()) {
         loadPremiumPaneData(paneId, currentServerGuildId);
+    }
+    if (currentSettingsPaneId === 'settingsPaneTheme' && hasPremiumAccess()) {
+        const themePane = document.getElementById('settingsPaneTheme');
+        const host = themePane?.querySelector('.settings-pane-body');
+        if (host && !host.querySelector('.settings-theme-studio')) {
+            window.location.reload();
+        }
     }
 }
 
@@ -2411,6 +2572,11 @@ function switchSettingsPane(paneId, options = {}) {
     const pane = document.getElementById(paneId);
     if (!pane) return;
 
+    if (isPremiumSettingsPane(paneId) && !hasPremiumAccess()) {
+        syncPremiumSettingsPaneLock(paneId);
+        injectPremiumSettingsPreview(paneId);
+    }
+
     currentSettingsPaneId = paneId;
 
     document.querySelectorAll('.settings-pane').forEach((el) => {
@@ -2817,6 +2983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         handleBillingQueryFeedback();
         ensureBillingPanel();
+        ensurePremiumSectionBillingPanel();
         await loadBillingStatus();
         
         registerGatedNavigationButtons();
@@ -3022,6 +3189,7 @@ function updateProfileSettingsData() {
     }
 
     ensureBillingPanel();
+    ensurePremiumSectionBillingPanel();
     renderBillingState();
 }
 
@@ -3084,6 +3252,7 @@ function updateUserUI() {
 // Configurar event listeners
 function setupEventListeners() {
     bindSettingsPaneNavigation();
+    refreshPremiumLocks();
     bindThemeControls();
 
     window.addEventListener('popstate', (event) => {
@@ -3744,7 +3913,8 @@ function showSection(sectionId, options = {}) {
         embedSection: 'embedBtn',
         statsSection: 'statsBtn',
         logsSection: 'logsBtn',
-        commandsSection: 'aboutCommandsBtn'
+        commandsSection: 'aboutCommandsBtn',
+        premiumSection: 'premiumNavBtn'
     };
 
     const activeNavId = navIdBySection[sectionId] || navIdBySection.dashboard;
@@ -3775,9 +3945,14 @@ function showSection(sectionId, options = {}) {
     } else if (sectionId === 'controlCenterSection') {
         loadAboutOverview();
         refreshActiveSectionReveal();
+    } else if (sectionId === 'premiumSection') {
+        ensurePremiumSectionBillingPanel();
+        void loadBillingStatus();
+        refreshActiveSectionReveal();
     } else if (sectionId === 'profileSettingsSection') {
         updateProfileSettingsData();
         switchSettingsPane(currentSettingsPaneId, { silent: true });
+        refreshPremiumLocks();
     }
 
     if (sectionId === 'commandsSection') {

@@ -28,7 +28,8 @@
         const btnMap = {
             dashboard: 'dashboardBtn',
             commandsSection: 'aboutCommandsBtn',
-            controlCenterSection: 'controlCenterBtn'
+            controlCenterSection: 'controlCenterBtn',
+            premiumSection: 'premiumNavBtn'
         };
         const btn = doc.getElementById(btnMap[sectionId] || '');
         if (btn) {
