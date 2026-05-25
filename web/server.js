@@ -11,6 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const multer = require('multer');
 const db = require('../src/utils/database');
+const billingStore = require('../src/utils/billing-store');
 const welcomeStore = require('../src/utils/welcome-config-store');
 const {
     canonicalWelcomeMediaUrl,
@@ -98,6 +99,73 @@ app.post(
     handleFeedWebSubHttpRequest
 );
 
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    if (!MP_ACCESS_TOKEN) {
+        return res.status(503).json({ error: 'Mercado Pago no configurado' });
+    }
+
+    let payload = {};
+    try {
+        if (Buffer.isBuffer(req.body) && req.body.length) {
+            payload = JSON.parse(req.body.toString('utf8'));
+        }
+    } catch {
+        payload = {};
+    }
+
+    const topic = String(
+        req.query.type
+        || req.query.topic
+        || payload.type
+        || payload.topic
+        || ''
+    ).trim().toLowerCase();
+
+    const resourceUrl = String(payload.resource || req.query.resource || '').trim();
+    let preapprovalId = String(
+        req.query['data.id']
+        || req.query.id
+        || payload?.data?.id
+        || payload?.id
+        || ''
+    ).trim();
+
+    if (!preapprovalId && resourceUrl.includes('/preapproval/')) {
+        const match = resourceUrl.match(/\/preapproval\/([^/?]+)/i);
+        preapprovalId = String(match?.[1] || '').trim();
+    }
+
+    if (MP_WEBHOOK_SECRET && !req.headers['x-signature']) {
+        return res.status(400).json({ error: 'Firma MP faltante' });
+    }
+
+    if (!preapprovalId) {
+        return res.json({ ok: true, ignored: true, reason: 'no_preapproval_id' });
+    }
+
+    try {
+        const subscription = await mercadoPagoRequest('get', `/preapproval/${encodeURIComponent(preapprovalId)}`);
+        const discordUserId = parseUserIdFromExternalReference(subscription?.external_reference);
+        if (!discordUserId) {
+            return res.json({ ok: true, ignored: true, reason: 'missing_external_reference' });
+        }
+
+        const statusKey = mapMercadoPagoStatusToBillingStatus(subscription?.status);
+        const fingerprint = `mp:${preapprovalId}:${statusKey}:${String(subscription?.last_modified || subscription?.date_modified || '')}`;
+        const alreadyProcessed = await billingStore.hasProcessedEvent(fingerprint);
+        if (alreadyProcessed) {
+            return res.json({ ok: true, ignored: true, reason: 'event_already_processed' });
+        }
+
+        await persistMercadoPagoSubscriptionForUser(discordUserId, subscription, topic || 'mp_webhook');
+        await billingStore.markEventProcessed(fingerprint, { sourceEvent: topic || 'mp_webhook' });
+        return res.json({ ok: true });
+    } catch (error) {
+        console.error('❌ Error procesando webhook Mercado Pago:', error?.response?.data || error?.message || error);
+        return res.status(500).json({ error: 'No se pudo procesar webhook' });
+    }
+});
+
 function buildStreamPushStatus() {
     return {
         publicOriginConfigured: isStreamPushConfigured(),
@@ -120,6 +188,55 @@ app.get('/health', (req, res) => {
     res.status(200).json({ ok: true, service: 'web-panel' });
 });
 
+function resolveWebOrigin(req) {
+    const explicit = String(WEB_PUBLIC_ORIGIN || '').trim().replace(/\/+$/, '');
+    if (explicit) return explicit;
+    const proto = String(req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+    const host = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
+    if (!host) return '';
+    return `${proto}://${host}`;
+}
+
+function mapMercadoPagoStatusToBillingStatus(status = '') {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (normalized === 'authorized') return 'active';
+    if (normalized === 'paused') return 'past_due';
+    if (normalized === 'cancelled' || normalized === 'canceled') return 'canceled';
+    if (normalized === 'pending') return 'inactive';
+    return 'inactive';
+}
+
+function buildMercadoPagoExternalReference(userId = '') {
+    return `${MP_EXTERNAL_REFERENCE_PREFIX}:${String(userId || '').trim()}`;
+}
+
+function parseUserIdFromExternalReference(externalReference = '') {
+    const raw = String(externalReference || '').trim();
+    if (!raw) return '';
+    const [prefix, ...rest] = raw.split(':');
+    if (prefix !== MP_EXTERNAL_REFERENCE_PREFIX || !rest.length) return '';
+    return String(rest.join(':') || '').trim();
+}
+
+async function mercadoPagoRequest(method, endpoint, body = undefined, params = undefined) {
+    if (!MP_ACCESS_TOKEN) {
+        throw new Error('Mercado Pago no configurado');
+    }
+    const url = `https://api.mercadopago.com${endpoint}`;
+    const response = await axios({
+        method,
+        url,
+        data: body,
+        params,
+        timeout: 15000,
+        headers: {
+            Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    return response.data;
+}
+
 function envValue(name, fallback = '') {
     const raw = process.env[name];
     if (raw === undefined || raw === null) return fallback;
@@ -129,6 +246,17 @@ function envValue(name, fallback = '') {
 const CLIENT_ID = envValue('CLIENT_ID');
 const CLIENT_SECRET = envValue('CLIENT_SECRET');
 const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID', '399740358101303316');
+const WEB_PUBLIC_ORIGIN = envValue('WEB_PUBLIC_ORIGIN') || envValue('PUBLIC_ORIGIN');
+const MP_ACCESS_TOKEN = envValue('MP_ACCESS_TOKEN');
+const MP_WEBHOOK_SECRET = envValue('MP_WEBHOOK_SECRET');
+const MP_REASON = envValue('MP_REASON', 'EyedBot Premium mensual');
+const MP_BACK_URL = envValue('MP_BACK_URL');
+const MP_CURRENCY_ID = envValue('MP_CURRENCY_ID', 'USD');
+const MP_MONTHLY_AMOUNT_RAW = Number.parseFloat(envValue('MP_MONTHLY_AMOUNT', '9.99'));
+const MP_MONTHLY_AMOUNT = Number.isFinite(MP_MONTHLY_AMOUNT_RAW) && MP_MONTHLY_AMOUNT_RAW > 0
+    ? MP_MONTHLY_AMOUNT_RAW
+    : 9.99;
+const MP_EXTERNAL_REFERENCE_PREFIX = envValue('MP_EXTERNAL_REFERENCE_PREFIX', 'eyedbot');
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 8 * 1024 * 1024 }
@@ -1004,6 +1132,55 @@ async function syncSessionGuilds(req, options = {}) {
     }
 }
 
+async function persistMercadoPagoSubscriptionForUser(userId, subscription, sourceEvent = '') {
+    const sid = String(subscription?.id || '').trim();
+    const customerId = String(subscription?.payer_id || subscription?.payer?.id || '').trim();
+    const status = mapMercadoPagoStatusToBillingStatus(subscription?.status);
+    const currentPeriodEndRaw = subscription?.next_payment_date || subscription?.auto_recurring?.end_date || null;
+    let currentPeriodEnd = null;
+    if (currentPeriodEndRaw) {
+        const parsed = new Date(currentPeriodEndRaw);
+        if (!Number.isNaN(parsed.getTime())) {
+            currentPeriodEnd = parsed.toISOString();
+        }
+    }
+    return billingStore.setUserSubscription(userId, {
+        userId,
+        status,
+        customerId,
+        subscriptionId: sid,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: status === 'canceled',
+        sourceEvent: String(sourceEvent || ''),
+        updatedAt: new Date().toISOString()
+    });
+}
+
+async function requirePremium(req, res, next) {
+    const userId = String(req.session?.user?.id || '').trim();
+    if (!userId) {
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+    }
+
+    try {
+        const subscription = await billingStore.getUserSubscription(userId);
+        if (!billingStore.isPremiumActive(subscription)) {
+            return res.status(402).json({
+                error: 'Premium requerido',
+                code: 'premium_required',
+                billing: {
+                    status: subscription?.status || 'inactive',
+                    active: false
+                }
+            });
+        }
+        return next();
+    } catch (error) {
+        console.error('Error validando premium:', error);
+        return res.status(500).json({ error: 'No se pudo validar premium' });
+    }
+}
+
 // Rutas protegidas
 app.get('/api/user', requireAuth, async (req, res) => {
     const guilds = await syncSessionGuilds(req);
@@ -1017,6 +1194,106 @@ app.get('/api/user', requireAuth, async (req, res) => {
         inviteUrl,
         isOwner: isOwnerUser(req.session.user)
     });
+});
+
+app.get('/api/billing/status', requireAuth, async (req, res) => {
+    const userId = String(req.session?.user?.id || '').trim();
+    if (!userId) {
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+    }
+
+    try {
+        const subscription = await billingStore.getUserSubscription(userId);
+        return res.json({
+            active: billingStore.isPremiumActive(subscription),
+            status: subscription?.status || 'inactive',
+            customerId: subscription?.customerId || '',
+            subscriptionId: subscription?.subscriptionId || '',
+            currentPeriodEnd: subscription?.currentPeriodEnd || null,
+            cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd === true,
+            updatedAt: subscription?.updatedAt || null
+        });
+    } catch (error) {
+        console.error('Error consultando estado de facturación:', error);
+        return res.status(500).json({ error: 'No se pudo obtener estado premium' });
+    }
+});
+
+app.post('/api/billing/checkout-session', requireAuth, async (req, res) => {
+    if (!MP_ACCESS_TOKEN) {
+        return res.status(503).json({ error: 'Mercado Pago no configurado en el servidor' });
+    }
+
+    const userId = String(req.session?.user?.id || '').trim();
+    if (!userId) {
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+    }
+
+    try {
+        const origin = resolveWebOrigin(req);
+        if (!origin) {
+            return res.status(500).json({ error: 'No se pudo resolver el origen público de la web' });
+        }
+
+        const successBackUrl = String(MP_BACK_URL || `${origin}/?billing=success`).trim();
+        const notificationUrl = `${origin}/api/billing/webhook`;
+        const payload = {
+            reason: MP_REASON,
+            external_reference: buildMercadoPagoExternalReference(userId),
+            auto_recurring: {
+                frequency: 1,
+                frequency_type: 'months',
+                transaction_amount: MP_MONTHLY_AMOUNT,
+                currency_id: MP_CURRENCY_ID
+            },
+            back_url: successBackUrl,
+            notification_url: notificationUrl,
+            status: 'pending'
+        };
+        const session = await mercadoPagoRequest('post', '/preapproval', payload);
+
+        if (!session?.init_point) {
+            return res.status(500).json({ error: 'Mercado Pago no devolvió URL de checkout' });
+        }
+
+        return res.json({ url: session.init_point });
+    } catch (error) {
+        console.error('Error creando suscripción en Mercado Pago:', error?.response?.data || error?.message || error);
+        return res.status(500).json({ error: 'No se pudo crear la sesión de pago' });
+    }
+});
+
+app.post('/api/billing/portal', requireAuth, async (req, res) => {
+    if (!MP_ACCESS_TOKEN) {
+        return res.status(503).json({ error: 'Mercado Pago no configurado en el servidor' });
+    }
+
+    const userId = String(req.session?.user?.id || '').trim();
+    if (!userId) {
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+    }
+
+    try {
+        const subscription = await billingStore.getUserSubscription(userId);
+        const subscriptionId = String(subscription?.subscriptionId || '').trim();
+        if (!subscriptionId) {
+            return res.status(400).json({ error: 'No existe una suscripción activa para este usuario' });
+        }
+
+        const updated = await mercadoPagoRequest('put', `/preapproval/${encodeURIComponent(subscriptionId)}`, {
+            status: 'cancelled'
+        });
+        await persistMercadoPagoSubscriptionForUser(userId, updated, 'manual_cancel');
+
+        return res.json({
+            ok: true,
+            action: 'cancelled',
+            message: 'Suscripción cancelada en Mercado Pago'
+        });
+    } catch (error) {
+        console.error('Error cancelando suscripción en Mercado Pago:', error?.response?.data || error?.message || error);
+        return res.status(500).json({ error: 'No se pudo gestionar la suscripción' });
+    }
 });
 
 app.get('/api/about-overview', requireAuth, (req, res) => {
@@ -1627,7 +1904,7 @@ app.post('/api/guild/:guildId/verify-embed-update', requireAuth, async (req, res
     }
 });
 
-app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -1695,7 +1972,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -1852,7 +2129,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/ticket-publish', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -1903,7 +2180,7 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, async (req, res) => 
     }
 });
 
-app.post('/api/guild/:guildId/ticket-embed-update', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/ticket-embed-update', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2142,7 +2419,7 @@ async function enrichReports(botClient, reports) {
     return out;
 }
 
-app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/tickets/overview', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2199,7 +2476,7 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, async (req, res) =>
     }
 });
 
-app.post('/api/guild/:guildId/tickets/pending/:requestId/accept', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/tickets/pending/:requestId/accept', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, requestId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2228,7 +2505,7 @@ app.post('/api/guild/:guildId/tickets/pending/:requestId/accept', requireAuth, a
     }
 });
 
-app.post('/api/guild/:guildId/tickets/active/:channelId/claim', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/tickets/active/:channelId/claim', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2254,7 +2531,7 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/claim', requireAuth, asy
     }
 });
 
-app.post('/api/guild/:guildId/tickets/active/:channelId/unclaim', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/tickets/active/:channelId/unclaim', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2277,7 +2554,7 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/unclaim', requireAuth, a
     }
 });
 
-app.post('/api/guild/:guildId/tickets/active/:channelId/close', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/tickets/active/:channelId/close', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2306,7 +2583,7 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/close', requireAuth, asy
     }
 });
 
-app.delete('/api/guild/:guildId/tickets/reports/:reportId', requireAuth, async (req, res) => {
+app.delete('/api/guild/:guildId/tickets/reports/:reportId', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, reportId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2382,7 +2659,7 @@ async function enrichReportDetail(client, report) {
     };
 }
 
-app.get('/api/guild/:guildId/tickets/report/:reportId', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/tickets/report/:reportId', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, reportId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2399,7 +2676,7 @@ app.get('/api/guild/:guildId/tickets/report/:reportId', requireAuth, async (req,
     }
 });
 
-app.get('/api/guild/:guildId/tickets/report/:reportId/download', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/tickets/report/:reportId/download', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, reportId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2449,7 +2726,7 @@ function buildSenderFromSession(reqUser) {
     };
 }
 
-app.get('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2484,7 +2761,7 @@ app.get('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, a
     }
 });
 
-app.post('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, express.json(), async (req, res) => {
+app.post('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, requirePremium, express.json(), async (req, res) => {
     try {
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2684,7 +2961,7 @@ function normalizeGachaConfigInput(body = {}, current = null, userId = 'unknown'
     });
 }
 
-app.get('/api/guild/:guildId/anti-raid-config', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/anti-raid-config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2698,7 +2975,7 @@ app.get('/api/guild/:guildId/anti-raid-config', requireAuth, async (req, res) =>
     }
 });
 
-app.post('/api/guild/:guildId/anti-raid-config', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/anti-raid-config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2923,7 +3200,7 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
     }
 });
 
-app.get('/api/guild/:guildId/gacha-config', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/gacha-config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2937,7 +3214,7 @@ app.get('/api/guild/:guildId/gacha-config', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/guild/:guildId/gacha-config', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/gacha-config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -2960,7 +3237,7 @@ app.post('/api/guild/:guildId/gacha-config', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/guild/:guildId/gacha-stats', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/gacha-stats', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3000,7 +3277,7 @@ app.get('/api/guild/:guildId/gacha-stats', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/guild/:guildId/gacha-inventory', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/gacha-inventory', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3021,7 +3298,7 @@ app.get('/api/guild/:guildId/gacha-inventory', requireAuth, async (req, res) => 
     }
 });
 
-app.get('/api/guild/:guildId/gacha-market', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/gacha-market', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3035,7 +3312,7 @@ app.get('/api/guild/:guildId/gacha-market', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/gacha-shop', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3064,7 +3341,7 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, characterId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3089,7 +3366,7 @@ app.post('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, async (r
     }
 });
 
-app.get('/api/guild/:guildId/gacha-catalog/:characterId/image', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/gacha-catalog/:characterId/image', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, characterId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3109,7 +3386,7 @@ app.get('/api/guild/:guildId/gacha-catalog/:characterId/image', requireAuth, asy
     }
 });
 
-app.delete('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, async (req, res) => {
+app.delete('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, characterId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3138,7 +3415,7 @@ app.delete('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, async 
     }
 });
 
-app.get('/api/guild/:guildId/gacha-leaderboard', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/gacha-leaderboard', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3188,7 +3465,7 @@ app.get('/api/guild/:guildId/gacha-leaderboard', requireAuth, async (req, res) =
     }
 });
 
-app.post('/api/guild/:guildId/gacha-market/list', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/gacha-market/list', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3207,7 +3484,7 @@ app.post('/api/guild/:guildId/gacha-market/list', requireAuth, async (req, res) 
     }
 });
 
-app.post('/api/guild/:guildId/gacha-market/buy', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/gacha-market/buy', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3733,7 +4010,7 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
     }
 });
 
-app.post('/api/guild/:guildId/gacha-catalog-upload', requireAuth, upload.single('imageFile'), async (req, res) => {
+app.post('/api/guild/:guildId/gacha-catalog-upload', requireAuth, requirePremium, upload.single('imageFile'), async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -4813,7 +5090,7 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
 });
 
 // Ruta para obtener información de música
-app.get('/api/guild/:guildId/music', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/music', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         
@@ -4868,7 +5145,7 @@ app.get('/api/guild/:guildId/music', requireAuth, async (req, res) => {
 });
 
 // Ruta para controlar música
-app.post('/api/guild/:guildId/music/control', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/music/control', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { action } = req.body;

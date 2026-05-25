@@ -15942,3 +15942,72 @@ body {
     content-visibility: auto;
     contain-intrinsic-size: 520px 640px;
 }
+
+.billing-panel-card {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(146, 130, 255, 0.32);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(77, 45, 160, 0.22), rgba(14, 18, 43, 0.8));
+}
+
+.billing-panel-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.8rem;
+    align-items: flex-start;
+    margin-bottom: 0.8rem;
+}
+
+.billing-panel-head h4 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.billing-panel-head p {
+    margin: 0.35rem 0 0;
+    color: rgba(229, 228, 255, 0.8);
+    font-size: 0.9rem;
+}
+
+.billing-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.billing-badge[data-billing-state="active"] {
+    background: rgba(47, 186, 109, 0.16);
+    color: #9ef2c2;
+    border-color: rgba(47, 186, 109, 0.36);
+}
+
+.billing-badge[data-billing-state="inactive"] {
+    background: rgba(255, 152, 83, 0.14);
+    color: #ffd1ab;
+    border-color: rgba(255, 152, 83, 0.34);
+}
+
+.billing-panel-body {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.billing-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    color: rgba(233, 235, 255, 0.86);
+}
+
+.billing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}

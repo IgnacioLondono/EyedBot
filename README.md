@@ -132,7 +132,28 @@ MUSIC_BUFFERING_TIMEOUT_MS=7000
 # Música desactivada por defecto
 MUSIC_ENABLED=false
 LAVALINK_ENABLED=false
+
+# Premium web con Mercado Pago (test mode)
+MP_ACCESS_TOKEN=TEST-xxxxxxxx
+MP_WEBHOOK_SECRET=xxxxxxxx
+MP_REASON=EyedBot Premium mensual
+MP_CURRENCY_ID=USD
+MP_MONTHLY_AMOUNT=9.99
 ```
+
+### 2.1 Premium web con Mercado Pago
+
+El panel ahora incluye suscripción premium para desbloquear módulos avanzados (tickets, anti-raid, gacha y control de música).
+
+Flujo recomendado en local (modo test):
+
+1. Crear un Access Token de prueba en Mercado Pago (`TEST-...`) y colocarlo en `MP_ACCESS_TOKEN`.
+2. Configurar `MP_MONTHLY_AMOUNT` y `MP_CURRENCY_ID` según tu plan premium.
+3. Levantar el bot/panel con `.env` configurado.
+4. Exponer el panel con HTTPS (o túnel) y configurar `WEB_PUBLIC_ORIGIN`.
+5. Configurar webhook de Mercado Pago apuntando a `/api/billing/webhook`.
+6. Iniciar checkout desde Configuraciones > Cuenta > Premium del panel.
+7. Confirmar que `/api/billing/status` cambie a `active` tras autorizar el cobro recurrente.
 
 ### 4. Música y Lavalink (opcional, desactivado)
 

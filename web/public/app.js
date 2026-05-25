@@ -218,6 +218,15 @@ let currentServerInsightView = 'overview';
 let currentServerInsightPayload = null;
 let serverSummaryRefreshInterval = null;
 let isSwitchingServer = false;
+let currentBillingState = {
+    active: false,
+    status: 'inactive',
+    customerId: '',
+    subscriptionId: '',
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false
+};
+let premiumUpsellLock = false;
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 let lastThemeSettingsDiskJson = null;
@@ -1266,10 +1275,185 @@ window.confirmServerSwitcherSelection = confirmServerSwitcherSelection;
 
 // Función auxiliar para fetch con credenciales
 async function fetchWithCredentials(url, options = {}) {
-    return fetch(url, {
+    const response = await fetch(url, {
         ...options,
         credentials: 'include' // Siempre incluir cookies
     });
+
+    const normalizedUrl = String(url || '');
+    const isBillingEndpoint = normalizedUrl.startsWith('/api/billing/');
+    if (!isBillingEndpoint && (response.status === 402 || response.status === 403)) {
+        const payload = await response.clone().json().catch(() => ({}));
+        if (payload?.code === 'premium_required') {
+            if (!premiumUpsellLock) {
+                premiumUpsellLock = true;
+                showToast('Este módulo es premium. Activa Mercado Pago para desbloquearlo.', 'warning');
+                ensureBillingPanel();
+                setTimeout(() => {
+                    premiumUpsellLock = false;
+                }, 1500);
+            }
+        }
+    }
+
+    return response;
+}
+
+function billingStatusLabel(status = '') {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'active') return 'Activa';
+    if (normalized === 'trialing') return 'En prueba';
+    if (normalized === 'past_due') return 'Pago pendiente';
+    if (normalized === 'canceled') return 'Cancelada';
+    if (normalized === 'unpaid') return 'Impaga';
+    if (normalized === 'incomplete') return 'Incompleta';
+    return 'Inactiva';
+}
+
+function renderBillingState() {
+    const statusNode = document.getElementById('billingStatusValue');
+    const periodNode = document.getElementById('billingPeriodValue');
+    const actionNode = document.getElementById('billingActionHint');
+    const manageBtn = document.getElementById('billingManageBtn');
+    if (!statusNode || !periodNode || !actionNode || !manageBtn) return;
+
+    const status = String(currentBillingState?.status || 'inactive').toLowerCase();
+    const isActive = currentBillingState?.active === true;
+    const period = currentBillingState?.currentPeriodEnd
+        ? new Date(currentBillingState.currentPeriodEnd).toLocaleDateString('es-ES')
+        : 'Sin fecha';
+
+    statusNode.textContent = billingStatusLabel(status);
+    statusNode.dataset.billingState = isActive ? 'active' : 'inactive';
+    periodNode.textContent = isActive ? `Renueva el ${period}` : period;
+
+    if (isActive) {
+        actionNode.textContent = currentBillingState?.cancelAtPeriodEnd
+            ? 'Tu suscripción finalizará al terminar el período actual.'
+            : 'Tienes acceso premium a módulos avanzados.';
+        manageBtn.hidden = false;
+    } else {
+        actionNode.textContent = 'Activa premium para usar tickets, anti-raid, gacha y control de música.';
+        manageBtn.hidden = true;
+    }
+}
+
+function ensureBillingPanel() {
+    const pane = document.getElementById('settingsPaneAccount');
+    if (!pane) return;
+    if (document.getElementById('billingPanelCard')) {
+        renderBillingState();
+        return;
+    }
+
+    const host = pane.querySelector('.settings-pane-body');
+    if (!host) return;
+
+    const wrapper = document.createElement('article');
+    wrapper.id = 'billingPanelCard';
+    wrapper.className = 'billing-panel-card';
+    wrapper.innerHTML = `
+        <header class="billing-panel-head">
+            <div>
+                <h4>Premium del panel</h4>
+                <p>Gestiona tu suscripción mensual con Mercado Pago.</p>
+            </div>
+            <span class="billing-badge" id="billingStatusValue" data-billing-state="inactive">Inactiva</span>
+        </header>
+        <div class="billing-panel-body">
+            <div class="billing-meta-row">
+                <span>Periodo</span>
+                <strong id="billingPeriodValue">Sin fecha</strong>
+            </div>
+            <p id="billingActionHint">Activa premium para usar tickets, anti-raid, gacha y control de música.</p>
+            <div class="billing-actions">
+                <button type="button" id="billingUpgradeBtn" class="btn btn-primary">Activar Premium</button>
+                <button type="button" id="billingManageBtn" class="btn btn-secondary" hidden>Cancelar suscripción</button>
+            </div>
+        </div>
+    `;
+
+    host.appendChild(wrapper);
+    const upgradeBtn = document.getElementById('billingUpgradeBtn');
+    const manageBtn = document.getElementById('billingManageBtn');
+    if (upgradeBtn) {
+        upgradeBtn.addEventListener('click', () => {
+            void startPremiumCheckout();
+        });
+    }
+    if (manageBtn) {
+        manageBtn.addEventListener('click', () => {
+            void openBillingPortal();
+        });
+    }
+    renderBillingState();
+}
+
+async function loadBillingStatus() {
+    try {
+        const response = await fetchWithCredentials('/api/billing/status');
+        if (!response.ok) return;
+        const data = await response.json();
+        currentBillingState = {
+            active: data?.active === true,
+            status: String(data?.status || 'inactive'),
+            customerId: String(data?.customerId || ''),
+            subscriptionId: String(data?.subscriptionId || ''),
+            currentPeriodEnd: data?.currentPeriodEnd || null,
+            cancelAtPeriodEnd: data?.cancelAtPeriodEnd === true
+        };
+        renderBillingState();
+    } catch (error) {
+        console.warn('No se pudo cargar estado premium:', error);
+    }
+}
+
+async function startPremiumCheckout() {
+    try {
+        const response = await fetchWithCredentials('/api/billing/checkout-session', {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.url) {
+            showToast(data.error || 'No se pudo iniciar el checkout premium', 'error');
+            return;
+        }
+        window.location.assign(data.url);
+    } catch (error) {
+        console.error('Error iniciando checkout premium:', error);
+        showToast('Error iniciando pago premium', 'error');
+    }
+}
+
+async function openBillingPortal() {
+    try {
+        const response = await fetchWithCredentials('/api/billing/portal', {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast(data.error || 'No se pudo gestionar la suscripción', 'error');
+            return;
+        }
+        showToast(data.message || 'Suscripción actualizada', 'success');
+        await loadBillingStatus();
+    } catch (error) {
+        console.error('Error gestionando suscripción premium:', error);
+        showToast('Error gestionando suscripción premium', 'error');
+    }
+}
+
+function handleBillingQueryFeedback() {
+    const params = new URLSearchParams(window.location.search || '');
+    const billingState = String(params.get('billing') || '').trim().toLowerCase();
+    if (!billingState) return;
+    if (billingState === 'success') showToast('Pago completado. Actualizando estado premium...', 'success');
+    if (billingState === 'cancelled') showToast('Pago cancelado. Puedes reintentarlo cuando quieras.', 'warning');
+    if (billingState === 'portal_return') showToast('Suscripción actualizada.', 'success');
+    params.delete('billing');
+    const query = params.toString();
+    const target = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    window.history.replaceState({}, '', target);
 }
 
 const apiGetCache = new Map();
@@ -2366,6 +2550,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn('⚠️ Usuario no autenticado, retornando');
             return; // No cargar datos si no hay autenticación
         }
+
+        handleBillingQueryFeedback();
+        ensureBillingPanel();
+        await loadBillingStatus();
         
         registerGatedNavigationButtons();
         console.log('✅ registerGatedNavigationButtons completado');
@@ -2568,6 +2756,9 @@ function updateProfileSettingsData() {
             webTimezone.textContent = '-';
         }
     }
+
+    ensureBillingPanel();
+    renderBillingState();
 }
 
 function updateUserUI() {
