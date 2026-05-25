@@ -1162,6 +1162,11 @@ async function requirePremium(req, res, next) {
         return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
     }
 
+    // El owner del bot siempre tiene acceso premium en el panel.
+    if (isOwnerUser(req.session?.user)) {
+        return next();
+    }
+
     try {
         const subscription = await billingStore.getUserSubscription(userId);
         if (!billingStore.isPremiumActive(subscription)) {
