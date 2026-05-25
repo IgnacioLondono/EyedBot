@@ -1489,6 +1489,7 @@ app.get('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
                 enabled: false,
                 channelId: '',
                 roleId: '',
+                newMemberRoleId: '',
                 emoji: '✅',
                 title: 'Verify',
                 message: '¡Reacciona a este mensaje para ver los demás canales!',
@@ -1518,6 +1519,7 @@ app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
             enabled: body.enabled === true,
             channelId: String(body.channelId || '').trim(),
             roleId: String(body.roleId || '').trim(),
+            newMemberRoleId: String(body.newMemberRoleId || '').trim(),
             emoji: String(body.emoji || '✅').trim().slice(0, 80),
             title: String(body.title || 'Verify').slice(0, 256),
             message: String(body.message || '¡Reacciona a este mensaje para ver los demás canales!').slice(0, 2000),
@@ -1560,6 +1562,13 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
 
         const role = guild.roles.cache.get(cfg.roleId) || await guild.roles.fetch(cfg.roleId).catch(() => null);
         if (!role) return res.status(404).json({ error: 'Rol de verificación no encontrado' });
+        const newMemberRoleId = String(cfg.newMemberRoleId || '').trim();
+        const newMemberRole = newMemberRoleId && newMemberRoleId !== role.id
+            ? guild.roles.cache.get(newMemberRoleId) || await guild.roles.fetch(newMemberRoleId).catch(() => null)
+            : null;
+        if (newMemberRoleId && newMemberRoleId !== role.id && !newMemberRole) {
+            return res.status(404).json({ error: 'Rol inicial de nuevo miembro no encontrado' });
+        }
 
         const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
         if (!me) return res.status(500).json({ error: 'No pude obtener los permisos del bot en el servidor' });
@@ -1570,6 +1579,9 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
 
         if (!me.permissions.has('ManageRoles') || me.roles.highest.position <= role.position) {
             return res.status(403).json({ error: 'El bot no puede administrar ese rol (revisa jerarquía y permiso Gestionar roles)' });
+        }
+        if (newMemberRole && (!me.permissions.has('ManageRoles') || me.roles.highest.position <= newMemberRole.position)) {
+            return res.status(403).json({ error: 'El bot no puede administrar el rol inicial de nuevo miembro (revisa jerarquía y permiso Gestionar roles)' });
         }
 
         const { embed, files } = await buildVerifyEmbedFromConfig(cfg, guild);

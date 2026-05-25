@@ -7653,6 +7653,7 @@ function collectVerifyConfigFromForm() {
         enabled: document.getElementById('verifyEnabled')?.checked ?? true,
         channelId: document.getElementById('verifyChannelSelect')?.value || '',
         roleId: document.getElementById('verifyRoleSelect')?.value || '',
+        newMemberRoleId: document.getElementById('verifyNewMemberRoleSelect')?.value || '',
         emoji: document.getElementById('verifyEmoji')?.value?.trim() || '✅',
         title: document.getElementById('verifyTitle')?.value || 'Verify',
         message: document.getElementById('verifyMessage')?.value || '¡Reacciona a este mensaje para ver los demás canales!',
@@ -7818,6 +7819,7 @@ async function loadVerifyPanel(guildId) {
         const enabled = cfg.enabled === true;
         const channelName = (channels.find((c) => c.id === cfg.channelId) || {}).name || '—';
         const roleName = (roles.find((r) => r.id === cfg.roleId) || {}).name || '—';
+        const newMemberRoleName = (roles.find((r) => r.id === cfg.newMemberRoleId) || {}).name || '—';
         const emojiPreview = escapeHtml(cfg.emoji || '✅');
         const isPublished = !!cfg.messageId;
 
@@ -7841,7 +7843,8 @@ async function loadVerifyPanel(guildId) {
             <div class="dpx-stats-grid">
                 ${dpxRenderStatCard({ label: 'Estado', value: `<span class="dpx-stat-pill ${enabled ? 'is-on' : 'is-off'}">${enabled ? 'Activo' : 'Inactivo'}</span>`, hint: enabled ? 'Verificación funcionando' : 'Activa para empezar', accent: '#7ef0b4' })}
                 ${dpxRenderStatCard({ label: 'Canal', value: cfg.channelId ? `# ${escapeHtml(channelName)}` : 'Sin canal', hint: cfg.channelId ? 'Donde se publica el embed' : 'Selecciona un canal', accent: '#7c4dff' })}
-                ${dpxRenderStatCard({ label: 'Rol asignado', value: cfg.roleId ? escapeHtml(roleName) : 'Sin rol', hint: cfg.roleId ? 'Asignado al reaccionar' : 'Configura un rol de verificado', accent: '#9a6dff' })}
+                ${dpxRenderStatCard({ label: 'Rol verificado', value: cfg.roleId ? escapeHtml(roleName) : 'Sin rol', hint: cfg.roleId ? 'Asignado al reaccionar' : 'Configura un rol de verificado', accent: '#9a6dff' })}
+                ${dpxRenderStatCard({ label: 'Rol al entrar', value: cfg.newMemberRoleId ? escapeHtml(newMemberRoleName) : 'Sin rol', hint: cfg.newMemberRoleId ? 'Se asigna al entrar al servidor' : 'Opcional para no verificados', accent: '#6dd6ff' })}
                 ${dpxRenderStatCard({ label: 'Emoji', value: emojiPreview, hint: 'Reacción que activa el rol', accent: '#ff78d1' })}
                 ${dpxRenderStatCard({ label: 'Publicado', value: `<span class="dpx-stat-pill ${isPublished ? 'is-on' : 'is-off'}">${isPublished ? 'Sí' : 'No'}</span>`, hint: isPublished ? 'Embed activo en Discord' : 'Pulsa "Publicar embed"', accent: '#ffb778', accent2: '#ff78d1' })}
             </div>
@@ -7864,7 +7867,7 @@ async function loadVerifyPanel(guildId) {
                         <div class="dpx-section-head">
                             <div class="dpx-section-head-text">
                                 <h4>Canal y rol</h4>
-                                <p>Define dónde se publica el embed y qué rol se asigna al reaccionar.</p>
+                                <p>Define dónde se publica el embed, qué rol se da al verificar y cuál rol inicial tendrá un usuario nuevo.</p>
                             </div>
                         </div>
                         <div class="dpx-field-grid is-wide">
@@ -7881,6 +7884,14 @@ async function loadVerifyPanel(guildId) {
                                     <option value="">Selecciona un rol</option>
                                     ${roles.map((r) => `<option value="${r.id}" ${cfg.roleId === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
                                 </select>
+                            </div>
+                            <div class="dpx-field">
+                                <label for="verifyNewMemberRoleSelect">Rol al entrar (opcional)</label>
+                                <select id="verifyNewMemberRoleSelect" class="form-control">
+                                    <option value="">Ninguno</option>
+                                    ${roles.map((r) => `<option value="${r.id}" ${cfg.newMemberRoleId === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                                </select>
+                                <small>Se asigna al unirse; al verificar, este rol se elimina automáticamente.</small>
                             </div>
                         </div>
                         <div class="dpx-toggle-grid" style="margin-top:1rem;">
@@ -7935,7 +7946,8 @@ async function loadVerifyPanel(guildId) {
                             <div class="dpx-preview-card">
                                 <h5>Resumen rápido</h5>
                                 <div class="dpx-preview-row"><span>Canal</span><strong>${cfg.channelId ? `# ${escapeHtml(channelName)}` : 'No configurado'}</strong></div>
-                                <div class="dpx-preview-row"><span>Rol</span><strong>${cfg.roleId ? escapeHtml(roleName) : 'No configurado'}</strong></div>
+                                <div class="dpx-preview-row"><span>Rol verificado</span><strong>${cfg.roleId ? escapeHtml(roleName) : 'No configurado'}</strong></div>
+                                <div class="dpx-preview-row"><span>Rol al entrar</span><strong>${cfg.newMemberRoleId ? escapeHtml(newMemberRoleName) : 'No configurado'}</strong></div>
                                 <div class="dpx-preview-row"><span>Emoji</span><strong>${emojiPreview}</strong></div>
                                 <div class="dpx-preview-row"><span>Estado</span><strong>${enabled ? 'Activo' : 'Inactivo'}</strong></div>
                                 <div class="dpx-preview-row"><span>Publicado</span><strong>${isPublished ? 'Sí' : 'No'}</strong></div>

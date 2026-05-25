@@ -1,5 +1,6 @@
 const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
+const verifyStore = require('../utils/verify-config-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
 const { applyWelcomeMediaToEmbed, resolveWelcomeCardBackground } = require('../utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../utils/embed-text-template');
@@ -30,9 +31,34 @@ function applyTemplate(text, member) {
     return applyGuildEmbedText(text, { guild: member?.guild, member });
 }
 
+function canManageRole(guild, role) {
+    const me = guild?.members?.me;
+    if (!me || !role) return false;
+    if (!me.permissions.has('ManageRoles')) return false;
+    return me.roles.highest.position > role.position;
+}
+
+async function assignNewMemberVerifyRole(member) {
+    if (!member?.guild?.id) return;
+    const cfg = await verifyStore.getVerifyConfig(member.guild.id).catch(() => null);
+    if (!cfg || cfg.enabled === false) return;
+
+    const newMemberRoleId = String(cfg.newMemberRoleId || '').trim();
+    if (!newMemberRoleId) return;
+    if (String(cfg.roleId || '').trim() === newMemberRoleId) return;
+
+    const role = member.guild.roles.cache.get(newMemberRoleId) || await member.guild.roles.fetch(newMemberRoleId).catch(() => null);
+    if (!role || !canManageRole(member.guild, role)) return;
+    if (member.roles.cache.has(role.id)) return;
+
+    await member.roles.add(role, 'Rol inicial al unirse (pendiente de verificación)').catch(() => null);
+}
+
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member) {
+        await assignNewMemberVerifyRole(member).catch(() => null);
+
         const welcomeConfig = await welcomeStore.getWelcomeConfig(member.guild.id);
         const welcomeChannelId = welcomeConfig?.channelId || await welcomeStore.getWelcomeChannelId(member.guild.id);
         if (!welcomeChannelId) return;
