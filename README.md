@@ -143,7 +143,7 @@ MP_MONTHLY_AMOUNT=9.99
 
 ### 2.1 Premium web con Mercado Pago
 
-El panel ahora incluye suscripción premium para desbloquear módulos avanzados (tickets, anti-raid, gacha y control de música).
+El panel ahora incluye suscripción premium para desbloquear módulos avanzados (tickets, anti-raid, gacha, juegos gratis y personalización).
 
 Flujo recomendado en local (modo test):
 

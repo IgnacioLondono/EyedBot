@@ -3511,7 +3511,7 @@ app.post('/api/guild/:guildId/gacha-market/buy', requireAuth, requirePremium, as
 // FREE GAMES (Epic Games / Steam)
 // ============================================================
 
-app.get('/api/guild/:guildId/free-games/config', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/free-games/config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3525,7 +3525,7 @@ app.get('/api/guild/:guildId/free-games/config', requireAuth, async (req, res) =
     }
 });
 
-app.post('/api/guild/:guildId/free-games/config', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/free-games/config', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3561,7 +3561,7 @@ app.post('/api/guild/:guildId/free-games/config', requireAuth, async (req, res) 
     }
 });
 
-app.get('/api/guild/:guildId/free-games/preview', requireAuth, async (req, res) => {
+app.get('/api/guild/:guildId/free-games/preview', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3584,7 +3584,7 @@ app.get('/api/guild/:guildId/free-games/preview', requireAuth, async (req, res) 
     }
 });
 
-app.post('/api/guild/:guildId/free-games/test', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/free-games/test', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -3657,7 +3657,7 @@ app.post('/api/guild/:guildId/free-games/test', requireAuth, async (req, res) =>
     }
 });
 
-app.post('/api/guild/:guildId/free-games/refresh-embeds', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/free-games/refresh-embeds', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
@@ -5095,7 +5095,7 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
 });
 
 // Ruta para obtener información de música
-app.get('/api/guild/:guildId/music', requireAuth, requirePremium, async (req, res) => {
+app.get('/api/guild/:guildId/music', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         
@@ -5150,7 +5150,7 @@ app.get('/api/guild/:guildId/music', requireAuth, requirePremium, async (req, re
 });
 
 // Ruta para controlar música
-app.post('/api/guild/:guildId/music/control', requireAuth, requirePremium, async (req, res) => {
+app.post('/api/guild/:guildId/music/control', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { action } = req.body;

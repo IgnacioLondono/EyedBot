@@ -1054,7 +1054,9 @@ function switchServerPane(paneId, button = null) {
     }
 
     if (paneId === 'serverPaneFreeGames' && typeof openFreeGamesPane === 'function') {
-        try { openFreeGamesPane(); } catch (e) { console.error('openFreeGamesPane error', e); }
+        if (hasPremiumAccess()) {
+            try { openFreeGamesPane(); } catch (e) { console.error('openFreeGamesPane error', e); }
+        }
     }
 
     if (paneId === 'serverPaneAutomation' && pendingAutomationDpxTab) {
@@ -1346,7 +1348,7 @@ function renderBillingState() {
             : 'Tienes acceso premium a módulos avanzados.';
         manageBtn.hidden = false;
     } else {
-        actionNode.textContent = 'Activa premium para tickets, anti-raid, gacha, música y personalización.';
+        actionNode.textContent = 'Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.';
         manageBtn.hidden = true;
     }
 
@@ -1362,7 +1364,7 @@ function renderBillingState() {
             ? (currentBillingState?.cancelAtPeriodEnd
                 ? 'Tu suscripción finalizará al terminar el período actual.'
                 : 'Tienes acceso premium a módulos avanzados.')
-            : 'Activa premium para tickets, anti-raid, gacha, música y personalización.';
+            : 'Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.';
     });
     document.querySelectorAll('[data-billing-manage]').forEach((node) => {
         node.hidden = !isActive;
@@ -1396,7 +1398,7 @@ function ensureBillingPanel() {
                 <span>Periodo</span>
                 <strong id="billingPeriodValue" data-billing-period>Sin fecha</strong>
             </div>
-            <p id="billingActionHint" data-billing-hint>Activa premium para tickets, anti-raid, gacha, música y personalización.</p>
+            <p id="billingActionHint" data-billing-hint>Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.</p>
             <div class="billing-actions">
                 <button type="button" id="billingUpgradeBtn" class="btn btn-primary">Activar Premium</button>
                 <button type="button" id="billingManageBtn" class="btn btn-secondary" data-billing-manage hidden>Cancelar suscripción</button>
@@ -1441,7 +1443,7 @@ function ensurePremiumSectionBillingPanel() {
                 <span>Periodo</span>
                 <strong data-billing-period>Sin fecha</strong>
             </div>
-            <p data-billing-hint>Activa premium para tickets, anti-raid, gacha, música y personalización.</p>
+            <p data-billing-hint>Activa premium para tickets, anti-raid, gacha, juegos gratis y personalización.</p>
             <div class="billing-actions">
                 <button type="button" id="billingUpgradeBtnPremium" class="btn btn-primary">Activar Premium</button>
                 <button type="button" id="billingManageBtnPremium" class="btn btn-secondary" data-billing-manage hidden>Cancelar suscripción</button>
@@ -1547,6 +1549,11 @@ const PREMIUM_PANE_CONFIG = {
         preview: 'gacha',
         title: 'Gacha / economía',
         hint: 'Rolls, tienda, mercado y ranking de tu servidor.'
+    },
+    serverPaneFreeGames: {
+        preview: 'freegames',
+        title: 'Juegos gratis',
+        hint: 'Avisos automáticos de Epic Games y Steam en tu servidor.'
     }
 };
 
@@ -1660,6 +1667,25 @@ function getPremiumPreviewHtml(previewKey = '') {
                     <div class="premium-preview-line long"></div>
                     <div class="premium-preview-line"></div>
                     <div class="premium-preview-line short"></div>
+                </div>
+            </div>
+        `;
+    }
+    if (previewKey === 'freegames') {
+        return `
+            <div class="premium-preview premium-preview--freegames" aria-hidden="true">
+                <div class="premium-preview-stats">
+                    <div class="premium-preview-stat"></div>
+                    <div class="premium-preview-stat"></div>
+                    <div class="premium-preview-stat"></div>
+                </div>
+                <div class="premium-preview-tabs">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="premium-preview-list">
+                    <div class="premium-preview-row"></div>
+                    <div class="premium-preview-row"></div>
+                    <div class="premium-preview-row"></div>
                 </div>
             </div>
         `;
@@ -1954,6 +1980,10 @@ function loadPremiumPaneData(paneId, guildId) {
     }
     if (paneId === 'serverPaneGacha') {
         void loadGachaPanel(gid);
+        return;
+    }
+    if (paneId === 'serverPaneFreeGames') {
+        void openFreeGamesPane();
     }
 }
 
@@ -3533,15 +3563,19 @@ function setupEventListeners() {
                 btn.setAttribute('aria-selected', active ? 'true' : 'false');
             });
             aboutPanels.forEach((panel) => {
-                panel.classList.toggle('active', panel.dataset.aboutPanel === tabKey);
+                const active = panel.dataset.aboutPanel === tabKey;
+                panel.classList.toggle('active', active);
+                panel.hidden = !active;
             });
+            refreshActiveSectionReveal();
         };
 
         aboutTabs.forEach((btn) => {
             btn.addEventListener('click', () => {
-                switchAboutTab(btn.dataset.aboutTab || '');
+                switchAboutTab(btn.dataset.aboutTab || 'what');
             });
         });
+        switchAboutTab(aboutTabs.find((b) => b.classList.contains('active'))?.dataset.aboutTab || 'what');
     }
 
     const aboutCarouselPrev = document.getElementById('aboutCarouselPrev');
@@ -5533,8 +5567,10 @@ async function selectServerGuild(guildId, options = {}) {
         } else {
             injectPremiumPreview('serverPaneSecurity');
             injectPremiumPreview('serverPaneGacha');
+            injectPremiumPreview('serverPaneFreeGames');
             syncPremiumPaneLock('serverPaneSecurity');
             syncPremiumPaneLock('serverPaneGacha');
+            syncPremiumPaneLock('serverPaneFreeGames');
         }
         await Promise.all(loadTasks);
         refreshPremiumLocks();
@@ -16081,6 +16117,12 @@ const _freeGamesState = {
 };
 
 async function openFreeGamesPane() {
+    syncPremiumPaneLock('serverPaneFreeGames');
+    if (!hasPremiumAccess()) {
+        enforceAllPremiumLocks();
+        return;
+    }
+
     const guildId = currentServerGuildId;
     if (!guildId) return;
     _freeGamesState.guildId = guildId;
@@ -16099,6 +16141,10 @@ async function openFreeGamesPane() {
             fetchWithCredentials(`/api/guild/${guildId}/free-games/config`),
             fetchWithCredentials(`/api/guild/${guildId}/channels`)
         ]);
+        if (cfgResp.status === 402) {
+            enforceAllPremiumLocks();
+            return;
+        }
         const cfg = await cfgResp.json();
         const channels = await chanResp.json();
         _freeGamesState.config = cfg;
@@ -16406,6 +16452,10 @@ function collectFreeGamesInput() {
 }
 
 async function saveFreeGamesConfig() {
+    if (!hasPremiumAccess()) {
+        enforceAllPremiumLocks();
+        return;
+    }
     const guildId = _freeGamesState.guildId;
     if (!guildId) return;
     const body = collectFreeGamesInput();
@@ -16437,6 +16487,10 @@ async function saveFreeGamesConfig() {
 }
 
 async function refreshFreeGamesEmbeds() {
+    if (!hasPremiumAccess()) {
+        enforceAllPremiumLocks();
+        return;
+    }
     const guildId = _freeGamesState.guildId;
     if (!guildId) return;
     const body = collectFreeGamesInput();
@@ -16491,6 +16545,10 @@ async function refreshFreeGamesEmbeds() {
 }
 
 async function sendFreeGamesTest() {
+    if (!hasPremiumAccess()) {
+        enforceAllPremiumLocks();
+        return;
+    }
     const guildId = _freeGamesState.guildId;
     if (!guildId) return;
     const body = collectFreeGamesInput();
@@ -16521,6 +16579,10 @@ async function sendFreeGamesTest() {
 }
 
 async function fetchFreeGamesPreview(force = false) {
+    if (!hasPremiumAccess()) {
+        enforceAllPremiumLocks();
+        return;
+    }
     const guildId = _freeGamesState.guildId;
     const list = document.getElementById('fgGamesList');
     if (!guildId || !list) return;
@@ -16546,6 +16608,10 @@ async function fetchFreeGamesPreview(force = false) {
             force: force ? '1' : '0'
         }).toString();
         const response = await fetchWithCredentials(`/api/guild/${guildId}/free-games/preview?${qs}`);
+        if (response.status === 402) {
+            enforceAllPremiumLocks();
+            return;
+        }
         const data = await response.json();
         if (!response.ok || !data?.success) throw new Error(data?.error || 'Error al cargar juegos');
         _freeGamesState.games = data.games || [];
