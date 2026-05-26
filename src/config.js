@@ -4,7 +4,7 @@ module.exports = {
     embedColor: '#0099FF', // Azul
     /** IDs que no pueden ser expulsados del canal temporal por el dueño (voz ni /vozquitar). TEMP_VOICE_PROTECTED_USER_IDS = lista separada por coma. */
     tempVoiceProtectedFromOwnerKickIds: String(
-        process.env.TEMP_VOICE_PROTECTED_USER_IDS || '399740358101303316'
+        process.env.TEMP_VOICE_PROTECTED_USER_IDS || ''
     )
         .split(/[,;\s]+/)
         .map((id) => id.trim())
@@ -32,6 +32,6 @@ module.exports = {
     lavalinkEnabled: (process.env.LAVALINK_ENABLED || 'false').toLowerCase() === 'true',
     lavalinkHost: process.env.LAVALINK_HOST || 'lavalink',
     lavalinkPort: Number.parseInt(process.env.LAVALINK_PORT || '2333', 10),
-    lavalinkPassword: process.env.LAVALINK_PASSWORD || 'youshallnotpass'
+    lavalinkPassword: process.env.LAVALINK_PASSWORD || ''
 };
 

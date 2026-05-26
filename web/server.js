@@ -6,7 +6,10 @@ const express = require('express');
 const session = require('express-session');
 const DiscordOauth2 = require('discord-oauth2');
 const axios = require('axios');
+const crypto = require('crypto');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const os = require('os');
 const multer = require('multer');
@@ -61,6 +64,8 @@ const { sanitizeDifficulty, sanitizeXpMultiplier, getProgress } = require('../sr
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
+const NODE_ENV = String(process.env.NODE_ENV || 'development').trim().toLowerCase();
+const IS_PRODUCTION = NODE_ENV === 'production';
 const {
     handleTwitchEventSubHttpRequest,
     isTwitchEventSubConfigured,
@@ -99,7 +104,15 @@ app.post(
     handleFeedWebSubHttpRequest
 );
 
-app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/api/billing/webhook',
+    rateLimit({
+        windowMs: 60 * 1000,
+        max: IS_PRODUCTION ? 120 : 500,
+        standardHeaders: true,
+        legacyHeaders: false
+    }),
+    express.raw({ type: 'application/json' }),
+    async (req, res) => {
     if (!MP_ACCESS_TOKEN) {
         return res.status(503).json({ error: 'Mercado Pago no configurado' });
     }
@@ -135,8 +148,11 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
         preapprovalId = String(match?.[1] || '').trim();
     }
 
-    if (MP_WEBHOOK_SECRET && !req.headers['x-signature']) {
-        return res.status(400).json({ error: 'Firma MP faltante' });
+    if (IS_PRODUCTION && !MP_WEBHOOK_SECRET) {
+        return res.status(503).json({ error: 'Webhook de Mercado Pago no configurado de forma segura' });
+    }
+    if (MP_WEBHOOK_SECRET && !validateMercadoPagoWebhookSignature(req, preapprovalId)) {
+        return res.status(401).json({ error: 'Firma MP inválida' });
     }
 
     if (!preapprovalId) {
@@ -218,6 +234,49 @@ function parseUserIdFromExternalReference(externalReference = '') {
     return String(rest.join(':') || '').trim();
 }
 
+function parseMercadoPagoSignatureHeader(signatureHeader = '') {
+    const raw = String(signatureHeader || '').trim();
+    if (!raw) return { ts: '', v1: '' };
+    return raw
+        .split(',')
+        .map((part) => part.trim())
+        .reduce((acc, part) => {
+            const [k, ...rest] = part.split('=');
+            const key = String(k || '').trim().toLowerCase();
+            const value = String(rest.join('=') || '').trim();
+            if (key === 'ts') acc.ts = value;
+            if (key === 'v1') acc.v1 = value.toLowerCase();
+            return acc;
+        }, { ts: '', v1: '' });
+}
+
+function timingSafeEqualHex(expectedHex = '', providedHex = '') {
+    try {
+        const a = Buffer.from(String(expectedHex || '').trim().toLowerCase(), 'hex');
+        const b = Buffer.from(String(providedHex || '').trim().toLowerCase(), 'hex');
+        if (!a.length || !b.length || a.length !== b.length) return false;
+        return crypto.timingSafeEqual(a, b);
+    } catch {
+        return false;
+    }
+}
+
+function validateMercadoPagoWebhookSignature(req, preapprovalId = '') {
+    if (!MP_WEBHOOK_SECRET) return !IS_PRODUCTION;
+    const signatureHeader = req.headers['x-signature'];
+    const requestId = String(req.headers['x-request-id'] || '').trim();
+    const { ts, v1 } = parseMercadoPagoSignatureHeader(signatureHeader);
+    if (!ts || !v1 || !requestId || !preapprovalId) return false;
+
+    // Patrón de manifiesto recomendado por Mercado Pago para webhooks.
+    const manifest = `id:${preapprovalId};request-id:${requestId};ts:${ts};`;
+    const expected = crypto
+        .createHmac('sha256', MP_WEBHOOK_SECRET)
+        .update(manifest)
+        .digest('hex');
+    return timingSafeEqualHex(expected, v1);
+}
+
 async function mercadoPagoRequest(method, endpoint, body = undefined, params = undefined) {
     if (!MP_ACCESS_TOKEN) {
         throw new Error('Mercado Pago no configurado');
@@ -245,10 +304,12 @@ function envValue(name, fallback = '') {
 
 const CLIENT_ID = envValue('CLIENT_ID');
 const CLIENT_SECRET = envValue('CLIENT_SECRET');
-const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID', '399740358101303316');
+const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID');
 const WEB_PUBLIC_ORIGIN = envValue('WEB_PUBLIC_ORIGIN') || envValue('PUBLIC_ORIGIN');
 const MP_ACCESS_TOKEN = envValue('MP_ACCESS_TOKEN');
 const MP_WEBHOOK_SECRET = envValue('MP_WEBHOOK_SECRET');
+const SESSION_SECRET = envValue('SESSION_SECRET');
+const BOT_INVITE_PERMISSIONS = envValue('BOT_INVITE_PERMISSIONS', '0');
 const MP_REASON = envValue('MP_REASON', 'EyedPlus+ mensual');
 const MP_BACK_URL = envValue('MP_BACK_URL');
 const MP_CURRENCY_ID = envValue('MP_CURRENCY_ID', 'USD');
@@ -274,6 +335,44 @@ const ownerAttachmentUpload = multer({
     }),
     limits: { fileSize: 1024 * 1024 * 1024 }
 });
+
+const authRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: IS_PRODUCTION ? 45 : 250,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiados intentos. Intenta de nuevo en unos minutos.' }
+});
+
+const apiRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: IS_PRODUCTION ? 180 : 1200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Límite de solicitudes alcanzado. Espera un momento.' }
+});
+
+function assertProductionSecurityConfig() {
+    if (!IS_PRODUCTION) return;
+    const issues = [];
+    if (!CLIENT_ID) issues.push('CLIENT_ID faltante');
+    if (!CLIENT_SECRET) issues.push('CLIENT_SECRET faltante');
+    if (!SESSION_SECRET || SESSION_SECRET === 'tu-secret-super-seguro-cambiar-en-produccion' || SESSION_SECRET === 'change_this_session_secret') {
+        issues.push('SESSION_SECRET inseguro o faltante');
+    }
+    if (!OWNER_DISCORD_ID) issues.push('WEB_OWNER_DISCORD_ID faltante');
+    if (!WEB_PUBLIC_ORIGIN || !/^https:\/\//i.test(WEB_PUBLIC_ORIGIN)) {
+        issues.push('WEB_PUBLIC_ORIGIN debe ser HTTPS en producción');
+    }
+    if (MP_ACCESS_TOKEN && !MP_WEBHOOK_SECRET) {
+        issues.push('MP_WEBHOOK_SECRET es obligatorio cuando MP_ACCESS_TOKEN está activo');
+    }
+    if (issues.length) {
+        throw new Error(`Configuración insegura para producción: ${issues.join(', ')}`);
+    }
+}
+
+assertProductionSecurityConfig();
 
 function handleOwnerAttachmentUpload(req, res, next) {
     ownerAttachmentUpload.single('attachmentFile')(req, res, (err) => {
@@ -423,7 +522,26 @@ console.log(`   Redirect URI: ${redirectUri}`);
 console.log(`   Session Cookie Secure: ${cookieSecure ? '✅ true' : '⚠️ false (HTTP/local)'}`);
 
 // Middleware
-app.use(cors());
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+}));
+app.use(cors({
+    origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        if (!IS_PRODUCTION) return callback(null, true);
+        const allowed = new Set([
+            String(WEB_PUBLIC_ORIGIN || '').replace(/\/+$/, ''),
+            `http://localhost:${PORT}`,
+            `http://127.0.0.1:${PORT}`
+        ]);
+        return callback(null, allowed.has(String(origin).replace(/\/+$/, '')));
+    },
+    credentials: true
+}));
+app.use('/auth/discord', authRateLimiter);
+app.use('/callback', authRateLimiter);
+app.use('/api/', apiRateLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -445,7 +563,7 @@ app.set('trust proxy', 1);
 const sessionStore = new MySqlSessionStore();
 app.use(session({
     store: sessionStore,
-    secret: process.env.SESSION_SECRET || 'tu-secret-super-seguro-cambiar-en-produccion',
+    secret: SESSION_SECRET || 'tu-secret-super-seguro-cambiar-en-produccion',
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -931,7 +1049,7 @@ app.get('/auth/discord', (req, res) => {
 
     try {
         // Generar URL de autorización con estado para prevenir CSRF
-        const state = Math.random().toString(36).substring(7);
+        const state = crypto.randomBytes(24).toString('hex');
         req.session.oauthState = state; // Guardar estado en sesión
 
         req.session.save((sessionError) => {
@@ -984,8 +1102,8 @@ app.get('/callback', async (req, res) => {
             return res.redirect('/login.html?error=config_error');
         }
 
-        // Verificar estado (CSRF protection) - opcional pero recomendado
-        if (state && req.session.oauthState && state !== req.session.oauthState) {
+        // Verificar estado (CSRF protection) de forma estricta.
+        if (!state || !req.session.oauthState || state !== req.session.oauthState) {
             console.error('❌ Estado OAuth no coincide - posible ataque CSRF');
             return res.redirect('/login.html?error=auth_failed');
         }
@@ -1132,6 +1250,27 @@ async function syncSessionGuilds(req, options = {}) {
     }
 }
 
+async function requireGuildManagementAccess(req, res, next) {
+    if (isOwnerUser(req.session?.user)) {
+        return next();
+    }
+    const guildId = String(req.params?.guildId || req.body?.guildId || '').trim();
+    if (!guildId) {
+        return res.status(400).json({ error: 'Falta guildId' });
+    }
+
+    let guilds = Array.isArray(req.session?.guilds) ? req.session.guilds : [];
+    let hasAccess = sessionGuildAllowsManagement(guilds, guildId);
+    if (!hasAccess) {
+        guilds = await syncSessionGuilds(req, { force: true });
+        hasAccess = sessionGuildAllowsManagement(guilds, guildId);
+    }
+    if (!hasAccess) {
+        return res.status(403).json({ error: 'No tienes permisos para gestionar este servidor' });
+    }
+    return next();
+}
+
 async function persistMercadoPagoSubscriptionForUser(userId, subscription, sourceEvent = '') {
     const sid = String(subscription?.id || '').trim();
     const customerId = String(subscription?.payer_id || subscription?.payer?.id || '').trim();
@@ -1190,7 +1329,7 @@ async function requirePremium(req, res, next) {
 app.get('/api/user', requireAuth, async (req, res) => {
     const guilds = await syncSessionGuilds(req);
     const inviteUrl = CLIENT_ID
-        ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&permissions=8&scope=bot%20applications.commands`
+        ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&permissions=${encodeURIComponent(BOT_INVITE_PERMISSIONS)}&scope=bot%20applications.commands`
         : '';
 
     res.json({
@@ -1200,6 +1339,9 @@ app.get('/api/user', requireAuth, async (req, res) => {
         isOwner: isOwnerUser(req.session.user)
     });
 });
+
+// Protección global para endpoints por servidor.
+app.use('/api/guild/:guildId', requireAuth, requireGuildManagementAccess);
 
 app.get('/api/billing/status', requireAuth, async (req, res) => {
     const userId = String(req.session?.user?.id || '').trim();
@@ -4366,12 +4508,13 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
-        if (!userGuild) {
-            return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const safeGuildId = String(guildId || '').trim();
+        const guilds = await syncSessionGuilds(req, { force: true });
+        if (!isOwnerUser(req.session?.user) && !sessionGuildAllowsManagement(guilds, safeGuildId)) {
+            return res.status(403).json({ error: 'No tienes permisos para gestionar este servidor' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+        const guild = botClient.guilds.cache.get(safeGuildId) || await botClient.guilds.fetch(safeGuildId).catch(() => null);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
@@ -5039,19 +5182,37 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
 app.post('/api/moderate', requireAuth, async (req, res) => {
     try {
         const { guildId, action, userId, reason } = req.body;
+        const safeGuildId = String(guildId || '').trim();
+        const safeUserId = String(userId || '').trim();
+        if (!safeGuildId || !safeUserId || !action) {
+            return res.status(400).json({ error: 'Faltan parámetros obligatorios' });
+        }
 
         if (!botClient) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guilds = await syncSessionGuilds(req, { force: true });
+        if (!isOwnerUser(req.session?.user) && !sessionGuildAllowsManagement(guilds, safeGuildId)) {
+            return res.status(403).json({ error: 'No tienes permisos para gestionar este servidor' });
+        }
+
+        const guild = botClient.guilds.cache.get(safeGuildId);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
 
-        const member = await guild.members.fetch(userId).catch(() => null);
+        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        if (!me) {
+            return res.status(500).json({ error: 'No se pudo validar permisos del bot' });
+        }
+
+        const member = await guild.members.fetch(safeUserId).catch(() => null);
         if (!member) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        if (member.id === guild.ownerId) {
+            return res.status(403).json({ error: 'No se puede moderar al dueño del servidor' });
         }
 
         const moderator = req.session.user.username;
@@ -5062,23 +5223,38 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
         let result;
         switch (action) {
             case 'kick':
+                if (!me.permissions.has('KickMembers') || !member.kickable) {
+                    return res.status(403).json({ error: 'El bot no puede expulsar a este usuario' });
+                }
                 await member.kick(actionReason);
                 result = { success: true, message: `Usuario ${member.user.tag} expulsado` };
                 break;
             case 'ban':
                 if (durationMs > 0 && durationMs <= maxTimeoutMs) {
+                    if (!me.permissions.has('ModerateMembers') || !member.moderatable) {
+                        return res.status(403).json({ error: 'El bot no puede aplicar timeout a este usuario' });
+                    }
                     await member.timeout(durationMs, actionReason);
                     result = { success: true, message: `Usuario ${member.user.tag} restringido temporalmente` };
                 } else {
+                    if (!me.permissions.has('BanMembers') || !member.bannable) {
+                        return res.status(403).json({ error: 'El bot no puede banear a este usuario' });
+                    }
                     await member.ban({ reason: actionReason });
                     result = { success: true, message: `Usuario ${member.user.tag} baneado` };
                 }
                 break;
             case 'timeout':
+                if (!me.permissions.has('ModerateMembers') || !member.moderatable) {
+                    return res.status(403).json({ error: 'El bot no puede aplicar timeout a este usuario' });
+                }
                 await member.timeout(durationMs > 0 ? durationMs : 600000, actionReason);
                 result = { success: true, message: `Usuario ${member.user.tag} silenciado` };
                 break;
             case 'removeTimeout':
+                if (!me.permissions.has('ModerateMembers') || !member.moderatable) {
+                    return res.status(403).json({ error: 'El bot no puede remover timeout a este usuario' });
+                }
                 await member.timeout(null);
                 result = { success: true, message: `Timeout removido de ${member.user.tag}` };
                 break;
@@ -5090,7 +5266,7 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Error en moderación:', error);
-        res.status(500).json({ error: error.message || 'Error al ejecutar acción de moderación' });
+        res.status(500).json({ error: 'Error al ejecutar acción de moderación' });
     }
 });
 
@@ -5301,11 +5477,12 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
         if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
         if (!userId) return res.status(400).json({ error: 'Falta userId' });
 
-        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
-        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-
         const guild = botClient.guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        if (!me || !me.permissions.has('BanMembers')) {
+            return res.status(403).json({ error: 'El bot no tiene permisos para desbanear en este servidor' });
+        }
 
         const moderator = req.session.user?.username || 'staff-web';
         const unbanReason = String(reason || `Desbaneado por ${moderator} desde panel web`).slice(0, 500);
@@ -5314,7 +5491,7 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
         res.json({ success: true, message: 'Usuario desbaneado correctamente' });
     } catch (error) {
         console.error('Error desbaneando usuario:', error);
-        res.status(500).json({ error: error.message || 'Error al desbanear usuario' });
+        res.status(500).json({ error: 'Error al desbanear usuario' });
     }
 });
 

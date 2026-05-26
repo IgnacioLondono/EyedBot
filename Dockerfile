@@ -16,9 +16,8 @@ WORKDIR /app
 # Copiar archivos de dependencias
 COPY package*.json ./
 
-# Instalar dependencias (primero todas para compilar dependencias nativas)
-# Luego limpiar devDependencies para reducir tamaño de imagen
-RUN npm install --no-audit --no-fund && \
+# Instalar dependencias de forma reproducible
+RUN npm ci --no-audit --no-fund && \
     npm prune --production && \
     npm cache clean --force
 
@@ -27,11 +26,13 @@ COPY src/ ./src/
 COPY web/ ./web/
 COPY verificar-*.js ./
 
-# Crear directorios necesarios
-RUN mkdir -p logs data backups
+# Crear directorios necesarios y ejecutar como usuario no-root
+RUN mkdir -p logs data backups && chown -R node:node /app
 
 # Variables de entorno por defecto
 ENV NODE_ENV=production
+
+USER node
 
 # Comando por defecto
 CMD ["node", "src/index.js"]

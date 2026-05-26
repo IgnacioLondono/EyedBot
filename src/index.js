@@ -48,7 +48,10 @@ const COMMAND_REGISTER_RETRIES = Math.max(1, Number.parseInt(process.env.COMMAND
 const COMMAND_REGISTER_RETRY_DELAY_MS = Math.max(1000, Number.parseInt(process.env.COMMAND_REGISTER_RETRY_DELAY_MS || '5000', 10));
 const COMMAND_REGISTER_POST_READY_DELAY_MS = Math.max(0, Number.parseInt(process.env.COMMAND_REGISTER_POST_READY_DELAY_MS || '10000', 10));
 const COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS = Number.parseInt(process.env.COMMAND_REGISTER_PER_GUILD_TIMEOUT_MS || '0', 10);
-const FORCED_SLASH_GUILD_IDS = ['1428561902086262908'];
+const FORCED_SLASH_GUILD_IDS = String(process.env.FORCED_SLASH_GUILD_IDS || '')
+    .split(/[,;\s]+/)
+    .map((id) => id.trim())
+    .filter(Boolean);
 const DISABLED_SLASH_COMMANDS = new Set([
     'voznombre',
     'vozprivado'

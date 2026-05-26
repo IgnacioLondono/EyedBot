@@ -1,8 +1,6 @@
 # Dependencias
 node_modules/
 web/node_modules/
-package-lock.json
-web/package-lock.json
 
 # Variables de entorno y configuración sensible
 .env
@@ -14,6 +12,8 @@ web/package-lock.json
 *.log
 logs/
 *.log.*
+backups/
+data/
 
 # Archivos del sistema
 .DS_Store

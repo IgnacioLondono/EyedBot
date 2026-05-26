@@ -22,17 +22,24 @@
 
         const w = global.innerWidth || 0;
         const coarse = global.matchMedia('(pointer: coarse)').matches;
-        const narrow = global.matchMedia('(max-width: 768px)').matches;
         const touch = 'ontouchstart' in global || (global.navigator.maxTouchPoints || 0) > 0;
-        const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(
-            global.navigator.userAgent || ''
-        );
+        const ua = String(global.navigator.userAgent || '');
+        const uaDataMobile = global.navigator.userAgentData?.mobile === true;
+        const isIpadLike = /\biPad\b/i.test(ua)
+            || (/\bMacintosh\b/i.test(ua) && (global.navigator.maxTouchPoints || 0) > 1);
+        const isAndroidTablet = /\bAndroid\b/i.test(ua) && !/\bMobile\b/i.test(ua);
+        const isGenericTablet = /\bTablet|PlayBook|Silk|Kindle|Nexus 7|Nexus 9|SM-T|Tab\b/i.test(ua);
+        const tabletLike = isIpadLike || isAndroidTablet || isGenericTablet;
+        const phoneUa = /\biPhone|iPod|Windows Phone|IEMobile|Opera Mini\b/i.test(ua)
+            || (/\bAndroid\b/i.test(ua) && /\bMobile\b/i.test(ua));
         const standalone = global.matchMedia('(display-mode: standalone)').matches;
 
-        if (narrow) return true;
-        if (uaMobile && w < 1024) return true;
-        if (touch && coarse && w < 900) return true;
-        if (standalone && w < 1024) return true;
+        // Modo móvil exclusivo para teléfonos (evita tablets incluso en vertical).
+        if (tabletLike) return false;
+        if (uaDataMobile) return true;
+        if (phoneUa) return true;
+        if (touch && coarse && w > 0 && w <= 500) return true;
+        if (standalone && touch && coarse && w > 0 && w <= 500) return true;
         return false;
     }
 
