@@ -3081,6 +3081,10 @@ function restoreServerState(state) {
     
     setTimeout(async () => {
         await loadGuildsForServer();
+        if (!hasSelectedGuildContext()) {
+            return;
+        }
+
         if (document.getElementById('serverSelect') && state.serverSection.selectedGuildId) {
             document.getElementById('serverSelect').value = state.serverSection.selectedGuildId;
             // Disparar evento change para cargar la informacion
@@ -5651,9 +5655,14 @@ async function loadGuildsForServer() {
 
             const selectedGuild = guilds.find((g) => String(g.id) === String(currentServerGuildId));
             if (!selectedGuild) {
+                const staleGuildId = String(currentServerGuildId || '').trim();
+                resetServerContextToDashboard();
                 if (select) {
                     select.disabled = true;
                     select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
+                }
+                if (staleGuildId) {
+                    showToast('El servidor guardado ya no está disponible para esta sesión. Selecciona otro desde Dashboard.', 'warning');
                 }
                 return;
             }
