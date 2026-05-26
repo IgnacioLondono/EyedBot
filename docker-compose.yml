@@ -60,8 +60,10 @@ services:
       - GUILD_ID=${GUILD_ID}
       - REDIRECT_URI=${REDIRECT_URI:-http://localhost:3000/callback}
       - SESSION_SECRET=${SESSION_SECRET}
-      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-}
       - WEB_OWNER_DISCORD_ID=${WEB_OWNER_DISCORD_ID}
+      - ALLOW_INSECURE_LOCAL_ORIGIN=${ALLOW_INSECURE_LOCAL_ORIGIN:-false}
+      - WEB_ALLOWED_ORIGINS=${WEB_ALLOWED_ORIGINS:-}
       - MUSIC_ENABLED=${MUSIC_ENABLED:-false}
       - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
       - CONFIG_CACHE_TTL_MS=${CONFIG_CACHE_TTL_MS:-120000}
@@ -78,7 +80,7 @@ services:
       - ./logs:/app/logs
       - ./backups:/app/backups
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${WEB_BIND_IP:-127.0.0.1}:3000:3000"
     depends_on:
       mysql:
         condition: service_healthy

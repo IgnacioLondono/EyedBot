@@ -310,6 +310,11 @@ const MP_ACCESS_TOKEN = envValue('MP_ACCESS_TOKEN');
 const MP_WEBHOOK_SECRET = envValue('MP_WEBHOOK_SECRET');
 const SESSION_SECRET = envValue('SESSION_SECRET');
 const BOT_INVITE_PERMISSIONS = envValue('BOT_INVITE_PERMISSIONS', '0');
+const ALLOW_INSECURE_LOCAL_ORIGIN = envValue('ALLOW_INSECURE_LOCAL_ORIGIN', 'false').toLowerCase() === 'true';
+const WEB_ALLOWED_ORIGINS = envValue('WEB_ALLOWED_ORIGINS')
+    .split(',')
+    .map((item) => item.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
 const MP_REASON = envValue('MP_REASON', 'EyedPlus+ mensual');
 const MP_BACK_URL = envValue('MP_BACK_URL');
 const MP_CURRENCY_ID = envValue('MP_CURRENCY_ID', 'USD');
@@ -361,8 +366,10 @@ function assertProductionSecurityConfig() {
         issues.push('SESSION_SECRET inseguro o faltante');
     }
     if (!OWNER_DISCORD_ID) issues.push('WEB_OWNER_DISCORD_ID faltante');
-    if (!WEB_PUBLIC_ORIGIN || !/^https:\/\//i.test(WEB_PUBLIC_ORIGIN)) {
-        issues.push('WEB_PUBLIC_ORIGIN debe ser HTTPS en producción');
+    if (WEB_PUBLIC_ORIGIN && !/^https:\/\//i.test(WEB_PUBLIC_ORIGIN)) {
+        if (!ALLOW_INSECURE_LOCAL_ORIGIN || !isLocalNetworkOrigin(WEB_PUBLIC_ORIGIN)) {
+            issues.push('WEB_PUBLIC_ORIGIN debe ser HTTPS en producción (o permitir origen local explícitamente)');
+        }
     }
     if (MP_ACCESS_TOKEN && !MP_WEBHOOK_SECRET) {
         issues.push('MP_WEBHOOK_SECRET es obligatorio cuando MP_ACCESS_TOKEN está activo');
@@ -373,6 +380,21 @@ function assertProductionSecurityConfig() {
 }
 
 assertProductionSecurityConfig();
+
+function isLocalNetworkOrigin(origin) {
+    try {
+        const parsed = new URL(String(origin || ''));
+        const hostname = String(parsed.hostname || '').toLowerCase();
+        if (!hostname) return false;
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true;
+        if (/^10\./.test(hostname)) return true;
+        if (/^192\.168\./.test(hostname)) return true;
+        if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)) return true;
+        return false;
+    } catch {
+        return false;
+    }
+}
 
 function handleOwnerAttachmentUpload(req, res, next) {
     ownerAttachmentUpload.single('attachmentFile')(req, res, (err) => {
@@ -533,9 +555,15 @@ app.use(cors({
         const allowed = new Set([
             String(WEB_PUBLIC_ORIGIN || '').replace(/\/+$/, ''),
             `http://localhost:${PORT}`,
-            `http://127.0.0.1:${PORT}`
+            `http://127.0.0.1:${PORT}`,
+            ...WEB_ALLOWED_ORIGINS
         ]);
-        return callback(null, allowed.has(String(origin).replace(/\/+$/, '')));
+        const normalized = String(origin).replace(/\/+$/, '');
+        if (allowed.has(normalized)) return callback(null, true);
+        if (ALLOW_INSECURE_LOCAL_ORIGIN && isLocalNetworkOrigin(normalized)) {
+            return callback(null, true);
+        }
+        return callback(null, false);
     },
     credentials: true
 }));
