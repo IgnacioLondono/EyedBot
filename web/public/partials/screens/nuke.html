@@ -1,0 +1,31 @@
+<section id="nukeSection" class="section" data-owner-only="true">
+            <div class="container">
+                <div class="section-header section-header--split">
+                    <div class="section-heading">
+                        <h2 class="section-title"><svg class="section-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>Nuke del servidor <span class="owner-pill owner-pill--title">Owner only</span></h2>
+                        <div class="title-accent"></div>
+                        <p class="section-lead">Acción destructiva: elimina todos los canales, renombra el servidor a <strong>eyedbot</strong> y crea canales con la invitación del bot.</p>
+                    </div>
+                    <div class="section-tools">
+                        <button type="button" id="backToServerFromNuke" class="btn btn-secondary back-to-server-btn" style="display:none;" title="Volver" aria-label="Volver">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M15 18l-6-6 6-6"></path>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="nuke-panel">
+                    <p id="nukeGuildTarget" class="nuke-target">Selecciona un servidor en el dashboard para habilitar esta acción.</p>
+                    <button type="button" id="executeNukeBtn" class="btn btn-danger" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M3 6h18"></path>
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                        </svg>
+                        <span>Ejecutar nuke</span>
+                    </button>
+                    <div id="nukeResult" class="nuke-result" hidden></div>
+                </div>
+            </div>
+        </section>

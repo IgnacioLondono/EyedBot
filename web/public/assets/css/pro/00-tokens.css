@@ -1,0 +1,42 @@
+/* =====================================================================
+   EyedBot — Pro Dashboard Overlay
+   Capa de estilos profesional y colorida. Se carga DESPUÉS de styles.css.
+   No modifica HTML/JS; solo rediseña la capa visual respetando las
+   variables del Theme Lab (--iris-*, --accent-*, --bg-*, --text-*).
+   ===================================================================== */
+
+:root {
+    /* Paleta multicolor para el dashboard (se combina con la del tema activo) */
+    --pro-violet: var(--iris-500, #8b5cf6);
+    --pro-violet-600: var(--iris-500, #7c3aed);
+    --pro-indigo: #6366f1;
+    --pro-pink: #ec4899;
+    --pro-rose: #f43f5e;
+    --pro-cyan: #22d3ee;
+    --pro-sky: #38bdf8;
+    --pro-emerald: #10b981;
+    --pro-lime: #84cc16;
+    --pro-amber: #f59e0b;
+    --pro-orange: #fb923c;
+
+    /* Shadows base */
+    --pro-shadow-sm: 0 2px 6px rgba(var(--bg-primary-rgb, 4, 2, 12), 0.35);
+    --pro-shadow-md: 0 10px 30px rgba(var(--bg-primary-rgb, 4, 2, 12), 0.45);
+    --pro-shadow-lg: 0 22px 60px rgba(var(--bg-primary-rgb, 4, 2, 12), 0.55);
+    --pro-shadow-glow: 0 10px 40px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35);
+
+    /* Radius */
+    --pro-radius-sm: 12px;
+    --pro-radius-md: 18px;
+    --pro-radius-lg: 24px;
+
+    /* Gradient recurrentes */
+    --pro-grad-primary: linear-gradient(135deg, var(--iris-500, #7c4dff) 0%, var(--fuchsia, #ff78d1) 100%);
+    --pro-grad-cool: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
+    --pro-grad-warm: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+    --pro-grad-night: linear-gradient(
+        180deg,
+        rgba(var(--bg-primary-rgb, 10, 6, 22), 0.92),
+        rgba(var(--bg-secondary-rgb, 18, 10, 36), 0.82)
+    );
+}

@@ -3094,9 +3094,12 @@ function restoreServerState(state) {
     }, 100);
 }
 
-// Inicialización
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 DOMContentLoaded iniciado');
+// Inicialización (espera pantallas parciales si screen-loader.js está activo)
+async function bootEyedBotPanel() {
+    if (window.__appScreensReady) {
+        await window.__appScreensReady;
+    }
+    console.log('🚀 Panel DOM listo');
     try {
         initAppDialog();
         console.log('✅ initAppDialog completado');
@@ -3192,7 +3195,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             guildsList.innerHTML = `<div class="loading"><p>Error: ${escapeHtml(String(error?.message || 'Error desconocido'))}</p></div>`;
         }
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        void bootEyedBotPanel();
+    });
+} else {
+    void bootEyedBotPanel();
+}
 
 // Verificar autenticación
 async function checkAuth() {

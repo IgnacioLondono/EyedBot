@@ -1,0 +1,35 @@
+<section id="commandsSection" class="section">
+            <div class="container commands-shell">
+                <header class="commands-hero">
+                    <div class="commands-hero-main">
+                        <button type="button" id="backToServerFromCommands" class="btn btn-secondary back-to-server-btn commands-back-btn" style="display:none;" title="Volver" aria-label="Volver">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M15 18l-6-6 6-6"></path>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <p class="commands-kicker">Catálogo</p>
+                        <h2 class="commands-title">Comandos del bot</h2>
+                        <p class="commands-subtitle">Explora los slash commands por categoría, revisa su descripción y filtra por nombre en tiempo real.</p>
+                    </div>
+                    <div class="commands-hero-stats" aria-label="Resumen del catálogo">
+                        <div class="commands-stat-card">
+                            <span class="commands-stat-value" id="commandsVisibleCount">0</span>
+                            <span class="commands-stat-label">Visibles</span>
+                        </div>
+                        <div class="commands-stat-card">
+                            <span class="commands-stat-value" id="commandsTotalCount">0</span>
+                            <span class="commands-stat-label">Total</span>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="commands-toolbar commands-toolbar--catalog">
+                    <div id="commandsCategoryFilters" class="commands-filters commands-filters--catalog"></div>
+                </div>
+
+                <div class="commands-catalog-scroll">
+                    <div id="commandsContainer" class="commands-catalog"></div>
+                </div>
+            </div>
+        </section>

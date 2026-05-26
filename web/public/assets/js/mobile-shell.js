@@ -161,7 +161,7 @@
         doc.getElementById('mobileMoreDiscord')?.addEventListener('click', (e) => {
             e.preventDefault();
             closeMoreSheet();
-            doc.getElementById('discordBtn')?.click();
+            doc.getElementById('discordServerBtn')?.click();
         });
 
         doc.getElementById('mobileMoreAddBot')?.addEventListener('click', () => {
@@ -303,14 +303,17 @@
 
     function boot() {
         buildBottomNav();
+        syncBottomNavActive();
+
+        const discordLink = doc.getElementById('discordServerBtn');
+        const mobileDiscord = doc.getElementById('mobileMoreDiscord');
+        if (discordLink && mobileDiscord && discordLink.href) mobileDiscord.href = discordLink.href;
+    }
+
+    function bootAfterScreens() {
         buildServerTopbar();
         injectSettingsHint();
         watchGuildName();
-        syncBottomNavActive();
-
-        const discordLink = doc.getElementById('discordBtn');
-        const mobileDiscord = doc.getElementById('mobileMoreDiscord');
-        if (discordLink && mobileDiscord && discordLink.href) mobileDiscord.href = discordLink.href;
     }
 
     if (doc.readyState === 'loading') {
@@ -319,8 +322,13 @@
         boot();
     }
 
+    doc.addEventListener('eyedbot:screens-ready', bootAfterScreens);
+
     global.addEventListener('eyedbot:device', () => {
-        if (isMobileActive()) boot();
+        if (isMobileActive()) {
+            boot();
+            bootAfterScreens();
+        }
         syncBottomNavActive();
     });
 
