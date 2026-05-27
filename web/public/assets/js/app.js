@@ -234,6 +234,13 @@ const EYED_PLUS_BRAND = 'EyedPlus+';
 const EYED_PLUS_ACTIVATE_LABEL = `Activar ${EYED_PLUS_BRAND}`;
 const EYED_PLUS_UNLOCK_HINT = `Activa ${EYED_PLUS_BRAND} para tickets, anti-raid, gacha, juegos gratis y personalización.`;
 const EYED_PLUS_ACTIVE_HINT = `Tienes acceso ${EYED_PLUS_BRAND} a módulos avanzados.`;
+/** Suscripción Mercado Pago oculta: la pestaña EyedPlus+ muestra aviso de desarrollo. */
+const EYED_PLUS_BILLING_DEV_MODE = true;
+const EYED_PLUS_DEV_MESSAGE = 'Las suscripciones con Mercado Pago están en desarrollo. Puedes revisar qué incluye el plan; la activación estará disponible pronto.';
+
+function isEyedPlusBillingDevMode() {
+    return EYED_PLUS_BILLING_DEV_MODE === true;
+}
 
 const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 let lastThemeSettingsDiskJson = null;
@@ -720,7 +727,7 @@ const HOME_ICON = `
 `;
 
 function registerGatedNavigationButtons() {
-    const ids = ['serverBtn', 'embedBtn', 'statsBtn', 'logsBtn', 'commandsBtn'];
+    const ids = ['serverBtn', 'embedBtn', 'commandsBtn'];
     ids.forEach((id) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -835,8 +842,8 @@ function setServerSwitchingState(isLoading) {
 }
 
 function updateBackToServerButtonsVisibility(sectionId = '') {
-    const isVisible = hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'nukeSection'].includes(sectionId);
-    ['backToServerFromEmbed', 'backToServerFromStats', 'backToServerFromLogs', 'backToServerFromNuke', 'backToServerFromCommands'].forEach((id) => {
+    const isVisible = hasSelectedGuildContext() && ['embedSection', 'commandsSection'].includes(sectionId);
+    ['backToServerFromEmbed', 'backToServerFromCommands'].forEach((id) => {
         const btn = document.getElementById(id);
         if (!btn) return;
         btn.style.display = isVisible ? 'inline-flex' : 'none';
@@ -1348,6 +1355,27 @@ function billingStatusLabel(status = '') {
 }
 
 function renderBillingState() {
+    document.querySelectorAll('.billing-actions').forEach((node) => {
+        node.hidden = isEyedPlusBillingDevMode();
+    });
+
+    if (isEyedPlusBillingDevMode()) {
+        document.querySelectorAll('[data-billing-hint], #billingActionHint').forEach((node) => {
+            node.textContent = EYED_PLUS_DEV_MESSAGE;
+        });
+        document.querySelectorAll('[data-billing-status], #billingStatusValue').forEach((node) => {
+            node.textContent = 'En desarrollo';
+            node.dataset.billingState = 'development';
+        });
+        document.querySelectorAll('[data-billing-period], #billingPeriodValue').forEach((node) => {
+            node.textContent = 'Próximamente';
+        });
+        document.querySelectorAll('#billingUpgradeBtn, #billingManageBtn, #billingUpgradeBtnPremium, #billingManageBtnPremium').forEach((node) => {
+            node.hidden = true;
+        });
+        return;
+    }
+
     const statusNode = document.getElementById('billingStatusValue');
     const periodNode = document.getElementById('billingPeriodValue');
     const actionNode = document.getElementById('billingActionHint');
@@ -1445,9 +1473,46 @@ function ensureBillingPanel() {
     renderBillingState();
 }
 
+function buildPremiumBillingDevCardHtml() {
+    return `
+        <article id="premiumBillingDevCard" class="billing-panel-card billing-panel-card--page billing-panel-card--dev">
+            <header class="billing-panel-head">
+                <div>
+                    <h4>Tu suscripción</h4>
+                    <p>Plan mensual con Mercado Pago.</p>
+                </div>
+                <span class="billing-badge billing-badge--dev" data-billing-status data-billing-state="development">En desarrollo</span>
+            </header>
+            <div class="billing-panel-body">
+                <div class="eyedplus-dev-notice" role="status">
+                    <span class="eyedplus-dev-notice__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4"></path><path d="M12 16h.01"></path><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                    </span>
+                    <div>
+                        <strong>Función en desarrollo</strong>
+                        <p>${escapeHtml(EYED_PLUS_DEV_MESSAGE)}</p>
+                    </div>
+                </div>
+            </div>
+        </article>
+    `;
+}
+
 function ensurePremiumSectionBillingPanel() {
     const host = document.getElementById('premiumSectionBillingHost');
-    if (!host || document.getElementById('billingPanelCardPremium')) return;
+    if (!host) return;
+
+    if (isEyedPlusBillingDevMode()) {
+        document.getElementById('billingPanelCardPremium')?.remove();
+        if (!document.getElementById('premiumBillingDevCard')) {
+            host.innerHTML = buildPremiumBillingDevCardHtml();
+        }
+        renderBillingState();
+        return;
+    }
+
+    document.getElementById('premiumBillingDevCard')?.remove();
+    if (document.getElementById('billingPanelCardPremium')) return;
 
     const wrapper = document.createElement('article');
     wrapper.id = 'billingPanelCardPremium';
@@ -1505,6 +1570,13 @@ async function loadBillingStatus() {
 }
 
 async function startPremiumCheckout() {
+    if (isEyedPlusBillingDevMode()) {
+        showToast(EYED_PLUS_DEV_MESSAGE, 'info');
+        showSection('premiumSection');
+        ensurePremiumSectionBillingPanel();
+        return;
+    }
+
     try {
         const response = await fetchWithCredentials('/api/billing/checkout-session', {
             method: 'POST'
@@ -1522,6 +1594,11 @@ async function startPremiumCheckout() {
 }
 
 async function openBillingPortal() {
+    if (isEyedPlusBillingDevMode()) {
+        showToast(EYED_PLUS_DEV_MESSAGE, 'info');
+        return;
+    }
+
     try {
         const response = await fetchWithCredentials('/api/billing/portal', {
             method: 'POST'
@@ -1631,14 +1708,21 @@ function ensurePremiumLockStructure(pane) {
 
 function buildPremiumOverlayHtml(meta = {}) {
     const title = escapeHtml(meta.title || `Módulo ${EYED_PLUS_BRAND}`);
-    const hint = escapeHtml(meta.hint || `Activa ${EYED_PLUS_BRAND} para desbloquear este módulo.`);
+    const hint = escapeHtml(
+        isEyedPlusBillingDevMode()
+            ? EYED_PLUS_DEV_MESSAGE
+            : (meta.hint || `Activa ${EYED_PLUS_BRAND} para desbloquear este módulo.`)
+    );
+    const activateBtn = isEyedPlusBillingDevMode()
+        ? ''
+        : `<button type="button" class="btn btn-primary premium-lock-activate-btn">${escapeHtml(EYED_PLUS_ACTIVATE_LABEL)}</button>`;
     return `
         <div class="premium-lock-card" role="dialog" aria-labelledby="premiumLockTitle">
             <div class="premium-lock-badge" aria-hidden="true">${escapeHtml(EYED_PLUS_BRAND)}</div>
             <h3 id="premiumLockTitle" class="premium-lock-title">${title}</h3>
             <p class="premium-lock-desc">${hint}</p>
             <div class="premium-lock-actions">
-                <button type="button" class="btn btn-primary premium-lock-activate-btn">${escapeHtml(EYED_PLUS_ACTIVATE_LABEL)}</button>
+                ${activateBtn}
                 <button type="button" class="btn btn-secondary premium-lock-settings-btn">Ver ${escapeHtml(EYED_PLUS_BRAND)}</button>
             </div>
         </div>
@@ -2715,6 +2799,10 @@ async function resetThemeSettings() {
 const SETTINGS_PANE_STORAGE_KEY = 'eyedbot:settings:activePane';
 
 function switchSettingsPane(paneId, options = {}) {
+    if (paneId === 'settingsPaneOwner' && !isOwnerUser) {
+        paneId = 'settingsPaneAccount';
+    }
+
     const pane = document.getElementById(paneId);
     if (!pane) return;
 
@@ -2738,6 +2826,11 @@ function switchSettingsPane(paneId, options = {}) {
         const container = document.querySelector('#profileSettingsSection > .container');
         if (container) container.scrollTop = 0;
     }
+
+    if (paneId === 'settingsPaneOwner' && isOwnerUser) {
+        void loadStats();
+        void loadLogs();
+    }
 }
 
 function bindSettingsPaneNavigation() {
@@ -2754,6 +2847,10 @@ function bindSettingsPaneNavigation() {
         const stored = sessionStorage.getItem(SETTINGS_PANE_STORAGE_KEY);
         if (stored && document.getElementById(stored)) initialPane = stored;
     } catch (_) { /* noop */ }
+
+    if (initialPane === 'settingsPaneOwner' && !isOwnerUser) {
+        initialPane = 'settingsPaneAccount';
+    }
 
     switchSettingsPane(initialPane, { silent: true });
 }
@@ -3183,9 +3280,6 @@ async function bootEyedBotPanel() {
         await loadGuilds();
         console.log('✅ loadGuilds completado');
         
-        await loadStats();
-        console.log('✅ loadStats completado');
-        
         await loadAboutOverview();
         console.log('✅ loadAboutOverview completado');
         // setupServerSummaryAutoRefresh(); // Deshabilitado: no cargar automáticamente, solo al actualizar página
@@ -3372,15 +3466,6 @@ function updateUserUI() {
     updateProfileSettingsData();
 
     const ownerRestrictedSelectors = [
-        '#statsBtn',
-        '#logsBtn',
-        '[data-section="statsSection"]',
-        '[data-section="logsSection"]',
-        '[data-quick-section="statsSection"]',
-        '[data-quick-section="logsSection"]',
-        '[data-section="nukeSection"]',
-        '[data-quick-section="nukeSection"]',
-        '#executeNukeBtn',
         '#embedTabs [data-dpx-tab="attachments"]',
         '#embedSection [data-dpx-panel="attachments"]',
         '#sendOwnerAttachmentBtn'
@@ -3400,6 +3485,18 @@ function updateUserUI() {
             }
         });
     });
+
+    document.querySelectorAll('.owner-settings-nav').forEach((el) => {
+        if (!(el instanceof HTMLElement)) return;
+        el.hidden = !isOwnerUser;
+        if (!isOwnerUser) {
+            el.classList.remove('active');
+        }
+    });
+
+    if (!isOwnerUser && currentSettingsPaneId === 'settingsPaneOwner') {
+        switchSettingsPane('settingsPaneAccount', { silent: true });
+    }
 
     const addBotBtn = document.getElementById('addBotBtn');
     if (addBotBtn) {
@@ -3779,7 +3876,6 @@ function setupEventListeners() {
     document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
     document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
     document.getElementById('sendOwnerAttachmentBtn')?.addEventListener('click', sendOwnerAttachmentToChannel);
-    document.getElementById('executeNukeBtn')?.addEventListener('click', executeGuildNukeFromPanel);
     document.getElementById('addFieldBtn').addEventListener('click', addField);
     document.getElementById('addTitleFieldBtn').addEventListener('click', function() {
         // Agrega un field con formato de título destacado
@@ -4052,16 +4148,39 @@ function renderFilteredCommands() {
 
     displayCommands(filtered, { total: commandsCatalog.length });
     updateCommandsSummary(filtered.length, commandsCatalog.length);
+
+    const scrollHost = document.querySelector('#commandsSection .commands-catalog-scroll');
+    if (scrollHost) scrollHost.scrollTop = 0;
+}
+
+function renderCommandCatalogCard(cmd) {
+    const options = Array.isArray(cmd.options) ? cmd.options : [];
+    const optionCountLabel = options.length
+        ? `${options.length} opción${options.length === 1 ? '' : 'es'}`
+        : 'Sin opciones';
+    const optionsMarkup = options.length > 0
+        ? `<div class="command-catalog-options">${options.map((opt) => {
+            const requiredBadge = opt.required ? '<span class="command-catalog-option-required">Requerida</span>' : '';
+            return `<div class="command-catalog-option"><div class="command-catalog-option-top"><strong>${escapeHtml(opt.name || 'opción')}</strong>${requiredBadge}</div><span>${escapeHtml(opt.description || 'Sin descripción')}</span></div>`;
+        }).join('')}</div>`
+        : '';
+    return `<article class="command-catalog-card"><div class="command-catalog-head"><code class="command-catalog-name">/${escapeHtml(cmd.name || 'comando')}</code><span class="command-catalog-option-count">${optionCountLabel}</span></div><p class="command-catalog-desc">${escapeHtml(cmd.description || 'Sin descripción')}</p>${optionsMarkup}</article>`;
 }
 
 // Mostrar sección
 function showSection(sectionId, options = {}) {
-    if (!isOwnerUser && ['statsSection', 'logsSection', 'nukeSection'].includes(sectionId)) {
-        showToast('Esta seccion solo esta disponible para el creador del bot', 'warning');
-        sectionId = hasSelectedGuildContext() ? 'serverSection' : 'dashboard';
+    if (sectionId === 'statsSection' || sectionId === 'logsSection') {
+        if (isOwnerUser) {
+            currentSettingsPaneId = 'settingsPaneOwner';
+            sectionId = 'profileSettingsSection';
+        } else {
+            sectionId = 'dashboard';
+        }
+    } else if (sectionId === 'nukeSection') {
+        sectionId = 'dashboard';
     }
 
-    if (!hasSelectedGuildContext() && ['embedSection', 'statsSection', 'logsSection', 'nukeSection', 'serverSection'].includes(sectionId)) {
+    if (!hasSelectedGuildContext() && ['embedSection', 'serverSection'].includes(sectionId)) {
         showToast('Primero selecciona un servidor en el dashboard', 'warning');
         sectionId = 'dashboard';
     }
@@ -4087,8 +4206,6 @@ function showSection(sectionId, options = {}) {
         profileSettingsSection: 'controlCenterBtn',
         serverSection: 'serverBtn',
         embedSection: 'embedBtn',
-        statsSection: 'statsBtn',
-        logsSection: 'logsBtn',
         commandsSection: 'aboutCommandsBtn',
         premiumSection: 'premiumNavBtn'
     };
@@ -4100,12 +4217,6 @@ function showSection(sectionId, options = {}) {
     if (sectionId === 'embedSection') {
         loadGuildsForEmbed();
         initEmbedPanel();
-    } else if (sectionId === 'statsSection') {
-        loadStats();
-    } else if (sectionId === 'logsSection') {
-        loadLogs();
-    } else if (sectionId === 'nukeSection') {
-        loadNukePanel();
     } else if (sectionId === 'commandsSection') {
         loadCommands();
     } else if (sectionId === 'serverSection') {
@@ -4127,6 +4238,9 @@ function showSection(sectionId, options = {}) {
         refreshActiveSectionReveal();
     } else if (sectionId === 'profileSettingsSection') {
         updateProfileSettingsData();
+        if (!isOwnerUser && currentSettingsPaneId === 'settingsPaneOwner') {
+            currentSettingsPaneId = 'settingsPaneAccount';
+        }
         switchSettingsPane(currentSettingsPaneId, { silent: true });
     }
 
@@ -4690,125 +4804,6 @@ function handleImageFileSelection(event, target) {
 
     updateEmbedPreview();
     saveState();
-}
-
-function loadNukePanel() {
-    const targetEl = document.getElementById('nukeGuildTarget');
-    const executeBtn = document.getElementById('executeNukeBtn');
-    const resultEl = document.getElementById('nukeResult');
-
-    if (resultEl) {
-        resultEl.hidden = true;
-        resultEl.textContent = '';
-    }
-
-    if (!isOwnerUser) {
-        if (targetEl) {
-            targetEl.textContent = 'Esta acción solo está disponible para el owner del bot.';
-        }
-        if (executeBtn) executeBtn.disabled = true;
-        return;
-    }
-
-    if (!hasSelectedGuildContext()) {
-        if (targetEl) {
-            targetEl.textContent = 'Selecciona un servidor en el dashboard para habilitar esta acción.';
-        }
-        if (executeBtn) executeBtn.disabled = true;
-        return;
-    }
-
-    const selectedGuild = currentServerGuilds.find((g) => String(g.id) === String(currentServerGuildId));
-    if (targetEl) {
-        targetEl.textContent = selectedGuild
-            ? `Servidor objetivo: ${selectedGuild.name}`
-            : 'Servidor activo no encontrado. Vuelve al dashboard y selecciona un servidor.';
-    }
-    if (executeBtn) executeBtn.disabled = !selectedGuild;
-}
-
-async function executeGuildNukeFromPanel() {
-    if (!isOwnerUser) {
-        showToast('Esta función está disponible solo para el owner', 'warning');
-        return;
-    }
-
-    const guildId = String(currentServerGuildId || '').trim();
-    if (!guildId) {
-        showToast('Selecciona un servidor antes de ejecutar el nuke', 'warning');
-        return;
-    }
-
-    const selectedGuild = currentServerGuilds.find((g) => String(g.id) === guildId);
-    const guildName = selectedGuild?.name || 'este servidor';
-    const confirmed = await showAppConfirm({
-        title: 'Ejecutar nuke',
-        message: `¿Ejecutar nuke en "${guildName}"?\n\nSe eliminarán todos los canales, el servidor pasará a llamarse eyedbot y se crearán canales con la invitación del bot.`,
-        confirmLabel: 'Ejecutar nuke',
-        variant: 'danger'
-    });
-    if (!confirmed) return;
-
-    const executeBtn = document.getElementById('executeNukeBtn');
-    const resultEl = document.getElementById('nukeResult');
-    const defaultLabel = executeBtn?.querySelector('span')?.textContent || 'Ejecutar nuke';
-
-    try {
-        if (executeBtn) {
-            executeBtn.disabled = true;
-            const label = executeBtn.querySelector('span');
-            if (label) label.textContent = 'Ejecutando…';
-        }
-        if (resultEl) {
-            resultEl.hidden = true;
-            resultEl.textContent = '';
-        }
-
-        const response = await fetchWithCredentials(`/api/guild/${encodeURIComponent(guildId)}/nuke`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        let data = {};
-        const raw = await response.text();
-        try {
-            data = raw ? JSON.parse(raw) : {};
-        } catch {
-            data = { error: raw?.slice(0, 200) || 'Respuesta inválida del servidor' };
-        }
-
-        if (!response.ok) {
-            showToast(data.error || `No se pudo ejecutar el nuke (${response.status})`, 'error');
-            return;
-        }
-
-        const summary = [
-            data.message || 'Nuke completado.',
-            `Canales eliminados: ${data.deletedCount ?? 0}.`,
-            `Canales EyedBot creados: ${data.createdCount ?? 0}.`,
-            data.renamed
-                ? `Nombre del servidor actualizado a ${data.serverName || 'eyedbot'}.`
-                : 'No se pudo cambiar el nombre del servidor.'
-        ];
-        if ((data.remainingChannels ?? 0) > 0) {
-            summary.push(`Canales que siguen activos: ${data.remainingChannels}. Sube el rol del bot por encima del resto.`);
-        }
-
-        if (resultEl) {
-            resultEl.textContent = summary.join('\n');
-            resultEl.hidden = false;
-        }
-        showToast('Nuke completado', 'success');
-    } catch (error) {
-        console.error('Error ejecutando nuke desde el panel:', error);
-        showToast('Error al ejecutar nuke', 'error');
-    } finally {
-        if (executeBtn) {
-            executeBtn.disabled = false;
-            const label = executeBtn.querySelector('span');
-            if (label) label.textContent = defaultLabel;
-        }
-        loadNukePanel();
-    }
 }
 
 async function sendOwnerAttachmentToChannel() {
@@ -5544,14 +5539,36 @@ function displayCommands(commands, meta = {}) {
         container.innerHTML = `<div class="commands-empty"><p>${message}</p></div>`;
         return;
     }
-    
+
+    if (isAllCategories) {
+        const sortedCommands = [...commands].sort((left, right) => {
+            const categorySort = getCommandCategoryLabel(left.category).localeCompare(
+                getCommandCategoryLabel(right.category),
+                'es'
+            );
+            if (categorySort !== 0) return categorySort;
+            return String(left.name || '').localeCompare(String(right.name || ''), 'es');
+        });
+        const commandCards = sortedCommands.map((cmd) => renderCommandCatalogCard(cmd)).join('');
+        container.innerHTML = `
+            <section class="commands-all-flat" aria-label="Todos los comandos">
+                <header class="commands-all-flat-head">
+                    <h3>Todos los comandos</h3>
+                    <p>${commands.length} comando${commands.length === 1 ? '' : 's'} en el catálogo completo</p>
+                </header>
+                <div class="commands-category-list commands-category-list--flat">${commandCards}</div>
+            </section>
+        `;
+        return;
+    }
+
     const categories = {};
     commands.forEach((cmd) => {
         const category = getCommandCategoryKey(cmd.category);
         if (!categories[category]) categories[category] = [];
         categories[category].push(cmd);
     });
-    
+
     const sortedCategories = Object.entries(categories).sort(([left], [right]) => {
         return getCommandCategoryLabel(left).localeCompare(getCommandCategoryLabel(right), 'es');
     });
@@ -5560,19 +5577,7 @@ function displayCommands(commands, meta = {}) {
         const tone = getCommandCategoryTone(category);
         const categoryLabel = getCommandCategoryLabel(category);
         const categoryIcon = getCommandCategoryIcon(category);
-        const commandCards = cmds.map((cmd) => {
-            const options = Array.isArray(cmd.options) ? cmd.options : [];
-            const optionCountLabel = options.length
-                ? `${options.length} opción${options.length === 1 ? '' : 'es'}`
-                : 'Sin opciones';
-            const optionsMarkup = options.length > 0
-                ? `<div class="command-catalog-options">${options.map((opt) => {
-                    const requiredBadge = opt.required ? '<span class="command-catalog-option-required">Requerida</span>' : '';
-                    return `<div class="command-catalog-option"><div class="command-catalog-option-top"><strong>${escapeHtml(opt.name || 'opción')}</strong>${requiredBadge}</div><span>${escapeHtml(opt.description || 'Sin descripción')}</span></div>`;
-                }).join('')}</div>`
-                : '';
-            return `<article class="command-catalog-card"><div class="command-catalog-head"><code class="command-catalog-name">/${escapeHtml(cmd.name || 'comando')}</code><span class="command-catalog-option-count">${optionCountLabel}</span></div><p class="command-catalog-desc">${escapeHtml(cmd.description || 'Sin descripción')}</p>${optionsMarkup}</article>`;
-        }).join('');
+        const commandCards = cmds.map((cmd) => renderCommandCatalogCard(cmd)).join('');
 
         return `<section class="commands-category-block commands-category-block--${tone}"><header class="commands-category-head"><span class="commands-category-icon" aria-hidden="true">${categoryIcon}</span><div class="commands-category-copy"><h3>${categoryLabel}</h3><p>${cmds.length} comando${cmds.length === 1 ? '' : 's'} en esta categoría</p></div><span class="commands-category-count">${cmds.length}</span></header><div class="commands-category-list">${commandCards}</div></section>`;
     }).join('');

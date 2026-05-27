@@ -11,9 +11,7 @@ El `index.html` (raíz de `public/`) carga estas piezas con `assets/js/screen-lo
 | `premium.html` | `#premiumSection` |
 | `settings.html` | `#profileSettingsSection` |
 | `embed.html` | `#embedSection` |
-| `stats.html` | `#statsSection` |
-| `logs.html` | `#logsSection` |
-| `nuke.html` | `#nukeSection` |
+| *(owner)* | Pestaña **Owner** en `settings.html` (`#settingsPaneOwner`) — estadísticas, registro global y logs |
 | `commands.html` | `#commandsSection` |
 | `server.html` | `#serverSection` |
 

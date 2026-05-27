@@ -2234,6 +2234,27 @@ body {
     padding-right: 0.2rem;
 }
 
+#commandsSection .commands-all-flat-head {
+    padding: 1rem 1.15rem 0.35rem;
+}
+
+#commandsSection .commands-all-flat-head h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1.12rem;
+    color: var(--text-primary, #f4eeff);
+}
+
+#commandsSection .commands-all-flat-head p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-secondary, #cbb7f6);
+}
+
+#commandsSection .commands-category-list--flat {
+    padding: 0.85rem 1.15rem 1.15rem;
+    gap: 1rem;
+}
+
 #commandsSection .commands-catalog--all {
     gap: 1.35rem;
 }
@@ -2539,6 +2560,50 @@ body {
 #profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="sky"] .settings-side-icon { color: #9fd8ff; }
 #profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="amber"] .settings-side-icon { color: #ffd18a; }
 #profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="teal"] .settings-side-icon { color: #8ce8d8; }
+#profileSettingsSection.profile-settings-shell .settings-side-btn[data-settings-tone="violet"] .settings-side-icon { color: #c4a5ff; }
+
+#profileSettingsSection .settings-owner-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+#profileSettingsSection .settings-owner-block-title {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary, #f4eeff);
+}
+
+#profileSettingsSection .stats-grid--settings {
+    margin-bottom: 1.25rem;
+}
+
+#profileSettingsSection .settings-owner-system-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+#profileSettingsSection .settings-owner-logs-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+}
+
+#profileSettingsSection .settings-owner-logs-head .log-filter {
+    min-width: 10rem;
+    flex: 1 1 10rem;
+    max-width: 14rem;
+}
+
+#profileSettingsSection .logs-container--settings {
+    min-height: 280px;
+    max-height: min(52vh, 520px);
+}
 
 #profileSettingsSection.profile-settings-shell .settings-pane-hero.dpx-hero {
     align-items: center;

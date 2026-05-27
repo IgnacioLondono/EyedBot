@@ -8,9 +8,6 @@
         'partials/screens/premium.html',
         'partials/screens/settings.html',
         'partials/screens/embed.html',
-        'partials/screens/stats.html',
-        'partials/screens/logs.html',
-        'partials/screens/nuke.html',
         'partials/screens/commands.html',
         'partials/screens/server.html'
     ];

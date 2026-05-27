@@ -250,9 +250,7 @@
             commandsSection: 'commands',
             profileSettingsSection: 'account',
             controlCenterSection: 'more',
-            embedSection: 'more',
-            statsSection: 'more',
-            logsSection: 'more'
+            embedSection: 'more'
         };
         const key = map[id] || 'home';
         doc.querySelectorAll('.mobile-bottom-nav__btn').forEach((b) => {
