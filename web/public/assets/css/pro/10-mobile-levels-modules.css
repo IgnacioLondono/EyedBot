@@ -855,40 +855,51 @@
 }
 
 .levels-podium-avatar-wrap {
-    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     margin: 0.35rem 0 0.15rem;
-    padding-top: 0.55rem;
+    padding-top: 0.4rem;
+}
+
+.levels-podium-avatar-ring {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
 }
 
 .podium-ribbon {
     position: absolute;
-    top: -2px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: -10px;
+    right: -10px;
     z-index: 3;
     display: flex;
     flex-direction: column;
     align-items: center;
     pointer-events: none;
-    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+    filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
+}
+
+.levels-podium-slot--first .podium-ribbon {
+    top: -12px;
+    right: -12px;
 }
 
 .podium-ribbon__crown {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: -2px;
+    margin-bottom: -4px;
     color: #ffe082;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
 .podium-ribbon__badge {
     position: relative;
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -901,8 +912,8 @@
 }
 
 .podium-ribbon--1 .podium-ribbon__badge {
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
 }
 
 .podium-ribbon__shine {
@@ -920,13 +931,13 @@
     z-index: 1;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-weight: 800;
-    font-size: 0.95rem;
+    font-size: 0.82rem;
     line-height: 1;
     letter-spacing: -0.02em;
 }
 
 .podium-ribbon--1 .podium-ribbon__num {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
 }
 
 .podium-ribbon--1 .podium-ribbon__badge {
@@ -949,14 +960,15 @@
 
 .podium-ribbon__tails {
     display: flex;
-    gap: 3px;
-    margin-top: -3px;
+    gap: 2px;
+    margin-top: -2px;
+    opacity: 0.95;
 }
 
 .podium-ribbon__tail {
-    width: 12px;
-    height: 15px;
-    border-radius: 0 0 4px 4px;
+    width: 9px;
+    height: 10px;
+    border-radius: 0 0 3px 3px;
     box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.18);
 }
 
@@ -980,14 +992,6 @@
 
 .podium-ribbon--3 .podium-ribbon__tail {
     background: linear-gradient(180deg, #ff8a65 0%, #e64a19 100%);
-}
-
-.levels-podium-slot--first .levels-podium-avatar-wrap {
-    padding-top: 0.75rem;
-}
-
-.levels-podium-slot--first .podium-ribbon {
-    top: -4px;
 }
 
 .levels-podium-avatar {

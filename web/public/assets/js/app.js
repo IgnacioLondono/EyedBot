@@ -9368,8 +9368,10 @@ function renderPodiumMedal(rank) {
 function renderPodiumAvatarWrap(rank, avatarMarkup) {
     return `
         <div class="levels-podium-avatar-wrap">
-            ${renderPodiumMedal(rank)}
-            ${avatarMarkup}
+            <div class="levels-podium-avatar-ring">
+                ${avatarMarkup}
+                ${renderPodiumMedal(rank)}
+            </div>
         </div>
     `;
 }
