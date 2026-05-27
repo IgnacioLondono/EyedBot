@@ -14,17 +14,26 @@
 
     const OVERLAYS_URL = 'partials/overlays.html';
 
-    async function fetchPartial(url) {
+    /** Rutas siempre desde la raíz del sitio (evita fallos en /dashboard u otras URLs). */
+    function resolvePanelAssetUrl(relativePath) {
+        const clean = String(relativePath || '').replace(/^\/+/, '');
+        const origin = String(global.location?.origin || '').replace(/\/$/, '');
+        if (!origin) return `/${clean}`;
+        return `${origin}/${clean}`;
+    }
+
+    async function fetchPartial(relativePath) {
         if (typeof global.fetch !== 'function') {
             throw new Error('fetch no disponible');
         }
+        const url = resolvePanelAssetUrl(relativePath);
         const response = await fetch(url, {
             cache: 'no-store',
             credentials: 'same-origin',
             headers: { Accept: 'text/html, */*' }
         });
         if (!response.ok) {
-            throw new Error(`No se pudo cargar ${url} (${response.status})`);
+            throw new Error(`No se pudo cargar ${relativePath} (${response.status})`);
         }
         return response.text();
     }
@@ -49,11 +58,13 @@
     global.__appScreensReady = loadPanelPartials().catch((error) => {
         console.error('❌ Error cargando pantallas del panel:', error);
         const screensMount = document.getElementById('appScreensMount');
+        const detail = error?.message ? String(error.message) : 'Error desconocido';
         if (screensMount) {
             screensMount.innerHTML = `
-                <section class="section active" style="padding:2rem;text-align:center;">
+                <section class="section active" style="padding:2rem;text-align:center;max-width:36rem;margin:0 auto;">
                     <h2>No se pudo cargar el panel</h2>
-                    <p>Recarga la página. Si persiste, revisa que existan los archivos en <code>partials/screens/</code>.</p>
+                    <p>Recarga la página con <strong>Ctrl+F5</strong>. Si persiste, comprueba que el despliegue incluya <code>web/public/partials/</code>.</p>
+                    <p style="margin-top:1rem;font-size:0.9rem;opacity:0.85;"><code>${detail.replace(/</g, '&lt;')}</code></p>
                 </section>`;
         }
         throw error;
