@@ -352,6 +352,11 @@
     display: block;
     margin-bottom: 0.35rem !important;
 }
+#serverPaneWelcome .greeting-style-option--card,
+#serverPaneWelcome .greeting-style-option:has(input[name="welcomeStyle"][value="card"]) {
+    display: none !important;
+}
+
 #serverPaneWelcome .greeting-style-segment {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(208px, 1fr));

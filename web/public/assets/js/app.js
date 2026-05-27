@@ -20,6 +20,8 @@ let welcomeCardPreviewObjectUrl = '';
 let welcomeCropVisualTimer = null;
 let welcomeCropVisualCache = { src: '', img: null };
 let currentGreetingMode = 'welcome';
+/** Tarjeta PNG / Eyed Studio en bienvenidas — desactivado hasta nuevo aviso. */
+const WELCOME_CARD_STYLE_ENABLED = false;
 
 /** Revoca blob de archivo pendiente y limpia el input file (la URL del campo se mantiene). */
 function clearWelcomeImagePendingPreview() {
@@ -2838,6 +2840,7 @@ function bindSettingsPaneNavigation() {
         button.addEventListener('click', () => {
             const paneId = button.dataset.settingsPane;
             if (!paneId) return;
+            if (paneId === 'settingsPaneOwner' && !isOwnerUser) return;
             switchSettingsPane(paneId);
         });
     });
@@ -3466,6 +3469,8 @@ function updateUserUI() {
     updateProfileSettingsData();
 
     const ownerRestrictedSelectors = [
+        '.owner-settings-nav',
+        '#settingsPaneOwner',
         '#embedTabs [data-dpx-tab="attachments"]',
         '#embedSection [data-dpx-panel="attachments"]',
         '#sendOwnerAttachmentBtn'
@@ -3476,22 +3481,19 @@ function updateUserUI() {
             if (!(el instanceof HTMLElement)) return;
             if (isOwnerUser) {
                 el.style.display = '';
+                el.hidden = false;
                 el.classList.remove('owner-only-hidden');
                 el.removeAttribute('aria-hidden');
             } else {
                 el.style.display = 'none';
+                el.hidden = true;
                 el.classList.add('owner-only-hidden');
                 el.setAttribute('aria-hidden', 'true');
+                if (el.classList.contains('settings-side-btn')) {
+                    el.classList.remove('active');
+                }
             }
         });
-    });
-
-    document.querySelectorAll('.owner-settings-nav').forEach((el) => {
-        if (!(el instanceof HTMLElement)) return;
-        el.hidden = !isOwnerUser;
-        if (!isOwnerUser) {
-            el.classList.remove('active');
-        }
     });
 
     if (!isOwnerUser && currentSettingsPaneId === 'settingsPaneOwner') {
@@ -12593,6 +12595,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                         </div>
                         <p class="greeting-card__hint greeting-card__hint--style" data-welcome-style-hint>La bienvenida se envía como un <strong>embed</strong> clásico de Discord (borde de color, miniatura e imagen).</p>
                     </div>
+                    ${WELCOME_CARD_STYLE_ENABLED ? `
                     <div class="form-group greeting-style-field">
                         <span class="greeting-var-strip__label greeting-style-field__label">Formato del mensaje</span>
                         <div class="greeting-style-options greeting-style-segment" role="radiogroup" aria-label="Formato del mensaje de bienvenida">
@@ -12603,7 +12606,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                                     <span class="greeting-style-option__desc">Mensaje con borde de color, como en Discord</span>
                                 </span>
                             </label>
-                            <label class="greeting-style-option">
+                            <label class="greeting-style-option greeting-style-option--card">
                                 <input type="radio" name="welcomeStyle" value="card" ${cfg.welcomeStyle === 'card' ? 'checked' : ''}>
                                 <span class="greeting-style-option__body">
                                     <span class="greeting-style-option__title">Imagen con fondo</span>
@@ -12612,6 +12615,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                             </label>
                         </div>
                     </div>
+                    ` : '<input type="hidden" name="welcomeStyle" value="embed">'}
                     <div id="welcomeCardColorFields" class="greeting-card__body-card-extra" style="display:none">
                         <div class="form-grid greeting-card__grid">
                         <div class="form-group">
@@ -13029,6 +13033,7 @@ function applyWelcomePreviewTemplate(text, sample, options = {}) {
 }
 
 function getWelcomeStyleFromForm() {
+    if (!WELCOME_CARD_STYLE_ENABLED) return 'embed';
     const checked = document.querySelector('input[name="welcomeStyle"]:checked');
     return checked?.value === 'card' ? 'card' : 'embed';
 }
@@ -13075,7 +13080,7 @@ function welcomeMergeCardLayout(raw) {
 }
 
 function syncWelcomeStyleUI(guildId) {
-    const style = getWelcomeStyleFromForm();
+    const style = WELCOME_CARD_STYLE_ENABLED ? getWelcomeStyleFromForm() : 'embed';
     const studioBtn = document.getElementById('welcomeOpenStudioBtn');
     const cardColors = document.getElementById('welcomeCardColorFields');
     const thumbRow = document.querySelector('#serverPaneWelcome .greeting-thumb-row');
@@ -17194,6 +17199,10 @@ function getDashboardUserAvatarUrl() {
 }
 
 function openWelcomeCardStudio(guildId) {
+    if (!WELCOME_CARD_STYLE_ENABLED) {
+        showToast('El editor de imagen con fondo no está disponible por el momento.', 'info');
+        return;
+    }
     if (typeof window.WelcomeCardStudio?.open !== 'function') {
         showToast('Recarga la página para cargar el editor visual.', 'warning');
         return;

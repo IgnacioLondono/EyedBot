@@ -305,6 +305,8 @@ function envValue(name, fallback = '') {
 const CLIENT_ID = envValue('CLIENT_ID');
 const CLIENT_SECRET = envValue('CLIENT_SECRET');
 const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID');
+/** Tarjeta PNG / imagen con fondo en bienvenidas — desactivado en panel y API hasta nuevo aviso. */
+const WELCOME_CARD_STYLE_ENABLED = false;
 const WEB_PUBLIC_ORIGIN = envValue('WEB_PUBLIC_ORIGIN') || envValue('PUBLIC_ORIGIN');
 const MP_ACCESS_TOKEN = envValue('MP_ACCESS_TOKEN');
 const MP_WEBHOOK_SECRET = envValue('MP_WEBHOOK_SECRET');
@@ -1784,6 +1786,12 @@ function sanitizeHexColor6(val, fallback) {
     return /^[0-9a-fA-F]{6}$/.test(h) ? h.toLowerCase() : fallback;
 }
 
+function coerceWelcomeStyleForPanel(config) {
+    if (!config || WELCOME_CARD_STYLE_ENABLED) return config;
+    if (config.welcomeStyle === 'card') config.welcomeStyle = 'embed';
+    return config;
+}
+
 function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) {
     const fallback = mode === 'goodbye'
         ? { title: 'Hasta pronto', message: '{username} ha salido de **{server}**.' }
@@ -1821,7 +1829,7 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
     };
 
     if (mode === 'welcome') {
-        base.welcomeStyle = body.welcomeStyle === 'card' ? 'card' : 'embed';
+        base.welcomeStyle = WELCOME_CARD_STYLE_ENABLED && body.welcomeStyle === 'card' ? 'card' : 'embed';
         base.cardAccentColor = sanitizeHexColor6(body.cardAccentColor, '4ade80');
         base.cardTitleColor = sanitizeHexColor6(body.cardTitleColor, 'ffffff');
         base.cardNameColor = sanitizeHexColor6(body.cardNameColor, 'f8fafc');
@@ -4171,7 +4179,7 @@ app.get('/api/guild/:guildId/welcome-config', requireAuth, async (req, res) => {
         if (!config) return res.json(buildDefaultGreetingConfig('welcome', fallbackChannel));
 
         if (!config.channelId && fallbackChannel) config.channelId = fallbackChannel;
-        res.json(config);
+        res.json(coerceWelcomeStyleForPanel(config));
     } catch (error) {
         console.error('Error obteniendo welcome config:', error);
         res.status(500).json({ error: 'Error al obtener configuración de bienvenida' });
@@ -4423,7 +4431,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         const content = cfg?.mentionUser ? `<@${member.id}>` : undefined;
         const allowedMentions = cfg?.mentionUser ? { parse: ['users'] } : undefined;
 
-        if (cfg?.welcomeStyle === 'card') {
+        if (WELCOME_CARD_STYLE_ENABLED && cfg?.welcomeStyle === 'card') {
             const bg = await resolveWelcomeCardBackground(cfg.imageUrl, guildId);
             const buffer = await renderWelcomeCardPng({
                 avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
