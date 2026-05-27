@@ -9,6 +9,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const os = require('os');
@@ -572,22 +573,48 @@ app.use(cors({
 app.use('/auth/discord', authRateLimiter);
 app.use('/callback', authRateLimiter);
 app.use('/api/', apiRateLimiter);
+app.use(compression({
+    level: 6,
+    threshold: 1024,
+    filter: (req, res) => {
+        const acceptHeader = String(req.headers.accept || '').toLowerCase();
+        if (acceptHeader.includes('text/event-stream')) return false;
+        return compression.filter(req, res);
+    }
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const panelFaviconPath = path.join(__dirname, 'public', 'assets', 'img', 'favicon.png');
 app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
+    res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
     res.sendFile(panelFaviconPath);
 });
-app.use(express.static(path.join(__dirname, 'public'), {
+const publicDir = path.join(__dirname, 'public');
+app.use(express.static(publicDir, {
     maxAge: 0,
     etag: true,
     setHeaders: (res, filePath) => {
-        if (/\.(html|js|css)$/i.test(filePath)) {
-            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        const relativePath = path.relative(publicDir, filePath).replace(/\\/g, '/').toLowerCase();
+        const isHtml = relativePath.endsWith('.html');
+        const isAssetFile = relativePath.startsWith('assets/');
+        const isLongCacheAsset = isAssetFile && /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|otf|mp4|webm)$/i.test(relativePath);
+
+        if (isHtml) {
+            // El HTML debe revalidarse siempre para no romper despliegues recientes.
+            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
+            return;
         }
+
+        if (isLongCacheAsset) {
+            // Archivos estáticos versionados: caché agresiva para bajar TTFB y transferencias.
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
+
+        res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
     }
 }));
 

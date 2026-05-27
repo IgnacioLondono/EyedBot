@@ -5559,12 +5559,16 @@ function displayCommands(commands, meta = {}) {
         });
         const commandCards = sortedCommands.map((cmd) => renderCommandCatalogCard(cmd)).join('');
         container.innerHTML = `
-            <section class="commands-all-flat" aria-label="Todos los comandos">
-                <header class="commands-all-flat-head">
-                    <h3>Todos los comandos</h3>
-                    <p>${commands.length} comando${commands.length === 1 ? '' : 's'} en el catálogo completo</p>
+            <section class="commands-category-block commands-category-block--all" aria-label="Todos los comandos">
+                <header class="commands-category-head">
+                    <span class="commands-category-icon" aria-hidden="true">${getCommandCategoryIcon('all')}</span>
+                    <div class="commands-category-copy">
+                        <h3>Todos los comandos</h3>
+                        <p>${commands.length} comando${commands.length === 1 ? '' : 's'} en el catálogo completo</p>
+                    </div>
+                    <span class="commands-category-count">${commands.length}</span>
                 </header>
-                <div class="commands-category-list commands-category-list--flat">${commandCards}</div>
+                <div class="commands-category-list">${commandCards}</div>
             </section>
         `;
         return;
