@@ -38,8 +38,8 @@
         if (tabletLike) return false;
         if (uaDataMobile) return true;
         if (phoneUa) return true;
-        if (touch && coarse && w > 0 && w <= 500) return true;
-        if (standalone && touch && coarse && w > 0 && w <= 500) return true;
+        if (touch && coarse && w > 0 && w <= 640) return true;
+        if (standalone && touch && coarse && w > 0 && w <= 640) return true;
         return false;
     }
 

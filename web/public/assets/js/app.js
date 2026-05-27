@@ -2833,6 +2833,8 @@ function switchSettingsPane(paneId, options = {}) {
         void loadStats();
         void loadLogs();
     }
+
+    window.EyedBotMobile?.onSettingsPaneChange?.(paneId);
 }
 
 function bindSettingsPaneNavigation() {
@@ -3791,6 +3793,10 @@ function setupEventListeners() {
 
     document.addEventListener('click', () => {
         document.getElementById('dropdownMenu').classList.remove('show');
+    });
+
+    document.getElementById('dropdownMenu')?.addEventListener('click', (e) => {
+        e.stopPropagation();
     });
 
     const profileSettingsBtn = document.getElementById('profileSettingsBtn');

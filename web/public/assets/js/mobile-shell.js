@@ -1,5 +1,5 @@
 /**
- * Shell móvil: bottom nav, drawer servidor, sheet «Más», sincronía con app.js
+ * Shell móvil: bottom nav, drawer servidor, sheet «Más», topbar secundaria
  */
 (function initEyedBotMobileShell(global) {
     const doc = global.document;
@@ -12,8 +12,15 @@
         account: 'profileSettingsSection'
     };
 
+    const SECONDARY_SECTIONS = {
+        controlCenterSection: { title: 'Acerca de', back: 'dashboard' },
+        premiumSection: { title: 'EyedPlus+', back: 'dashboard' },
+        embedSection: { title: 'Mensajes embed', back: 'serverSection' }
+    };
+
     let bottomNavBuilt = false;
     let serverTopbarBuilt = false;
+    let sectionTopbarBuilt = false;
 
     function isMobileActive() {
         return doc.documentElement.classList.contains('is-mobile');
@@ -52,7 +59,7 @@
         nav.className = 'mobile-bottom-nav';
         nav.setAttribute('aria-label', 'Navegación principal');
         nav.innerHTML = `
-            <button type="button" class="mobile-bottom-nav__btn" data-mobile-nav="home" aria-label="Inicio">
+            <button type="button" class="mobile-bottom-nav__btn is-active" data-mobile-nav="home" aria-label="Inicio">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1V9.5z"/></svg>
                 <span>Inicio</span>
             </button>
@@ -98,6 +105,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></svg>
                     Acerca de
                 </button>
+                <button type="button" class="mobile-more-sheet__item" data-more-section="premiumSection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9.2 7.2 5.6l1.9 2.2L12 5l3 2.8 1.9-2.2L19 9.2"/><path d="M6.2 9.2h11.6"/><path d="M3.5 14.2s4-4.2 8.5-4.2 8.5 4.2 8.5 4.2"/><path d="M3.5 14.2s4 4.2 8.5 4.2 8.5-4.2 8.5-4.2"/><circle cx="12" cy="14.2" r="2.1"/></svg>
+                    EyedPlus+
+                </button>
                 <button type="button" class="mobile-more-sheet__item" data-more-section="embedSection">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="2"/></svg>
                     Embed
@@ -110,6 +121,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
                     Añadir bot
                 </button>
+                <a class="mobile-more-sheet__item" href="/logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                    Cerrar sesión
+                </a>
                 <button type="button" class="mobile-more-sheet__item" id="mobileForceDesktop">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 20h8"/></svg>
                     Vista escritorio
@@ -152,8 +167,17 @@
 
         sheet.querySelectorAll('[data-more-section]').forEach((el) => {
             el.addEventListener('click', () => {
+                const target = el.dataset.moreSection;
                 closeMoreSheet();
-                navigateToSection(el.dataset.moreSection);
+                if (target === 'embedSection' && !hasGuildSelected()) {
+                    if (typeof global.showToast === 'function') {
+                        global.showToast('Selecciona un servidor en Inicio primero', 'warning');
+                    }
+                    navigateToSection('dashboard');
+                    syncBottomNavActive();
+                    return;
+                }
+                navigateToSection(target);
                 syncBottomNavActive();
             });
         });
@@ -161,7 +185,8 @@
         doc.getElementById('mobileMoreDiscord')?.addEventListener('click', (e) => {
             e.preventDefault();
             closeMoreSheet();
-            doc.getElementById('discordServerBtn')?.click();
+            const link = doc.getElementById('discordServerBtn');
+            if (link?.href) global.open(link.href, '_blank', 'noopener,noreferrer');
         });
 
         doc.getElementById('mobileMoreAddBot')?.addEventListener('click', () => {
@@ -185,6 +210,64 @@
         doc.getElementById('mobileMoreSheet')?.classList.remove('is-open');
         if (!doc.querySelector('.server-side-menu.is-drawer-open')) {
             doc.getElementById('mobileDrawerBackdrop')?.classList.remove('is-open');
+        }
+    }
+
+    function buildMobileSectionTopbar() {
+        if (sectionTopbarBuilt) return;
+        sectionTopbarBuilt = true;
+
+        const bar = doc.createElement('div');
+        bar.className = 'mobile-section-topbar';
+        bar.id = 'mobileSectionTopbar';
+        bar.innerHTML = `
+            <button type="button" class="mobile-section-topbar__back" id="mobileSectionTopbarBack" aria-label="Volver">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <h2 class="mobile-section-topbar__title" id="mobileSectionTopbarTitle"></h2>
+        `;
+        doc.body.appendChild(bar);
+
+        doc.getElementById('mobileSectionTopbarBack')?.addEventListener('click', () => {
+            const active = doc.querySelector('.section.active')?.id || 'dashboard';
+            const meta = SECONDARY_SECTIONS[active];
+            if (!meta) {
+                navigateToSection('dashboard');
+            } else if (meta.back === 'serverSection' && !hasGuildSelected()) {
+                navigateToSection('dashboard');
+            } else {
+                navigateToSection(meta.back);
+            }
+            syncBottomNavActive();
+        });
+    }
+
+    function updateMobileSectionTopbar(sectionId) {
+        if (!isMobileActive()) return;
+        buildMobileSectionTopbar();
+        const bar = doc.getElementById('mobileSectionTopbar');
+        const titleEl = doc.getElementById('mobileSectionTopbarTitle');
+        if (!bar || !titleEl) return;
+
+        const meta = SECONDARY_SECTIONS[sectionId];
+        if (!meta) {
+            bar.classList.remove('is-visible');
+            return;
+        }
+
+        titleEl.textContent = meta.title;
+        bar.classList.add('is-visible');
+
+        const section = doc.getElementById(sectionId);
+        const container = section?.querySelector(':scope > .container');
+        if (container && !container.querySelector('.mobile-section-topbar-mount')) {
+            const mount = doc.createElement('div');
+            mount.className = 'mobile-section-topbar-mount';
+            container.insertBefore(mount, container.firstChild);
+        }
+        const mount = container?.querySelector('.mobile-section-topbar-mount');
+        if (mount && bar.parentElement !== mount) {
+            mount.appendChild(bar);
         }
     }
 
@@ -227,6 +310,8 @@
         });
 
         doc.querySelectorAll('.side-menu-btn').forEach((btn) => {
+            if (btn.dataset.mobilePaneBound === '1') return;
+            btn.dataset.mobilePaneBound = '1';
             btn.addEventListener('click', () => {
                 if (isMobileActive()) closeServerDrawer();
             });
@@ -250,6 +335,7 @@
             commandsSection: 'commands',
             profileSettingsSection: 'account',
             controlCenterSection: 'more',
+            premiumSection: 'more',
             embedSection: 'more'
         };
         const key = map[id] || 'home';
@@ -266,29 +352,10 @@
         titleEl.textContent = name;
     }
 
-    function injectSettingsHint() {
-        const settings = doc.getElementById('profileSettingsSection');
-        if (!settings || settings.querySelector('.mobile-desktop-hint')) return;
-        const hint = doc.createElement('div');
-        hint.className = 'mobile-desktop-hint';
-        hint.innerHTML =
-            '<span>Vista móvil activa.</span> <button type="button" class="btn btn-ghost btn-sm" id="mobileForceDesktopSettings">Usar escritorio</button>';
-        const container = settings.querySelector('.container');
-        if (container) container.insertBefore(hint, container.firstChild);
-        doc.getElementById('mobileForceDesktopSettings')?.addEventListener('click', () => {
-            global.EyedBotDevice?.setForceMode('desktop');
-            global.location.reload();
-        });
-    }
-
-    function onSectionChange(sectionId) {
-        syncBottomNavActive();
-        if (sectionId === 'serverSection') updateServerTopbarTitle();
-        closeServerDrawer();
-    }
-
-    function onServerPaneChange() {
-        updateServerTopbarTitle();
+    function scrollActiveSettingsTabIntoView() {
+        if (!isMobileActive()) return;
+        const active = doc.querySelector('#profileSettingsSection .settings-side-btn.active');
+        active?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
     }
 
     function watchGuildName() {
@@ -299,8 +366,37 @@
         obs.observe(el, { childList: true, characterData: true, subtree: true });
     }
 
+    function bindSettingsSidebarMobile() {
+        doc.querySelectorAll('#profileSettingsSection .settings-side-btn').forEach((btn) => {
+            if (btn.dataset.mobileSettingsBound === '1') return;
+            btn.dataset.mobileSettingsBound = '1';
+            btn.addEventListener('click', () => {
+                setTimeout(scrollActiveSettingsTabIntoView, 50);
+            });
+        });
+    }
+
+    function onSectionChange(sectionId) {
+        if (!isMobileActive()) return;
+        syncBottomNavActive();
+        updateMobileSectionTopbar(sectionId);
+        if (sectionId === 'serverSection') updateServerTopbarTitle();
+        closeServerDrawer();
+        closeMoreSheet();
+        doc.getElementById('dropdownMenu')?.classList.remove('show');
+    }
+
+    function onServerPaneChange() {
+        updateServerTopbarTitle();
+    }
+
+    function onSettingsPaneChange() {
+        scrollActiveSettingsTabIntoView();
+    }
+
     function boot() {
         buildBottomNav();
+        buildMobileSectionTopbar();
         syncBottomNavActive();
 
         const discordLink = doc.getElementById('discordServerBtn');
@@ -310,8 +406,10 @@
 
     function bootAfterScreens() {
         buildServerTopbar();
-        injectSettingsHint();
+        bindSettingsSidebarMobile();
         watchGuildName();
+        const activeId = doc.querySelector('.section.active')?.id || 'dashboard';
+        updateMobileSectionTopbar(activeId);
     }
 
     if (doc.readyState === 'loading') {
@@ -326,6 +424,8 @@
         if (isMobileActive()) {
             boot();
             bootAfterScreens();
+        } else {
+            doc.getElementById('mobileSectionTopbar')?.classList.remove('is-visible');
         }
         syncBottomNavActive();
     });
@@ -333,6 +433,7 @@
     global.EyedBotMobile = {
         onSectionChange,
         onServerPaneChange,
+        onSettingsPaneChange,
         syncBottomNavActive,
         closeServerDrawer,
         closeMoreSheet

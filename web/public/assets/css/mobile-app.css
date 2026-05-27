@@ -11,10 +11,16 @@ html.is-mobile {
 }
 
 html.is-mobile body {
-    padding-top: var(--mobile-header-h);
-    padding-bottom: var(--mobile-nav-h);
+    padding-top: var(--mobile-header-h) !important;
+    padding-bottom: var(--mobile-nav-h) !important;
     overflow-x: hidden;
     overscroll-behavior-y: none;
+}
+
+@media (max-width: 520px) {
+    html.is-mobile body {
+        padding-top: var(--mobile-header-h) !important;
+    }
 }
 
 html.is-mobile .gradient-bg .interactive,
