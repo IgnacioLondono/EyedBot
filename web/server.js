@@ -1492,7 +1492,7 @@ app.get('/api/about-overview', requireAuth, (req, res) => {
 app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
     try {
         const analytics = await loadLoginAnalyticsSnapshot();
-        const users = Object.values(analytics.users || {})
+        const usersRaw = Object.values(analytics.users || {})
             .map((entry) => ({
                 userId: String(entry.userId || ''),
                 username: String(entry.username || 'Usuario'),
@@ -1517,6 +1517,20 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
                 return bTime - aTime;
             });
 
+        const users = await Promise.all(usersRaw.map(async (entry) => {
+            const sub = await billingStore.getUserSubscription(entry.userId);
+            return {
+                ...entry,
+                billing: {
+                    active: billingStore.isPremiumActive(sub),
+                    status: sub?.status || 'inactive',
+                    currentPeriodEnd: sub?.currentPeriodEnd || null,
+                    sourceEvent: sub?.sourceEvent || '',
+                    updatedAt: sub?.updatedAt || null
+                }
+            };
+        }));
+
         res.json({
             summary: {
                 totalLogins: Number(analytics.totals.totalLogins) || 0,
@@ -1529,6 +1543,98 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
     } catch (error) {
         console.error('Error obteniendo registro global de logins:', error);
         res.status(500).json({ error: 'Error al obtener registro global' });
+    }
+});
+
+function buildAdminBillingPayload(body = {}) {
+    const action = String(body.action || '').trim().toLowerCase();
+    const daysRaw = Number.parseInt(`${body.days ?? 30}`, 10);
+    const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(3650, daysRaw)) : 30;
+    const periodEnd = new Date(Date.now() + (days * 24 * 60 * 60 * 1000)).toISOString();
+    const now = new Date().toISOString();
+
+    if (action === 'grant' || action === 'active') {
+        return {
+            status: 'active',
+            currentPeriodEnd: periodEnd,
+            cancelAtPeriodEnd: false,
+            sourceEvent: 'admin_grant',
+            updatedAt: now
+        };
+    }
+    if (action === 'trial') {
+        return {
+            status: 'trialing',
+            currentPeriodEnd: periodEnd,
+            cancelAtPeriodEnd: false,
+            sourceEvent: 'admin_trial',
+            updatedAt: now
+        };
+    }
+    if (action === 'revoke' || action === 'inactive') {
+        return {
+            status: 'inactive',
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: false,
+            sourceEvent: 'admin_revoke',
+            updatedAt: now
+        };
+    }
+    if (action === 'canceled' || action === 'cancel') {
+        return {
+            status: 'canceled',
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: true,
+            sourceEvent: 'admin_cancel',
+            updatedAt: now
+        };
+    }
+
+    const customStatus = String(body.status || '').trim().toLowerCase();
+    if (customStatus) {
+        const payload = {
+            status: customStatus,
+            cancelAtPeriodEnd: body.cancelAtPeriodEnd === true,
+            sourceEvent: 'admin_custom',
+            updatedAt: now
+        };
+        if (customStatus === 'active' || customStatus === 'trialing') {
+            payload.currentPeriodEnd = body.currentPeriodEnd || periodEnd;
+        } else {
+            payload.currentPeriodEnd = body.currentPeriodEnd || null;
+        }
+        return payload;
+    }
+
+    return null;
+}
+
+app.put('/api/admin/user/:userId/billing', requireOwner, async (req, res) => {
+    try {
+        const userId = String(req.params.userId || '').trim();
+        if (!/^\d{10,25}$/.test(userId)) {
+            return res.status(400).json({ error: 'ID de usuario invalido' });
+        }
+
+        const payload = buildAdminBillingPayload(req.body || {});
+        if (!payload) {
+            return res.status(400).json({ error: 'Accion invalida. Usa grant, trial, revoke o status.' });
+        }
+
+        const saved = await billingStore.setUserSubscription(userId, payload);
+        return res.json({
+            success: true,
+            billing: {
+                active: billingStore.isPremiumActive(saved),
+                status: saved.status,
+                currentPeriodEnd: saved.currentPeriodEnd,
+                sourceEvent: saved.sourceEvent,
+                updatedAt: saved.updatedAt
+            }
+        });
+    } catch (error) {
+        console.error('Error actualizando billing de usuario (admin):', error);
+        return res.status(500).json({ error: 'No se pudo actualizar EyedPlus+' });
     }
 });
 

@@ -3643,6 +3643,95 @@ body {
     background: rgba(255, 255, 255, 0.02);
 }
 
+.owner-billing-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.owner-billing-badge--is-active {
+    color: #b8f5d4;
+    background: rgba(46, 204, 113, 0.14);
+    border-color: rgba(46, 204, 113, 0.45);
+}
+
+.owner-billing-badge--is-trial {
+    color: #ffe6a8;
+    background: rgba(255, 193, 7, 0.12);
+    border-color: rgba(255, 193, 7, 0.4);
+}
+
+.owner-billing-badge--is-inactive {
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--border-color);
+}
+
+.owner-billing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.owner-billing-actions .btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    min-height: 0;
+}
+
+.owner-billing-detail {
+    margin-top: 0.35rem;
+    padding: 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.owner-billing-detail-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.owner-billing-detail-meta {
+    margin: 0 0 0.65rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.owner-billing-detail-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.owner-billing-detail-label {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    min-width: 5rem;
+}
+
+.owner-billing-detail-label .form-control {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.owner-analytics-table {
+    min-width: 920px;
+}
+
 .owner-user-preview {
     display: grid;
     gap: 0.8rem;

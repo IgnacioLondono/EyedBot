@@ -5241,6 +5241,85 @@ async function loadLogs() {
     }
 }
 
+function renderOwnerBillingBadge(billing = {}) {
+    const active = billing.active === true;
+    const status = String(billing.status || 'inactive').toLowerCase();
+    const label = active ? 'Activo' : billingStatusLabel(status);
+    const cls = active ? 'is-active' : (status === 'trialing' ? 'is-trial' : 'is-inactive');
+    return `<span class="owner-billing-badge owner-billing-badge--${cls}">${escapeHtml(label)}</span>`;
+}
+
+function renderOwnerBillingActions(userId, billing = {}) {
+    const safeId = String(userId || '').replace(/[^0-9]/g, '');
+    const active = billing.active === true;
+    return `
+        <div class="owner-billing-actions" data-owner-billing-user="${safeId}">
+            <button type="button" class="btn btn-secondary btn-xs" data-owner-billing-action="grant" data-user-id="${safeId}" title="Activar EyedPlus+ 30 dias">Plus</button>
+            <button type="button" class="btn btn-secondary btn-xs" data-owner-billing-action="trial" data-user-id="${safeId}" title="Modo prueba 7 dias">Prueba</button>
+            <button type="button" class="btn btn-secondary btn-xs" data-owner-billing-action="revoke" data-user-id="${safeId}" ${active ? '' : 'disabled'} title="Quitar Plus">Quitar</button>
+        </div>
+    `;
+}
+
+function renderOwnerBillingDetailPanel(userId, billing = {}) {
+    const safeId = String(userId || '').replace(/[^0-9]/g, '');
+    const period = billing.currentPeriodEnd
+        ? new Date(billing.currentPeriodEnd).toLocaleDateString('es-ES')
+        : 'Sin fecha';
+    const source = billing.sourceEvent ? `Origen: ${billing.sourceEvent}` : 'Origen: —';
+    return `
+        <div class="owner-billing-detail">
+            <div class="owner-billing-detail-head">
+                <strong>EyedPlus+</strong>
+                <span>${renderOwnerBillingBadge(billing)}</span>
+            </div>
+            <p class="owner-billing-detail-meta">Vence: ${escapeHtml(period)} · ${escapeHtml(source)}</p>
+            <div class="owner-billing-detail-form">
+                <label class="owner-billing-detail-label">
+                    Dias
+                    <input type="number" class="form-control" min="1" max="3650" value="30" data-owner-billing-days="${safeId}">
+                </label>
+                <button type="button" class="btn btn-primary btn-sm" data-owner-billing-action="grant" data-user-id="${safeId}">Activar Plus</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-owner-billing-action="trial" data-user-id="${safeId}">Prueba</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-owner-billing-action="revoke" data-user-id="${safeId}">Quitar</button>
+            </div>
+        </div>
+    `;
+}
+
+async function applyOwnerUserBilling(userId, action, options = {}) {
+    const safeId = String(userId || '').trim();
+    if (!safeId) return null;
+
+    const daysInput = document.querySelector(`[data-owner-billing-days="${safeId.replace(/[^0-9]/g, '')}"]`);
+    const defaultDays = action === 'trial' ? 7 : 30;
+    const days = daysInput
+        ? Number.parseInt(daysInput.value, 10)
+        : (options.days || defaultDays);
+
+    const response = await fetchWithCredentials(`/api/admin/user/${encodeURIComponent(safeId)}/billing`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action,
+            days: Number.isFinite(days) ? days : 30
+        })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'No se pudo actualizar EyedPlus+');
+    }
+
+    showToast(
+        action === 'revoke'
+            ? 'EyedPlus+ desactivado para el usuario'
+            : `EyedPlus+ actualizado (${billingStatusLabel(payload.billing?.status)})`,
+        'success'
+    );
+    return payload.billing;
+}
+
 async function loadOwnerLoginRegistry() {
     if (!isOwnerUser) return;
 
@@ -5269,12 +5348,13 @@ async function loadOwnerLoginRegistry() {
         `;
 
         if (users.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5">Sin registros por el momento.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="7">Sin registros por el momento.</td></tr>';
             return;
         }
 
         tableBody.innerHTML = users.map((entry) => {
             const safeUserId = String(entry.userId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            const billing = entry.billing && typeof entry.billing === 'object' ? entry.billing : {};
             const name = escapeHtml(entry.globalName || entry.username || 'Usuario');
             const username = escapeHtml(entry.username || 'usuario');
             const profileText = `${name} (@${username})`;
@@ -5313,10 +5393,12 @@ async function loadOwnerLoginRegistry() {
                     <td>${entry.loginCount || 0}</td>
                     <td>${entry.guildCount || 0}</td>
                     <td>${(entry.guilds || []).length}</td>
+                    <td>${renderOwnerBillingBadge(billing)}</td>
                     <td>${lastSeen}</td>
+                    <td>${renderOwnerBillingActions(entry.userId, billing)}</td>
                 </tr>
                 <tr class="owner-analytics-detail-row" data-owner-detail-row="${safeUserId}" hidden>
-                    <td colspan="5">
+                    <td colspan="7">
                         <div class="owner-user-preview">
                             <div class="owner-user-preview-profile">
                                 <img src="${avatarUrl}" alt="${profileText}" class="owner-user-preview-avatar">
@@ -5325,6 +5407,7 @@ async function loadOwnerLoginRegistry() {
                                     <div class="owner-user-preview-meta">Servidor(es) administrable(s) con bot: ${(entry.guilds || []).length}</div>
                                 </div>
                             </div>
+                            ${renderOwnerBillingDetailPanel(entry.userId, billing)}
                             <div class="owner-server-preview-grid">
                                 ${serverPreview}
                             </div>
@@ -5336,9 +5419,28 @@ async function loadOwnerLoginRegistry() {
 
         if (!tableBody.dataset.ownerRegistryBound) {
             tableBody.dataset.ownerRegistryBound = '1';
-            tableBody.addEventListener('click', (event) => {
+            tableBody.addEventListener('click', async (event) => {
                 const target = event.target;
                 if (!(target instanceof Element)) return;
+
+                const billingBtn = target.closest('[data-owner-billing-action]');
+                if (billingBtn instanceof HTMLElement) {
+                    const userId = String(billingBtn.dataset.userId || '').trim();
+                    const action = String(billingBtn.dataset.ownerBillingAction || '').trim();
+                    if (!userId || !action) return;
+
+                    billingBtn.disabled = true;
+                    try {
+                        await applyOwnerUserBilling(userId, action);
+                        await loadOwnerLoginRegistry();
+                    } catch (err) {
+                        showToast(err.message || 'Error al actualizar Plus', 'error');
+                    } finally {
+                        billingBtn.disabled = false;
+                    }
+                    return;
+                }
+
                 const btn = target.closest('.owner-analytics-profile-btn');
                 if (!(btn instanceof HTMLElement)) return;
 
@@ -5361,7 +5463,7 @@ async function loadOwnerLoginRegistry() {
     } catch (error) {
         panel.style.display = 'block';
         summary.innerHTML = '<div class="owner-analytics-pill"><span>No se pudo cargar el registro global.</span></div>';
-        tableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(error.message || 'Error inesperado')}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="7">${escapeHtml(error.message || 'Error inesperado')}</td></tr>`;
     }
 }
 
