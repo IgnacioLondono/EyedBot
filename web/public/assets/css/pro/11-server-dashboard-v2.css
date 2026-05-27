@@ -2,6 +2,7 @@
    Server Dashboard V2 - estilo unificado tipo "control center"
    ===================================================================== */
 :root {
+    --app-nav-height: 70px;
     --sv2-bg-0: var(--bg-primary, #080a15);
     --sv2-bg-1: var(--bg-secondary, #0d1020);
     --sv2-bg-2: var(--bg-card, #131830);
@@ -957,35 +958,46 @@ body {
         linear-gradient(180deg, rgba(var(--bg-primary-rgb, 10, 12, 26), 0.62), rgba(var(--bg-secondary-rgb, 16, 18, 34), 0.58)) !important;
 }
 
-/* Vuelve a usar scroll interno en la vista de servidor */
+/* Altura del panel servidor: hereda del main-content (ver bloque «sin scroll del documento») */
 #serverSection.section {
-    height: calc(100vh - 70px) !important;
+    height: 100% !important;
     min-height: 0 !important;
+    max-height: 100% !important;
     overflow: hidden !important;
 }
 
 #serverSection.section > .container {
     height: 100% !important;
     min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 .server-shell {
+    flex: 1 1 auto !important;
     height: 100% !important;
     min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
 }
 
 .server-side-menu {
     height: 100% !important;
     max-height: 100% !important;
+    min-height: 0 !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
 }
 
 .server-content-area {
-    height: 100% !important;
+    flex: 1 1 auto !important;
+    height: auto !important;
     min-height: 0 !important;
+    max-height: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Scrollbars visibles en sidebar y pantalla principal */
@@ -1010,16 +1022,18 @@ body {
     background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.72) !important;
 }
 
+/* En escritorio estrecho sin modo móvil, mantener scroll interno del panel */
 @media (max-width: 1024px) {
-    #serverSection.section {
+    html.is-mobile #serverSection.section {
         height: auto !important;
+        max-height: none !important;
         overflow: visible !important;
     }
 
-    #serverSection.section > .container,
-    .server-shell,
-    .server-side-menu,
-    .server-content-area {
+    html.is-mobile #serverSection.section > .container,
+    html.is-mobile .server-shell,
+    html.is-mobile .server-side-menu,
+    html.is-mobile .server-content-area {
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
@@ -1076,7 +1090,8 @@ body {
 }
 
 #profileSettingsSection.section {
-    height: calc(100vh - 70px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
 }
@@ -3429,4 +3444,61 @@ body {
 .search-pill.dashboard-home-search,
 .search-pill.commands-search {
     display: none !important;
+}
+
+/* =====================================================================
+   Sin scroll del documento en escritorio: solo áreas internas
+   ===================================================================== */
+html:not(.is-mobile) body:has(#appScreensMount) {
+    height: 100dvh;
+    overflow: hidden;
+    padding-top: var(--app-nav-height, 70px);
+    box-sizing: border-box;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount) .main-content {
+    height: calc(100dvh - var(--app-nav-height, 70px));
+    max-height: calc(100dvh - var(--app-nav-height, 70px));
+    min-height: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount) .main-content > .section {
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount) .main-content > .section.active {
+    display: flex;
+    flex-direction: column;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount) #dashboard.active,
+html:not(.is-mobile) body:has(#appScreensMount) #controlCenterSection.active,
+html:not(.is-mobile) body:has(#appScreensMount) #commandsSection.active,
+html:not(.is-mobile) body:has(#appScreensMount) #premiumSection.active,
+html:not(.is-mobile) body:has(#appScreensMount) #embedSection.active {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount) #serverSection .server-pane.active {
+    display: block;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount) #serverSection .server-pane-surface {
+    min-height: 0;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount) .main-content:has(#serverSection.active),
+html:not(.is-mobile) body:has(#appScreensMount) .main-content:has(#profileSettingsSection.active) {
+    padding: 0 !important;
 }
