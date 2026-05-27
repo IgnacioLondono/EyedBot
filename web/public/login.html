@@ -35,7 +35,7 @@
         html, body {
             height: 100%;
             max-width: 100%;
-            overflow-x: hidden;
+            overflow: hidden;
         }
 
         body {
@@ -45,12 +45,12 @@
                 radial-gradient(900px 480px at 88% -8%, rgba(255, 120, 209, 0.16), transparent 58%),
                 radial-gradient(820px 420px at 6% 12%, rgba(124, 77, 255, 0.22), transparent 55%),
                 linear-gradient(180deg, var(--bg-primary), var(--bg-secondary) 55%, var(--bg-primary));
-            min-height: 100vh;
-            min-height: 100dvh;
+            height: 100dvh;
+            max-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1.25rem;
+            padding: 0.65rem;
         }
 
         body::before {
@@ -84,13 +84,15 @@
             position: relative;
             z-index: 1;
             width: 100%;
-            max-width: 1020px;
+            max-width: 980px;
+            max-height: calc(100dvh - 1.3rem);
         }
 
         .login-shell {
             display: grid;
-            grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
-            border-radius: 26px;
+            grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+            max-height: calc(100dvh - 1.3rem);
+            border-radius: 22px;
             border: 1px solid var(--border);
             background: linear-gradient(165deg, rgba(22, 14, 42, 0.96), rgba(8, 5, 18, 0.98));
             box-shadow:
@@ -103,11 +105,13 @@
         }
 
         .login-intro {
-            padding: 2rem 2.1rem;
+            padding: 1.15rem 1.25rem;
             border-right: 1px solid rgba(190, 155, 255, 0.12);
             display: flex;
             flex-direction: column;
-            gap: 1.35rem;
+            gap: 0.65rem;
+            min-height: 0;
+            overflow: hidden;
             background:
                 linear-gradient(125deg, rgba(124, 77, 255, 0.1) 0%, transparent 42%),
                 linear-gradient(180deg, rgba(16, 10, 32, 0.4), transparent);
@@ -120,9 +124,9 @@
         }
 
         .login-brand-icon {
-            width: 52px;
-            height: 52px;
-            border-radius: 15px;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
             background: var(--grad-primary);
             display: inline-flex;
             align-items: center;
@@ -132,14 +136,14 @@
         }
 
         .login-brand-icon svg {
-            width: 28px;
-            height: 28px;
+            width: 22px;
+            height: 22px;
             color: #fff;
         }
 
         .login-brand-text h1 {
             font-family: 'Sora', sans-serif;
-            font-size: 1.4rem;
+            font-size: 1.15rem;
             font-weight: 700;
             letter-spacing: -0.02em;
         }
@@ -154,43 +158,43 @@
 
         .login-intro-copy h2 {
             font-family: 'Sora', sans-serif;
-            font-size: clamp(1.5rem, 2.5vw, 2rem);
+            font-size: clamp(1.1rem, 1.8vw, 1.45rem);
             line-height: 1.15;
             letter-spacing: -0.02em;
-            margin-bottom: 0.65rem;
+            margin-bottom: 0.35rem;
         }
 
         .login-intro-copy p {
             color: var(--text-secondary);
-            font-size: 0.94rem;
-            line-height: 1.65;
+            font-size: 0.8rem;
+            line-height: 1.45;
             max-width: 38ch;
         }
 
         .login-features {
             display: grid;
-            gap: 0.55rem;
+            gap: 0.3rem;
             list-style: none;
         }
 
         .login-features li {
             display: flex;
             align-items: center;
-            gap: 0.6rem;
-            font-size: 0.86rem;
+            gap: 0.45rem;
+            font-size: 0.76rem;
             color: var(--text-secondary);
         }
 
         .login-features li svg {
-            width: 18px;
-            height: 18px;
+            width: 15px;
+            height: 15px;
             flex-shrink: 0;
             color: #c4b5fd;
         }
 
         .login-privacy-banner {
-            padding: 1rem 1.05rem;
-            border-radius: 16px;
+            padding: 0.55rem 0.65rem;
+            border-radius: 12px;
             border: 1px solid rgba(126, 240, 180, 0.22);
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(124, 77, 255, 0.08));
         }
@@ -198,9 +202,9 @@
         .login-privacy-banner-head {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.45rem;
-            font-size: 0.78rem;
+            gap: 0.4rem;
+            margin-bottom: 0.2rem;
+            font-size: 0.68rem;
             font-weight: 700;
             letter-spacing: 0.06em;
             text-transform: uppercase;
@@ -213,15 +217,16 @@
         }
 
         .login-privacy-banner p {
-            font-size: 0.84rem;
-            line-height: 1.55;
+            font-size: 0.72rem;
+            line-height: 1.4;
             color: var(--text-secondary);
         }
 
         .login-intro-foot {
-            font-size: 0.82rem;
+            font-size: 0.72rem;
             color: var(--text-muted);
             margin-top: auto;
+            flex-shrink: 0;
         }
 
         .login-intro-foot a {
@@ -235,11 +240,13 @@
         }
 
         .login-panel {
-            padding: 2rem 2.1rem;
+            padding: 1.15rem 1.25rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            gap: 1rem;
+            gap: 0.5rem;
+            min-height: 0;
+            overflow: hidden;
         }
 
         .login-panel-kicker {
@@ -269,38 +276,40 @@
 
         .login-panel h2 {
             font-family: 'Sora', sans-serif;
-            font-size: 1.6rem;
+            font-size: 1.25rem;
             letter-spacing: -0.02em;
+            line-height: 1.1;
         }
 
         .login-panel-lead {
             color: var(--text-secondary);
-            font-size: 0.92rem;
-            line-height: 1.55;
+            font-size: 0.78rem;
+            line-height: 1.4;
         }
 
         .login-trust-list {
             display: grid;
-            gap: 0.55rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.4rem;
             list-style: none;
-            margin: 0.15rem 0 0.25rem;
+            margin: 0;
         }
 
         .login-trust-list li {
             display: grid;
             grid-template-columns: auto 1fr;
-            gap: 0.65rem;
+            gap: 0.45rem;
             align-items: start;
-            padding: 0.7rem 0.8rem;
-            border-radius: 12px;
+            padding: 0.45rem 0.5rem;
+            border-radius: 10px;
             border: 1px solid rgba(190, 155, 255, 0.12);
             background: rgba(255, 255, 255, 0.03);
         }
 
         .login-trust-icon {
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -310,22 +319,27 @@
         }
 
         .login-trust-icon svg {
-            width: 17px;
-            height: 17px;
+            width: 14px;
+            height: 14px;
         }
 
         .login-trust-list strong {
             display: block;
-            font-size: 0.84rem;
+            font-size: 0.72rem;
             font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 0.12rem;
+            margin-bottom: 0.08rem;
+            line-height: 1.2;
         }
 
         .login-trust-list span {
-            font-size: 0.8rem;
-            line-height: 1.45;
+            font-size: 0.68rem;
+            line-height: 1.35;
             color: var(--text-muted);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .error {
@@ -354,7 +368,8 @@
             justify-content: center;
             gap: 0.65rem;
             width: 100%;
-            padding: 1rem 1.2rem;
+            padding: 0.75rem 1rem;
+            flex-shrink: 0;
             border: none;
             border-radius: 14px;
             text-decoration: none;
@@ -386,11 +401,12 @@
         }
 
         .login-legal {
-            font-size: 0.78rem;
-            line-height: 1.55;
+            font-size: 0.66rem;
+            line-height: 1.35;
             color: var(--text-muted);
-            padding-top: 0.35rem;
+            padding-top: 0.2rem;
             border-top: 1px solid rgba(190, 155, 255, 0.1);
+            flex-shrink: 0;
         }
 
         .login-legal a {
@@ -404,12 +420,13 @@
         }
 
         .login-note {
-            font-size: 0.8rem;
-            line-height: 1.5;
+            font-size: 0.68rem;
+            line-height: 1.35;
             color: var(--text-muted);
             display: flex;
             align-items: flex-start;
-            gap: 0.45rem;
+            gap: 0.35rem;
+            flex-shrink: 0;
         }
 
         .login-note svg {
@@ -421,18 +438,43 @@
         }
 
         @media (max-width: 900px) {
+            html, body {
+                overflow: hidden;
+            }
+
+            .login-page,
+            .login-shell {
+                max-height: calc(100dvh - 0.8rem);
+            }
+
             .login-shell {
                 grid-template-columns: 1fr;
+                grid-template-rows: auto minmax(0, 1fr);
             }
 
             .login-intro {
                 border-right: none;
                 border-bottom: 1px solid rgba(190, 155, 255, 0.12);
-                padding: 1.65rem 1.4rem;
+                padding: 0.85rem 1rem;
+                gap: 0.45rem;
+            }
+
+            .login-features {
+                display: none;
+            }
+
+            .login-privacy-banner {
+                display: none;
             }
 
             .login-panel {
-                padding: 1.55rem 1.4rem 1.7rem;
+                padding: 0.85rem 1rem;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            .login-trust-list {
+                grid-template-columns: 1fr 1fr;
             }
 
             .login-intro-foot {
@@ -440,12 +482,21 @@
             }
         }
 
-        @media (max-width: 480px) {
-            body { padding: 0.85rem; }
-            .login-shell { border-radius: 18px; }
-            .login-brand-text h1 { font-size: 1.2rem; }
-            .login-panel h2 { font-size: 1.35rem; }
-            .login-trust-list li { padding: 0.62rem 0.7rem; }
+        @media (max-width: 520px) {
+            .login-trust-list {
+                grid-template-columns: 1fr;
+            }
+
+            .login-trust-list span {
+                -webkit-line-clamp: 3;
+            }
+        }
+
+        @media (max-height: 720px) {
+            body { padding: 0.45rem; }
+            .login-intro-copy p { display: none; }
+            .login-panel-lead { display: none; }
+            .login-trust-list span { -webkit-line-clamp: 1; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -507,7 +558,7 @@
             <section class="login-panel" aria-labelledby="login-panel-title">
                 <span class="login-panel-kicker">Acceso seguro con Discord</span>
                 <h2 id="login-panel-title">Iniciar sesión</h2>
-                <p class="login-panel-lead">Autenticación oficial OAuth2 de Discord. Sin contraseñas, sin registros extra y sin acceso a tu cuenta fuera de lo que autorices.</p>
+                <p class="login-panel-lead">OAuth2 oficial de Discord. Sin contraseñas ni registros extra.</p>
 
                 <ul class="login-trust-list" aria-label="Seguridad y privacidad">
                     <li>
@@ -516,7 +567,7 @@
                         </span>
                         <div>
                             <strong>Datos guardados de forma segura</strong>
-                            <span>La información de sesión y configuración se almacena en nuestro servidor con acceso restringido. No se expone públicamente ni se comparte con terceros.</span>
+                            <span>Datos de sesión y configuración almacenados con acceso restringido. No se venden ni comparten.</span>
                         </div>
                     </li>
                     <li>
@@ -525,7 +576,7 @@
                         </span>
                         <div>
                             <strong>Bajo la privacidad de Discord</strong>
-                            <span>El inicio de sesión y los permisos los gestiona Discord. Tu cuenta y contraseña nunca pasan por EyedBot.</span>
+                            <span>Discord gestiona el acceso. Tu contraseña nunca pasa por EyedBot.</span>
                         </div>
                     </li>
                     <li>
@@ -534,7 +585,7 @@
                         </span>
                         <div>
                             <strong>Sin acceso a tus datos personales</strong>
-                            <span>No leemos tus mensajes privados ni el contenido de tus DMs. Solo vemos lo necesario para administrar servidores donde tú tienes permisos y está el bot.</span>
+                            <span>No leemos DMs ni mensajes privados. Solo lo necesario en servidores con el bot.</span>
                         </div>
                     </li>
                     <li>
@@ -543,7 +594,7 @@
                         </span>
                         <div>
                             <strong>Tú controlas el acceso</strong>
-                            <span>Puedes cerrar sesión cuando quieras. Revocar la app desde Discord corta el acceso al panel de inmediato.</span>
+                            <span>Cierra sesión o revoca la app en Discord cuando quieras.</span>
                         </div>
                     </li>
                 </ul>
@@ -570,9 +621,7 @@
                 </p>
 
                 <p class="login-legal">
-                    Al continuar, aceptas que el acceso se realiza mediante Discord y que el tratamiento de datos personales se rige por la
-                    <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad de Discord</a>
-                    y los permisos que otorgues a la aplicación. EyedBot no solicita ni almacena tu contraseña de Discord.
+                    Acceso vía Discord · <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad</a> · EyedBot no guarda tu contraseña.
                 </p>
             </section>
         </div>
