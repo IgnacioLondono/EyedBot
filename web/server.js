@@ -896,13 +896,22 @@ function summarizeAnalytics(analytics) {
     };
 }
 
-async function recordGlobalLoginEvent(user, guilds = []) {
+function analyticsGuildIdsKey(guilds = []) {
+    return (Array.isArray(guilds) ? guilds : [])
+        .map((guild) => String(guild?.id || ''))
+        .filter(Boolean)
+        .sort()
+        .join('|');
+}
+
+async function updateUserAnalyticsGuilds(user, oauthGuilds = [], options = {}) {
     if (!user?.id) return;
 
+    const incrementLogin = options.incrementLogin === true;
     const analytics = await loadLoginAnalyticsSnapshot();
     const userId = String(user.id);
     const nowIso = new Date().toISOString();
-    const guildList = filterTrackableGuilds(guilds);
+    const guildList = filterTrackableGuilds(oauthGuilds);
     const sanitizedGuilds = guildList.slice(0, 60).map(sanitizeGuildSnapshot);
 
     const current = analytics.users[userId] || {
@@ -917,13 +926,28 @@ async function recordGlobalLoginEvent(user, guilds = []) {
         guilds: []
     };
 
+    const profileChanged =
+        current.username !== String(user.username || current.username || 'Usuario')
+        || current.globalName !== String(user.global_name || user.username || current.globalName || 'Usuario')
+        || current.avatar !== (user.avatar || null);
+    const guildsChanged = analyticsGuildIdsKey(current.guilds) !== analyticsGuildIdsKey(sanitizedGuilds);
+
+    if (!incrementLogin && !profileChanged && !guildsChanged) {
+        return;
+    }
+
     current.username = String(user.username || current.username || 'Usuario');
     current.globalName = String(user.global_name || user.username || current.globalName || 'Usuario');
     current.avatar = user.avatar || null;
-    current.loginCount = (Number(current.loginCount) || 0) + 1;
-    current.lastLoginAt = nowIso;
     current.guildCount = guildList.length;
     current.guilds = sanitizedGuilds;
+    current.guildsSyncedAt = nowIso;
+
+    if (incrementLogin) {
+        current.loginCount = (Number(current.loginCount) || 0) + 1;
+        current.lastLoginAt = nowIso;
+        if (!current.firstLoginAt) current.firstLoginAt = nowIso;
+    }
 
     analytics.users[userId] = current;
     analytics.totals = summarizeAnalytics(analytics);
@@ -931,6 +955,19 @@ async function recordGlobalLoginEvent(user, guilds = []) {
 
     await safeDbSet(LOGIN_ANALYTICS_KEY, analytics);
     writeLoginAnalyticsToFile(analytics);
+}
+
+async function recordGlobalLoginEvent(user, guilds = []) {
+    await updateUserAnalyticsGuilds(user, guilds, { incrementLogin: true });
+}
+
+function scheduleUserAnalyticsGuildSync(user, oauthGuilds = []) {
+    if (!user?.id || !Array.isArray(oauthGuilds)) return;
+    setImmediate(() => {
+        updateUserAnalyticsGuilds(user, oauthGuilds, { incrementLogin: false }).catch((error) => {
+            console.warn('⚠️ No se pudo actualizar servidores en analytics:', error.message);
+        });
+    });
 }
 
 function summarizePeakDay(daily = {}, key) {
@@ -1305,6 +1342,11 @@ async function syncSessionGuilds(req, options = {}) {
         req.session.guilds = freshGuilds;
         req.session.guildsSyncedAt = Date.now();
         req.session.save(() => {});
+
+        if (req.session?.user) {
+            scheduleUserAnalyticsGuildSync(req.session.user, freshGuilds);
+        }
+
         return freshGuilds;
     } catch (error) {
         console.warn('⚠️ No se pudo sincronizar la lista de servidores del usuario:', error.message);
