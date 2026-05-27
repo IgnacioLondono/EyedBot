@@ -23,6 +23,29 @@ function resolveOwnerMember(channel, ownerId) {
     return channel.guild.members.cache.get(ownerId) || null;
 }
 
+async function resolveBotMember(guild) {
+    if (!guild) return null;
+    return guild.members.me || await guild.members.fetch(guild.client.user.id).catch(() => null);
+}
+
+async function moveMemberToTempChannel(member, channel, reason = 'Canal de voz temporal') {
+    if (!member || !channel) return false;
+    if (String(member.voice?.channelId || '') === String(channel.id)) return true;
+
+    const tryMove = async (targetMember) => {
+        if (!targetMember) return false;
+        return targetMember.voice.setChannel(channel, reason).then(() => true).catch(() => false);
+    };
+
+    if (await tryMove(member)) return true;
+
+    const freshMember = await member.guild.members.fetch(member.id).catch(() => null);
+    if (await tryMove(freshMember)) return true;
+
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    return tryMove(freshMember || member);
+}
+
 async function findRecentVoiceDisconnectOrMoveExecutor(guild, memberId) {
     if (!guild?.members?.me?.permissions?.has(PermissionsBitField.Flags.ViewAuditLog)) return null;
 
@@ -281,9 +304,47 @@ async function sendManagementEmbed(channel, member, voiceConfig) {
     const payload = buildManagementPanelPayload(channel, member.id, voiceConfig, {}, ownerMember);
     if (!payload) return;
 
-    const sentMessage = await channel.send(payload).catch(() => null);
-    if (sentMessage && typeof sentMessage.pin === 'function') {
-        await sentMessage.pin('Panel de gestion de voz temporal').catch(() => null);
+    const botMember = await resolveBotMember(channel.guild);
+    if (!botMember) return;
+    const canSendPanel = channel.permissionsFor(botMember)?.has([
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.EmbedLinks
+    ]);
+    if (!canSendPanel) {
+        console.warn(`[TempVoice] No se pudo enviar panel en #${channel.name}: faltan permisos para el bot.`);
+        return;
+    }
+
+    const sendOnce = async () => {
+        const sentMessage = await channel.send(payload).catch(() => null);
+        if (sentMessage && typeof sentMessage.pin === 'function') {
+            await sentMessage.pin('Panel de gestion de voz temporal').catch(() => null);
+        }
+        return sentMessage;
+    };
+
+    let sentMessage = await sendOnce();
+    if (!sentMessage) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        sentMessage = await sendOnce();
+    }
+}
+
+async function ensureManagementEmbedIfMissing(channel, member, voiceConfig) {
+    if (!voiceConfig?.sendManageEmbed) return;
+    if (!channel || typeof channel.messages?.fetch !== 'function') return;
+
+    const recent = await channel.messages.fetch({ limit: 25 }).catch(() => null);
+    const hasPanel = recent?.some((msg) => {
+        if (!msg || msg.author?.id !== channel.client.user.id) return false;
+        return msg.components?.some((row) => row.components?.some((btn) =>
+            String(btn.customId || '').startsWith(CONTROL_BUTTON_PREFIX)
+        ));
+    });
+
+    if (!hasPanel) {
+        await sendManagementEmbed(channel, member, voiceConfig);
     }
 }
 
@@ -295,6 +356,7 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
             await existing.permissionOverwrites.edit(member.id, {
                 ManageChannels: false
             }).catch(() => null);
+            await ensureManagementEmbedIfMissing(existing, member, config);
             return { channel: existing, created: false };
         }
         await tempVoiceStore.clearActiveChannel(guild.id, member.id, existingChannelId);
@@ -312,6 +374,37 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
 
     const parentId = parent?.type === ChannelType.GuildCategory ? parent.id : creatorChannel.parentId || null;
     const userLimit = Math.max(0, Math.min(99, Number.parseInt(config.userLimit || 0, 10) || 0));
+    const botMember = await resolveBotMember(guild);
+    const overwrites = [
+        {
+            id: member.id,
+            allow: [
+                PermissionsBitField.Flags.Connect,
+                PermissionsBitField.Flags.Speak,
+                PermissionsBitField.Flags.Stream,
+                PermissionsBitField.Flags.UseVAD,
+                PermissionsBitField.Flags.MoveMembers,
+                PermissionsBitField.Flags.MuteMembers,
+                PermissionsBitField.Flags.DeafenMembers
+            ]
+        }
+    ];
+
+    if (botMember) {
+        overwrites.push({
+            id: botMember.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.Connect,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.EmbedLinks,
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.MoveMembers,
+                PermissionsBitField.Flags.ManageChannels
+            ]
+        });
+    }
 
     const channel = await guild.channels.create({
         name: channelName,
@@ -319,20 +412,7 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
         parent: parentId,
         bitrate: creatorChannel.bitrate || undefined,
         userLimit,
-        permissionOverwrites: [
-            {
-                id: member.id,
-                allow: [
-                    PermissionsBitField.Flags.Connect,
-                    PermissionsBitField.Flags.Speak,
-                    PermissionsBitField.Flags.Stream,
-                    PermissionsBitField.Flags.UseVAD,
-                    PermissionsBitField.Flags.MoveMembers,
-                    PermissionsBitField.Flags.MuteMembers,
-                    PermissionsBitField.Flags.DeafenMembers
-                ]
-            }
-        ]
+        permissionOverwrites: overwrites
     });
 
     await tempVoiceStore.setActiveChannel(guild.id, member.id, channel.id);
@@ -377,7 +457,11 @@ async function createOrMoveMemberTempChannel(member, preferredName = null) {
     }
 
     if (targetChannel.id !== userVoiceChannelId) {
-        await member.voice.setChannel(targetChannel).catch(() => null);
+        const moved = await moveMemberToTempChannel(member, targetChannel);
+        if (!moved) {
+            console.warn(`[TempVoice] No se pudo mover a ${member.user?.tag || member.id} a su canal temporal ${targetChannel.id}`);
+            return { ok: false, reason: 'move-failed', channel: targetChannel, created: result?.created === true };
+        }
     }
 
     return { ok: true, channel: targetChannel, created: result?.created === true };
@@ -398,7 +482,10 @@ async function handleJoinCreatorChannel(newState, config) {
     const targetChannel = result?.channel || null;
     if (!targetChannel || targetChannel.id === newState.channelId) return;
 
-    await newState.setChannel(targetChannel).catch(() => null);
+    const moved = await moveMemberToTempChannel(member, targetChannel);
+    if (!moved) {
+        console.warn(`[TempVoice] Falló mover desde canal creador a canal temporal (${member.user?.tag || member.id}).`);
+    }
 }
 
 async function handleLeaveTempChannel(oldState) {

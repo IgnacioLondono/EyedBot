@@ -227,6 +227,7 @@ let currentBillingState = {
     cancelAtPeriodEnd: false
 };
 let premiumUpsellLock = false;
+let guildAccessResetLock = false;
 
 /** Marca de suscripción del panel (UI). */
 const EYED_PLUS_BRAND = 'EyedPlus+';
@@ -1302,6 +1303,21 @@ async function fetchWithCredentials(url, options = {}) {
     const isBillingEndpoint = normalizedUrl.startsWith('/api/billing/');
     if (!isBillingEndpoint && (response.status === 402 || response.status === 403)) {
         const payload = await response.clone().json().catch(() => ({}));
+        const routeGuildId = normalizedUrl.match(/^\/api\/guild\/([^/]+)/)?.[1] || '';
+        const deniedManagement = response.status === 403
+            && routeGuildId
+            && String(routeGuildId) === String(currentServerGuildId)
+            && /permisos|acceso|gestionar/i.test(String(payload?.error || ''));
+
+        if (deniedManagement && !guildAccessResetLock) {
+            guildAccessResetLock = true;
+            resetServerContextToDashboard();
+            showToast('El servidor seleccionado ya no está disponible para gestionar. Selecciona otro desde Dashboard.', 'warning');
+            setTimeout(() => {
+                guildAccessResetLock = false;
+            }, 3000);
+        }
+
         if (payload?.code === 'premium_required') {
             if (isPremiumPane(currentServerPaneId)) {
                 enforceAllPremiumLocks();
@@ -4050,10 +4066,16 @@ function showSection(sectionId, options = {}) {
         sectionId = 'dashboard';
     }
 
+    const targetSection = document.getElementById(sectionId);
+    if (!targetSection) {
+        console.warn('Seccion invalida solicitada:', sectionId);
+        sectionId = 'dashboard';
+    }
+
     document.querySelectorAll('.section').forEach(section => {
         section.classList.remove('active');
     });
-    document.getElementById(sectionId).classList.add('active');
+    document.getElementById(sectionId)?.classList.add('active');
 
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.remove('active');
@@ -14293,8 +14315,11 @@ function clearDraftTicketConfig(guildId) {
 function hasTicketConfigChanges(guildId) {
     const draft = loadDraftTicketConfig(guildId);
     if (!draft) return false;
-    // Si hay draft y más de 30 segundos sin guardar, hay cambios
-    return (Date.now() - draft.timestamp) < 30000;
+    const hasContent = ['title', 'description', 'message', 'footer', 'buttonLabel']
+        .some((key) => String(draft?.[key] || '').trim().length > 0);
+    const hasArrays = ['adminRoleIds', 'ticketCategories', 'commonProblems', 'minecraftServers']
+        .some((key) => Array.isArray(draft?.[key]) && draft[key].length > 0);
+    return hasContent || hasArrays;
 }
 
 // Persistencia de scroll position para gestión de tickets
@@ -15662,8 +15687,10 @@ async function fetchTicketChatMessages({ initial = false, force = false } = {}) 
     if (!force && !initial && now - _ticketChatState.lastFetchAt < 1500) return;
     _ticketChatState.lastFetchAt = now;
 
+    let responseStatus = 0;
     try {
         const response = await fetchWithCredentials(`/api/guild/${guildId}/tickets/active/${encodeURIComponent(channelId)}/messages?limit=60`);
+        responseStatus = Number(response.status || 0);
         const data = await response.json();
         if (!response.ok || !data?.success) {
             throw new Error(data?.error || 'No se pudieron cargar los mensajes');
@@ -15698,6 +15725,11 @@ async function fetchTicketChatMessages({ initial = false, force = false } = {}) 
         setTicketChatStatus('');
     } catch (error) {
         console.error('Error cargando mensajes:', error);
+        if (responseStatus === 403 || responseStatus === 404) {
+            stopTicketChatPolling();
+            setTicketChatStatus('La conversación ya no está disponible en este servidor.');
+            return;
+        }
         if (initial) setTicketChatStatus(error.message || 'No se pudieron cargar los mensajes.');
     }
 }

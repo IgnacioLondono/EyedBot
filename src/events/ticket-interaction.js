@@ -27,6 +27,7 @@ const PANEL_COMMON_SELECT_PREFIX = 'ticket_panel_common_';
 const PANEL_CONTINUE_PREFIX = 'ticket_panel_continue_';
 const PANEL_CANCEL_PREFIX = 'ticket_panel_cancel_';
 const DRAFT_TTL_MS = 15 * 60 * 1000;
+const PENDING_TTL_MS = 30 * 60 * 1000;
 
 const DEFAULT_CATEGORIES = [
     { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
@@ -73,6 +74,9 @@ const DEFAULT_COMMON_ISSUES_BY_CATEGORY = {
 const ticketDrafts = new Map();
 const pendingRequestsMemory = new Map();
 const pendingUsersMemory = new Map();
+const pendingSubmitLocks = new Map();
+const ticketCreateLocks = new Map();
+const acceptPendingLocks = new Map();
 
 async function sendEphemeral(interaction, content) {
     if (interaction.deferred || interaction.replied) {
@@ -184,48 +188,107 @@ function pendingUserKey(guildId, userId) {
     return `ticket_pending_user_${guildId}_${userId}`;
 }
 
+function withLock(lockMap, key, task) {
+    const safeKey = String(key || 'lock');
+    const previous = lockMap.get(safeKey) || Promise.resolve();
+    const next = previous
+        .catch(() => null)
+        .then(() => task());
+    lockMap.set(safeKey, next);
+    return next.finally(() => {
+        if (lockMap.get(safeKey) === next) {
+            lockMap.delete(safeKey);
+        }
+    });
+}
+
+function isPendingExpired(record) {
+    if (!record || typeof record !== 'object') return true;
+    const expiresAt = Date.parse(String(record.expiresAt || ''));
+    if (Number.isFinite(expiresAt)) return Date.now() >= expiresAt;
+    const createdAt = Date.parse(String(record.createdAt || ''));
+    if (!Number.isFinite(createdAt)) return true;
+    return (Date.now() - createdAt) > PENDING_TTL_MS;
+}
+
 async function getPendingRequest(guildId, requestId) {
     const key = pendingKey(guildId, requestId);
     const fromDb = await db.get(key).catch(() => null);
     if (fromDb && typeof fromDb === 'object') {
+        if (isPendingExpired(fromDb)) {
+            await clearPendingRequest(guildId, requestId, fromDb.requesterId || '').catch(() => null);
+            return null;
+        }
         pendingRequestsMemory.set(key, fromDb);
         pendingUsersMemory.set(pendingUserKey(guildId, fromDb.requesterId), requestId);
         return fromDb;
     }
 
-    return pendingRequestsMemory.get(key) || null;
+    const fromMemory = pendingRequestsMemory.get(key) || null;
+    if (!fromMemory) return null;
+    if (isPendingExpired(fromMemory)) {
+        await clearPendingRequest(guildId, requestId, fromMemory.requesterId || '').catch(() => null);
+        return null;
+    }
+    return fromMemory;
 }
 
 async function getPendingUserRequestId(guildId, userId) {
     const key = pendingUserKey(guildId, userId);
     const fromDb = await db.get(key).catch(() => null);
     if (fromDb) {
-        pendingUsersMemory.set(key, String(fromDb));
-        return String(fromDb);
+        const requestId = String(fromDb);
+        const pending = await getPendingRequest(guildId, requestId);
+        if (!pending) {
+            pendingUsersMemory.delete(key);
+            await db.delete(key).catch(() => null);
+            return null;
+        }
+        pendingUsersMemory.set(key, requestId);
+        return requestId;
     }
-    return pendingUsersMemory.get(key) || null;
+    const requestId = pendingUsersMemory.get(key) || null;
+    if (!requestId) return null;
+    const pending = await getPendingRequest(guildId, requestId);
+    if (!pending) {
+        pendingUsersMemory.delete(key);
+        return null;
+    }
+    return requestId;
 }
 
 async function savePendingRequest(guildId, requestId, pendingRecord) {
     const key = pendingKey(guildId, requestId);
     const userKey = pendingUserKey(guildId, pendingRecord.requesterId);
+    const record = {
+        ...pendingRecord,
+        expiresAt: new Date(Date.now() + PENDING_TTL_MS).toISOString()
+    };
 
-    pendingRequestsMemory.set(key, pendingRecord);
+    pendingRequestsMemory.set(key, record);
     pendingUsersMemory.set(userKey, requestId);
 
-    await db.set(key, pendingRecord).catch(() => null);
+    await db.set(key, record).catch(() => null);
     await db.set(userKey, requestId).catch(() => null);
+}
+
+async function claimPendingRequest(guildId, requestId) {
+    const pending = await getPendingRequest(guildId, requestId);
+    if (!pending) return null;
+    await clearPendingRequest(guildId, requestId, pending.requesterId);
+    return pending;
 }
 
 async function clearPendingRequest(guildId, requestId, requesterId) {
     const key = pendingKey(guildId, requestId);
-    const userKey = pendingUserKey(guildId, requesterId);
+    const safeRequesterId = String(requesterId || '').trim();
+    const userKey = safeRequesterId ? pendingUserKey(guildId, safeRequesterId) : null;
 
     pendingRequestsMemory.delete(key);
-    pendingUsersMemory.delete(userKey);
+    if (userKey) pendingUsersMemory.delete(userKey);
 
     await db.delete(key).catch(() => null);
-    await db.delete(userKey).catch(() => null);
+    if (userKey) await db.delete(userKey).catch(() => null);
 }
 
 function parseAcceptCustomId(customId = '') {
@@ -644,78 +707,85 @@ async function submitPendingTicketRequest(interaction, guildId, payload = {}) {
         return;
     }
 
-    const existing = guild.channels.cache.find((ch) =>
-        ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === interaction.user.id
-    );
-    if (existing) {
-        await sendEphemeral(interaction, `Ya tienes un ticket abierto: <#${existing.id}>`);
+    const lockKey = `${guildId}:${interaction.user.id}`;
+    const submitResult = await withLock(pendingSubmitLocks, lockKey, async () => {
+        const existing = guild.channels.cache.find((ch) =>
+            ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === interaction.user.id
+        );
+        if (existing) {
+            return { ok: false, error: `Ya tienes un ticket abierto: <#${existing.id}>` };
+        }
+
+        const userPendingId = await getPendingUserRequestId(guildId, interaction.user.id);
+        if (userPendingId) {
+            return { ok: false, error: 'Ya tienes una solicitud pendiente. Espera a que un moderador la atienda.' };
+        }
+
+        const requestChannelId = String(cfg.requestChannelId || cfg.panelChannelId || '').trim();
+        const requestChannel = guild.channels.cache.get(requestChannelId) || await guild.channels.fetch(requestChannelId).catch(() => null);
+        if (!requestChannel || !requestChannel.isTextBased()) {
+            return { ok: false, error: 'No se encontro el canal de tickets para dejar la solicitud pendiente.' };
+        }
+
+        const requestId = makePendingRequestId();
+        const acceptId = `${ACCEPT_PREFIX}${guildId}_${requestId}`;
+
+        const pendingEmbed = new EmbedBuilder()
+            .setColor('f5a623')
+            .setTitle('Solicitud de ticket pendiente')
+            .setDescription('Un moderador debe aceptar esta solicitud para crear el canal del ticket.')
+            .addFields(
+                { name: 'Solicitante', value: `<@${interaction.user.id}>`, inline: true },
+                { name: 'Categoria', value: String(payload.category || 'No especificado').slice(0, 1024), inline: true },
+                { name: 'Caso', value: String(payload.commonIssue || 'No especificado').slice(0, 1024), inline: true },
+                { name: 'Detalle', value: String(payload.reason || 'Sin detalles').slice(0, 1024), inline: false },
+                { name: 'Estado', value: 'Pendiente de aceptación', inline: true },
+                { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
+            )
+            .setTimestamp();
+
+        const acceptBtn = new ButtonBuilder()
+            .setCustomId(acceptId)
+            .setLabel('Aceptar solicitud')
+            .setStyle(ButtonStyle.Success);
+
+        const pendingMessage = await requestChannel.send({
+            content: `<@${interaction.user.id}>`,
+            embeds: [pendingEmbed],
+            components: [new ActionRowBuilder().addComponents(acceptBtn)]
+        }).catch(() => null);
+
+        if (!pendingMessage) {
+            return { ok: false, error: 'No se pudo registrar la solicitud pendiente.' };
+        }
+
+        const pendingRecord = {
+            requestId,
+            guildId,
+            requesterId: interaction.user.id,
+            requesterTag: interaction.user.tag,
+            requesterUsername: interaction.user.username,
+            category: String(payload.category || 'Soporte general'),
+            commonIssue: String(payload.commonIssue || 'No especificado'),
+            categoryValue: String(payload.categoryValue || ''),
+            commonIssueValue: String(payload.commonIssueValue || ''),
+            noMatchIssue: String(payload.noMatchIssue || 'No aplica'),
+            reason: String(payload.reason || 'Sin motivo'),
+            messageId: pendingMessage.id,
+            channelId: pendingMessage.channelId,
+            createdAt: new Date().toISOString()
+        };
+
+        await savePendingRequest(guildId, requestId, pendingRecord);
+        return { ok: true, requestId };
+    });
+
+    if (!submitResult?.ok) {
+        await sendEphemeral(interaction, submitResult?.error || 'No se pudo registrar la solicitud pendiente.');
         return;
     }
 
-    const userPendingId = await getPendingUserRequestId(guildId, interaction.user.id);
-    if (userPendingId) {
-        await sendEphemeral(interaction, 'Ya tienes una solicitud pendiente. Espera a que un moderador la atienda.');
-        return;
-    }
-
-    const requestChannelId = String(cfg.requestChannelId || cfg.panelChannelId || '').trim();
-    const requestChannel = guild.channels.cache.get(requestChannelId) || await guild.channels.fetch(requestChannelId).catch(() => null);
-    if (!requestChannel || !requestChannel.isTextBased()) {
-        await sendEphemeral(interaction, 'No se encontro el canal de tickets para dejar la solicitud pendiente.');
-        return;
-    }
-
-    const requestId = makePendingRequestId();
-    const acceptId = `${ACCEPT_PREFIX}${guildId}_${requestId}`;
-
-    const pendingEmbed = new EmbedBuilder()
-        .setColor('f5a623')
-        .setTitle('Solicitud de ticket pendiente')
-        .setDescription('Un moderador debe aceptar esta solicitud para crear el canal del ticket.')
-        .addFields(
-            { name: 'Solicitante', value: `<@${interaction.user.id}>`, inline: true },
-            { name: 'Categoria', value: String(payload.category || 'No especificado').slice(0, 1024), inline: true },
-            { name: 'Caso', value: String(payload.commonIssue || 'No especificado').slice(0, 1024), inline: true },
-            { name: 'Detalle', value: String(payload.reason || 'Sin detalles').slice(0, 1024), inline: false },
-            { name: 'Estado', value: 'Pendiente de aceptación', inline: true },
-            { name: 'ID solicitud', value: requestId.slice(0, 1024), inline: true }
-        )
-        .setTimestamp();
-
-    const acceptBtn = new ButtonBuilder()
-        .setCustomId(acceptId)
-        .setLabel('Aceptar solicitud')
-        .setStyle(ButtonStyle.Success);
-
-    const pendingMessage = await requestChannel.send({
-        content: `<@${interaction.user.id}>`,
-        embeds: [pendingEmbed],
-        components: [new ActionRowBuilder().addComponents(acceptBtn)]
-    }).catch(() => null);
-
-    if (!pendingMessage) {
-        await sendEphemeral(interaction, 'No se pudo registrar la solicitud pendiente.');
-        return;
-    }
-
-    const pendingRecord = {
-        requestId,
-        guildId,
-        requesterId: interaction.user.id,
-        requesterTag: interaction.user.tag,
-        requesterUsername: interaction.user.username,
-        category: String(payload.category || 'Soporte general'),
-        commonIssue: String(payload.commonIssue || 'No especificado'),
-        categoryValue: String(payload.categoryValue || ''),
-        commonIssueValue: String(payload.commonIssueValue || ''),
-        noMatchIssue: String(payload.noMatchIssue || 'No aplica'),
-        reason: String(payload.reason || 'Sin motivo'),
-        messageId: pendingMessage.id,
-        channelId: pendingMessage.channelId,
-        createdAt: new Date().toISOString()
-    };
-
-    await savePendingRequest(guildId, requestId, pendingRecord);
+    const requestId = submitResult.requestId;
 
     const userPendingEmbed = new EmbedBuilder()
         .setColor('f5a623')
@@ -852,15 +922,17 @@ async function createTicketChannel(interaction, guildId, reason, details = {}, o
 
     const ownerUserId = String(options.ownerUserId || interaction.user.id);
     const ownerUsername = String(options.ownerUsername || interaction.user.username || 'usuario');
+    const lockKey = `${guildId}:${ownerUserId}`;
 
-    const existing = guild.channels.cache.find((ch) =>
-        ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === ownerUserId
-    );
+    return withLock(ticketCreateLocks, lockKey, async () => {
+        const existing = guild.channels.cache.find((ch) =>
+            ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === ownerUserId
+        );
 
-    if (existing) {
-        await sendEphemeral(interaction, `Ya tienes un ticket abierto: <#${existing.id}>`);
-        return;
-    }
+        if (existing) {
+            await sendEphemeral(interaction, `Ya tienes un ticket abierto: <#${existing.id}>`);
+            return null;
+        }
 
     const adminRoleIds = Array.isArray(cfg.adminRoleIds) ? cfg.adminRoleIds : [];
     const validAdminRoles = adminRoleIds
@@ -941,17 +1013,17 @@ async function createTicketChannel(interaction, guildId, reason, details = {}, o
         `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
     ].join(' | ').slice(0, 1000);
 
-    const created = await guild.channels.create({
-        name: ticketName,
-        type: ChannelType.GuildText,
-        topic,
-        permissionOverwrites
-    }).catch(() => null);
+        const created = await guild.channels.create({
+            name: ticketName,
+            type: ChannelType.GuildText,
+            topic,
+            permissionOverwrites
+        }).catch(() => null);
 
-    if (!created) {
-        await sendEphemeral(interaction, 'No pude crear el canal del ticket.');
-        return;
-    }
+        if (!created) {
+            await sendEphemeral(interaction, 'No pude crear el canal del ticket.');
+            return null;
+        }
 
     const infoEmbed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
@@ -983,17 +1055,18 @@ async function createTicketChannel(interaction, guildId, reason, details = {}, o
         components: [new ActionRowBuilder().addComponents(closeBtn)]
     }).catch(() => null);
 
-    clearDraftForUser(guildId, ownerUserId);
-    await interaction.editReply({
-        content: `Ticket creado correctamente. Accede aqui: <#${created.id}>`,
-        components: []
-    }).catch(() => null);
+        clearDraftForUser(guildId, ownerUserId);
+        await interaction.editReply({
+            content: `Ticket creado correctamente. Accede aqui: <#${created.id}>`,
+            components: []
+        }).catch(() => null);
 
-    setTimeout(() => {
-        interaction.deleteReply().catch(() => null);
-    }, 60000);
+        setTimeout(() => {
+            interaction.deleteReply().catch(() => null);
+        }, 60000);
 
-    return created;
+        return created;
+    });
 }
 
 function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue) {
@@ -1065,21 +1138,21 @@ async function handleTicketButton(interaction) {
             return true;
         }
 
-        const pending = await getPendingRequest(guildId, requestId);
-        if (!pending) {
-            await interaction.reply({ content: 'Esta solicitud ya fue gestionada o no existe.', flags: 64 }).catch(() => null);
-            return true;
-        }
-
         const cfg = await resolveConfig(guildId);
         if (!cfg) {
             await interaction.reply({ content: 'El sistema de tickets no esta activo.', flags: 64 }).catch(() => null);
             return true;
         }
 
+        const pendingPreview = await getPendingRequest(guildId, requestId);
+        if (!pendingPreview) {
+            await interaction.reply({ content: 'Esta solicitud ya fue gestionada o no existe.', flags: 64 }).catch(() => null);
+            return true;
+        }
+
         const closerRoleSet = buildCaseRoleSet(cfg, {
-            categoryValue: pending.categoryValue,
-            commonIssueValue: pending.commonIssueValue
+            categoryValue: pendingPreview.categoryValue,
+            commonIssueValue: pendingPreview.commonIssueValue
         });
 
         if (!memberCanCloseTicket(interaction.member, closerRoleSet)) {
@@ -1088,6 +1161,14 @@ async function handleTicketButton(interaction) {
         }
 
         await interaction.deferReply({ flags: 64 }).catch(() => null);
+
+        const pending = await withLock(acceptPendingLocks, `${guildId}:${requestId}`, () =>
+            claimPendingRequest(guildId, requestId)
+        );
+        if (!pending) {
+            await interaction.editReply({ content: 'Esta solicitud ya fue gestionada o no existe.' }).catch(() => null);
+            return true;
+        }
 
         const requesterUser = await interaction.client.users.fetch(pending.requesterId).catch(() => null);
         const created = await createTicketChannel(
@@ -1138,12 +1219,6 @@ async function handleTicketButton(interaction) {
 
             if (requesterUser) {
                 await requesterUser.send({ embeds: [approvedForUserEmbed] }).catch(() => null);
-            }
-
-            await clearPendingRequest(guildId, requestId, pending.requesterId);
-
-            if (requesterUser) {
-                await requesterUser.send(`Tu solicitud fue aceptada por ${interaction.user.tag}. Canal del ticket: <#${created.id}>`).catch(() => null);
             }
         }
 
@@ -1404,209 +1479,208 @@ async function acceptPendingFromWeb(botClient, guildId, requestId, acceptedByUse
         return { ok: false, code: 'GUILD_NOT_FOUND', error: 'Servidor no encontrado' };
     }
 
-    const pending = await getPendingRequest(guildId, requestId);
-    if (!pending || typeof pending !== 'object') {
-        return { ok: false, code: 'PENDING_NOT_FOUND', error: 'La solicitud ya fue atendida o expiro' };
-    }
-
-    const cfg = await ticketStore.getTicketConfig(guildId);
-    if (!cfg) {
-        return { ok: false, code: 'CONFIG_MISSING', error: 'El sistema de tickets no esta configurado' };
-    }
-
-    const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
-    if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
-        return { ok: false, code: 'BOT_NO_PERMS', error: 'El bot no tiene permisos para crear canales' };
-    }
-
-    const ownerUserId = String(pending.requesterId || '');
-    const ownerUsername = String(pending.requesterUsername || pending.requesterTag || 'usuario');
-
-    if (!ownerUserId) {
-        await clearPendingRequest(guildId, requestId, ownerUserId).catch(() => null);
-        return { ok: false, code: 'PENDING_CORRUPT', error: 'La solicitud no tiene usuario asociado' };
-    }
-
-    const existing = guild.channels.cache.find((ch) =>
-        ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === ownerUserId
-    );
-
-    if (existing) {
-        await clearPendingRequest(guildId, requestId, ownerUserId).catch(() => null);
-        return {
-            ok: false,
-            code: 'ALREADY_OPEN',
-            error: `El usuario ya tiene un ticket abierto: #${existing.name}`,
-            channelId: existing.id
-        };
-    }
-
-    const details = {
-        category: String(pending.category || 'Soporte general'),
-        commonIssue: String(pending.commonIssue || 'No especificado'),
-        categoryValue: String(pending.categoryValue || ''),
-        commonIssueValue: String(pending.commonIssueValue || ''),
-        noMatchIssue: String(pending.noMatchIssue || 'No especificado')
-    };
-
-    const reason = String(pending.reason || 'Sin motivo');
-
-    const adminRoleIds = Array.isArray(cfg.adminRoleIds) ? cfg.adminRoleIds : [];
-    const validAdminRoles = adminRoleIds
-        .map((id) => guild.roles.cache.get(id))
-        .filter(Boolean);
-    const caseRoleIds = buildCaseRoleIds(cfg, details);
-    const validCaseRoles = caseRoleIds
-        .filter((id) => !adminRoleIds.includes(id))
-        .map((id) => guild.roles.cache.get(id))
-        .filter(Boolean);
-
-    const categoryLabel = details.category.slice(0, 80);
-    const commonIssueLabel = details.commonIssue.slice(0, 120);
-    const noMatchIssueLabel = details.noMatchIssue.slice(0, 180);
-
-    const baseName = toSafeChannelName(ownerUsername);
-    const categorySlug = toSafeChannelName(categoryLabel).slice(0, 24);
-    const ticketName = `ticket-${categorySlug}-${baseName}`.slice(0, 95);
-
-    const permissionOverwrites = [
-        {
-            id: guild.roles.everyone.id,
-            deny: [PermissionsBitField.Flags.ViewChannel]
-        },
-        {
-            id: ownerUserId,
-            allow: [
-                PermissionsBitField.Flags.ViewChannel,
-                PermissionsBitField.Flags.SendMessages,
-                PermissionsBitField.Flags.ReadMessageHistory,
-                PermissionsBitField.Flags.AttachFiles,
-                PermissionsBitField.Flags.EmbedLinks
-            ]
-        },
-        {
-            id: me.id,
-            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.SendMessages]
+    return withLock(acceptPendingLocks, `${guildId}:${requestId}`, async () => {
+        const pending = await claimPendingRequest(guildId, requestId);
+        if (!pending || typeof pending !== 'object') {
+            return { ok: false, code: 'PENDING_NOT_FOUND', error: 'La solicitud ya fue atendida o expiro' };
         }
-    ];
 
-    validAdminRoles.forEach((role) => {
-        permissionOverwrites.push({
-            id: role.id,
-            allow: [
-                PermissionsBitField.Flags.ViewChannel,
-                PermissionsBitField.Flags.SendMessages,
-                PermissionsBitField.Flags.ReadMessageHistory,
-                PermissionsBitField.Flags.ManageMessages,
-                PermissionsBitField.Flags.ManageChannels
-            ]
-        });
-    });
+        const cfg = await ticketStore.getTicketConfig(guildId);
+        if (!cfg) {
+            return { ok: false, code: 'CONFIG_MISSING', error: 'El sistema de tickets no esta configurado' };
+        }
 
-    validCaseRoles.forEach((role) => {
-        permissionOverwrites.push({
-            id: role.id,
-            allow: [
-                PermissionsBitField.Flags.ViewChannel,
-                PermissionsBitField.Flags.SendMessages,
-                PermissionsBitField.Flags.ReadMessageHistory,
-                PermissionsBitField.Flags.ManageMessages,
-                PermissionsBitField.Flags.ManageChannels
-            ]
-        });
-    });
+        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+            return { ok: false, code: 'BOT_NO_PERMS', error: 'El bot no tiene permisos para crear canales' };
+        }
 
-    const closerRoleIds = Array.from(new Set([
-        ...validAdminRoles.map((role) => String(role.id)),
-        ...validCaseRoles.map((role) => String(role.id))
-    ]));
+        const ownerUserId = String(pending.requesterId || '');
+        const ownerUsername = String(pending.requesterUsername || pending.requesterTag || 'usuario');
 
-    const topic = [
-        `owner:${ownerUserId}`,
-        `category:${categoryLabel}`,
-        `common:${commonIssueLabel}`,
-        `staff:${closerRoleIds.join(',')}`,
-        `no-match:${noMatchIssueLabel}`,
-        `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
-    ].join(' | ').slice(0, 1000);
+        if (!ownerUserId) {
+            return { ok: false, code: 'PENDING_CORRUPT', error: 'La solicitud no tiene usuario asociado' };
+        }
 
-    const created = await guild.channels.create({
-        name: ticketName,
-        type: ChannelType.GuildText,
-        topic,
-        permissionOverwrites
-    }).catch(() => null);
+        return withLock(ticketCreateLocks, `${guildId}:${ownerUserId}`, async () => {
+            const existing = guild.channels.cache.find((ch) =>
+                ch.type === ChannelType.GuildText && parseTicketOwner(ch.topic) === ownerUserId
+            );
 
-    if (!created) {
-        return { ok: false, code: 'CHANNEL_CREATE_FAILED', error: 'No pude crear el canal del ticket' };
-    }
+            if (existing) {
+                return {
+                    ok: false,
+                    code: 'ALREADY_OPEN',
+                    error: `El usuario ya tiene un ticket abierto: #${existing.name}`,
+                    channelId: existing.id
+                };
+            }
 
-    const ownerMember = await guild.members.fetch(ownerUserId).catch(() => null);
-    const acceptorUser = acceptedByUserId ? await botClient.users.fetch(acceptedByUserId).catch(() => null) : null;
-    const ownerAvatarURL = ownerMember?.user?.displayAvatarURL({ size: 128 }) || null;
+            const details = {
+                category: String(pending.category || 'Soporte general'),
+                commonIssue: String(pending.commonIssue || 'No especificado'),
+                categoryValue: String(pending.categoryValue || ''),
+                commonIssueValue: String(pending.commonIssueValue || ''),
+                noMatchIssue: String(pending.noMatchIssue || 'No especificado')
+            };
 
-    const infoEmbed = new EmbedBuilder()
-        .setColor((cfg.color || '7c4dff').replace('#', ''))
-        .setAuthor({
-            name: `${ownerUsername} abrio un ticket`,
-            iconURL: ownerAvatarURL || undefined
-        })
-        .setTitle('Nuevo ticket abierto')
-        .setDescription('Se registro una nueva solicitud. El staff revisara la informacion del ticket.')
-        .addFields(
-            { name: 'Usuario', value: `<@${ownerUserId}>`, inline: true },
-            { name: 'Referencia', value: `#${created.id}`, inline: true },
-            { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
-            { name: 'Caso', value: commonIssueLabel.slice(0, 1024), inline: true },
-            { name: 'Contexto / Motivo', value: String(reason).slice(0, 1024) || 'Sin detalles', inline: false },
-            { name: 'Aceptado por', value: acceptorUser ? `<@${acceptorUser.id}> (web)` : 'Web panel', inline: false }
-        )
-        .setFooter({ text: 'Usa el boton de abajo para cerrar el ticket cuando termines.' })
-        .setTimestamp();
+            const reason = String(pending.reason || 'Sin motivo');
 
-    if (ownerAvatarURL) infoEmbed.setThumbnail(ownerAvatarURL);
+            const adminRoleIds = Array.isArray(cfg.adminRoleIds) ? cfg.adminRoleIds : [];
+            const validAdminRoles = adminRoleIds
+                .map((id) => guild.roles.cache.get(id))
+                .filter(Boolean);
+            const caseRoleIds = buildCaseRoleIds(cfg, details);
+            const validCaseRoles = caseRoleIds
+                .filter((id) => !adminRoleIds.includes(id))
+                .map((id) => guild.roles.cache.get(id))
+                .filter(Boolean);
 
-    const closeBtn = new ButtonBuilder()
-        .setCustomId(CLOSE_ID)
-        .setLabel('Cerrar ticket')
-        .setStyle(ButtonStyle.Danger);
+            const categoryLabel = details.category.slice(0, 80);
+            const commonIssueLabel = details.commonIssue.slice(0, 120);
+            const noMatchIssueLabel = details.noMatchIssue.slice(0, 180);
 
-    await created.send({
-        content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
-        embeds: [infoEmbed],
-        components: [new ActionRowBuilder().addComponents(closeBtn)]
-    }).catch(() => null);
+            const baseName = toSafeChannelName(ownerUsername);
+            const categorySlug = toSafeChannelName(categoryLabel).slice(0, 24);
+            const ticketName = `ticket-${categorySlug}-${baseName}`.slice(0, 95);
 
-    // Intentar editar / borrar el mensaje pendiente si existe
-    if (pending.channelId && pending.messageId) {
-        const pendingChannel = guild.channels.cache.get(pending.channelId) || await guild.channels.fetch(pending.channelId).catch(() => null);
-        if (pendingChannel && pendingChannel.isTextBased && pendingChannel.isTextBased()) {
-            const pendingMsg = await pendingChannel.messages.fetch(pending.messageId).catch(() => null);
-            if (pendingMsg) {
-                await pendingMsg.edit({
-                    content: `Solicitud aceptada desde la web. Canal: <#${created.id}>`,
-                    components: []
+            const permissionOverwrites = [
+                {
+                    id: guild.roles.everyone.id,
+                    deny: [PermissionsBitField.Flags.ViewChannel]
+                },
+                {
+                    id: ownerUserId,
+                    allow: [
+                        PermissionsBitField.Flags.ViewChannel,
+                        PermissionsBitField.Flags.SendMessages,
+                        PermissionsBitField.Flags.ReadMessageHistory,
+                        PermissionsBitField.Flags.AttachFiles,
+                        PermissionsBitField.Flags.EmbedLinks
+                    ]
+                },
+                {
+                    id: me.id,
+                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.SendMessages]
+                }
+            ];
+
+            validAdminRoles.forEach((role) => {
+                permissionOverwrites.push({
+                    id: role.id,
+                    allow: [
+                        PermissionsBitField.Flags.ViewChannel,
+                        PermissionsBitField.Flags.SendMessages,
+                        PermissionsBitField.Flags.ReadMessageHistory,
+                        PermissionsBitField.Flags.ManageMessages,
+                        PermissionsBitField.Flags.ManageChannels
+                    ]
+                });
+            });
+
+            validCaseRoles.forEach((role) => {
+                permissionOverwrites.push({
+                    id: role.id,
+                    allow: [
+                        PermissionsBitField.Flags.ViewChannel,
+                        PermissionsBitField.Flags.SendMessages,
+                        PermissionsBitField.Flags.ReadMessageHistory,
+                        PermissionsBitField.Flags.ManageMessages,
+                        PermissionsBitField.Flags.ManageChannels
+                    ]
+                });
+            });
+
+            const closerRoleIds = Array.from(new Set([
+                ...validAdminRoles.map((role) => String(role.id)),
+                ...validCaseRoles.map((role) => String(role.id))
+            ]));
+
+            const topic = [
+                `owner:${ownerUserId}`,
+                `category:${categoryLabel}`,
+                `common:${commonIssueLabel}`,
+                `staff:${closerRoleIds.join(',')}`,
+                `no-match:${noMatchIssueLabel}`,
+                `reason:${String(reason).replace(/\|/g, '/').slice(0, 450)}`
+            ].join(' | ').slice(0, 1000);
+
+            const created = await guild.channels.create({
+                name: ticketName,
+                type: ChannelType.GuildText,
+                topic,
+                permissionOverwrites
+            }).catch(() => null);
+
+            if (!created) {
+                return { ok: false, code: 'CHANNEL_CREATE_FAILED', error: 'No pude crear el canal del ticket' };
+            }
+
+            const ownerMember = await guild.members.fetch(ownerUserId).catch(() => null);
+            const acceptorUser = acceptedByUserId ? await botClient.users.fetch(acceptedByUserId).catch(() => null) : null;
+            const ownerAvatarURL = ownerMember?.user?.displayAvatarURL({ size: 128 }) || null;
+
+            const infoEmbed = new EmbedBuilder()
+                .setColor((cfg.color || '7c4dff').replace('#', ''))
+                .setAuthor({
+                    name: `${ownerUsername} abrio un ticket`,
+                    iconURL: ownerAvatarURL || undefined
+                })
+                .setTitle('Nuevo ticket abierto')
+                .setDescription('Se registro una nueva solicitud. El staff revisara la informacion del ticket.')
+                .addFields(
+                    { name: 'Usuario', value: `<@${ownerUserId}>`, inline: true },
+                    { name: 'Referencia', value: `#${created.id}`, inline: true },
+                    { name: 'Categoria', value: categoryLabel.slice(0, 1024), inline: true },
+                    { name: 'Caso', value: commonIssueLabel.slice(0, 1024), inline: true },
+                    { name: 'Contexto / Motivo', value: String(reason).slice(0, 1024) || 'Sin detalles', inline: false },
+                    { name: 'Aceptado por', value: acceptorUser ? `<@${acceptorUser.id}> (web)` : 'Web panel', inline: false }
+                )
+                .setFooter({ text: 'Usa el boton de abajo para cerrar el ticket cuando termines.' })
+                .setTimestamp();
+
+            if (ownerAvatarURL) infoEmbed.setThumbnail(ownerAvatarURL);
+
+            const closeBtn = new ButtonBuilder()
+                .setCustomId(CLOSE_ID)
+                .setLabel('Cerrar ticket')
+                .setStyle(ButtonStyle.Danger);
+
+            await created.send({
+                content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
+                embeds: [infoEmbed],
+                components: [new ActionRowBuilder().addComponents(closeBtn)]
+            }).catch(() => null);
+
+            if (pending.channelId && pending.messageId) {
+                const pendingChannel = guild.channels.cache.get(pending.channelId) || await guild.channels.fetch(pending.channelId).catch(() => null);
+                if (pendingChannel && pendingChannel.isTextBased && pendingChannel.isTextBased()) {
+                    const pendingMsg = await pendingChannel.messages.fetch(pending.messageId).catch(() => null);
+                    if (pendingMsg) {
+                        await pendingMsg.edit({
+                            content: `Solicitud aceptada desde la web. Canal: <#${created.id}>`,
+                            components: []
+                        }).catch(() => null);
+                    }
+                }
+            }
+
+            clearDraftForUser(guildId, ownerUserId);
+
+            if (ownerMember) {
+                await ownerMember.send({
+                    content: `Tu solicitud de ticket fue aceptada. Accede aqui: <#${created.id}>`
                 }).catch(() => null);
             }
-        }
-    }
 
-    clearDraftForUser(guildId, ownerUserId);
-    await clearPendingRequest(guildId, requestId, ownerUserId).catch(() => null);
-
-    // DM de confirmacion al usuario
-    if (ownerMember) {
-        await ownerMember.send({
-            content: `Tu solicitud de ticket fue aceptada. Accede aqui: <#${created.id}>`
-        }).catch(() => null);
-    }
-
-    return {
-        ok: true,
-        channelId: created.id,
-        channelName: created.name,
-        ownerId: ownerUserId
-    };
+            return {
+                ok: true,
+                channelId: created.id,
+                channelName: created.name,
+                ownerId: ownerUserId
+            };
+        });
+    });
 }
 
 async function listPendingRequests(guildId) {
@@ -1629,6 +1703,10 @@ async function listPendingRequests(guildId) {
             try {
                 const parsed = JSON.parse(row.value);
                 if (parsed && typeof parsed === 'object' && parsed.requesterId) {
+                    if (isPendingExpired(parsed)) {
+                        await clearPendingRequest(safeGuildId, parsed.requestId, parsed.requesterId).catch(() => null);
+                        continue;
+                    }
                     out.push(parsed);
                 }
             } catch {

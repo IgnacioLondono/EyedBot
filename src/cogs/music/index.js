@@ -327,6 +327,14 @@ class MusicSystem {
         if (sent) this.client.musicNowPlayingMessages.set(guildId, sent);
     }
 
+    async refreshNowPlayingMessage(guildId) {
+        const queue = useQueue(guildId);
+        const track = queue?.currentTrack;
+        const channel = queue?.metadata?.channel;
+        if (!track || !channel) return;
+        await this.sendNowPlayingEmbed(guildId, channel, track);
+    }
+
     async _onPlayerStart(queue, track) {
         const guildId = this._queueGuildId(queue);
         const channel = queue?.metadata?.channel || null;
@@ -759,9 +767,11 @@ class MusicSystem {
             case 'pause_resume': {
                 if (queue.node.isPaused()) {
                     queue.node.resume();
+                    await this.refreshNowPlayingMessage(interaction.guild.id);
                     await interaction.reply({ content: '▶️ Reanudado.', flags: 64 }).catch(() => {});
                 } else {
                     queue.node.pause();
+                    await this.refreshNowPlayingMessage(interaction.guild.id);
                     await interaction.reply({ content: '⏸️ Pausado.', flags: 64 }).catch(() => {});
                 }
                 return;
@@ -778,6 +788,7 @@ class MusicSystem {
             }
             case 'shuffle': {
                 queue.tracks.shuffle();
+                await this.refreshNowPlayingMessage(interaction.guild.id);
                 await interaction.reply({ content: '🔀 Cola mezclada.', flags: 64 }).catch(() => {});
                 return;
             }
@@ -795,6 +806,7 @@ class MusicSystem {
                 const next = this._nextRepeatMode(mode);
                 queue.setRepeatMode(next);
                 const label = this._repeatModeLabel(next);
+                await this.refreshNowPlayingMessage(interaction.guild.id);
                 await interaction.reply({ content: `🔁 Loop: ${label}`, flags: 64 }).catch(() => {});
                 return;
             }
@@ -840,6 +852,7 @@ class MusicSystem {
         }
 
         queue.node.setVolume(value);
+        await this.refreshNowPlayingMessage(interaction.guild.id);
         await interaction.reply({ content: `🔊 Volumen: ${value}%`, flags: 64 }).catch(() => {});
     }
 
