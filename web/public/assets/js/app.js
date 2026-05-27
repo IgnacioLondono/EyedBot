@@ -7495,8 +7495,10 @@ function renderGachaLeaderboardPodium(entries) {
                 const progress = Math.max(0, Math.min(100, Number(entry.progressPercent) || 0));
                 return `
                     <div class="levels-podium-slot ${positionClass}">
-                        <div class="levels-podium-medal">${renderPodiumMedal(realRank)}</div>
-                        ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${rarity.color};">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${rarity.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                        ${renderPodiumAvatarWrap(realRank, entry.avatar
+                            ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${rarity.color};">`
+                            : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${rarity.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`
+                        )}
                         <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
                         <div class="levels-podium-level">${levelingFormatNumber(entry.coins)} monedas</div>
                         <div class="levels-podium-progress">
@@ -9340,18 +9342,36 @@ function renderTierIcon(iconId, size = 20) {
     }
 }
 
-function renderPodiumMedal(rank, size = 28) {
-    const common = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"`;
-    switch (rank) {
-        case 1:
-            return `<svg ${common}><defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#ffd54a"/><stop offset="1" stop-color="#ffb300"/></linearGradient></defs><circle cx="12" cy="10" r="6" fill="url(#g1)" stroke="rgba(0,0,0,0.12)"/><path d="M8 21l4-3 4 3" stroke="rgba(0,0,0,0.12)" fill="none"/></svg>`;
-        case 2:
-            return `<svg ${common}><defs><linearGradient id="g2" x1="0" x2="1"><stop offset="0" stop-color="#e0e0e0"/><stop offset="1" stop-color="#bdbdbd"/></linearGradient></defs><circle cx="12" cy="10" r="6" fill="url(#g2)" stroke="rgba(0,0,0,0.08)"/><path d="M8 21l4-3 4 3" stroke="rgba(0,0,0,0.08)" fill="none"/></svg>`;
-        case 3:
-            return `<svg ${common}><defs><linearGradient id="g3" x1="0" x2="1"><stop offset="0" stop-color="#ffab91"/><stop offset="1" stop-color="#ff7043"/></linearGradient></defs><circle cx="12" cy="10" r="6" fill="url(#g3)" stroke="rgba(0,0,0,0.08)"/><path d="M8 21l4-3 4 3" stroke="rgba(0,0,0,0.08)" fill="none"/></svg>`;
-        default:
-            return '';
-    }
+function renderPodiumMedal(rank) {
+    if (![1, 2, 3].includes(Number(rank))) return '';
+    const titles = { 1: '1.er lugar', 2: '2.º lugar', 3: '3.er lugar' };
+    const crown = rank === 1
+        ? `<span class="podium-ribbon__crown" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M5 17l-1-9 5 3 3-5 3 5 5-3-1 9H5z"/></svg>
+           </span>`
+        : '';
+    return `
+        <div class="podium-ribbon podium-ribbon--${rank}" role="img" aria-label="${titles[rank]}">
+            ${crown}
+            <div class="podium-ribbon__badge">
+                <span class="podium-ribbon__shine" aria-hidden="true"></span>
+                <span class="podium-ribbon__num">${rank}</span>
+            </div>
+            <div class="podium-ribbon__tails" aria-hidden="true">
+                <span class="podium-ribbon__tail podium-ribbon__tail--left"></span>
+                <span class="podium-ribbon__tail podium-ribbon__tail--right"></span>
+            </div>
+        </div>
+    `;
+}
+
+function renderPodiumAvatarWrap(rank, avatarMarkup) {
+    return `
+        <div class="levels-podium-avatar-wrap">
+            ${renderPodiumMedal(rank)}
+            ${avatarMarkup}
+        </div>
+    `;
 }
 
 function renderTierBadge(tier, size = 'sm') {
@@ -9775,8 +9795,10 @@ function renderLeaderboardPodium(entries) {
                 const progress = Math.max(0, Math.min(100, Number(entry.progressPercent) || 0));
                 return `
                         <div class="levels-podium-slot ${positionClass}">
-                        <div class="levels-podium-medal">${renderPodiumMedal(realRank)}</div>
-                        ${entry.avatar ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${tier.color};">` : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${tier.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`}
+                        ${renderPodiumAvatarWrap(realRank, entry.avatar
+                            ? `<img src="${entry.avatar}" alt="avatar" class="levels-podium-avatar" style="--tier-color:${tier.color};">`
+                            : `<div class="levels-podium-avatar levels-podium-avatar--placeholder" style="--tier-color:${tier.color};">${(entry.tag || 'U').charAt(0).toUpperCase()}</div>`
+                        )}
                         <div class="levels-podium-name">${escapeHtml(entry.tag || entry.username || 'Usuario')}</div>
                         <div class="levels-podium-level">Nivel ${entry.level}</div>
                         <div class="levels-podium-progress-wrap">
