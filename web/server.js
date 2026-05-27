@@ -572,6 +572,11 @@ app.use('/callback', authRateLimiter);
 app.use('/api/', apiRateLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const panelFaviconPath = path.join(__dirname, 'public', 'assets', 'img', 'favicon.png');
+app.get('/favicon.ico', (req, res) => {
+    res.type('image/png');
+    res.sendFile(panelFaviconPath);
+});
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: 0,
     etag: true,
