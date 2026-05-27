@@ -50,7 +50,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0.65rem;
+            padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
         }
 
         body::before {
@@ -84,15 +84,17 @@
             position: relative;
             z-index: 1;
             width: 100%;
-            max-width: 980px;
-            max-height: calc(100dvh - 1.3rem);
+            max-width: 960px;
+            max-height: calc(100dvh - 1.5rem);
+            transform-origin: center center;
         }
 
         .login-shell {
             display: grid;
             grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-            max-height: calc(100dvh - 1.3rem);
+            max-height: calc(100dvh - 1.5rem);
             border-radius: 22px;
+            align-items: stretch;
             border: 1px solid var(--border);
             background: linear-gradient(165deg, rgba(22, 14, 42, 0.96), rgba(8, 5, 18, 0.98));
             box-shadow:
@@ -105,13 +107,14 @@
         }
 
         .login-intro {
-            padding: 1.15rem 1.25rem;
+            padding: 1.35rem 1.4rem 1.25rem;
             border-right: 1px solid rgba(190, 155, 255, 0.12);
             display: flex;
             flex-direction: column;
-            gap: 0.65rem;
+            gap: 0.75rem;
             min-height: 0;
             overflow: hidden;
+            justify-content: center;
             background:
                 linear-gradient(125deg, rgba(124, 77, 255, 0.1) 0%, transparent 42%),
                 linear-gradient(180deg, rgba(16, 10, 32, 0.4), transparent);
@@ -240,13 +243,20 @@
         }
 
         .login-panel {
-            padding: 1.15rem 1.25rem;
+            padding: 1.35rem 1.4rem 1.15rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
             min-height: 0;
             overflow: hidden;
+        }
+
+        .login-panel-footer {
+            display: grid;
+            gap: 0.35rem;
+            flex-shrink: 0;
+            padding-top: 0.15rem;
         }
 
         .login-panel-kicker {
@@ -333,13 +343,9 @@
         }
 
         .login-trust-list span {
-            font-size: 0.68rem;
-            line-height: 1.35;
+            font-size: 0.7rem;
+            line-height: 1.38;
             color: var(--text-muted);
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
         }
 
         .error {
@@ -492,11 +498,19 @@
             }
         }
 
-        @media (max-height: 720px) {
-            body { padding: 0.45rem; }
+        @media (max-height: 820px) {
+            .login-page {
+                transform: scale(0.94);
+            }
+        }
+
+        @media (max-height: 700px) {
+            .login-page {
+                transform: scale(0.88);
+            }
+
             .login-intro-copy p { display: none; }
             .login-panel-lead { display: none; }
-            .login-trust-list span { -webkit-line-clamp: 1; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -615,14 +629,15 @@
                     <span>Continuar con Discord</span>
                 </a>
 
-                <p class="login-note">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-                    <span>Necesitas permiso de administración en al menos un servidor donde esté EyedBot para usar el panel.</span>
-                </p>
-
-                <p class="login-legal">
-                    Acceso vía Discord · <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad</a> · EyedBot no guarda tu contraseña.
-                </p>
+                <div class="login-panel-footer">
+                    <p class="login-note">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                        <span>Requiere permiso de administración en un servidor con EyedBot.</span>
+                    </p>
+                    <p class="login-legal">
+                        Acceso vía Discord · <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad</a> · Sin guardar contraseñas.
+                    </p>
+                </div>
             </section>
         </div>
     </main>
