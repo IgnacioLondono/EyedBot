@@ -8,7 +8,8 @@ RUN apk add --no-cache \
     g++ \
     ffmpeg \
     opus \
-    opus-dev
+    opus-dev \
+    su-exec
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -25,15 +26,16 @@ RUN npm ci --no-audit --no-fund && \
 COPY src/ ./src/
 COPY web/ ./web/
 COPY verificar-*.js ./
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Crear directorios necesarios y ejecutar como usuario no-root
-RUN mkdir -p logs data backups && chown -R node:node /app
+# Crear directorios necesarios; el entrypoint ajusta permisos de volúmenes montados
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    mkdir -p logs data backups && \
+    chown -R node:node /app
 
 # Variables de entorno por defecto
 ENV NODE_ENV=production
 
-USER node
-
-# Comando por defecto
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "src/index.js"]
 
