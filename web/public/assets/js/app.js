@@ -3313,7 +3313,11 @@ async function bootEyedBotPanel() {
         updateServerMenuIdentity();
         updateDashboardButtonState();
 
-        const initialSection = savedState?.activeSection || 'dashboard';
+        const entrySection = String(window.__EYEDBOT_ENTRY_SECTION || '').trim();
+        const allowedEntrySections = new Set(['dashboard', 'controlCenterSection', 'commandsSection', 'premiumSection', 'profileSettingsSection', 'serverSection', 'embedSection']);
+        const initialSection = allowedEntrySections.has(entrySection)
+            ? entrySection
+            : (savedState?.activeSection || 'dashboard');
         const needsGuildsAtBoot = ['dashboard', 'serverSection', 'embedSection'].includes(initialSection);
         if (needsGuildsAtBoot) {
             console.log('📋 Cargando guilds...');
@@ -6022,7 +6026,6 @@ function dpxIcon(name = '', className = 'dpx-icon') {
         info: '<circle cx="10" cy="10" r="7.5"/><path d="M10 9v4.5M10 6.2v.5"/>',
         close: '<path d="M4 4l12 12M16 4L4 16"/>',
         edit: '<path d="M12.5 3.5l4 4-8 8-4-4 8-8z"/>',
-        check: '<path d="M4 10l4 4 8-8"/>',
         twitch: '<path d="M4 3l-1 4v10h3v3h3l3-3h3l4-4V3H4zm3 2h10v8l-3 3h-3l-3 3v-3H7V5z"/><path d="M10 7v5M13 7v5"/>',
         youtube: '<rect x="2.5" y="4.5" width="15" height="11" rx="3"/><path d="M8.5 8l4 2.2-4 2.1z" fill="currentColor" stroke="none"/>',
         tiktok: '<path d="M13 3v8.5a3.5 3.5 0 11-3.5-3.5"/><path d="M13 3c.5 2 2 3.5 4 3.5"/>',

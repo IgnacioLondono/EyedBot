@@ -18,36 +18,36 @@
     const DEFERRED_SCREENS = Object.keys(SCREEN_FILES).filter((id) => !PRIORITY_BOOT.includes(id));
 
     const CSS_DEFERRED = [
-        `assets/css/pro/02-about-legacy.css?v=${VERSION}`,
-        `assets/css/pro/03-about-rb3.css?v=${VERSION}`,
-        `assets/css/pro/04-tickets-manage.css?v=${VERSION}`,
-        `assets/css/pro/05-receipt-modal.css?v=${VERSION}`,
-        `assets/css/pro/06-server-overview.css?v=${VERSION}`,
-        `assets/css/pro/07-server-insights.css?v=${VERSION}`,
-        `assets/css/pro/08-server-panes.css?v=${VERSION}`,
-        `assets/css/pro/09-free-games.css?v=${VERSION}`,
-        `assets/css/pro/10-mobile-levels-modules.css?v=${VERSION}`,
-        `assets/css/pro/12-card-accents.css?v=${VERSION}`,
-        `assets/css/pro/13-eyedplus-lock.css?v=${VERSION}`,
-        `assets/css/mobile-app-complete.css?v=${VERSION}`
+        `assets/css/pro/02-about-legacy.min.css?v=${VERSION}`,
+        `assets/css/pro/03-about-rb3.min.css?v=${VERSION}`,
+        `assets/css/pro/04-tickets-manage.min.css?v=${VERSION}`,
+        `assets/css/pro/05-receipt-modal.min.css?v=${VERSION}`,
+        `assets/css/pro/06-server-overview.min.css?v=${VERSION}`,
+        `assets/css/pro/07-server-insights.min.css?v=${VERSION}`,
+        `assets/css/pro/08-server-panes.min.css?v=${VERSION}`,
+        `assets/css/pro/09-free-games.min.css?v=${VERSION}`,
+        `assets/css/pro/10-mobile-levels-modules.min.css?v=${VERSION}`,
+        `assets/css/pro/12-card-accents.min.css?v=${VERSION}`,
+        `assets/css/pro/13-eyedplus-lock.min.css?v=${VERSION}`,
+        `assets/css/mobile-app-complete.min.css?v=${VERSION}`
     ];
 
     const CSS_BY_SECTION = {
         controlCenterSection: [
-            `assets/css/pro/02-about-legacy.css?v=${VERSION}`,
-            `assets/css/pro/03-about-rb3.css?v=${VERSION}`
+            `assets/css/pro/02-about-legacy.min.css?v=${VERSION}`,
+            `assets/css/pro/03-about-rb3.min.css?v=${VERSION}`
         ],
-        premiumSection: [`assets/css/pro/13-eyedplus-lock.css?v=${VERSION}`],
+        premiumSection: [`assets/css/pro/13-eyedplus-lock.min.css?v=${VERSION}`],
         profileSettingsSection: [],
-        embedSection: [`assets/css/pro/05-receipt-modal.css?v=${VERSION}`],
+        embedSection: [`assets/css/pro/05-receipt-modal.min.css?v=${VERSION}`],
         commandsSection: [],
         serverSection: [
-            `assets/css/pro/04-tickets-manage.css?v=${VERSION}`,
-            `assets/css/pro/06-server-overview.css?v=${VERSION}`,
-            `assets/css/pro/07-server-insights.css?v=${VERSION}`,
-            `assets/css/pro/08-server-panes.css?v=${VERSION}`,
-            `assets/css/pro/09-free-games.css?v=${VERSION}`,
-            `assets/css/pro/10-mobile-levels-modules.css?v=${VERSION}`
+            `assets/css/pro/04-tickets-manage.min.css?v=${VERSION}`,
+            `assets/css/pro/06-server-overview.min.css?v=${VERSION}`,
+            `assets/css/pro/07-server-insights.min.css?v=${VERSION}`,
+            `assets/css/pro/08-server-panes.min.css?v=${VERSION}`,
+            `assets/css/pro/09-free-games.min.css?v=${VERSION}`,
+            `assets/css/pro/10-mobile-levels-modules.min.css?v=${VERSION}`
         ]
     };
 
@@ -164,10 +164,14 @@
     }
 
     async function loadPanelPartials() {
+        if (global.__appLayoutReady && typeof global.__appLayoutReady.then === 'function') {
+            await global.__appLayoutReady;
+        }
+
         const screensMount = document.getElementById('appScreensMount');
         const overlaysMount = document.getElementById('appOverlaysMount');
         if (!screensMount || !overlaysMount) {
-            throw new Error('Faltan #appScreensMount o #appOverlaysMount en index.html');
+            throw new Error('Faltan #appScreensMount o #appOverlaysMount en el layout base');
         }
 
         const [dashboardHtml, overlaysHtml] = await Promise.all([
