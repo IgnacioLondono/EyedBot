@@ -1,17 +1,11 @@
-<section id="commandsSection" class="section">
-            <div class="container commands-shell">
-                <div class="commands-toolbar commands-toolbar--catalog">
-                    <button type="button" id="backToServerFromCommands" class="btn btn-secondary back-to-server-btn commands-back-btn" style="display:none;" title="Volver" aria-label="Volver">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path d="M15 18l-6-6 6-6"></path>
-                        </svg>
-                        <span>Volver</span>
-                    </button>
-                    <div id="commandsCategoryFilters" class="commands-filters commands-filters--catalog"></div>
-                </div>
-
-                <div class="commands-catalog-scroll">
-                    <div id="commandsContainer" class="commands-catalog"></div>
-                </div>
-            </div>
-        </section>
+<section id="commandsSection" class="screen">
+    <header class="screen-head">
+        <p class="kicker">Comandos</p>
+        <h2>Catalogo del bot</h2>
+        <p>Filtra y consulta comandos disponibles.</p>
+    </header>
+    <div class="toolbar">
+        <input id="commandSearch" class="input" type="search" placeholder="Buscar comando...">
+    </div>
+    <div id="commandsGrid" class="card-grid"></div>
+</section>
