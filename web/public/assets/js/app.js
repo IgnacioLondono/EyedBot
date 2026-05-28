@@ -3280,6 +3280,22 @@ async function bootEyedBotPanel() {
         
         registerGatedNavigationButtons();
         console.log('✅ registerGatedNavigationButtons completado');
+
+        if (window.EyedBotPanelLoader?.ensureScreen) {
+            const listenerSections = [
+                'controlCenterSection',
+                'premiumSection',
+                'profileSettingsSection',
+                'embedSection',
+                'commandsSection',
+                'serverSection'
+            ];
+            await Promise.all(
+                listenerSections.map((sectionId) =>
+                    window.EyedBotPanelLoader.ensureScreen(sectionId).catch(() => {})
+                )
+            );
+        }
         
         setupEventListeners();
         console.log('✅ setupEventListeners completado');
