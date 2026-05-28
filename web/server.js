@@ -428,6 +428,35 @@ function timeoutAfter(ms, label = 'timeout') {
 }
 
 const OAUTH_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.OAUTH_REQUEST_TIMEOUT_MS || '10000', 10) || 10000;
+const OAUTH_STATE_TTL_MS = Number.parseInt(process.env.OAUTH_STATE_TTL_MS || '600000', 10) || 600000;
+const oauthStateFallbackStore = new Map();
+
+function pruneOauthStateFallbackStore(now = Date.now()) {
+    for (const [stateKey, entry] of oauthStateFallbackStore.entries()) {
+        if (!entry || Number(entry.expiresAt || 0) <= now) {
+            oauthStateFallbackStore.delete(stateKey);
+        }
+    }
+}
+
+function rememberOauthState(state, sid) {
+    const now = Date.now();
+    pruneOauthStateFallbackStore(now);
+    oauthStateFallbackStore.set(String(state), {
+        sid: String(sid || ''),
+        expiresAt: now + OAUTH_STATE_TTL_MS
+    });
+}
+
+function consumeOauthStateFallback(state) {
+    if (!state) return null;
+    const key = String(state);
+    const entry = oauthStateFallbackStore.get(key) || null;
+    oauthStateFallbackStore.delete(key);
+    if (!entry) return null;
+    if (Number(entry.expiresAt || 0) <= Date.now()) return null;
+    return entry;
+}
 
 async function withOauthTimeout(promise, label) {
     return Promise.race([promise, timeoutAfter(OAUTH_REQUEST_TIMEOUT_MS, label)]);
@@ -1159,9 +1188,11 @@ app.get('/auth/discord', (req, res) => {
     }
 
     try {
-        // Generar URL de autorización con estado para prevenir CSRF
+        // Generar estado fresco y guardarlo; evita depender de regeneración de sesión.
         const state = crypto.randomBytes(24).toString('hex');
-        req.session.oauthState = state; // Guardar estado en sesión
+        req.session.oauthState = state;
+        req.session.oauthStateIssuedAt = Date.now();
+        rememberOauthState(state, req.sessionID);
 
         req.session.save((sessionError) => {
             if (sessionError) {
@@ -1213,10 +1244,18 @@ app.get('/callback', async (req, res) => {
             return res.redirect('/login.html?error=config_error');
         }
 
-        // Verificar estado (CSRF protection) de forma estricta.
-        if (!state || !req.session.oauthState || state !== req.session.oauthState) {
+        // Verificar estado (CSRF protection). Si la sesión llegó tarde/rota, usa fallback temporal.
+        const sessionState = String(req.session.oauthState || '');
+        const stateFromQuery = String(state || '');
+        const stateMatchesSession = Boolean(stateFromQuery && sessionState && stateFromQuery === sessionState);
+        const fallbackStateEntry = !stateMatchesSession ? consumeOauthStateFallback(stateFromQuery) : null;
+
+        if (!stateMatchesSession && !fallbackStateEntry) {
             console.error('❌ Estado OAuth no coincide - posible ataque CSRF');
             return res.redirect('/login.html?error=auth_failed');
+        }
+        if (!stateMatchesSession && fallbackStateEntry) {
+            console.warn('⚠️ OAuth state validado por fallback temporal (sesión no sincronizada a tiempo)');
         }
 
         console.log('🔐 Intercambiando código por token...');
@@ -1250,6 +1289,7 @@ app.get('/callback', async (req, res) => {
         req.session.guilds = previousGuilds;
         req.session.accessToken = tokenData.access_token;
         delete req.session.oauthState; // Limpiar estado OAuth
+        delete req.session.oauthStateIssuedAt;
 
         // Guardar sesión antes de redirigir
         req.session.save((err) => {
@@ -1303,6 +1343,12 @@ app.get('/callback', async (req, res) => {
 
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
+        res.clearCookie('tulabot.session', {
+            path: '/',
+            httpOnly: true,
+            secure: cookieSecure,
+            sameSite: 'lax'
+        });
         res.redirect('/login.html');
     });
 });
