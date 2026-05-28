@@ -305,7 +305,17 @@ function envValue(name, fallback = '') {
 
 const CLIENT_ID = envValue('CLIENT_ID');
 const CLIENT_SECRET = envValue('CLIENT_SECRET');
-const OWNER_DISCORD_ID = envValue('WEB_OWNER_DISCORD_ID');
+const OWNER_DISCORD_IDS = (() => {
+    const raw = [
+        envValue('WEB_OWNER_DISCORD_ID'),
+        envValue('WEB_OWNER_DISCORD_IDS')
+    ].filter(Boolean).join(',');
+
+    return raw
+        .split(',')
+        .map((value) => String(value || '').trim().replace(/^['"]+|['"]+$/g, ''))
+        .filter(Boolean);
+})();
 /** Tarjeta PNG / imagen con fondo en bienvenidas — desactivado en panel y API hasta nuevo aviso. */
 const WELCOME_CARD_STYLE_ENABLED = false;
 const WEB_PUBLIC_ORIGIN = envValue('WEB_PUBLIC_ORIGIN') || envValue('PUBLIC_ORIGIN');
@@ -368,7 +378,7 @@ function assertProductionSecurityConfig() {
     if (!SESSION_SECRET || SESSION_SECRET === 'tu-secret-super-seguro-cambiar-en-produccion' || SESSION_SECRET === 'change_this_session_secret') {
         issues.push('SESSION_SECRET inseguro o faltante');
     }
-    if (!OWNER_DISCORD_ID) issues.push('WEB_OWNER_DISCORD_ID faltante');
+    if (!OWNER_DISCORD_IDS.length) issues.push('WEB_OWNER_DISCORD_ID faltante');
     if (WEB_PUBLIC_ORIGIN && !/^https:\/\//i.test(WEB_PUBLIC_ORIGIN)) {
         if (!ALLOW_INSECURE_LOCAL_ORIGIN || !isLocalNetworkOrigin(WEB_PUBLIC_ORIGIN)) {
             issues.push('WEB_PUBLIC_ORIGIN debe ser HTTPS en producción (o permitir origen local explícitamente)');
@@ -727,7 +737,9 @@ const PERMISSION_MANAGE_GUILD = 0x20n;
 const PERMISSION_MANAGE_CHANNELS = 0x10n;
 
 function isOwnerUser(user = null) {
-    return String(user?.id || '') === String(OWNER_DISCORD_ID);
+    const userId = String(user?.id || '').trim();
+    if (!userId) return false;
+    return OWNER_DISCORD_IDS.includes(userId);
 }
 
 function sanitizeGuildSnapshot(guild) {
