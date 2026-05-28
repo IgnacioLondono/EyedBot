@@ -3497,7 +3497,7 @@ function updateProfileSettingsData() {
         webHost.textContent = window.location.host || '-';
     }
     if (webPath) {
-        webPath.textContent = window.location.pathname || '/';
+        webPath.textContent = 'Oculta por privacidad';
     }
     if (webBrowser) {
         webBrowser.textContent = detectBrowserName();
@@ -3575,6 +3575,19 @@ function updateUserUI() {
 
 // Configurar event listeners
 function setupEventListeners() {
+    if (setupEventListeners._bound) return;
+    setupEventListeners._bound = true;
+
+    const bindById = (id, eventName, handler, options) => {
+        const el = document.getElementById(id);
+        if (!el) {
+            console.warn(`⚠️ Listener omitido: #${id} no existe`);
+            return null;
+        }
+        el.addEventListener(eventName, handler, options);
+        return el;
+    };
+
     bindSettingsPaneNavigation();
     refreshPremiumLocks();
     bindThemeControls();
@@ -3595,7 +3608,7 @@ function setupEventListeners() {
     });
 
     // Navegación
-    document.getElementById('dashboardBtn').addEventListener('click', async () => {
+    bindById('dashboardBtn', 'click', async () => {
         if (hasSelectedGuildContext()) {
             resetServerContextToDashboard();
         }
@@ -3843,13 +3856,15 @@ function setupEventListeners() {
     }
 
     // Menú de usuario
-    document.getElementById('userMenu').addEventListener('click', (e) => {
+    bindById('userMenu', 'click', (e) => {
         e.stopPropagation();
-        document.getElementById('dropdownMenu').classList.toggle('show');
+        const dropdown = document.getElementById('dropdownMenu');
+        if (dropdown) dropdown.classList.toggle('show');
     });
 
     document.addEventListener('click', () => {
-        document.getElementById('dropdownMenu').classList.remove('show');
+        const dropdown = document.getElementById('dropdownMenu');
+        if (dropdown) dropdown.classList.remove('show');
     });
 
     document.getElementById('dropdownMenu')?.addEventListener('click', (e) => {
@@ -3861,7 +3876,8 @@ function setupEventListeners() {
         profileSettingsBtn.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            document.getElementById('dropdownMenu').classList.remove('show');
+            const dropdown = document.getElementById('dropdownMenu');
+            if (dropdown) dropdown.classList.remove('show');
             updateProfileSettingsData();
             switchSettingsPane(currentSettingsPaneId, { silent: true });
             showSection('profileSettingsSection');
@@ -3869,49 +3885,51 @@ function setupEventListeners() {
     }
 
     // Embed form
-    document.getElementById('guildSelect').addEventListener('change', () => {
+    bindById('guildSelect', 'change', () => {
         handleGuildSelect();
         saveState();
     });
-    document.getElementById('embedTitle').addEventListener('input', () => {
+    bindById('embedTitle', 'input', () => {
         syncEmbedTextCounters();
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('embedDescription').addEventListener('input', () => {
+    bindById('embedDescription', 'input', () => {
         syncEmbedTextCounters();
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('embedColor').addEventListener('input', () => {
+    bindById('embedColor', 'input', () => {
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('embedFooter').addEventListener('input', () => {
+    bindById('embedFooter', 'input', () => {
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('embedImage').addEventListener('input', () => {
+    bindById('embedImage', 'input', () => {
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('embedThumbnail').addEventListener('input', () => {
+    bindById('embedThumbnail', 'input', () => {
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('embedImageFile').addEventListener('change', (e) => {
+    bindById('embedImageFile', 'change', (e) => {
         handleImageFileSelection(e, 'image');
     });
-    document.getElementById('embedThumbnailFile').addEventListener('change', (e) => {
+    bindById('embedThumbnailFile', 'change', (e) => {
         handleImageFileSelection(e, 'thumbnail');
     });
-    document.getElementById('embedImageScale').addEventListener('input', (e) => {
-        document.getElementById('embedImageScaleValue').textContent = `${e.target.value}%`;
+    bindById('embedImageScale', 'input', (e) => {
+        const target = document.getElementById('embedImageScaleValue');
+        if (target) target.textContent = `${e.target.value}%`;
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('embedThumbnailScale').addEventListener('input', (e) => {
-        document.getElementById('embedThumbnailScaleValue').textContent = `${e.target.value}%`;
+    bindById('embedThumbnailScale', 'input', (e) => {
+        const target = document.getElementById('embedThumbnailScaleValue');
+        if (target) target.textContent = `${e.target.value}%`;
         updateEmbedPreview();
         saveState();
     });
@@ -3924,11 +3942,11 @@ function setupEventListeners() {
                 saveState();
             });
         });
-    document.getElementById('embedTimestamp').addEventListener('change', () => {
+    bindById('embedTimestamp', 'change', () => {
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('channelSelect').addEventListener('change', saveState);
+    bindById('channelSelect', 'change', saveState);
     const embedTargetMid = document.getElementById('embedTargetMessageId');
     if (embedTargetMid) {
         embedTargetMid.addEventListener('input', () => {
@@ -3938,11 +3956,11 @@ function setupEventListeners() {
     }
     syncEmbedSendButtonLabel();
     document.getElementById('previewBtn')?.addEventListener('click', updateEmbedPreview);
-    document.getElementById('resetEmbedBtn').addEventListener('click', () => clearEmbedComposer({ keepDestination: true }));
-    document.getElementById('sendEmbedBtn').addEventListener('click', sendEmbed);
+    bindById('resetEmbedBtn', 'click', () => clearEmbedComposer({ keepDestination: true }));
+    bindById('sendEmbedBtn', 'click', sendEmbed);
     document.getElementById('sendOwnerAttachmentBtn')?.addEventListener('click', sendOwnerAttachmentToChannel);
-    document.getElementById('addFieldBtn').addEventListener('click', addField);
-    document.getElementById('addTitleFieldBtn').addEventListener('click', function() {
+    bindById('addFieldBtn', 'click', addField);
+    bindById('addTitleFieldBtn', 'click', function() {
         // Agrega un field con formato de título destacado
         const container = document.getElementById('fieldsContainer');
         const fieldId = `field_${Date.now()}_${Math.floor(Math.random()*1000)}`;
@@ -3973,9 +3991,10 @@ function setupEventListeners() {
         saveState();
     });
 
-    document.getElementById('addTitleDescBtn').addEventListener('click', function() {
+    bindById('addTitleDescBtn', 'click', function() {
         // Inserta un bloque de título en la descripción usando markdown
         const desc = document.getElementById('embedDescription');
+        if (!desc) return;
         const cursorPos = desc.selectionStart || desc.value.length;
         const before = desc.value.substring(0, cursorPos);
         const after = desc.value.substring(cursorPos);
@@ -3987,9 +4006,9 @@ function setupEventListeners() {
         updateEmbedPreview();
         saveState();
     });
-    document.getElementById('saveTemplateBtn').addEventListener('click', saveEmbedTemplate);
-    document.getElementById('loadTemplateBtn').addEventListener('click', loadSelectedTemplate);
-    document.getElementById('deleteTemplateBtn').addEventListener('click', deleteSelectedTemplate);
+    bindById('saveTemplateBtn', 'click', saveEmbedTemplate);
+    bindById('loadTemplateBtn', 'click', loadSelectedTemplate);
+    bindById('deleteTemplateBtn', 'click', deleteSelectedTemplate);
     
     // Guardar estado al cambiar de sección
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -5242,6 +5261,10 @@ async function loadLogs() {
     }
 
     const container = document.getElementById('logsContainer');
+    if (!container) {
+        console.warn('⚠️ #logsContainer no existe en el DOM actual');
+        return;
+    }
     
     try {
         container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Cargando logs...</p></div>';
@@ -5266,26 +5289,38 @@ async function loadLogs() {
         if (!logsListenersSetup) {
             logsListenersSetup = true;
             
-            document.getElementById('logLevelFilter').addEventListener('change', async (e) => {
-                const level = e.target.value;
-                const response = await fetchWithCredentials(`/api/logs?limit=100${level ? '&level=' + level : ''}`);
-                if (response.ok) {
-                    const logs = await response.json();
-                    displayLogs(logs || []);
-                }
-                saveState();
-            });
+            const logLevelFilter = document.getElementById('logLevelFilter');
+            if (logLevelFilter) {
+                logLevelFilter.addEventListener('change', async (e) => {
+                    const level = e.target.value;
+                    const response = await fetchWithCredentials(`/api/logs?limit=100${level ? '&level=' + level : ''}`);
+                    if (response.ok) {
+                        const logs = await response.json();
+                        displayLogs(logs || []);
+                    }
+                    saveState();
+                });
+            }
             
-            document.getElementById('clearLogsBtn').addEventListener('click', () => {
-                container.innerHTML = '';
-                saveState();
-            });
+            const clearLogsBtn = document.getElementById('clearLogsBtn');
+            if (clearLogsBtn) {
+                clearLogsBtn.addEventListener('click', () => {
+                    container.innerHTML = '';
+                    saveState();
+                });
+            }
             
-            document.getElementById('autoScrollBtn').addEventListener('click', () => {
-                autoScroll = !autoScroll;
-                document.getElementById('autoScrollText').textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
-                saveState();
-            });
+            const autoScrollBtn = document.getElementById('autoScrollBtn');
+            if (autoScrollBtn) {
+                autoScrollBtn.addEventListener('click', () => {
+                    autoScroll = !autoScroll;
+                    const autoScrollText = document.getElementById('autoScrollText');
+                    if (autoScrollText) {
+                        autoScrollText.textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
+                    }
+                    saveState();
+                });
+            }
         }
         
         // Limpiar intervalo anterior si existe
