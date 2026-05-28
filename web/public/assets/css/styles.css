@@ -1288,8 +1288,8 @@ body {
 
 .section {
     display: none;
-    height: 100%;
-    overflow: hidden;
+    height: auto;
+    overflow: visible;
     animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1298,9 +1298,8 @@ body {
 }
 
 .section > .container {
-    height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
+    height: auto;
+    overflow: visible;
     padding-right: 0;
 }
 

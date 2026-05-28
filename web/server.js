@@ -612,6 +612,17 @@ app.use(cors({
 app.use('/auth/discord', authRateLimiter);
 app.use('/callback', authRateLimiter);
 app.use('/api/', apiRateLimiter);
+app.use((req, res, next) => {
+    const path = String(req.path || '');
+    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/callback', '/api/user'];
+    if (neverCachePrefixes.some((prefix) => path.startsWith(prefix))) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Surrogate-Control', 'no-store');
+    }
+    next();
+});
 app.use(compression({
     level: 6,
     threshold: 1024,
@@ -640,10 +651,11 @@ app.use(express.static(publicDir, {
         const isLongCacheAsset = isAssetFile && /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|otf|mp4|webm)$/i.test(relativePath);
 
         if (isHtml) {
-            // El HTML debe revalidarse siempre para no romper despliegues recientes.
-            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+            // Evita usar HTML viejo en navegador o CDN tras despliegues.
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
+            res.setHeader('Surrogate-Control', 'no-store');
             return;
         }
 

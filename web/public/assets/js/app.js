@@ -3330,10 +3330,11 @@ async function bootEyedBotPanel() {
         updateDashboardButtonState();
 
         const entrySection = String(window.__EYEDBOT_ENTRY_SECTION || '').trim();
+        const savedSection = String(savedState?.activeSection || '').trim();
         const allowedEntrySections = new Set(['dashboard', 'controlCenterSection', 'commandsSection', 'premiumSection', 'profileSettingsSection', 'serverSection', 'embedSection']);
-        const initialSection = allowedEntrySections.has(entrySection)
-            ? entrySection
-            : (savedState?.activeSection || 'dashboard');
+        const initialSection = allowedEntrySections.has(savedSection)
+            ? savedSection
+            : (allowedEntrySections.has(entrySection) ? entrySection : 'dashboard');
         const needsGuildsAtBoot = ['dashboard', 'serverSection', 'embedSection'].includes(initialSection);
         if (needsGuildsAtBoot) {
             console.log('📋 Cargando guilds...');
