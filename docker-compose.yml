@@ -79,8 +79,6 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./backups:/app/backups
-    ports:
-      - "${BOT_BIND_IP:-127.0.0.1}:${BOT_PORT:-3001}:3000"
     depends_on:
       mysql:
         condition: service_healthy
