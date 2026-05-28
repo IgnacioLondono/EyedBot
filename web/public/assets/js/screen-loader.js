@@ -2,7 +2,7 @@
  * Carga progresiva: dashboard primero, demás pantallas y CSS en segundo plano.
  */
 (function initScreenLoader(global) {
-    const VERSION = '20260531-lazy4';
+    const VERSION = '20260528-min5';
 
     const SCREEN_FILES = {
         dashboard: 'partials/screens/dashboard.html',
@@ -127,6 +127,8 @@
             screensMount.appendChild(section);
         }
         loadedScreens.add(sectionId);
+        document.dispatchEvent(new CustomEvent('eyedbot:screen-mounted', { detail: { sectionId } }));
+        global.applyOwnerRestrictedVisibility?.();
     }
 
     async function loadScreen(sectionId) {

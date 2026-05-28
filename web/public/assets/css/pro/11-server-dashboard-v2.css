@@ -1303,9 +1303,10 @@ body {
 
 #dashboard.section,
 #controlCenterSection.section {
-    height: calc(100vh - 70px) !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
+    height: auto !important;
+    min-height: calc(100dvh - var(--app-nav-height, 70px)) !important;
+    max-height: none !important;
+    overflow: visible !important;
 }
 
 #dashboard.section > .container.fullbleed-shell,
@@ -1313,12 +1314,11 @@ body {
     max-width: none !important;
     width: 100% !important;
     margin: 0 !important;
-    height: 100% !important;
-    min-height: 0 !important;
+    height: auto !important;
+    min-height: calc(100dvh - var(--app-nav-height, 70px)) !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+    overflow: visible !important;
     flex: 1 !important;
     padding-right: 0 !important;
     padding-bottom: 0 !important;
@@ -1411,13 +1411,13 @@ body {
 }
 
 #dashboard .dashboard-guilds-board {
-    flex: 1 !important;
+    flex: 1 1 auto !important;
     min-height: 0 !important;
     padding: 1rem 1.15rem 1.15rem !important;
     display: flex;
     flex-direction: column;
     gap: 1.35rem;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 #dashboard .dashboard-guild-section {
@@ -2217,19 +2217,20 @@ body {
 }
 
 #commandsSection.section {
-    height: calc(100vh - 70px) !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
+    height: auto !important;
+    min-height: calc(100dvh - var(--app-nav-height, 70px)) !important;
+    max-height: none !important;
+    overflow: visible !important;
 }
 
 #commandsSection.section > .container.commands-shell {
     max-width: none !important;
     width: 100% !important;
     margin: 0 !important;
-    height: 100% !important;
-    min-height: 0 !important;
+    height: auto !important;
+    min-height: calc(100dvh - var(--app-nav-height, 70px)) !important;
     padding: 0.85rem 1.1rem 1.15rem !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
@@ -2245,7 +2246,7 @@ body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: visible;
     padding-right: 0.2rem;
 }
 
@@ -3448,15 +3449,27 @@ body {
 
 /* =====================================================================
    Sin scroll del documento en escritorio: solo áreas internas
+   (servidor y configuraciones mantienen viewport fijo)
    ===================================================================== */
-html:not(.is-mobile) body:has(#appScreensMount) {
+html:not(.is-mobile) body:has(#appScreensMount):has(#serverSection.active),
+html:not(.is-mobile) body:has(#appScreensMount):has(#profileSettingsSection.active) {
     height: 100dvh;
     overflow: hidden;
     padding-top: var(--app-nav-height, 70px);
     box-sizing: border-box;
 }
 
-html:not(.is-mobile) body:has(#appScreensMount) .main-content {
+html:not(.is-mobile) body:has(#appScreensMount):not(:has(#serverSection.active)):not(:has(#profileSettingsSection.active)) {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-top: var(--app-nav-height, 70px);
+    box-sizing: border-box;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount):has(#serverSection.active) .main-content,
+html:not(.is-mobile) body:has(#appScreensMount):has(#profileSettingsSection.active) .main-content {
     height: calc(100dvh - var(--app-nav-height, 70px));
     max-height: calc(100dvh - var(--app-nav-height, 70px));
     min-height: 0;
@@ -3464,7 +3477,16 @@ html:not(.is-mobile) body:has(#appScreensMount) .main-content {
     box-sizing: border-box;
 }
 
-html:not(.is-mobile) body:has(#appScreensMount) .main-content > .section {
+html:not(.is-mobile) body:has(#appScreensMount):not(:has(#serverSection.active)):not(:has(#profileSettingsSection.active)) .main-content {
+    height: auto;
+    max-height: none;
+    min-height: calc(100dvh - var(--app-nav-height, 70px));
+    overflow: visible;
+    box-sizing: border-box;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount):has(#serverSection.active) .main-content > .section,
+html:not(.is-mobile) body:has(#appScreensMount):has(#profileSettingsSection.active) .main-content > .section {
     height: 100%;
     max-height: 100%;
     min-height: 0;
@@ -3472,19 +3494,22 @@ html:not(.is-mobile) body:has(#appScreensMount) .main-content > .section {
     box-sizing: border-box;
 }
 
-html:not(.is-mobile) body:has(#appScreensMount) .main-content > .section.active {
+html:not(.is-mobile) body:has(#appScreensMount):not(:has(#serverSection.active)):not(:has(#profileSettingsSection.active)) .main-content > .section {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    box-sizing: border-box;
+}
+
+html:not(.is-mobile) body:has(#appScreensMount):has(#serverSection.active) .main-content > .section.active,
+html:not(.is-mobile) body:has(#appScreensMount):has(#profileSettingsSection.active) .main-content > .section.active {
     display: flex;
     flex-direction: column;
 }
 
-html:not(.is-mobile) body:has(#appScreensMount) #dashboard.active,
-html:not(.is-mobile) body:has(#appScreensMount) #controlCenterSection.active,
-html:not(.is-mobile) body:has(#appScreensMount) #commandsSection.active,
-html:not(.is-mobile) body:has(#appScreensMount) #premiumSection.active,
-html:not(.is-mobile) body:has(#appScreensMount) #embedSection.active {
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+html:not(.is-mobile) body:has(#appScreensMount):not(:has(#serverSection.active)):not(:has(#profileSettingsSection.active)) .main-content > .section.active {
+    display: block;
 }
 
 html:not(.is-mobile) body:has(#appScreensMount) #serverSection .server-pane.active {

@@ -3953,8 +3953,9 @@ body {
 .main-content {
     max-width: 1720px;
     padding: 1.2rem clamp(0.9rem, 1.8vw, 1.7rem) 2rem;
-    height: calc(100vh - 70px);
-    overflow: hidden;
+    min-height: calc(100dvh - 70px);
+    height: auto;
+    overflow: visible;
 }
 
 .section {

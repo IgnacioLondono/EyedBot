@@ -3295,6 +3295,7 @@ async function bootEyedBotPanel() {
                     window.EyedBotPanelLoader.ensureScreen(sectionId).catch(() => {})
                 )
             );
+            applyOwnerRestrictedVisibility();
         }
         
         setupEventListeners();
@@ -3516,18 +3517,7 @@ function updateProfileSettingsData() {
     renderBillingState();
 }
 
-function updateUserUI() {
-    if (currentUser) {
-        document.getElementById('userName').textContent = currentUser.username;
-        if (currentUser.avatar) {
-            document.getElementById('userAvatar').src = `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png`;
-        } else {
-            document.getElementById('userAvatar').src = `https://cdn.discordapp.com/embed/avatars/${currentUser.discriminator % 5}.png`;
-        }
-    }
-
-    updateProfileSettingsData();
-
+function applyOwnerRestrictedVisibility() {
     const ownerRestrictedSelectors = [
         '.owner-settings-nav',
         '#settingsPaneOwner',
@@ -3559,6 +3549,20 @@ function updateUserUI() {
     if (!isOwnerUser && currentSettingsPaneId === 'settingsPaneOwner') {
         switchSettingsPane('settingsPaneAccount', { silent: true });
     }
+}
+
+function updateUserUI() {
+    if (currentUser) {
+        document.getElementById('userName').textContent = currentUser.username;
+        if (currentUser.avatar) {
+            document.getElementById('userAvatar').src = `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png`;
+        } else {
+            document.getElementById('userAvatar').src = `https://cdn.discordapp.com/embed/avatars/${currentUser.discriminator % 5}.png`;
+        }
+    }
+
+    updateProfileSettingsData();
+    applyOwnerRestrictedVisibility();
 
     const addBotBtn = document.getElementById('addBotBtn');
     if (addBotBtn) {
@@ -3573,6 +3577,16 @@ function updateUserUI() {
         }
     }
 }
+
+window.applyOwnerRestrictedVisibility = applyOwnerRestrictedVisibility;
+
+document.addEventListener('eyedbot:screen-mounted', () => {
+    applyOwnerRestrictedVisibility();
+});
+
+document.addEventListener('eyedbot:screens-all-ready', () => {
+    applyOwnerRestrictedVisibility();
+});
 
 // Configurar event listeners
 function setupEventListeners() {
@@ -4278,6 +4292,8 @@ function showSection(sectionId, options = {}) {
             console.warn('No se pudo cargar la pantalla:', sectionId, error?.message || error);
         }
     }
+
+    applyOwnerRestrictedVisibility();
 
     let targetSection = document.getElementById(sectionId);
     if (!targetSection) {
