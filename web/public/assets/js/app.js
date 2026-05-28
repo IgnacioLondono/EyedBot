@@ -2184,9 +2184,10 @@ function invalidateGetCache(prefix = '') {
 // Clave para localStorage
 const STORAGE_KEY = 'tulabot_panel_state';
 let _lastPersistedPanelStateJson = null;
+let _saveStateTimer = 0;
+let _saveStateQueued = false;
 
-// Guardar estado en localStorage
-function saveState() {
+function persistStateNow() {
     const state = {
         activeSection: document.querySelector('.section.active')?.id || 'dashboard',
         embedForm: {
@@ -2243,6 +2244,33 @@ function saveState() {
         console.warn('No se pudo guardar el estado:', e);
     }
 }
+
+// Guardar estado en localStorage (debounced para reducir trabajo en CPU/IO)
+function saveState(options = {}) {
+    const immediate = options === true || options?.immediate === true;
+    if (immediate) {
+        if (_saveStateTimer) {
+            clearTimeout(_saveStateTimer);
+            _saveStateTimer = 0;
+        }
+        _saveStateQueued = false;
+        persistStateNow();
+        return;
+    }
+
+    _saveStateQueued = true;
+    if (_saveStateTimer) return;
+
+    const delay = document.hidden ? 900 : 260;
+    _saveStateTimer = setTimeout(() => {
+        _saveStateTimer = 0;
+        if (!_saveStateQueued) return;
+        _saveStateQueued = false;
+        persistStateNow();
+    }, delay);
+}
+
+window.addEventListener('pagehide', () => saveState({ immediate: true }), { capture: true });
 
 // Cargar estado desde localStorage
 function loadState() {
@@ -2552,6 +2580,7 @@ function initBrandEyeAnimation() {
     const pupil = svg?.querySelector('.brand-eye-pupil');
     if (!svg || !pupil) return;
 
+    if (document.documentElement.classList.contains('perf-lite')) return;
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
     if (reduceMotion) return;
 
@@ -3283,17 +3312,22 @@ async function bootEyedBotPanel() {
         }
         updateServerMenuIdentity();
         updateDashboardButtonState();
-        
-        console.log('📋 Cargando guilds...');
-        await loadGuilds();
-        console.log('✅ loadGuilds completado');
-        
-        await loadAboutOverview();
-        console.log('✅ loadAboutOverview completado');
-        // setupServerSummaryAutoRefresh(); // Deshabilitado: no cargar automáticamente, solo al actualizar página
-        
+
         const initialSection = savedState?.activeSection || 'dashboard';
-        showSection(initialSection, { skipHistory: true });
+        const needsGuildsAtBoot = ['dashboard', 'serverSection', 'embedSection'].includes(initialSection);
+        if (needsGuildsAtBoot) {
+            console.log('📋 Cargando guilds...');
+            await loadGuilds();
+            console.log('✅ loadGuilds completado');
+        } else {
+            setTimeout(() => {
+                loadGuilds().catch((error) => {
+                    console.warn('No se pudo precargar guilds:', error?.message || error);
+                });
+            }, 1200);
+        }
+
+        await showSection(initialSection, { skipHistory: true });
         console.log('✅ showSection completado:', initialSection);
         
         initializePanelHistory(initialSection);
@@ -4279,7 +4313,7 @@ function showSection(sectionId, options = {}) {
 
     window.EyedBotMobile?.onSectionChange?.(sectionId);
     };
-    void run();
+    return run();
 }
 
 // Cargar servidores
@@ -12619,13 +12653,7 @@ function renderGreetingPanel(guildId, channels, mode) {
                 ${mode === 'welcome' ? `
                 <section class="greeting-card greeting-card--welcome-style" aria-labelledby="greeting-section-welcome-style">
                     <div class="greeting-card__head">
-                        <div class="greeting-card__title-row">
-                            <h4 id="greeting-section-welcome-style" class="greeting-card__title">Estilo de bienvenida</h4>
-                            <button type="button" id="welcomeOpenStudioBtn" class="btn btn-primary wc-studio-launch-btn" style="display:none;" title="Editor profesional a pantalla completa">
-                                <span class="wc-studio-launch-icon" aria-hidden="true">✦</span>
-                                Abrir Eyed Studio
-                            </button>
-                        </div>
+                        <h4 id="greeting-section-welcome-style" class="greeting-card__title">Estilo de bienvenida</h4>
                         <p class="greeting-card__hint greeting-card__hint--style" data-welcome-style-hint>La bienvenida se envía como un <strong>embed</strong> clásico de Discord (borde de color, miniatura e imagen).</p>
                     </div>
                     ${WELCOME_CARD_STYLE_ENABLED ? `
@@ -12975,10 +13003,6 @@ function renderGreetingPanel(guildId, channels, mode) {
     const testBtn = document.getElementById('testWelcomeBtn');
     if (saveBtn) saveBtn.addEventListener('click', () => saveWelcomeConfig(guildId));
     if (testBtn) testBtn.addEventListener('click', () => sendWelcomeTest(guildId));
-    const studioBtn = document.getElementById('welcomeOpenStudioBtn');
-    if (studioBtn && mode === 'welcome') {
-        studioBtn.addEventListener('click', () => openWelcomeCardStudio(guildId));
-    }
     container.querySelector('#welcomeScrollToBg')?.addEventListener('click', (e) => {
         e.preventDefault();
         container.querySelector('[data-welcome-section-tab="media"]')?.click();
@@ -13072,9 +13096,6 @@ function getWelcomeStyleFromForm() {
 }
 
 function welcomeMergeCardLayout(raw) {
-    if (typeof window.WelcomeCardStudio?.mergeCardLayout === 'function') {
-        return window.WelcomeCardStudio.mergeCardLayout(raw);
-    }
     const d = {
         bgFocalX: 0.5,
         bgFocalY: 0.5,
@@ -13114,14 +13135,12 @@ function welcomeMergeCardLayout(raw) {
 
 function syncWelcomeStyleUI(guildId) {
     const style = WELCOME_CARD_STYLE_ENABLED ? getWelcomeStyleFromForm() : 'embed';
-    const studioBtn = document.getElementById('welcomeOpenStudioBtn');
     const cardColors = document.getElementById('welcomeCardColorFields');
     const thumbRow = document.querySelector('#serverPaneWelcome .greeting-thumb-row');
     const styleHint = document.querySelector('[data-welcome-style-hint]');
     const footerField = document.getElementById('welcomeFooter')?.closest('.form-group');
     const colorField = document.getElementById('welcomeColor')?.closest('.form-group');
 
-    if (studioBtn) studioBtn.style.display = style === 'card' ? '' : 'none';
     if (cardColors) cardColors.style.display = style === 'card' ? '' : 'none';
     if (thumbRow) thumbRow.style.display = style === 'card' ? 'none' : '';
     if (footerField) footerField.style.display = style === 'card' ? 'none' : '';
@@ -17231,82 +17250,3 @@ function getDashboardUserAvatarUrl() {
     return `https://cdn.discordapp.com/embed/avatars/${mod}.png`;
 }
 
-function openWelcomeCardStudio(guildId) {
-    if (!WELCOME_CARD_STYLE_ENABLED) {
-        showToast('El editor de imagen con fondo no está disponible por el momento.', 'info');
-        return;
-    }
-    if (typeof window.WelcomeCardStudio?.open !== 'function') {
-        showToast('Recarga la página para cargar el editor visual.', 'warning');
-        return;
-    }
-    const cardRadio = document.querySelector('input[name="welcomeStyle"][value="card"]');
-    if (cardRadio && !cardRadio.checked) {
-        cardRadio.checked = true;
-        syncWelcomeStyleUI(guildId);
-    }
-    saveCurrentGreetingDraft();
-    currentWelcomeConfig = { ...(currentWelcomeConfig || {}) };
-    window.WelcomeCardStudio.open({
-        guildId,
-        getWelcomeConfig: () => currentWelcomeConfig,
-        applyCardLayout: (L) => {
-            currentWelcomeConfig = { ...currentWelcomeConfig, cardLayout: { ...L } };
-        },
-        getBgUrl: () => welcomeImagePreviewUrl || document.getElementById('welcomeImageUrl')?.value || '',
-        getAvatarUrl: () => getDashboardUserAvatarUrl(),
-        processAndUploadBackground: (file) => processAndUploadWelcomeStudioBackground(guildId, file),
-        onBackgroundUploaded: () => updateWelcomePreviewPanel(guildId),
-        getRawCardTexts: () => {
-            const cfg = collectWelcomeConfigFromForm();
-            return {
-                title: String(cfg.title != null ? cfg.title : ''),
-                cardNameTemplate: String(cfg.cardNameTemplate != null ? cfg.cardNameTemplate : '{username}').trim() || '{username}',
-                message: String(cfg.message != null ? cfg.message : ''),
-                cardOverlayText: String(cfg.cardOverlayText != null ? cfg.cardOverlayText : '')
-            };
-        },
-        onCardTextsUpdated: (raw) => {
-            const titleEl = document.getElementById('welcomeTitle');
-            const msgEl = document.getElementById('welcomeMessage');
-            const nameLineEl = document.getElementById('welcomeCardNameLine');
-            const overlayEl = document.getElementById('welcomeCardOverlay');
-            if (titleEl && raw.title != null) titleEl.value = raw.title;
-            if (msgEl && raw.message != null) msgEl.value = raw.message;
-            if (nameLineEl && raw.cardNameTemplate != null) nameLineEl.value = raw.cardNameTemplate;
-            if (overlayEl && raw.cardOverlayText != null) overlayEl.value = raw.cardOverlayText;
-            currentWelcomeConfig = {
-                ...currentWelcomeConfig,
-                title: raw.title != null ? String(raw.title) : currentWelcomeConfig.title,
-                message: raw.message != null ? String(raw.message) : currentWelcomeConfig.message,
-                cardNameTemplate:
-                    raw.cardNameTemplate != null
-                        ? String(raw.cardNameTemplate).trim() || '{username}'
-                        : currentWelcomeConfig.cardNameTemplate,
-                cardOverlayText:
-                    raw.cardOverlayText != null ? String(raw.cardOverlayText) : currentWelcomeConfig.cardOverlayText
-            };
-            scheduleWelcomeCardPreview(guildId);
-        },
-        getPreviewLines: () => {
-            const cfg = collectWelcomeConfigFromForm();
-            const guild = currentServerGuilds.find((g) => String(g.id) === String(guildId));
-            const sample = {
-                userMention: `@${currentUser?.username || 'Usuario'}`,
-                username: currentUser?.username || 'Usuario',
-                server: guild?.name || 'Tu servidor',
-                memberCount: guild?.botGuild?.memberCount || 100
-            };
-            return {
-                title: applyWelcomePreviewTemplate(cfg.title || '¡Bienvenido!', sample),
-                name: applyWelcomePreviewTemplate((cfg.cardNameTemplate || '{username}'), sample),
-                sub: applyWelcomePreviewTemplate(cfg.message || '', sample),
-                overlay: applyWelcomePreviewTemplate(cfg.cardOverlayText || '', sample)
-            };
-        },
-        onClose: () => {
-            saveCurrentGreetingDraft();
-            updateWelcomePreviewPanel(guildId);
-        }
-    });
-}

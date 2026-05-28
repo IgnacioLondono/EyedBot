@@ -29,7 +29,6 @@
         `assets/css/pro/10-mobile-levels-modules.css?v=${VERSION}`,
         `assets/css/pro/12-card-accents.css?v=${VERSION}`,
         `assets/css/pro/13-eyedplus-lock.css?v=${VERSION}`,
-        `assets/css/welcome-card-studio.css?v=${VERSION}`,
         `assets/css/mobile-app-complete.css?v=${VERSION}`
     ];
 
@@ -48,8 +47,7 @@
             `assets/css/pro/07-server-insights.css?v=${VERSION}`,
             `assets/css/pro/08-server-panes.css?v=${VERSION}`,
             `assets/css/pro/09-free-games.css?v=${VERSION}`,
-            `assets/css/pro/10-mobile-levels-modules.css?v=${VERSION}`,
-            `assets/css/welcome-card-studio.css?v=${VERSION}`
+            `assets/css/pro/10-mobile-levels-modules.css?v=${VERSION}`
         ]
     };
 
