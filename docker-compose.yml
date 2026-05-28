@@ -80,7 +80,7 @@ services:
       - ./logs:/app/logs
       - ./backups:/app/backups
     ports:
-      - "${WEB_BIND_IP:-127.0.0.1}:3000:3000"
+      - "${BOT_BIND_IP:-127.0.0.1}:${BOT_PORT:-3001}:3000"
     depends_on:
       mysql:
         condition: service_healthy
