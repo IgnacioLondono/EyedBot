@@ -2612,6 +2612,9 @@ function initBrandEyeAnimation() {
 }
 
 function initializeInteractiveGradient() {
+    if (document.documentElement.classList.contains('perf-lite')) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
     const interactive = document.getElementById('interactiveGradient');
     if (!(interactive instanceof HTMLElement)) return;
 
@@ -3304,8 +3307,8 @@ async function bootEyedBotPanel() {
         }
         
         console.log('✅ Inicialización completada exitosamente');
-        // Guardar estado periódicamente y en eventos
-        setInterval(saveState, 2000); // Guardar cada 2 segundos
+        const saveStateIntervalMs = document.documentElement.classList.contains('perf-lite') ? 12000 : 8000;
+        setInterval(saveState, saveStateIntervalMs);
     } catch (error) {
         console.error('❌ Error fatal durante inicialización:', error);
         console.error('Stack:', error?.stack);
@@ -4177,6 +4180,7 @@ function renderCommandCatalogCard(cmd) {
 
 // Mostrar sección
 function showSection(sectionId, options = {}) {
+    const run = async () => {
     if (sectionId === 'statsSection' || sectionId === 'logsSection') {
         if (isOwnerUser) {
             currentSettingsPaneId = 'settingsPaneOwner';
@@ -4193,10 +4197,19 @@ function showSection(sectionId, options = {}) {
         sectionId = 'dashboard';
     }
 
-    const targetSection = document.getElementById(sectionId);
+    if (window.EyedBotPanelLoader?.ensureScreen) {
+        try {
+            await window.EyedBotPanelLoader.ensureScreen(sectionId);
+        } catch (error) {
+            console.warn('No se pudo cargar la pantalla:', sectionId, error?.message || error);
+        }
+    }
+
+    let targetSection = document.getElementById(sectionId);
     if (!targetSection) {
         console.warn('Seccion invalida solicitada:', sectionId);
         sectionId = 'dashboard';
+        targetSection = document.getElementById(sectionId);
     }
 
     document.querySelectorAll('.section').forEach(section => {
@@ -4265,6 +4278,8 @@ function showSection(sectionId, options = {}) {
     }
 
     window.EyedBotMobile?.onSectionChange?.(sectionId);
+    };
+    void run();
 }
 
 // Cargar servidores
@@ -10938,12 +10953,20 @@ function buildServerActivityPoints(info, mode = 'week') {
     }));
 }
 
-function renderServerActivityChart(info, options = {}) {
+async function renderServerActivityChart(info, options = {}) {
     const canvasId = options.canvasId || 'serverActivityChart';
     const canvas = document.getElementById(canvasId);
     const rangeSelect = document.getElementById(options.selectId || 'serverActivityRange');
     const emptyState = document.getElementById(options.emptyId || 'serverActivityChartEmpty');
     if (!canvas || !rangeSelect) return;
+
+    if (typeof Chart === 'undefined' && window.EyedBotPanelLoader?.loadChartJs) {
+        try {
+            await window.EyedBotPanelLoader.loadChartJs();
+        } catch {
+            /* fallthrough */
+        }
+    }
 
     if (typeof Chart === 'undefined') {
         if (emptyState) {
