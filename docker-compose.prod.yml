@@ -2,33 +2,6 @@
 # Usar: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
-  web-v2:
-    restart: always
-    cpus: "0.75"
-    mem_limit: 768m
-    mem_reservation: 256m
-    stop_grace_period: 20s
-    init: true
-    deploy:
-      resources:
-        limits:
-          cpus: '0.75'
-          memory: 768M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-
   lavalink:
     profiles: ["music"]
     restart: always

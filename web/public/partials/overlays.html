@@ -1,0 +1,157 @@
+<div id="serverSwitcherModal" class="server-switcher-modal" aria-hidden="true">
+        <div class="server-switcher-backdrop" data-close-server-switcher="true"></div>
+        <div class="server-switcher-dialog" role="dialog" aria-modal="true" aria-labelledby="serverSwitcherTitle">
+            <div class="server-switcher-head">
+                <h3 id="serverSwitcherTitle">Elegir servidor</h3>
+                <button type="button" id="serverSwitcherClose" class="server-switcher-close" aria-label="Cerrar selector">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M18 6L6 18"></path>
+                        <path d="M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-switcher-carousel">
+                <button type="button" id="serverSwitcherPrev" class="server-switcher-arrow" aria-label="Servidor anterior">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M15 18l-6-6 6-6"></path>
+                    </svg>
+                </button>
+                <div class="server-switcher-viewport">
+                    <div id="serverSwitcherTrack" class="server-switcher-track"></div>
+                </div>
+                <button type="button" id="serverSwitcherNext" class="server-switcher-arrow" aria-label="Servidor siguiente">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M9 18l6-6-6-6"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-switcher-foot">
+                <div class="server-switcher-counter"><span id="serverSwitcherCurrentIndex">1</span> / <span id="serverSwitcherTotal">1</span></div>
+                <button type="button" id="serverSwitcherSelect" class="btn btn-primary">Seleccionar este servidor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Modal: Visor de comprobantes -->
+    <div id="receiptModal" class="receipt-modal" aria-hidden="true" role="dialog" aria-labelledby="receiptModalTitle">
+        <div class="receipt-modal-backdrop" data-receipt-close="1"></div>
+        <div class="receipt-modal-dialog" role="document">
+            <header class="receipt-modal-head">
+                <div class="receipt-modal-kicker">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M8 9h3"></path></svg>
+                    <span>Comprobante</span>
+                </div>
+                <h3 id="receiptModalTitle">Detalle del comprobante</h3>
+                <button type="button" class="receipt-modal-close" data-receipt-close="1" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </header>
+            <div class="receipt-modal-toolbar">
+                <div class="receipt-modal-tabs" role="tablist">
+                    <button type="button" class="receipt-tab-btn is-active" data-receipt-tab="summary" role="tab">Resumen</button>
+                    <button type="button" class="receipt-tab-btn" data-receipt-tab="transcript" role="tab">Transcripción</button>
+                    <button type="button" class="receipt-tab-btn" data-receipt-tab="participants" role="tab">Participantes</button>
+                </div>
+                <div class="receipt-modal-toolbar-actions">
+                    <input type="text" id="receiptSearchInput" class="receipt-search" placeholder="Buscar en transcripción..." />
+                    <button type="button" id="receiptCopyBtn" class="btn btn-ghost btn-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span>Copiar</span>
+                    </button>
+                    <a id="receiptDownloadBtn" href="#" class="btn btn-primary btn-sm" download>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Descargar</span>
+                    </a>
+                </div>
+            </div>
+            <div class="receipt-modal-body">
+                <div id="receiptPaneSummary" class="receipt-pane is-active">
+                    <div class="receipt-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Cargando comprobante...</p>
+                    </div>
+                </div>
+                <div id="receiptPaneTranscript" class="receipt-pane"></div>
+                <div id="receiptPaneParticipants" class="receipt-pane"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Chat de ticket en vivo -->
+    <div id="ticketChatModal" class="ticket-chat-modal" aria-hidden="true" role="dialog" aria-labelledby="ticketChatTitle">
+        <div class="ticket-chat-backdrop" data-tchat-close="1"></div>
+        <div class="ticket-chat-dialog" role="document">
+            <header class="ticket-chat-head">
+                <div class="ticket-chat-head-info">
+                    <div class="ticket-chat-avatar" id="ticketChatAvatar">#</div>
+                    <div class="ticket-chat-head-meta">
+                        <div class="ticket-chat-kicker">
+                            <span class="ticket-chat-dot"></span>
+                            <span>Chat en vivo</span>
+                        </div>
+                        <h3 id="ticketChatTitle">Cargando ticket...</h3>
+                        <div class="ticket-chat-sub" id="ticketChatSubtitle">—</div>
+                    </div>
+                </div>
+                <div class="ticket-chat-head-actions">
+                    <button type="button" id="ticketChatRefreshBtn" class="btn btn-ghost btn-sm" title="Refrescar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>
+                    </button>
+                    <button type="button" class="ticket-chat-close" data-tchat-close="1" aria-label="Cerrar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="ticket-chat-body" id="ticketChatBody">
+                <div class="ticket-chat-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando mensajes...</p>
+                </div>
+            </div>
+
+            <div class="ticket-chat-status" id="ticketChatStatus" style="display:none;"></div>
+
+            <form class="ticket-chat-form" id="ticketChatForm" autocomplete="off">
+                <div class="ticket-chat-input-wrap">
+                    <textarea id="ticketChatInput" class="ticket-chat-input" rows="1" maxlength="1800" placeholder="Escribe un mensaje al usuario..."></textarea>
+                    <div class="ticket-chat-counter"><span id="ticketChatCounter">0</span>/1800</div>
+                </div>
+                <button type="submit" class="ticket-chat-send" id="ticketChatSendBtn" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    <span>Enviar</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: confirmación / entrada de texto (reemplaza alert, confirm y prompt nativos) -->
+    <div id="appDialogModal" class="app-dialog-modal" aria-hidden="true" role="dialog" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage">
+        <div class="app-dialog-backdrop" data-app-dialog-close="1"></div>
+        <div class="app-dialog-panel" role="document">
+            <header class="app-dialog-head">
+                <h3 id="appDialogTitle" class="app-dialog-title">Confirmar</h3>
+                <button type="button" class="app-dialog-close" data-app-dialog-close="1" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </header>
+            <div class="app-dialog-body">
+                <p id="appDialogMessage" class="app-dialog-message"></p>
+                <div id="appDialogSelectWrap" class="app-dialog-input-wrap" hidden>
+                    <label id="appDialogSelectLabel" class="app-dialog-input-label" for="appDialogSelect">Duración</label>
+                    <select id="appDialogSelect" class="app-dialog-input form-control"></select>
+                </div>
+                <div id="appDialogInputWrap" class="app-dialog-input-wrap" hidden>
+                    <label id="appDialogInputLabel" class="app-dialog-input-label" for="appDialogInput"></label>
+                    <input type="text" id="appDialogInput" class="app-dialog-input form-control" autocomplete="off">
+                </div>
+            </div>
+            <footer class="app-dialog-actions">
+                <button type="button" id="appDialogCancelBtn" class="btn btn-secondary" data-app-dialog-close="1">Cancelar</button>
+                <button type="button" id="appDialogConfirmBtn" class="btn btn-primary">Aceptar</button>
+            </footer>
+        </div>
+    </div>

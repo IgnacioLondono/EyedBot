@@ -1,0 +1,761 @@
+openapi: 3.0.3
+info:
+  title: EyedBot Web API
+  version: 1.0.0
+  description: |
+    OpenAPI base para el panel web de EyedBot.
+    Autenticacion actual: sesion por cookie (Express Session).
+servers:
+  - url: http://localhost:3000
+    description: Local
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: User
+  - name: Guilds
+  - name: Verify
+  - name: Tickets
+  - name: AntiRaid
+  - name: TempVoice
+  - name: Leveling
+  - name: WelcomeGoodbye
+  - name: Embeds
+  - name: Panel
+  - name: Moderation
+  - name: Music
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: tulabot.session
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      additionalProperties: true
+
+    GenericSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+      additionalProperties: true
+
+    UserResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          additionalProperties: true
+        guilds:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
+
+    GuildListResponse:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+
+    ChannelListResponse:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+
+    ConfigObject:
+      type: object
+      additionalProperties: true
+
+    MembersResponse:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+
+  parameters:
+    GuildId:
+      in: path
+      name: guildId
+      required: true
+      schema:
+        type: string
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Healthcheck del servicio web
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  service:
+                    type: string
+
+  /auth/discord:
+    get:
+      tags: [Auth]
+      summary: Inicia OAuth2 con Discord
+      description: Redirecciona al flujo OAuth de Discord.
+      responses:
+        '302':
+          description: Redirect a Discord OAuth
+
+  /callback:
+    get:
+      tags: [Auth]
+      summary: Callback OAuth2
+      parameters:
+        - in: query
+          name: code
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect al dashboard o login
+
+  /logout:
+    get:
+      tags: [Auth]
+      summary: Cierra sesion
+      responses:
+        '302':
+          description: Redirect login
+
+  /api/user:
+    get:
+      tags: [User]
+      security:
+        - sessionCookie: []
+      summary: Devuelve usuario y guilds de la sesion
+      responses:
+        '200':
+          description: Datos de usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: No autenticado
+
+  /api/guilds:
+    get:
+      tags: [Guilds]
+      security:
+        - sessionCookie: []
+      summary: Lista guilds gestionables
+      responses:
+        '200':
+          description: Lista de guilds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildListResponse'
+
+  /api/guild/{guildId}/channels:
+    get:
+      tags: [Guilds]
+      security:
+        - sessionCookie: []
+      summary: Lista canales del guild
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Lista de canales
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelListResponse'
+
+  /api/guild/{guildId}/info:
+    get:
+      tags: [Guilds]
+      security:
+        - sessionCookie: []
+      summary: Informacion del guild
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Info guild
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/guild/{guildId}/members:
+    get:
+      tags: [Guilds]
+      security:
+        - sessionCookie: []
+      summary: Miembros del guild
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Miembros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembersResponse'
+
+  /api/guild/{guildId}/verify-config:
+    get:
+      tags: [Verify]
+      security:
+        - sessionCookie: []
+      summary: Obtener config de verificacion
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Config verify
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigObject'
+    post:
+      tags: [Verify]
+      security:
+        - sessionCookie: []
+      summary: Guardar config de verificacion
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Config actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+
+  /api/guild/{guildId}/verify-publish:
+    post:
+      tags: [Verify]
+      security:
+        - sessionCookie: []
+      summary: Publicar mensaje de verificacion
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Publicado
+
+  /api/guild/{guildId}/verify-image:
+    post:
+      tags: [Verify]
+      security:
+        - sessionCookie: []
+      summary: Subir imagen de verificacion
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                imageFile:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Imagen subida
+
+  /api/guild/{guildId}/ticket-config:
+    get:
+      tags: [Tickets]
+      security:
+        - sessionCookie: []
+      summary: Obtener config de tickets
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Config tickets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigObject'
+    post:
+      tags: [Tickets]
+      security:
+        - sessionCookie: []
+      summary: Guardar config de tickets
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Config actualizada
+
+  /api/guild/{guildId}/ticket-publish:
+    post:
+      tags: [Tickets]
+      security:
+        - sessionCookie: []
+      summary: Publicar panel de tickets
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Publicado
+
+  /api/guild/{guildId}/anti-raid-config:
+    get:
+      tags: [AntiRaid]
+      security:
+        - sessionCookie: []
+      summary: Obtener config anti-raid
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Config anti-raid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigObject'
+    post:
+      tags: [AntiRaid]
+      security:
+        - sessionCookie: []
+      summary: Guardar config anti-raid
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Config actualizada
+
+  /api/guild/{guildId}/temp-voice-config:
+    get:
+      tags: [TempVoice]
+      security:
+        - sessionCookie: []
+      summary: Obtener config temp voice
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Config temp voice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigObject'
+    post:
+      tags: [TempVoice]
+      security:
+        - sessionCookie: []
+      summary: Guardar config temp voice
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Config actualizada
+
+  /api/guild/{guildId}/leveling-config:
+    get:
+      tags: [Leveling]
+      security:
+        - sessionCookie: []
+      summary: Obtener config leveling
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Config leveling
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigObject'
+    post:
+      tags: [Leveling]
+      security:
+        - sessionCookie: []
+      summary: Guardar config leveling
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Config actualizada
+
+  /api/guild/{guildId}/leveling-leaderboard:
+    get:
+      tags: [Leveling]
+      security:
+        - sessionCookie: []
+      summary: Ranking de leveling
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+  /api/guild/{guildId}/welcome-config:
+    get:
+      tags: [WelcomeGoodbye]
+      security:
+        - sessionCookie: []
+      summary: Obtener config de bienvenida
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Config welcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigObject'
+    post:
+      tags: [WelcomeGoodbye]
+      security:
+        - sessionCookie: []
+      summary: Guardar config de bienvenida
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Config actualizada
+
+  /api/guild/{guildId}/welcome-image:
+    post:
+      tags: [WelcomeGoodbye]
+      security:
+        - sessionCookie: []
+      summary: Subir imagen de bienvenida
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                imageFile:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Imagen subida
+
+  /api/guild/{guildId}/welcome-test:
+    post:
+      tags: [WelcomeGoodbye]
+      security:
+        - sessionCookie: []
+      summary: Enviar test de bienvenida
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Test enviado
+
+  /api/guild/{guildId}/goodbye-config:
+    get:
+      tags: [WelcomeGoodbye]
+      security:
+        - sessionCookie: []
+      summary: Obtener config de despedida
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Config goodbye
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigObject'
+    post:
+      tags: [WelcomeGoodbye]
+      security:
+        - sessionCookie: []
+      summary: Guardar config de despedida
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigObject'
+      responses:
+        '200':
+          description: Config actualizada
+
+  /api/guild/{guildId}/goodbye-test:
+    post:
+      tags: [WelcomeGoodbye]
+      security:
+        - sessionCookie: []
+      summary: Enviar test de despedida
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Test enviado
+
+  /api/send-embed:
+    post:
+      tags: [Embeds]
+      security:
+        - sessionCookie: []
+      summary: Enviar embed al canal
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Embed enviado
+
+  /api/embed-templates/{guildId}:
+    get:
+      tags: [Embeds]
+      security:
+        - sessionCookie: []
+      summary: Obtener templates de embed
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+  /api/embed-templates:
+    post:
+      tags: [Embeds]
+      security:
+        - sessionCookie: []
+      summary: Guardar template de embed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Template guardado
+
+  /api/embed-templates/{guildId}/{templateId}:
+    delete:
+      tags: [Embeds]
+      security:
+        - sessionCookie: []
+      summary: Eliminar template de embed
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template eliminado
+
+  /api/stats:
+    get:
+      tags: [Panel]
+      security:
+        - sessionCookie: []
+      summary: Estadisticas del bot
+      responses:
+        '200':
+          description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/logs:
+    get:
+      tags: [Panel]
+      security:
+        - sessionCookie: []
+      summary: Logs recientes
+      responses:
+        '200':
+          description: Logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+  /api/logs/stream:
+    get:
+      tags: [Panel]
+      security:
+        - sessionCookie: []
+      summary: Stream de logs (SSE)
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /api/commands:
+    get:
+      tags: [Panel]
+      security:
+        - sessionCookie: []
+      summary: Comandos cargados del bot
+      responses:
+        '200':
+          description: Lista de comandos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+  /api/moderate:
+    post:
+      tags: [Moderation]
+      security:
+        - sessionCookie: []
+      summary: Ejecutar accion de moderacion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Accion ejecutada
+
+  /api/guild/{guildId}/music:
+    get:
+      tags: [Music]
+      security:
+        - sessionCookie: []
+      summary: Estado de musica en guild
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      responses:
+        '200':
+          description: Estado musica
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/guild/{guildId}/music/control:
+    post:
+      tags: [Music]
+      security:
+        - sessionCookie: []
+      summary: Control de musica en guild
+      parameters:
+        - $ref: '#/components/parameters/GuildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Control aplicado

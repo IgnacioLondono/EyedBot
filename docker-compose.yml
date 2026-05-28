@@ -79,30 +79,11 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./backups:/app/backups
+    ports:
+      - "${WEB_BIND_IP:-127.0.0.1}:3000:3000"
     depends_on:
       mysql:
         condition: service_healthy
-    networks:
-      - eyedbot-net
-
-  # Nueva web v2 (modular, separada del bot legacy)
-  web-v2:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-    container_name: eyedbot-web-v2
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-    ports:
-      - "${WEB_V2_BIND_IP:-127.0.0.1}:${WEB_V2_PORT:-3000}:3000"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
-      interval: 20s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
     networks:
       - eyedbot-net
 
