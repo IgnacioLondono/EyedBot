@@ -102,10 +102,17 @@ body {
 .gradients-container {
     position: relative;
     z-index: 1;
-    filter: url(#goo) blur(40px);
+    /* Sin filtro SVG goo: el blur solo es mucho más ligero en GPU */
+    filter: blur(72px);
     width: 100%;
     height: 100%;
-    opacity: 0.92;
+    opacity: 0.72;
+}
+
+.gradient-bg:not(.gradient-bg--no-bubbles) .g4,
+.gradient-bg:not(.gradient-bg--no-bubbles) .g5,
+.gradient-bg:not(.gradient-bg--no-bubbles) .interactive {
+    display: none;
 }
 
 .gradient-bg.gradient-bg--no-bubbles .gradients-container {

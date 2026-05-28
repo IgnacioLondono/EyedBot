@@ -696,8 +696,8 @@ const THEME_DEFAULTS = {
     preset: 'midnight',
     ...THEME_PRESETS.midnight,
     autoContrast: true,
-    /** Orbes animados (.gradients-container) detrás del contenido */
-    backgroundBubbles: true,
+    /** Orbes animados (.gradients-container) detrás del contenido — off por defecto (GPU) */
+    backgroundBubbles: false,
     wallpaperEnabled: false,
     wallpaperStorage: 'none',
     wallpaperKind: 'none',
@@ -2643,6 +2643,7 @@ function initBrandEyeAnimation() {
 function initializeInteractiveGradient() {
     if (document.documentElement.classList.contains('perf-lite')) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+    if (themeSettings?.backgroundBubbles !== true) return;
 
     const interactive = document.getElementById('interactiveGradient');
     if (!(interactive instanceof HTMLElement)) return;
@@ -2713,7 +2714,7 @@ function getThemeControlsState() {
         backgroundBubbles:
             document.getElementById('themeBackgroundBubbles') != null
                 ? Boolean(document.getElementById('themeBackgroundBubbles').checked)
-                : baseWp.backgroundBubbles !== false,
+                : baseWp.backgroundBubbles === true,
         wallpaperEnabled: document.getElementById('themeWallpaperEnabled')?.checked ?? baseWp.wallpaperEnabled,
         wallpaperStorage: baseWp.wallpaperStorage ?? THEME_DEFAULTS.wallpaperStorage,
         wallpaperKind: baseWp.wallpaperKind ?? THEME_DEFAULTS.wallpaperKind,
@@ -2797,6 +2798,7 @@ function applyThemeSettings(theme = themeSettings, options = {}) {
     setThemeCssVariables(normalized);
     syncThemeControls(normalized);
     void hydrateWallpaperLayer(normalized);
+    window.EyedBotPerformance?.syncBackgroundBubbles?.();
 
     if (options.persist !== false) {
         saveThemeSettings(normalized);

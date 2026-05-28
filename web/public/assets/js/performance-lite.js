@@ -7,6 +7,7 @@
 
     const STORAGE_KEY = 'eyedbot-force-perf-lite';
     const STORAGE_OFF = 'eyedbot-force-perf-off';
+    const THEME_STORAGE_KEY = 'eyedbot_theme_settings_v1';
 
     function readForcePerf() {
         try {
@@ -50,10 +51,48 @@
         return enabled;
     }
 
+    function readThemeBackgroundBubblesEnabled() {
+        try {
+            const raw = global.localStorage.getItem(THEME_STORAGE_KEY);
+            if (!raw) return false;
+            const saved = JSON.parse(raw);
+            return saved?.backgroundBubbles === true;
+        } catch {
+            return false;
+        }
+    }
+
+    function shouldShowBackgroundBubbles() {
+        if (applyPerfLite._enabled) return false;
+        return readThemeBackgroundBubblesEnabled();
+    }
+
+    function syncBackgroundBubbles() {
+        const show = shouldShowBackgroundBubbles();
+        doc.querySelectorAll('.gradient-bg').forEach((bg) => {
+            if (!(bg instanceof HTMLElement)) return;
+            bg.classList.toggle('gradient-bg--no-bubbles', !show);
+        });
+        return show;
+    }
+
     const enabled = applyPerfLite(detectPerfLite());
+    applyPerfLite._enabled = enabled;
+
+    const runBubbleSync = () => {
+        syncBackgroundBubbles();
+    };
+
+    if (doc.readyState === 'loading') {
+        doc.addEventListener('DOMContentLoaded', runBubbleSync, { once: true });
+    } else {
+        runBubbleSync();
+    }
 
     global.EyedBotPerformance = {
         isLite: () => doc.documentElement.classList.contains('perf-lite'),
+        shouldShowBackgroundBubbles,
+        syncBackgroundBubbles,
         setForceLite(on) {
             try {
                 global.localStorage.removeItem(STORAGE_OFF);
@@ -63,7 +102,8 @@
             } catch {
                 /* ignore */
             }
-            applyPerfLite(on);
+            applyPerfLite._enabled = applyPerfLite(on);
+            syncBackgroundBubbles();
         },
         clearForce() {
             try {
@@ -72,14 +112,8 @@
             } catch {
                 /* ignore */
             }
-            applyPerfLite(detectPerfLite());
+            applyPerfLite._enabled = applyPerfLite(detectPerfLite());
+            syncBackgroundBubbles();
         }
     };
-
-    if (enabled) {
-        doc.addEventListener('DOMContentLoaded', () => {
-            const bg = doc.querySelector('.gradient-bg');
-            if (bg) bg.classList.add('gradient-bg--no-bubbles');
-        }, { once: true });
-    }
 })(window);

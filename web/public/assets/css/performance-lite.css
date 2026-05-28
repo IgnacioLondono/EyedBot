@@ -1,8 +1,9 @@
-/* Modo rendimiento: menos GPU, sin filtro goo ni animaciones pesadas */
+/* Modo rendimiento: menos GPU, sin burbujas ni animaciones pesadas */
 
 html.perf-lite .gradients-container {
+    opacity: 0 !important;
+    visibility: hidden !important;
     filter: none !important;
-    opacity: 0.55 !important;
 }
 
 html.perf-lite .g1,
@@ -12,7 +13,7 @@ html.perf-lite .g4,
 html.perf-lite .g5,
 html.perf-lite .interactive {
     animation: none !important;
-    opacity: 0.35 !important;
+    display: none !important;
 }
 
 html.perf-lite #interactiveGradient {
@@ -48,11 +49,14 @@ html.perf-lite * {
 
 @media (prefers-reduced-motion: reduce) {
     .gradients-container {
+        opacity: 0 !important;
+        visibility: hidden !important;
         filter: none !important;
     }
 
     .g1, .g2, .g3, .g4, .g5, .interactive {
         animation: none !important;
+        display: none !important;
     }
 
     #interactiveGradient {

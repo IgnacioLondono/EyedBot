@@ -24,9 +24,21 @@ html.is-mobile body {
 }
 
 html.is-mobile .gradient-bg .interactive,
-html.is-mobile .gradients-container .g1,
-html.is-mobile .gradients-container .g2 {
-    opacity: 0.35;
+html.is-mobile .gradients-container .g3,
+html.is-mobile .gradients-container .g4,
+html.is-mobile .gradients-container .g5 {
+    display: none !important;
+}
+
+html.is-mobile .gradient-bg .gradients-container {
+    filter: blur(56px);
+    opacity: 0.45;
+}
+
+html.is-mobile .gradient-bg .gradients-container .g1,
+html.is-mobile .gradient-bg .gradients-container .g2 {
+    opacity: 0.3;
+    animation-duration: 140s;
 }
 
 /* —— Navbar compacta —— */

@@ -28,6 +28,7 @@
         }
 
         mount.innerHTML = await response.text();
+        global.EyedBotPerformance?.syncBackgroundBubbles?.();
     }
 
     global.__appLayoutReady = loadLayout().catch((error) => {
