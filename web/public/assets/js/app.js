@@ -210,7 +210,6 @@ let serverSwitcherTouchStartX = 0;
 let serverSwitcherTouchDeltaX = 0;
 let themeSettings = null;
 let currentSettingsPaneId = 'settingsPaneAccount';
-let aboutCarouselBound = false;
 let revealObserver = null;
 let commandsCatalog = [];
 let commandsFilterQuery = '';
@@ -3026,6 +3025,118 @@ function bindSettingsPaneNavigation() {
     wireSettingsSectionControls();
 }
 
+function switchAboutTab(tabKey = 'what') {
+    const section = document.getElementById('controlCenterSection');
+    if (!section) return;
+
+    section.querySelectorAll('.about-pro-tab').forEach((btn) => {
+        const active = btn.dataset.aboutTab === tabKey;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+
+    section.querySelectorAll('.about-pro-panel').forEach((panel) => {
+        const active = panel.dataset.aboutPanel === tabKey;
+        panel.classList.toggle('active', active);
+        panel.hidden = !active;
+    });
+
+    refreshActiveSectionReveal();
+}
+
+function applyAboutTabInitialState() {
+    const section = document.getElementById('controlCenterSection');
+    if (!section) return;
+    const activeTab = section.querySelector('.about-pro-tab.active');
+    switchAboutTab(activeTab?.dataset.aboutTab || 'what');
+}
+
+function wireAboutCarousel() {
+    const aboutCarouselPrev = document.getElementById('aboutCarouselPrev');
+    const aboutCarouselNext = document.getElementById('aboutCarouselNext');
+    const aboutCarouselViewport = document.getElementById('aboutCarouselViewport');
+    if (!aboutCarouselPrev || !aboutCarouselNext || !aboutCarouselViewport) return;
+    if (aboutCarouselViewport.dataset.carouselBound === '1') return;
+
+    const moveByViewport = (dir = 1) => {
+        const width = Math.max(260, Math.round(aboutCarouselViewport.clientWidth * 0.82));
+        aboutCarouselViewport.scrollBy({ left: width * dir, behavior: 'smooth' });
+    };
+
+    aboutCarouselPrev.addEventListener('click', () => moveByViewport(-1));
+    aboutCarouselNext.addEventListener('click', () => moveByViewport(1));
+
+    let aboutCarouselAutoScroll = setInterval(() => moveByViewport(1), 5400);
+    const pauseAboutAuto = () => {
+        if (aboutCarouselAutoScroll) {
+            clearInterval(aboutCarouselAutoScroll);
+            aboutCarouselAutoScroll = null;
+        }
+    };
+    const resumeAboutAuto = () => {
+        if (aboutCarouselAutoScroll) return;
+        aboutCarouselAutoScroll = setInterval(() => moveByViewport(1), 5400);
+    };
+
+    aboutCarouselViewport.addEventListener('mouseenter', pauseAboutAuto);
+    aboutCarouselViewport.addEventListener('mouseleave', resumeAboutAuto);
+    aboutCarouselViewport.addEventListener('focusin', pauseAboutAuto);
+    aboutCarouselViewport.addEventListener('focusout', resumeAboutAuto);
+
+    aboutCarouselViewport.dataset.carouselBound = '1';
+}
+
+function observeSectionReveal(sectionEl) {
+    if (!sectionEl) return;
+
+    const elements = sectionEl.querySelectorAll('.reveal-on-scroll');
+    if (!elements.length) return;
+
+    if (!('IntersectionObserver' in window)) {
+        elements.forEach((el) => el.classList.add('is-visible'));
+        return;
+    }
+
+    if (!revealObserver) {
+        initializeScrollReveal();
+    }
+
+    elements.forEach((el) => {
+        if (!el.classList.contains('is-visible')) {
+            revealObserver?.observe(el);
+        }
+    });
+}
+
+function wireAboutSectionControls() {
+    const section = document.getElementById('controlCenterSection');
+    if (!section) return;
+
+    void loadAboutOverview();
+    applyAboutTabInitialState();
+    wireAboutCarousel();
+    observeSectionReveal(section);
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            refreshActiveSectionReveal();
+        });
+    });
+}
+
+function initAboutSectionNavigation() {
+    if (initAboutSectionNavigation._bound) return;
+    initAboutSectionNavigation._bound = true;
+
+    document.addEventListener('click', (event) => {
+        const btn = event.target.closest('.about-pro-tab[data-about-tab]');
+        if (!btn) return;
+        const section = document.getElementById('controlCenterSection');
+        if (!section?.contains(btn)) return;
+        switchAboutTab(btn.dataset.aboutTab || 'what');
+    });
+}
+
 function bindThemeControls() {
     const controlIds = [
         'themeAccentPrimary',
@@ -3822,6 +3933,9 @@ document.addEventListener('eyedbot:screen-mounted', (event) => {
     if (event?.detail?.sectionId === 'profileSettingsSection') {
         wireSettingsSectionControls();
     }
+    if (event?.detail?.sectionId === 'controlCenterSection') {
+        wireAboutSectionControls();
+    }
 });
 
 document.addEventListener('eyedbot:screens-all-ready', () => {
@@ -3844,6 +3958,7 @@ function setupEventListeners() {
     };
 
     initSettingsPaneNavigation();
+    initAboutSectionNavigation();
     refreshPremiumLocks();
 
     window.addEventListener('popstate', (event) => {
@@ -4013,63 +4128,6 @@ function setupEventListeners() {
             commandsFilterQuery = String(event.target?.value || '').trim().toLowerCase();
             renderFilteredCommands();
         });
-    }
-
-    const aboutTabs = Array.from(document.querySelectorAll('.about-pro-tab'));
-    const aboutPanels = Array.from(document.querySelectorAll('.about-pro-panel'));
-    if (aboutTabs.length && aboutPanels.length) {
-        const switchAboutTab = (tabKey = '') => {
-            aboutTabs.forEach((btn) => {
-                const active = btn.dataset.aboutTab === tabKey;
-                btn.classList.toggle('active', active);
-                btn.setAttribute('aria-selected', active ? 'true' : 'false');
-            });
-            aboutPanels.forEach((panel) => {
-                const active = panel.dataset.aboutPanel === tabKey;
-                panel.classList.toggle('active', active);
-                panel.hidden = !active;
-            });
-            refreshActiveSectionReveal();
-        };
-
-        aboutTabs.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                switchAboutTab(btn.dataset.aboutTab || 'what');
-            });
-        });
-        switchAboutTab(aboutTabs.find((b) => b.classList.contains('active'))?.dataset.aboutTab || 'what');
-    }
-
-    const aboutCarouselPrev = document.getElementById('aboutCarouselPrev');
-    const aboutCarouselNext = document.getElementById('aboutCarouselNext');
-    const aboutCarouselViewport = document.getElementById('aboutCarouselViewport');
-    if (aboutCarouselPrev && aboutCarouselNext && aboutCarouselViewport && !aboutCarouselBound) {
-        const moveByViewport = (dir = 1) => {
-            const width = Math.max(260, Math.round(aboutCarouselViewport.clientWidth * 0.82));
-            aboutCarouselViewport.scrollBy({ left: width * dir, behavior: 'smooth' });
-        };
-
-        aboutCarouselPrev.addEventListener('click', () => moveByViewport(-1));
-        aboutCarouselNext.addEventListener('click', () => moveByViewport(1));
-
-        let aboutCarouselAutoScroll = setInterval(() => moveByViewport(1), 5400);
-        const pauseAboutAuto = () => {
-            if (aboutCarouselAutoScroll) {
-                clearInterval(aboutCarouselAutoScroll);
-                aboutCarouselAutoScroll = null;
-            }
-        };
-        const resumeAboutAuto = () => {
-            if (aboutCarouselAutoScroll) return;
-            aboutCarouselAutoScroll = setInterval(() => moveByViewport(1), 5400);
-        };
-
-        aboutCarouselViewport.addEventListener('mouseenter', pauseAboutAuto);
-        aboutCarouselViewport.addEventListener('mouseleave', resumeAboutAuto);
-        aboutCarouselViewport.addEventListener('focusin', pauseAboutAuto);
-        aboutCarouselViewport.addEventListener('focusout', resumeAboutAuto);
-
-        aboutCarouselBound = true;
     }
 
     document.addEventListener('click', (event) => {
@@ -4580,8 +4638,7 @@ function showSection(sectionId, options = {}) {
             switchServerPane(pane, paneBtn);
         }
     } else if (sectionId === 'controlCenterSection') {
-        loadAboutOverview();
-        refreshActiveSectionReveal();
+        wireAboutSectionControls();
     } else if (sectionId === 'premiumSection') {
         ensurePremiumSectionBillingPanel();
         void loadBillingStatus();
