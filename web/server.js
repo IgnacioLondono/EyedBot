@@ -1389,7 +1389,39 @@ function requireOwner(req, res, next) {
     next();
 }
 
-const GUILDS_SESSION_SYNC_TTL_MS = 30 * 1000;
+const GUILDS_SESSION_SYNC_TTL_MS = Number.parseInt(process.env.GUILDS_SESSION_SYNC_TTL_MS || '', 10) || (3 * 60 * 1000);
+const GUILDS_API_RESPONSE_CACHE_TTL_MS = Number.parseInt(process.env.GUILDS_API_RESPONSE_CACHE_TTL_MS || '', 10) || (90 * 1000);
+const guildsApiResponseCache = new Map();
+
+function invalidateGuildsApiCache(userId = '') {
+    const key = String(userId || '').trim();
+    if (key) {
+        guildsApiResponseCache.delete(key);
+        return;
+    }
+    guildsApiResponseCache.clear();
+}
+
+function buildBotGuildsPayload(guilds = []) {
+    const list = Array.isArray(guilds) ? guilds : [];
+    if (!botClient) return [];
+
+    return list.reduce((acc, guild) => {
+        const botGuild = botClient.guilds.cache.get(String(guild.id));
+        if (!botGuild) return acc;
+
+        acc.push({
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png` : null,
+            permissions: guild.permissions,
+            botGuild: {
+                memberCount: botGuild.memberCount
+            }
+        });
+        return acc;
+    }, []);
+}
 
 async function syncSessionGuilds(req, options = {}) {
     const force = options.force === true;
@@ -1412,6 +1444,7 @@ async function syncSessionGuilds(req, options = {}) {
         req.session.guilds = freshGuilds;
         req.session.guildsSyncedAt = Date.now();
         req.session.save(() => {});
+        invalidateGuildsApiCache(req.session?.user?.id);
 
         if (req.session?.user) {
             scheduleUserAnalyticsGuildSync(req.session.user, freshGuilds);
@@ -1781,36 +1814,27 @@ app.put('/api/admin/user/:userId/billing', requireOwner, async (req, res) => {
 
 app.get('/api/guilds', requireAuth, async (req, res) => {
     try {
-        const guilds = filterTrackableGuilds(await syncSessionGuilds(req, { force: true }));
-        console.log('📋 GET /api/guilds - User:', req.session.user?.username, '| Session guilds:', guilds.length, '| botClient available:', !!botClient, '| bot cache size:', botClient?.guilds?.cache?.size || 0);
-        
-        // Filtrar solo servidores donde el bot está presente
-        const botGuilds = [];
-        if (botClient) {
-            for (const guild of guilds) {
-                const botGuild = botClient.guilds.cache.get(guild.id);
-                if (botGuild) {
-                    botGuilds.push({
-                        id: guild.id,
-                        name: guild.name,
-                        icon: guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png` : null,
-                        permissions: guild.permissions,
-                        botGuild: {
-                            memberCount: botGuild.memberCount,
-                            channels: botGuild.channels.cache.filter(c => c.type === 0 || c.type === 2).map(c => ({
-                                id: c.id,
-                                name: c.name,
-                                type: c.type
-                            }))
-                        }
-                    });
-                }
-            }
-        } else {
-            console.warn('⚠️ botClient not available - returning empty guilds list');
+        const userId = String(req.session?.user?.id || '').trim();
+        const forceRefresh = String(req.query?.refresh || '') === '1';
+        const cached = userId ? guildsApiResponseCache.get(userId) : null;
+        if (!forceRefresh && cached && Number(cached.expiresAt || 0) > Date.now()) {
+            res.setHeader('Cache-Control', 'private, max-age=30');
+            return res.json(cached.data);
         }
-        
-        console.log('✅ Returning', botGuilds.length, 'guilds to user');
+
+        const guilds = filterTrackableGuilds(
+            await syncSessionGuilds(req, { force: forceRefresh })
+        );
+        const botGuilds = buildBotGuildsPayload(guilds);
+
+        if (userId) {
+            guildsApiResponseCache.set(userId, {
+                data: botGuilds,
+                expiresAt: Date.now() + GUILDS_API_RESPONSE_CACHE_TTL_MS
+            });
+        }
+
+        res.setHeader('Cache-Control', 'private, max-age=30');
         res.json(botGuilds);
     } catch (error) {
         console.error('❌ Error obteniendo servidores:', error);

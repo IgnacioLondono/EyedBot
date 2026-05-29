@@ -1249,13 +1249,7 @@ async function openServerSwitcherModal() {
         }
 
         setServerSwitchingState(true);
-        const response = await fetchWithCredentials('/api/guilds');
-        if (!response.ok) {
-            showToast('No se pudieron cargar los servidores', 'error');
-            return;
-        }
-
-        const guilds = await response.json();
+        const guilds = await warmPanelGuilds();
         serverSwitcherGuilds = Array.isArray(guilds) ? guilds : [];
         currentServerGuilds = serverSwitcherGuilds;
 
@@ -2110,10 +2104,26 @@ function handleActivePremiumPaneAfterBillingChange() {
 
 const apiGetCache = new Map();
 const API_CACHE_TTL = {
-    guilds: 10000,
+    guilds: 90000,
     channels: 8000,
     templates: 6000
 };
+
+let panelGuildsWarmPromise = null;
+
+function warmPanelGuilds(force = false) {
+    if (force) {
+        invalidateGetCache('/api/guilds');
+        panelGuildsWarmPromise = null;
+    }
+    if (!panelGuildsWarmPromise) {
+        panelGuildsWarmPromise = fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds).catch((error) => {
+            panelGuildsWarmPromise = null;
+            throw error;
+        });
+    }
+    return panelGuildsWarmPromise;
+}
 
 function debounce(fn, delay = 180) {
     let timeoutId = null;
@@ -3299,6 +3309,8 @@ async function bootEyedBotPanel() {
             return; // No cargar datos si no hay autenticación
         }
 
+        warmPanelGuilds();
+
         handleBillingQueryFeedback();
         ensureBillingPanel();
         ensurePremiumSectionBillingPanel();
@@ -3363,20 +3375,24 @@ async function bootEyedBotPanel() {
             ? savedSection
             : (allowedEntrySections.has(entrySection) ? entrySection : 'dashboard');
         const needsGuildsAtBoot = ['dashboard', 'serverSection', 'embedSection'].includes(initialSection);
-        if (needsGuildsAtBoot) {
-            console.log('📋 Cargando guilds...');
-            await loadGuilds();
-            console.log('✅ loadGuilds completado');
-        } else {
-            setTimeout(() => {
-                loadGuilds().catch((error) => {
-                    console.warn('No se pudo precargar guilds:', error?.message || error);
-                });
-            }, 1200);
-        }
 
         await showSection(initialSection, { skipHistory: true });
         console.log('✅ showSection completado:', initialSection);
+
+        if (needsGuildsAtBoot) {
+            console.log('📋 Cargando guilds...');
+            void loadGuilds().then(() => {
+                console.log('✅ loadGuilds completado');
+            }).catch((error) => {
+                console.warn('No se pudo cargar guilds:', error?.message || error);
+            });
+        } else {
+            setTimeout(() => {
+                loadGuilds({ silent: true }).catch((error) => {
+                    console.warn('No se pudo precargar guilds:', error?.message || error);
+                });
+            }, 800);
+        }
         
         initializePanelHistory(initialSection);
         refreshActiveSectionReveal();
@@ -3654,7 +3670,7 @@ function setupEventListeners() {
             resetServerContextToDashboard();
         }
         showSection('dashboard');
-        await loadGuilds();
+        void loadGuilds();
     });
 
     document.querySelectorAll('[data-section]').forEach((link) => {
@@ -4400,9 +4416,23 @@ function showSection(sectionId, options = {}) {
 }
 
 // Cargar servidores
-async function loadGuilds() {
+function showGuildsLoadingState() {
+    const container = document.getElementById('guildsList');
+    if (!container) return;
+    container.className = 'dashboard-guilds-board';
+    container.innerHTML = `
+        <div class="loading dashboard-guild-loading">
+            <div class="loading-spinner"></div>
+            <p>Cargando servidores...</p>
+        </div>`;
+}
+
+async function loadGuilds(options = {}) {
+    if (!options.silent) {
+        showGuildsLoadingState();
+    }
     try {
-        const guilds = await fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds);
+        const guilds = await warmPanelGuilds(Boolean(options.force));
         dashboardGuildsCache = Array.isArray(guilds) ? guilds : [];
         displayGuilds(getFilteredDashboardGuilds());
     } catch (error) {
@@ -4540,7 +4570,7 @@ function displayGuilds(guilds) {
 // Cargar servidores para el formulario de embed
 async function loadGuildsForEmbed() {
     try {
-        const guilds = await fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds);
+        const guilds = await warmPanelGuilds();
         const select = document.getElementById('guildSelect');
         const channelSelect = document.getElementById('channelSelect');
 
@@ -5936,45 +5966,40 @@ async function loadGuildsForServer() {
             return;
         }
 
-        const response = await fetchWithCredentials('/api/guilds');
-        if (response.ok) {
-            const guilds = await response.json();
-            currentServerGuilds = Array.isArray(guilds) ? guilds : [];
-            updateServerMenuIdentity();
+        const guilds = await warmPanelGuilds();
+        currentServerGuilds = Array.isArray(guilds) ? guilds : [];
+        updateServerMenuIdentity();
 
-            const selectedGuild = guilds.find((g) => String(g.id) === String(currentServerGuildId));
-            if (!selectedGuild) {
-                const staleGuildId = String(currentServerGuildId || '').trim();
-                resetServerContextToDashboard();
-                if (select) {
-                    select.disabled = true;
-                    select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
-                }
-                if (staleGuildId) {
-                    showToast('El servidor guardado ya no está disponible para esta sesión. Selecciona otro desde Dashboard.', 'warning');
-                }
-                return;
-            }
-
+        const selectedGuild = currentServerGuilds.find((g) => String(g.id) === String(currentServerGuildId));
+        if (!selectedGuild) {
+            const staleGuildId = String(currentServerGuildId || '').trim();
+            resetServerContextToDashboard();
             if (select) {
                 select.disabled = true;
-                select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
-                select.value = selectedGuild.id;
+                select.innerHTML = '<option value="">Servidor seleccionado no disponible</option>';
             }
-            if (tabsContainer) {
-                renderServerTabs([selectedGuild], selectedGuild.id);
+            if (staleGuildId) {
+                showToast('El servidor guardado ya no está disponible para esta sesión. Selecciona otro desde Dashboard.', 'warning');
             }
-            await selectServerGuild(selectedGuild.id, { preserveInsight: true });
-        } else {
-            const error = await response.json().catch(() => ({ error: 'Error al cargar servidores' }));
-            if (select) {
-                select.innerHTML = '<option value="">Error al cargar servidores</option>';
-            }
-            showToast(error.error || 'Error al cargar servidores', 'error');
+            return;
         }
+
+        if (select) {
+            select.disabled = true;
+            select.innerHTML = `<option value="${selectedGuild.id}">${escapeHtml(selectedGuild.name)}</option>`;
+            select.value = selectedGuild.id;
+        }
+        if (tabsContainer) {
+            renderServerTabs([selectedGuild], selectedGuild.id);
+        }
+        await selectServerGuild(selectedGuild.id, { preserveInsight: true });
     } catch (error) {
         console.error('Error cargando servidores:', error);
         showToast('Error al cargar servidores', 'error');
+        const select = document.getElementById('serverSelect');
+        if (select) {
+            select.innerHTML = '<option value="">Error al cargar servidores</option>';
+        }
     } finally {
         loadGuildsForServerPromise = null;
     }
