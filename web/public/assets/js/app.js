@@ -1295,12 +1295,32 @@ window.closeServerSwitcherModal = closeServerSwitcherModal;
 window.moveServerSwitcher = moveServerSwitcher;
 window.confirmServerSwitcherSelection = confirmServerSwitcherSelection;
 
+const DEFAULT_FETCH_TIMEOUT_MS = 20000;
+
 // Función auxiliar para fetch con credenciales
 async function fetchWithCredentials(url, options = {}) {
-    const response = await fetch(url, {
-        ...options,
-        credentials: 'include' // Siempre incluir cookies
-    });
+    const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_FETCH_TIMEOUT_MS;
+    const { timeoutMs: _timeoutMs, ...fetchOptions } = options;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let response;
+    try {
+        response = await fetch(url, {
+            ...fetchOptions,
+            credentials: 'include',
+            signal: controller.signal
+        });
+    } catch (error) {
+        if (error?.name === 'AbortError') {
+            const timeoutError = new Error(`Tiempo de espera agotado (${Math.round(timeoutMs / 1000)}s)`);
+            timeoutError.code = 'fetch_timeout';
+            throw timeoutError;
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
 
     const normalizedUrl = String(url || '');
     const isBillingEndpoint = normalizedUrl.startsWith('/api/billing/');
@@ -2110,15 +2130,20 @@ const API_CACHE_TTL = {
 };
 
 let panelGuildsWarmPromise = null;
+let panelGuildsWarmGeneration = 0;
 
 function warmPanelGuilds(force = false) {
     if (force) {
         invalidateGetCache('/api/guilds');
         panelGuildsWarmPromise = null;
+        panelGuildsWarmGeneration += 1;
     }
     if (!panelGuildsWarmPromise) {
-        panelGuildsWarmPromise = fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds).catch((error) => {
-            panelGuildsWarmPromise = null;
+        const generation = panelGuildsWarmGeneration;
+        panelGuildsWarmPromise = fetchCachedGetJSON('/api/guilds', API_CACHE_TTL.guilds, { timeoutMs: 25000 }).catch((error) => {
+            if (generation === panelGuildsWarmGeneration) {
+                panelGuildsWarmPromise = null;
+            }
             throw error;
         });
     }
@@ -3324,6 +3349,9 @@ function restoreServerState(state) {
 
 // Inicialización (espera pantallas parciales si screen-loader.js está activo)
 async function bootEyedBotPanel() {
+    if (window.__appLayoutReady) {
+        await window.__appLayoutReady.catch(() => {});
+    }
     if (window.__appScreensReady) {
         await window.__appScreensReady;
     }
@@ -3344,11 +3372,14 @@ async function bootEyedBotPanel() {
         
         // Solo continuar si el usuario está autenticado
         if (!isAuthenticated) {
-            console.warn('⚠️ Usuario no autenticado, retornando');
-            return; // No cargar datos si no hay autenticación
+            console.warn('⚠️ Usuario no autenticado o sesión no verificada, retornando');
+            if (!window.location.pathname.includes('login')) {
+                renderGuildsLoadError('No se pudo verificar tu sesión. Comprueba que el panel esté en línea y recarga con Ctrl+F5.');
+            }
+            return;
         }
 
-        warmPanelGuilds();
+        refreshPanelUserUI();
 
         handleBillingQueryFeedback();
         ensureBillingPanel();
@@ -3420,11 +3451,12 @@ async function bootEyedBotPanel() {
 
         if (needsGuildsAtBoot) {
             console.log('📋 Cargando guilds...');
-            void loadGuilds().then(() => {
+            try {
+                await loadGuilds();
                 console.log('✅ loadGuilds completado');
-            }).catch((error) => {
+            } catch (error) {
                 console.warn('No se pudo cargar guilds:', error?.message || error);
-            });
+            }
         } else {
             setTimeout(() => {
                 loadGuilds({ silent: true }).catch((error) => {
@@ -3468,7 +3500,7 @@ if (document.readyState === 'loading') {
 async function checkAuth() {
     try {
         console.log('🔐 Verificando autenticación en /api/user...');
-        const response = await fetchWithCredentials('/api/user');
+        const response = await fetchWithCredentials('/api/user', { timeoutMs: 15000 });
         console.log('📊 Respuesta de /api/user:', response.status, response.statusText);
         
         if (response.ok) {
@@ -3513,6 +3545,9 @@ async function checkAuth() {
     } catch (error) {
         console.error('❌ Excepción verificando autenticación:', error);
         console.error('Stack:', error?.stack);
+        if (error?.code === 'fetch_timeout') {
+            return false;
+        }
         if (!window.location.pathname.includes('login')) {
             window.location.replace('/login.html');
         }
@@ -3634,11 +3669,17 @@ function applyOwnerRestrictedVisibility() {
 
 function updateUserUI() {
     if (currentUser) {
-        document.getElementById('userName').textContent = currentUser.username;
-        if (currentUser.avatar) {
-            document.getElementById('userAvatar').src = `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png`;
-        } else {
-            document.getElementById('userAvatar').src = `https://cdn.discordapp.com/embed/avatars/${currentUser.discriminator % 5}.png`;
+        const userNameEl = document.getElementById('userName');
+        const userAvatarEl = document.getElementById('userAvatar');
+        if (userNameEl) {
+            userNameEl.textContent = currentUser.username;
+        }
+        if (userAvatarEl) {
+            if (currentUser.avatar) {
+                userAvatarEl.src = `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png`;
+            } else {
+                userAvatarEl.src = `https://cdn.discordapp.com/embed/avatars/${currentUser.discriminator % 5}.png`;
+            }
         }
     }
 
@@ -4466,6 +4507,25 @@ function showGuildsLoadingState() {
         </div>`;
 }
 
+function renderGuildsLoadError(message) {
+    const container = document.getElementById('guildsList');
+    if (!container) return;
+    const safeMessage = escapeHtml(String(message || 'Error al cargar servidores'));
+    container.className = 'dashboard-guilds-board';
+    container.innerHTML = `
+        <div class="dashboard-guild-empty">
+            <h3>No se pudieron cargar los servidores</h3>
+            <p>${safeMessage}</p>
+            <button type="button" class="btn btn-primary dashboard-guild-retry" id="dashboardGuildsRetryBtn">Reintentar</button>
+        </div>`;
+    const retryBtn = document.getElementById('dashboardGuildsRetryBtn');
+    if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+            void loadGuilds({ force: true });
+        });
+    }
+}
+
 async function loadGuilds(options = {}) {
     if (!options.silent) {
         showGuildsLoadingState();
@@ -4476,14 +4536,22 @@ async function loadGuilds(options = {}) {
         displayGuilds(getFilteredDashboardGuilds());
     } catch (error) {
         console.error('Error cargando servidores:', error);
-        const container = document.getElementById('guildsList');
         const isAuth = error && (error.status === 401 || (error.message && error.message.toLowerCase().includes('401')));
-        const msg = isAuth ? 'No autenticado. Por favor inicia sesión.' : 'Error al cargar servidores';
-        if (container) {
-            container.innerHTML = `<div class="loading"><p>${escapeHtml(String(msg))}</p></div>`;
-        }
+        const isTimeout = error?.code === 'fetch_timeout' || /tiempo de espera|timeout/i.test(String(error?.message || ''));
+        const msg = isAuth
+            ? 'No autenticado. Por favor inicia sesión.'
+            : (isTimeout
+                ? 'La solicitud tardó demasiado. Comprueba la conexión con el servidor y pulsa Reintentar.'
+                : 'Error al cargar servidores');
+        renderGuildsLoadError(msg);
         showToast(msg, 'error');
+        throw error;
     }
+}
+
+function refreshPanelUserUI() {
+    if (!currentUser) return;
+    updateUserUI();
 }
 
 function getFilteredDashboardGuilds() {

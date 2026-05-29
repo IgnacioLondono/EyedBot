@@ -1534,7 +1534,7 @@ async function requirePremium(req, res, next) {
 
 // Rutas protegidas
 app.get('/api/user', requireAuth, async (req, res) => {
-    const guilds = await syncSessionGuilds(req);
+    const guilds = Array.isArray(req.session?.guilds) ? req.session.guilds : [];
     const inviteUrl = CLIENT_ID
         ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&permissions=${encodeURIComponent(BOT_INVITE_PERMISSIONS)}&scope=bot%20applications.commands`
         : '';
