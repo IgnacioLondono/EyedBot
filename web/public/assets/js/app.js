@@ -2696,8 +2696,26 @@ function initializeInteractiveGradient() {
     });
 }
 
+function isThemePaneControlsActive() {
+    return currentSettingsPaneId === 'settingsPaneTheme'
+        && Boolean(document.getElementById('settingsPaneTheme')?.classList.contains('active'));
+}
+
+function rehydrateThemeWallpaper(theme = themeSettings) {
+    if (!theme) return;
+    void hydrateWallpaperLayer(normalizeThemeSettings(theme));
+}
+
 function getThemeControlsState() {
     const baseWp = themeSettings || {};
+    const themePaneActive = isThemePaneControlsActive();
+    const wpToggle = document.getElementById('themeWallpaperEnabled');
+
+    let wallpaperEnabled = baseWp.wallpaperEnabled === true;
+    if (themePaneActive && wpToggle) {
+        wallpaperEnabled = Boolean(wpToggle.checked);
+    }
+
     return normalizeThemeSettings({
         preset: document.querySelector('.theme-preset-btn.active')?.dataset.themePreset || themeSettings?.preset || THEME_DEFAULTS.preset,
         accentPrimary: document.getElementById('themeAccentPrimary')?.value,
@@ -2715,7 +2733,7 @@ function getThemeControlsState() {
             document.getElementById('themeBackgroundBubbles') != null
                 ? Boolean(document.getElementById('themeBackgroundBubbles').checked)
                 : baseWp.backgroundBubbles === true,
-        wallpaperEnabled: document.getElementById('themeWallpaperEnabled')?.checked ?? baseWp.wallpaperEnabled,
+        wallpaperEnabled,
         wallpaperStorage: baseWp.wallpaperStorage ?? THEME_DEFAULTS.wallpaperStorage,
         wallpaperKind: baseWp.wallpaperKind ?? THEME_DEFAULTS.wallpaperKind,
         wallpaperMime: baseWp.wallpaperMime ?? THEME_DEFAULTS.wallpaperMime,
@@ -2866,6 +2884,10 @@ function switchSettingsPane(paneId, options = {}) {
     if (paneId === 'settingsPaneOwner' && isOwnerUser) {
         void loadStats();
         void loadLogs();
+    }
+
+    if (paneId === 'settingsPaneTheme') {
+        syncThemeControls(themeSettings);
     }
 
     window.EyedBotMobile?.onSettingsPaneChange?.(paneId);
@@ -3086,6 +3108,7 @@ function bindThemeControls() {
 
 themeSettings = loadThemeSettings();
 applyThemeSettings(themeSettings, { persist: false });
+window.rehydrateThemeWallpaper = rehydrateThemeWallpaper;
 scheduleLegacyWallpaperMigration();
 
 function buildPanelHistoryState(sectionId = 'dashboard', guard = false) {
@@ -3255,6 +3278,7 @@ async function bootEyedBotPanel() {
     if (window.__appScreensReady) {
         await window.__appScreensReady;
     }
+    rehydrateThemeWallpaper(themeSettings);
     console.log('🚀 Panel DOM listo');
     try {
         initAppDialog();
@@ -4351,6 +4375,7 @@ function showSection(sectionId, options = {}) {
         refreshActiveSectionReveal();
     } else if (sectionId === 'profileSettingsSection') {
         updateProfileSettingsData();
+        syncThemeControls(themeSettings);
         if (!isOwnerUser && currentSettingsPaneId === 'settingsPaneOwner') {
             currentSettingsPaneId = 'settingsPaneAccount';
         }

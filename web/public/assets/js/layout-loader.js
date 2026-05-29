@@ -29,6 +29,9 @@
 
         mount.innerHTML = await response.text();
         global.EyedBotPerformance?.syncBackgroundBubbles?.();
+        if (typeof global.rehydrateThemeWallpaper === 'function') {
+            global.rehydrateThemeWallpaper();
+        }
     }
 
     global.__appLayoutReady = loadLayout().catch((error) => {
