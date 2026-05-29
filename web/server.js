@@ -481,6 +481,8 @@ async function safeDbSet(key, value, timeoutMs = 3000) {
     }
 }
 
+const SESSION_STORE_TIMEOUT_MS = Number.parseInt(process.env.SESSION_STORE_TIMEOUT_MS || '4000', 10) || 4000;
+
 class MySqlSessionStore extends session.Store {
     constructor(options = {}) {
         super();
@@ -488,29 +490,58 @@ class MySqlSessionStore extends session.Store {
     }
 
     get(sid, callback) {
+        let settled = false;
+        const finish = (error, sessionData) => {
+            if (settled) return;
+            settled = true;
+            callback(error, sessionData);
+        };
+
+        const timeoutId = setTimeout(() => {
+            console.warn('⚠️ session.get timeout — continuando sin datos de sesión en MySQL');
+            finish(null, null);
+        }, SESSION_STORE_TIMEOUT_MS);
+
         db.get(`${this.prefix}${sid}`)
             .then((record) => {
+                clearTimeout(timeoutId);
                 if (!record || typeof record !== 'object') {
-                    return callback(null, null);
+                    return finish(null, null);
                 }
 
                 if (record.expires && new Date(record.expires).getTime() <= Date.now()) {
-                    return this.destroy(sid, () => callback(null, null));
+                    return this.destroy(sid, () => finish(null, null));
                 }
 
-                return callback(null, record.session || null);
+                return finish(null, record.session || null);
             })
-            .catch((error) => callback(error));
+            .catch((error) => {
+                clearTimeout(timeoutId);
+                console.warn('⚠️ session.get error:', error?.message || error);
+                finish(null, null);
+            });
     }
 
     set(sid, sessionData, callback) {
         const expires = this.getExpiration(sessionData);
+        const timeoutId = setTimeout(() => {
+            console.warn('⚠️ session.set timeout — la sesión puede no persistir en MySQL');
+            if (callback) callback(null);
+        }, SESSION_STORE_TIMEOUT_MS);
+
         db.set(`${this.prefix}${sid}`, {
             session: sessionData,
             expires: expires ? expires.toISOString() : null
         })
-            .then(() => callback && callback(null))
-            .catch((error) => callback && callback(error));
+            .then(() => {
+                clearTimeout(timeoutId);
+                if (callback) callback(null);
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId);
+                console.warn('⚠️ session.set error:', error?.message || error);
+                if (callback) callback(null);
+            });
     }
 
     destroy(sid, callback) {
@@ -614,7 +645,7 @@ app.use('/callback', authRateLimiter);
 app.use('/api/', apiRateLimiter);
 app.use((req, res, next) => {
     const path = String(req.path || '');
-    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/callback', '/api/user'];
+    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/callback', '/api/user', '/api/guilds'];
     if (neverCachePrefixes.some((prefix) => path.startsWith(prefix))) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
@@ -1818,14 +1849,28 @@ app.get('/api/guilds', requireAuth, async (req, res) => {
         const forceRefresh = String(req.query?.refresh || '') === '1';
         const cached = userId ? guildsApiResponseCache.get(userId) : null;
         if (!forceRefresh && cached && Number(cached.expiresAt || 0) > Date.now()) {
-            res.setHeader('Cache-Control', 'private, max-age=30');
+            res.setHeader('Cache-Control', 'no-store');
             return res.json(cached.data);
         }
 
-        const guilds = filterTrackableGuilds(
-            await syncSessionGuilds(req, { force: forceRefresh })
-        );
-        const botGuilds = buildBotGuildsPayload(guilds);
+        let sessionGuilds = Array.isArray(req.session?.guilds) ? req.session.guilds : [];
+        const lastSyncedAt = Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0;
+        const guildsAreStale = (Date.now() - lastSyncedAt) >= GUILDS_SESSION_SYNC_TTL_MS;
+        const shouldSync = forceRefresh || !sessionGuilds.length || guildsAreStale;
+
+        if (shouldSync && req.session?.accessToken) {
+            try {
+                sessionGuilds = await withOauthTimeout(
+                    syncSessionGuilds(req, { force: forceRefresh }),
+                    'GET /api/guilds syncSessionGuilds timeout'
+                );
+            } catch (syncError) {
+                console.warn('⚠️ /api/guilds sync incompleta:', syncError.message);
+                sessionGuilds = Array.isArray(req.session?.guilds) ? req.session.guilds : sessionGuilds;
+            }
+        }
+
+        const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(sessionGuilds));
 
         if (userId) {
             guildsApiResponseCache.set(userId, {
@@ -1834,7 +1879,7 @@ app.get('/api/guilds', requireAuth, async (req, res) => {
             });
         }
 
-        res.setHeader('Cache-Control', 'private, max-age=30');
+        res.setHeader('Cache-Control', 'no-store');
         res.json(botGuilds);
     } catch (error) {
         console.error('❌ Error obteniendo servidores:', error);

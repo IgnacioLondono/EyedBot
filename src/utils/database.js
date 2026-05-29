@@ -12,6 +12,7 @@ const dbConfig = {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
+    connectTimeout: Number.parseInt(process.env.DB_CONNECT_TIMEOUT_MS || '5000', 10) || 5000,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0
 };

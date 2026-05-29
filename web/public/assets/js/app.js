@@ -3347,14 +3347,41 @@ function restoreServerState(state) {
     }, 100);
 }
 
+function awaitPanelResource(promise, timeoutMs, label) {
+    if (!promise || typeof promise.then !== 'function') {
+        return Promise.resolve();
+    }
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(`${label} timeout (${timeoutMs}ms)`)), timeoutMs);
+        })
+    ]).catch((error) => {
+        console.warn(`⚠️ ${label}:`, error?.message || error);
+    });
+}
+
+function preloadDeferredPanelScreens() {
+    if (!window.EyedBotPanelLoader?.ensureScreen) return;
+    const listenerSections = [
+        'controlCenterSection',
+        'premiumSection',
+        'profileSettingsSection',
+        'embedSection',
+        'commandsSection',
+        'serverSection'
+    ];
+    void Promise.all(
+        listenerSections.map((sectionId) =>
+            window.EyedBotPanelLoader.ensureScreen(sectionId).catch(() => {})
+        )
+    ).then(() => applyOwnerRestrictedVisibility());
+}
+
 // Inicialización (espera pantallas parciales si screen-loader.js está activo)
 async function bootEyedBotPanel() {
-    if (window.__appLayoutReady) {
-        await window.__appLayoutReady.catch(() => {});
-    }
-    if (window.__appScreensReady) {
-        await window.__appScreensReady;
-    }
+    await awaitPanelResource(window.__appLayoutReady, 15000, 'Layout del panel');
+    await awaitPanelResource(window.__appScreensReady, 20000, 'Pantalla principal');
     rehydrateThemeWallpaper(themeSettings);
     console.log('🚀 Panel DOM listo');
     try {
@@ -3381,39 +3408,6 @@ async function bootEyedBotPanel() {
 
         refreshPanelUserUI();
 
-        handleBillingQueryFeedback();
-        ensureBillingPanel();
-        ensurePremiumSectionBillingPanel();
-        await loadBillingStatus();
-        
-        registerGatedNavigationButtons();
-        console.log('✅ registerGatedNavigationButtons completado');
-
-        if (window.EyedBotPanelLoader?.ensureScreen) {
-            const listenerSections = [
-                'controlCenterSection',
-                'premiumSection',
-                'profileSettingsSection',
-                'embedSection',
-                'commandsSection',
-                'serverSection'
-            ];
-            await Promise.all(
-                listenerSections.map((sectionId) =>
-                    window.EyedBotPanelLoader.ensureScreen(sectionId).catch(() => {})
-                )
-            );
-            applyOwnerRestrictedVisibility();
-        }
-        
-        setupEventListeners();
-        console.log('✅ setupEventListeners completado');
-
-        initializeServerConfigShell();
-        
-        initializeScrollReveal();
-        console.log('✅ initializeScrollReveal completado');
-        
         // Cargar estado guardado
         const savedState = loadState();
         serverFeaturesUnlocked = false;
@@ -3450,7 +3444,7 @@ async function bootEyedBotPanel() {
         console.log('✅ showSection completado:', initialSection);
 
         if (needsGuildsAtBoot) {
-            console.log('📋 Cargando guilds...');
+            console.log('📋 Cargando guilds (prioridad)...');
             try {
                 await loadGuilds();
                 console.log('✅ loadGuilds completado');
@@ -3464,6 +3458,24 @@ async function bootEyedBotPanel() {
                 });
             }, 800);
         }
+
+        handleBillingQueryFeedback();
+        ensureBillingPanel();
+        ensurePremiumSectionBillingPanel();
+        void loadBillingStatus();
+
+        registerGatedNavigationButtons();
+        console.log('✅ registerGatedNavigationButtons completado');
+
+        preloadDeferredPanelScreens();
+
+        setupEventListeners();
+        console.log('✅ setupEventListeners completado');
+
+        initializeServerConfigShell();
+
+        initializeScrollReveal();
+        console.log('✅ initializeScrollReveal completado');
         
         initializePanelHistory(initialSection);
         refreshActiveSectionReveal();
@@ -4476,6 +4488,8 @@ function showSection(sectionId, options = {}) {
             currentSettingsPaneId = 'settingsPaneAccount';
         }
         switchSettingsPane(currentSettingsPaneId, { silent: true });
+    } else if (sectionId === 'dashboard') {
+        void loadGuilds();
     }
 
     if (sectionId === 'commandsSection') {

@@ -2,7 +2,7 @@
  * Carga progresiva: dashboard primero, demás pantallas y CSS en segundo plano.
  */
 (function initScreenLoader(global) {
-    const VERSION = '20260528-min10';
+    const VERSION = '20260528-min11';
 
     const SCREEN_FILES = {
         dashboard: 'partials/screens/dashboard.html',
@@ -69,11 +69,19 @@
             throw new Error('fetch no disponible');
         }
         const url = resolvePanelAssetUrl(relativePath);
-        const response = await fetch(url, {
-            cache: 'default',
-            credentials: 'same-origin',
-            headers: { Accept: 'text/html, */*' }
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        let response;
+        try {
+            response = await fetch(url, {
+                cache: 'default',
+                credentials: 'same-origin',
+                headers: { Accept: 'text/html, */*' },
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         if (!response.ok) {
             throw new Error(`No se pudo cargar ${relativePath} (${response.status})`);
         }

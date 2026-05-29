@@ -18,11 +18,19 @@
             throw new Error('Falta #appLayoutMount en la página');
         }
 
-        const response = await fetch(resolveUrl('partials/layout-shell.html'), {
-            cache: 'default',
-            credentials: 'same-origin',
-            headers: { Accept: 'text/html, */*' }
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        let response;
+        try {
+            response = await fetch(resolveUrl('partials/layout-shell.html'), {
+                cache: 'default',
+                credentials: 'same-origin',
+                headers: { Accept: 'text/html, */*' },
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         if (!response.ok) {
             throw new Error(`No se pudo cargar layout-shell (${response.status})`);
         }
