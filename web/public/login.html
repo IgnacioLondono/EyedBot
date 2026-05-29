@@ -660,6 +660,19 @@
             errorSpan.textContent = errorMessages[error];
             errorEl.style.display = 'flex';
         }
+
+        const loginBtn = document.querySelector('.login-btn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => {
+                if (loginBtn.dataset.loading === '1') {
+                    return;
+                }
+                loginBtn.dataset.loading = '1';
+                loginBtn.setAttribute('aria-busy', 'true');
+                loginBtn.style.pointerEvents = 'none';
+                loginBtn.querySelector('span').textContent = 'Redirigiendo a Discord…';
+            }, { once: false });
+        }
     </script>
 </body>
 </html>

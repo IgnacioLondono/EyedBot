@@ -474,6 +474,19 @@ function consumeOauthStateFallback(state) {
     return entry;
 }
 
+function saveSession(req) {
+    return new Promise((resolve, reject) => {
+        if (!req.session?.save) {
+            resolve();
+            return;
+        }
+        req.session.save((error) => {
+            if (error) reject(error);
+            else resolve();
+        });
+    });
+}
+
 async function withOauthTimeout(promise, label) {
     return Promise.race([promise, timeoutAfter(OAUTH_REQUEST_TIMEOUT_MS, label)]);
 }
@@ -1320,19 +1333,19 @@ app.get('/auth/discord', (req, res) => {
         req.session.oauthStateIssuedAt = Date.now();
         rememberOauthState(state, req.sessionID);
 
-        req.session.save((sessionError) => {
-            if (sessionError) {
+        saveSession(req)
+            .then(() => {
+                const url = oauth.generateAuthUrl({
+                    scope: ['identify', 'guilds'],
+                    state: state
+                });
+                console.log('🔗 Redirigiendo a Discord OAuth2...');
+                res.redirect(url);
+            })
+            .catch((sessionError) => {
                 console.error('❌ Error guardando estado OAuth en sesión:', sessionError);
-                return res.redirect('/login.html?error=session_error');
-            }
-
-            const url = oauth.generateAuthUrl({
-                scope: ['identify', 'guilds'],
-                state: state
+                res.redirect('/login.html?error=session_error');
             });
-            console.log('🔗 Redirigiendo a Discord OAuth2...');
-            res.redirect(url);
-        });
     } catch (error) {
         console.error('❌ Error generando URL de autorización:', error);
         res.status(500).send(`
@@ -1409,46 +1422,53 @@ app.get('/callback', async (req, res) => {
         }
 
         const previousGuilds = Array.isArray(req.session.guilds) ? req.session.guilds : [];
+        let guilds = previousGuilds;
 
-        // Guardar en sesión
+        try {
+            const freshGuilds = await withOauthTimeout(
+                oauth.getUserGuilds(tokenData.access_token),
+                'oauth.getUserGuilds login'
+            );
+            if (Array.isArray(freshGuilds)) {
+                guilds = freshGuilds;
+            }
+        } catch (guildSyncError) {
+            console.warn('⚠️ No se pudieron cargar servidores en el login:', guildSyncError.message);
+        }
+
         req.session.user = user;
-        req.session.guilds = previousGuilds;
+        req.session.guilds = guilds;
+        req.session.guildsSyncedAt = Date.now();
         req.session.accessToken = tokenData.access_token;
-        delete req.session.oauthState; // Limpiar estado OAuth
+        delete req.session.oauthState;
         delete req.session.oauthStateIssuedAt;
 
-        // Guardar sesión antes de redirigir
-        req.session.save((err) => {
-            if (err) {
-                console.error('❌ Error guardando sesión:', err);
-                return res.redirect('/login.html?error=session_error');
-            }
-            console.log(`✅ Usuario autenticado: ${user.username}#${user.discriminator} (${user.id})`);
-            console.log('   Servidores: sincronización diferida en segundo plano');
+        try {
+            await saveSession(req);
+        } catch (err) {
+            console.error('❌ Error guardando sesión:', err);
+            return res.redirect('/login.html?error=session_error');
+        }
 
-            // Fuera del camino crítico: sincronizar guilds y analytics sin bloquear el login.
-            setImmediate(async () => {
-                try {
-                    const guilds = await withOauthTimeout(
-                        oauth.getUserGuilds(tokenData.access_token),
-                        'oauth.getUserGuilds timeout'
-                    );
-
-                    if (Array.isArray(guilds)) {
-                        req.session.guilds = guilds;
-                        req.session.guildsSyncedAt = Date.now();
-                        req.session.save(() => {});
-                    }
-
-                    await recordGlobalLoginEvent(user, Array.isArray(guilds) ? guilds : []);
-                } catch (backgroundError) {
-                    console.warn('⚠️ Sincronización post-login incompleta:', backgroundError.message);
-                }
+        const userId = String(user.id || '').trim();
+        if (userId && Array.isArray(guilds)) {
+            const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(guilds));
+            guildsApiResponseCache.set(userId, {
+                data: botGuilds,
+                expiresAt: Date.now() + GUILDS_API_RESPONSE_CACHE_TTL_MS
             });
+        }
 
-            // Redirigir a la raíz en lugar de /dashboard
-            res.redirect('/');
+        console.log(`✅ Usuario autenticado: ${user.username}#${user.discriminator} (${user.id})`);
+        console.log(`   Servidores en sesión: ${Array.isArray(guilds) ? guilds.length : 0}`);
+
+        setImmediate(() => {
+            recordGlobalLoginEvent(user, Array.isArray(guilds) ? guilds : []).catch((error) => {
+                console.warn('⚠️ Analytics post-login:', error?.message || error);
+            });
         });
+
+        return res.redirect('/');
     } catch (error) {
         console.error('❌ Error en callback:', error);
         console.error('   Mensaje:', error.message);
