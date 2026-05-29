@@ -2132,9 +2132,19 @@ const API_CACHE_TTL = {
 let panelGuildsWarmPromise = null;
 let panelGuildsWarmGeneration = 0;
 
+function cachePanelGuildsPayload(guilds) {
+    const list = Array.isArray(guilds) ? guilds : [];
+    dashboardGuildsCache = list;
+    apiGetCache.set('/api/guilds', { data: list, expiresAt: Date.now() + API_CACHE_TTL.guilds });
+    apiGetCache.set('/api/panel/bootstrap', { data: { guilds: list }, expiresAt: Date.now() + API_CACHE_TTL.guilds });
+    panelGuildsWarmPromise = Promise.resolve(list);
+    return list;
+}
+
 function warmPanelGuilds(force = false) {
     if (force) {
         invalidateGetCache('/api/guilds');
+        invalidateGetCache('/api/panel/bootstrap');
         panelGuildsWarmPromise = null;
         panelGuildsWarmGeneration += 1;
     }
@@ -3394,19 +3404,16 @@ async function bootEyedBotPanel() {
         initBrandEyeAnimation();
         console.log('✅ initBrandEyeAnimation completado');
 
-        const isAuthenticated = await checkAuth();
-        console.log('✅ checkAuth completado:', isAuthenticated);
-        
-        // Solo continuar si el usuario está autenticado
+        const isAuthenticated = await bootstrapPanel({ renderGuilds: true });
+        console.log('✅ bootstrapPanel completado:', isAuthenticated);
+
         if (!isAuthenticated) {
-            console.warn('⚠️ Usuario no autenticado o sesión no verificada, retornando');
+            console.warn('⚠️ Usuario no autenticado o panel no iniciado, retornando');
             if (!window.location.pathname.includes('login')) {
-                renderGuildsLoadError('No se pudo verificar tu sesión. Comprueba que el panel esté en línea y recarga con Ctrl+F5.');
+                renderGuildsLoadError('No se pudo iniciar el panel. Comprueba que el servicio web esté en línea y recarga con Ctrl+F5.');
             }
             return;
         }
-
-        refreshPanelUserUI();
 
         // Cargar estado guardado
         const savedState = loadState();
@@ -3440,24 +3447,20 @@ async function bootEyedBotPanel() {
             : (allowedEntrySections.has(entrySection) ? entrySection : 'dashboard');
         const needsGuildsAtBoot = ['dashboard', 'serverSection', 'embedSection'].includes(initialSection);
 
-        await showSection(initialSection, { skipHistory: true });
-        console.log('✅ showSection completado:', initialSection);
-
-        if (needsGuildsAtBoot) {
-            console.log('📋 Cargando guilds (prioridad)...');
+        // Siempre pintar dashboard primero (ya en DOM); evita cargar server.html antes que los guilds.
+        await showSection('dashboard', { skipHistory: true, skipEnsureScreen: true });
+        if (needsGuildsAtBoot && !dashboardGuildsCache.length) {
             try {
                 await loadGuilds();
-                console.log('✅ loadGuilds completado');
             } catch (error) {
-                console.warn('No se pudo cargar guilds:', error?.message || error);
+                console.warn('No se pudo refrescar guilds:', error?.message || error);
             }
-        } else {
-            setTimeout(() => {
-                loadGuilds({ silent: true }).catch((error) => {
-                    console.warn('No se pudo precargar guilds:', error?.message || error);
-                });
-            }, 800);
         }
+
+        if (initialSection !== 'dashboard') {
+            await showSection(initialSection, { skipHistory: true });
+        }
+        console.log('✅ showSection completado:', initialSection);
 
         handleBillingQueryFeedback();
         ensureBillingPanel();
@@ -3488,9 +3491,11 @@ async function bootEyedBotPanel() {
         }
         
         console.log('✅ Inicialización completada exitosamente');
+        window.__EYEDBOT_BOOT_DONE = true;
         const saveStateIntervalMs = document.documentElement.classList.contains('perf-lite') ? 12000 : 8000;
         setInterval(saveState, saveStateIntervalMs);
     } catch (error) {
+        window.__EYEDBOT_BOOT_DONE = true;
         console.error('❌ Error fatal durante inicialización:', error);
         console.error('Stack:', error?.stack);
         const guildsList = document.getElementById('guildsList');
@@ -3506,6 +3511,64 @@ if (document.readyState === 'loading') {
     });
 } else {
     void bootEyedBotPanel();
+}
+
+function setPanelNavbarError(message = 'Sin conexión') {
+    const userNameEl = document.getElementById('userName');
+    if (userNameEl) {
+        userNameEl.textContent = message;
+    }
+}
+
+async function bootstrapPanel(options = {}) {
+    const renderGuilds = options.renderGuilds !== false;
+    try {
+        console.log('🔐 Iniciando panel (/api/panel/bootstrap)...');
+        const response = await fetchWithCredentials('/api/panel/bootstrap', { timeoutMs: 22000 });
+        if (response.status === 401) {
+            const data = await response.json().catch(() => ({}));
+            window.location.replace(data.redirect || '/login.html');
+            return false;
+        }
+        if (!response.ok) {
+            throw new Error(`bootstrap ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data?.user) {
+            window.location.replace('/login.html');
+            return false;
+        }
+
+        currentUser = data.user;
+        isOwnerUser = Boolean(data.isOwner);
+        currentGuilds = Array.isArray(data.sessionGuilds) ? data.sessionGuilds : [];
+        botInviteUrl = String(data.inviteUrl || '').trim();
+        updateUserUI();
+
+        const guilds = cachePanelGuildsPayload(data.guilds);
+        if (renderGuilds) {
+            displayGuilds(getFilteredDashboardGuilds());
+        }
+
+        if (data.botConnected === false) {
+            showToast('El bot aún no está conectado. Si no ves servidores, espera unos segundos y pulsa Reintentar.', 'warning');
+        }
+
+        return true;
+    } catch (error) {
+        console.error('❌ bootstrapPanel:', error);
+        setPanelNavbarError('Error de panel');
+        if (renderGuilds) {
+            const isTimeout = error?.code === 'fetch_timeout' || /tiempo de espera|timeout/i.test(String(error?.message || ''));
+            renderGuildsLoadError(
+                isTimeout
+                    ? 'El servidor no respondió a tiempo. Revisa el contenedor web y MySQL, luego recarga.'
+                    : 'No se pudo conectar con el panel. Recarga con Ctrl+F5.'
+            );
+        }
+        return false;
+    }
 }
 
 // Verificar autenticación
@@ -4419,7 +4482,7 @@ function showSection(sectionId, options = {}) {
         sectionId = 'dashboard';
     }
 
-    if (window.EyedBotPanelLoader?.ensureScreen) {
+    if (!options.skipEnsureScreen && window.EyedBotPanelLoader?.ensureScreen) {
         try {
             await window.EyedBotPanelLoader.ensureScreen(sectionId);
         } catch (error) {
@@ -4545,8 +4608,16 @@ async function loadGuilds(options = {}) {
         showGuildsLoadingState();
     }
     try {
-        const guilds = await warmPanelGuilds(Boolean(options.force));
-        dashboardGuildsCache = Array.isArray(guilds) ? guilds : [];
+        if (options.force) {
+            invalidateGetCache('/api/panel/bootstrap');
+        }
+        let guilds;
+        if (!options.force && dashboardGuildsCache.length) {
+            guilds = dashboardGuildsCache;
+        } else {
+            guilds = await warmPanelGuilds(Boolean(options.force));
+        }
+        cachePanelGuildsPayload(guilds);
         displayGuilds(getFilteredDashboardGuilds());
     } catch (error) {
         console.error('Error cargando servidores:', error);

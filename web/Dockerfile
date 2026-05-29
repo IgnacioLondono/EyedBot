@@ -1,3 +1,5 @@
+# Dockerfile LEGACY — no usar solo para producción.
+# El panel web requiere src/ (database, billing-store) y se despliega con el Dockerfile raíz del monorepo.
 # Dockerfile para Panel Web de TulaBot
 FROM node:20-alpine
 

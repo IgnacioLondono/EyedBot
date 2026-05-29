@@ -201,8 +201,24 @@ function buildStreamPushStatus() {
     };
 }
 
-app.get('/health', (req, res) => {
-    res.status(200).json({ ok: true, service: 'web-panel' });
+app.get('/health', async (req, res) => {
+    let dbOk = false;
+    try {
+        dbOk = await Promise.race([
+            safeDbGet('__health_ping__', null, 2500).then(() => true),
+            timeoutAfter(3000, 'health db ping')
+        ]).then(() => true).catch(() => false);
+    } catch {
+        dbOk = false;
+    }
+
+    res.status(200).json({
+        ok: true,
+        service: 'web-panel',
+        botConnected: Boolean(botClient?.user?.id),
+        dbOk,
+        sessionCacheSize: sessionL1Cache.size
+    });
 });
 
 function resolveWebOrigin(req) {
@@ -482,6 +498,32 @@ async function safeDbSet(key, value, timeoutMs = 3000) {
 }
 
 const SESSION_STORE_TIMEOUT_MS = Number.parseInt(process.env.SESSION_STORE_TIMEOUT_MS || '4000', 10) || 4000;
+const SESSION_L1_TTL_MS = Number.parseInt(process.env.SESSION_L1_TTL_MS || '60000', 10) || 60000;
+const sessionL1Cache = new Map();
+
+function readSessionL1(sid) {
+    const key = String(sid || '').trim();
+    if (!key) return null;
+    const entry = sessionL1Cache.get(key);
+    if (!entry || Number(entry.expiresAt || 0) <= Date.now()) {
+        sessionL1Cache.delete(key);
+        return null;
+    }
+    return entry.data || null;
+}
+
+function writeSessionL1(sid, sessionData) {
+    const key = String(sid || '').trim();
+    if (!key || !sessionData) return;
+    sessionL1Cache.set(key, {
+        data: sessionData,
+        expiresAt: Date.now() + SESSION_L1_TTL_MS
+    });
+}
+
+function clearSessionL1(sid) {
+    sessionL1Cache.delete(String(sid || '').trim());
+}
 
 class MySqlSessionStore extends session.Store {
     constructor(options = {}) {
@@ -490,6 +532,11 @@ class MySqlSessionStore extends session.Store {
     }
 
     get(sid, callback) {
+        const cached = readSessionL1(sid);
+        if (cached) {
+            return callback(null, cached);
+        }
+
         let settled = false;
         const finish = (error, sessionData) => {
             if (settled) return;
@@ -498,7 +545,12 @@ class MySqlSessionStore extends session.Store {
         };
 
         const timeoutId = setTimeout(() => {
-            console.warn('⚠️ session.get timeout — continuando sin datos de sesión en MySQL');
+            const fallback = readSessionL1(sid);
+            if (fallback) {
+                console.warn('⚠️ session.get timeout — usando caché en memoria de la sesión');
+                return finish(null, fallback);
+            }
+            console.warn('⚠️ session.get timeout — sin sesión disponible');
             finish(null, null);
         }, SESSION_STORE_TIMEOUT_MS);
 
@@ -510,19 +562,30 @@ class MySqlSessionStore extends session.Store {
                 }
 
                 if (record.expires && new Date(record.expires).getTime() <= Date.now()) {
+                    clearSessionL1(sid);
                     return this.destroy(sid, () => finish(null, null));
                 }
 
-                return finish(null, record.session || null);
+                const sessionData = record.session || null;
+                if (sessionData) {
+                    writeSessionL1(sid, sessionData);
+                }
+                return finish(null, sessionData);
             })
             .catch((error) => {
                 clearTimeout(timeoutId);
+                const fallback = readSessionL1(sid);
+                if (fallback) {
+                    console.warn('⚠️ session.get error — usando caché en memoria:', error?.message || error);
+                    return finish(null, fallback);
+                }
                 console.warn('⚠️ session.get error:', error?.message || error);
                 finish(null, null);
             });
     }
 
     set(sid, sessionData, callback) {
+        writeSessionL1(sid, sessionData);
         const expires = this.getExpiration(sessionData);
         const timeoutId = setTimeout(() => {
             console.warn('⚠️ session.set timeout — la sesión puede no persistir en MySQL');
@@ -645,7 +708,7 @@ app.use('/callback', authRateLimiter);
 app.use('/api/', apiRateLimiter);
 app.use((req, res, next) => {
     const path = String(req.path || '');
-    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/callback', '/api/user', '/api/guilds'];
+    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/callback', '/api/user', '/api/guilds', '/api/panel/bootstrap'];
     if (neverCachePrefixes.some((prefix) => path.startsWith(prefix))) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
@@ -665,6 +728,24 @@ app.use(compression({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Necesario si se usa proxy inverso para respetar cookies seguras.
+app.set('trust proxy', 1);
+
+const sessionStore = new MySqlSessionStore();
+app.use(session({
+    store: sessionStore,
+    secret: SESSION_SECRET || 'tu-secret-super-seguro-cambiar-en-produccion',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: cookieSecure,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+        sameSite: 'lax'
+    },
+    name: 'tulabot.session'
+}));
+
 const panelFaviconPath = path.join(__dirname, 'public', 'assets', 'img', 'favicon.png');
 app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
@@ -672,6 +753,27 @@ app.get('/favicon.ico', (req, res) => {
     res.sendFile(panelFaviconPath);
 });
 const publicDir = path.join(__dirname, 'public');
+
+function sendProtectedPanelPage(fileName, req, res) {
+    if (!req.session?.user) {
+        return res.redirect('/login');
+    }
+    return res.sendFile(path.join(publicDir, 'pages', fileName));
+}
+
+const PROTECTED_PANEL_PAGES = {
+    '/pages/dashboard.html': 'dashboard.html',
+    '/pages/about.html': 'about.html',
+    '/pages/commands.html': 'commands.html',
+    '/pages/premium.html': 'premium.html',
+    '/pages/settings.html': 'settings.html',
+    '/pages/server.html': 'server.html'
+};
+
+Object.entries(PROTECTED_PANEL_PAGES).forEach(([routePath, fileName]) => {
+    app.get(routePath, (req, res) => sendProtectedPanelPage(fileName, req, res));
+});
+
 app.use(express.static(publicDir, {
     maxAge: 0,
     etag: true,
@@ -698,25 +800,6 @@ app.use(express.static(publicDir, {
 
         res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
     }
-}));
-
-// Necesario si se usa proxy inverso para respetar cookies seguras.
-app.set('trust proxy', 1);
-
-// Configuración de sesiones
-const sessionStore = new MySqlSessionStore();
-app.use(session({
-    store: sessionStore,
-    secret: SESSION_SECRET || 'tu-secret-super-seguro-cambiar-en-produccion',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: cookieSecure,
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000, // 24 horas
-        sameSite: 'lax' // Ayuda con redirecciones de OAuth
-    },
-    name: 'tulabot.session' // Nombre personalizado para la cookie
 }));
 
 // Variable global para el cliente del bot (se inyectará desde index.js)
@@ -1578,6 +1661,65 @@ app.get('/api/user', requireAuth, async (req, res) => {
     });
 });
 
+async function resolvePanelGuildsForUser(req, options = {}) {
+    const userId = String(req.session?.user?.id || '').trim();
+    const forceRefresh = options.force === true;
+    const cached = userId ? guildsApiResponseCache.get(userId) : null;
+    if (!forceRefresh && cached && Number(cached.expiresAt || 0) > Date.now()) {
+        return cached.data;
+    }
+
+    let sessionGuilds = Array.isArray(req.session?.guilds) ? req.session.guilds : [];
+    const lastSyncedAt = Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0;
+    const guildsAreStale = (Date.now() - lastSyncedAt) >= GUILDS_SESSION_SYNC_TTL_MS;
+    const shouldSync = forceRefresh || !sessionGuilds.length || guildsAreStale;
+
+    if (shouldSync && req.session?.accessToken) {
+        try {
+            sessionGuilds = await withOauthTimeout(
+                syncSessionGuilds(req, { force: forceRefresh }),
+                'panel guilds sync timeout'
+            );
+        } catch (syncError) {
+            console.warn('⚠️ Sincronización de guilds incompleta:', syncError.message);
+            sessionGuilds = Array.isArray(req.session?.guilds) ? req.session.guilds : sessionGuilds;
+        }
+    }
+
+    const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(sessionGuilds));
+    if (userId) {
+        guildsApiResponseCache.set(userId, {
+            data: botGuilds,
+            expiresAt: Date.now() + GUILDS_API_RESPONSE_CACHE_TTL_MS
+        });
+    }
+    return botGuilds;
+}
+
+app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
+    try {
+        const forceRefresh = String(req.query?.refresh || '') === '1';
+        const inviteUrl = CLIENT_ID
+            ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&permissions=${encodeURIComponent(BOT_INVITE_PERMISSIONS)}&scope=bot%20applications.commands`
+            : '';
+        const guilds = await resolvePanelGuildsForUser(req, { force: forceRefresh });
+
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({
+            user: req.session.user,
+            sessionGuilds: Array.isArray(req.session?.guilds) ? req.session.guilds : [],
+            guilds,
+            inviteUrl,
+            isOwner: isOwnerUser(req.session.user),
+            botConnected: Boolean(botClient?.user?.id),
+            guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0
+        });
+    } catch (error) {
+        console.error('❌ Error en /api/panel/bootstrap:', error);
+        res.status(500).json({ error: 'No se pudo iniciar el panel' });
+    }
+});
+
 // Protección global para endpoints por servidor.
 app.use('/api/guild/:guildId', requireAuth, requireGuildManagementAccess);
 
@@ -1845,40 +1987,8 @@ app.put('/api/admin/user/:userId/billing', requireOwner, async (req, res) => {
 
 app.get('/api/guilds', requireAuth, async (req, res) => {
     try {
-        const userId = String(req.session?.user?.id || '').trim();
         const forceRefresh = String(req.query?.refresh || '') === '1';
-        const cached = userId ? guildsApiResponseCache.get(userId) : null;
-        if (!forceRefresh && cached && Number(cached.expiresAt || 0) > Date.now()) {
-            res.setHeader('Cache-Control', 'no-store');
-            return res.json(cached.data);
-        }
-
-        let sessionGuilds = Array.isArray(req.session?.guilds) ? req.session.guilds : [];
-        const lastSyncedAt = Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0;
-        const guildsAreStale = (Date.now() - lastSyncedAt) >= GUILDS_SESSION_SYNC_TTL_MS;
-        const shouldSync = forceRefresh || !sessionGuilds.length || guildsAreStale;
-
-        if (shouldSync && req.session?.accessToken) {
-            try {
-                sessionGuilds = await withOauthTimeout(
-                    syncSessionGuilds(req, { force: forceRefresh }),
-                    'GET /api/guilds syncSessionGuilds timeout'
-                );
-            } catch (syncError) {
-                console.warn('⚠️ /api/guilds sync incompleta:', syncError.message);
-                sessionGuilds = Array.isArray(req.session?.guilds) ? req.session.guilds : sessionGuilds;
-            }
-        }
-
-        const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(sessionGuilds));
-
-        if (userId) {
-            guildsApiResponseCache.set(userId, {
-                data: botGuilds,
-                expiresAt: Date.now() + GUILDS_API_RESPONSE_CACHE_TTL_MS
-            });
-        }
-
+        const botGuilds = await resolvePanelGuildsForUser(req, { force: forceRefresh });
         res.setHeader('Cache-Control', 'no-store');
         res.json(botGuilds);
     } catch (error) {

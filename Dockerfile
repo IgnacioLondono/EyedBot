@@ -25,6 +25,7 @@ RUN npm ci --no-audit --no-fund && \
 # Copiar código fuente (el catálogo va en src/bundled; data/ se monta en runtime)
 COPY src/ ./src/
 COPY web/ ./web/
+RUN cd web && npm ci --no-audit --no-fund && npm run build:assets && npm prune --production && npm cache clean --force
 COPY verificar-*.js ./
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
