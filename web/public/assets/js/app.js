@@ -2541,6 +2541,15 @@ function setThemeCssVariables(theme = themeSettings) {
         ? ensureReadableColor(textMutedSeed, normalized.bgPrimary, 2.4)
         : textMutedSeed;
 
+    const rgbAccentPrimary = hexToRgb(normalized.accentPrimary);
+    const rgbAccentSecondary = hexToRgb(normalized.accentSecondary);
+    const rgbTextPrimary = hexToRgb(textPrimaryAuto);
+    const rgbTextSecondary = hexToRgb(textSecondaryAuto);
+    const rgbBorder = hexToRgb(normalized.borderColor);
+    const rgbBgPrimary = hexToRgb(normalized.bgPrimary);
+    const rgbBgSecondary = hexToRgb(normalized.bgSecondary);
+    const rgbBgCard = hexToRgb(normalized.bgCard);
+
     root.style.setProperty('--iris-900', mixHexColors(normalized.bgPrimary, '#000000', 0.12));
     root.style.setProperty('--iris-800', mixHexColors(normalized.bgSecondary, normalized.accentPrimary, 0.06));
     root.style.setProperty('--iris-700', mixHexColors(normalized.bgCard, normalized.accentPrimary, 0.1));
@@ -2585,15 +2594,6 @@ function setThemeCssVariables(theme = themeSettings) {
     }
 
     applyWallpaperVeilCss(normalized);
-
-    const rgbAccentPrimary = hexToRgb(normalized.accentPrimary);
-    const rgbAccentSecondary = hexToRgb(normalized.accentSecondary);
-    const rgbTextPrimary = hexToRgb(textPrimaryAuto);
-    const rgbTextSecondary = hexToRgb(textSecondaryAuto);
-    const rgbBorder = hexToRgb(normalized.borderColor);
-    const rgbBgPrimary = hexToRgb(normalized.bgPrimary);
-    const rgbBgSecondary = hexToRgb(normalized.bgSecondary);
-    const rgbBgCard = hexToRgb(normalized.bgCard);
 
     root.style.setProperty('--color-bg1', mixHexColors(normalized.bgPrimary, normalized.accentPrimary, 0.28));
     root.style.setProperty('--color-bg2', mixHexColors(normalized.bgSecondary, normalized.accentSecondary, 0.18));
@@ -2897,7 +2897,11 @@ function applyThemeSettings(theme = themeSettings, options = {}) {
     if (options.persist !== false && !canCustomizeTheme()) return;
     const normalized = normalizeThemeSettings(theme);
     themeSettings = normalized;
-    setThemeCssVariables(normalized);
+    try {
+        setThemeCssVariables(normalized);
+    } catch (error) {
+        console.error('No se pudo aplicar el tema visual:', error);
+    }
     syncThemeControls(normalized);
     void hydrateWallpaperLayer(normalized);
     window.EyedBotPerformance?.syncBackgroundBubbles?.();
@@ -3191,7 +3195,13 @@ function bindThemeControls() {
 }
 
 themeSettings = loadThemeSettings();
-applyThemeSettings(themeSettings, { persist: false });
+try {
+    applyThemeSettings(themeSettings, { persist: false });
+} catch (error) {
+    console.error('Tema visual corrupto, usando valores por defecto:', error);
+    themeSettings = { ...THEME_DEFAULTS };
+    applyThemeSettings(themeSettings, { persist: false });
+}
 window.rehydrateThemeWallpaper = rehydrateThemeWallpaper;
 scheduleLegacyWallpaperMigration();
 

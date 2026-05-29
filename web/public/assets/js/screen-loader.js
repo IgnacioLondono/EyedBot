@@ -2,7 +2,7 @@
  * Carga progresiva: dashboard primero, demás pantallas y CSS en segundo plano.
  */
 (function initScreenLoader(global) {
-    const VERSION = '20260528-min12';
+    const VERSION = '20260528-min13';
 
     const SCREEN_FILES = {
         dashboard: 'partials/screens/dashboard.html',

@@ -17,6 +17,10 @@ Esos textos son **placeholders HTML** hasta que `bootEyedBotPanel()` complete `b
 | Alto | Docker no ejecutaba `npm run build:assets` | `app.min.js` desactualizado |
 | Medio | `web/Dockerfile` aislado incompleto | No incluye `src/` |
 
+## Bug crítico corregido (min13)
+
+En `setThemeCssVariables` se usaba `rgbTextSecondary` **antes** de declararlo (al añadir variables `--rail-*` para la barra lateral). Eso lanzaba `ReferenceError` al cargar `app.js` y el panel entero quedaba en "Cargando..." sin ejecutar el boot.
+
 ## Comprobaciones en producción
 
 1. `GET /health` → `botConnected: true`, `dbOk: true`
