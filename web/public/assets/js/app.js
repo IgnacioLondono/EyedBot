@@ -2940,6 +2940,47 @@ async function resetThemeSettings() {
 
 const SETTINGS_PANE_STORAGE_KEY = 'eyedbot:settings:activePane';
 
+function applySettingsPaneInitialState() {
+    if (!document.getElementById('settingsPaneAccount')) return;
+
+    let initialPane = currentSettingsPaneId;
+    try {
+        const stored = sessionStorage.getItem(SETTINGS_PANE_STORAGE_KEY);
+        if (stored && document.getElementById(stored)) initialPane = stored;
+    } catch (_) { /* noop */ }
+
+    if (initialPane === 'settingsPaneOwner' && !isOwnerUser) {
+        initialPane = 'settingsPaneAccount';
+    }
+
+    switchSettingsPane(initialPane, { silent: true });
+}
+
+function wireSettingsSectionControls() {
+    if (!document.getElementById('profileSettingsSection')) return;
+    bindThemeControls();
+    refreshPremiumLocks();
+    applySettingsPaneInitialState();
+}
+
+function initSettingsPaneNavigation() {
+    if (initSettingsPaneNavigation._bound) return;
+    initSettingsPaneNavigation._bound = true;
+
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('.settings-side-btn[data-settings-pane]');
+        if (!button) return;
+        const section = document.getElementById('profileSettingsSection');
+        if (!section?.contains(button)) return;
+
+        const paneId = button.dataset.settingsPane;
+        if (!paneId) return;
+        if (paneId === 'settingsPaneOwner' && !isOwnerUser) return;
+
+        switchSettingsPane(paneId);
+    });
+}
+
 function switchSettingsPane(paneId, options = {}) {
     if (paneId === 'settingsPaneOwner' && !isOwnerUser) {
         paneId = 'settingsPaneAccount';
@@ -2982,26 +3023,7 @@ function switchSettingsPane(paneId, options = {}) {
 }
 
 function bindSettingsPaneNavigation() {
-    document.querySelectorAll('.settings-side-btn').forEach((button) => {
-        button.addEventListener('click', () => {
-            const paneId = button.dataset.settingsPane;
-            if (!paneId) return;
-            if (paneId === 'settingsPaneOwner' && !isOwnerUser) return;
-            switchSettingsPane(paneId);
-        });
-    });
-
-    let initialPane = currentSettingsPaneId;
-    try {
-        const stored = sessionStorage.getItem(SETTINGS_PANE_STORAGE_KEY);
-        if (stored && document.getElementById(stored)) initialPane = stored;
-    } catch (_) { /* noop */ }
-
-    if (initialPane === 'settingsPaneOwner' && !isOwnerUser) {
-        initialPane = 'settingsPaneAccount';
-    }
-
-    switchSettingsPane(initialPane, { silent: true });
+    wireSettingsSectionControls();
 }
 
 function bindThemeControls() {
@@ -3024,7 +3046,8 @@ function bindThemeControls() {
 
     controlIds.forEach((id) => {
         const el = document.getElementById(id);
-        if (!el) return;
+        if (!el || el.dataset.themeBound === '1') return;
+        el.dataset.themeBound = '1';
         el.addEventListener('input', () => {
             if (id === 'themeWallpaperBloom') {
                 const lab = document.getElementById('themeWallpaperBloomValue');
@@ -3039,7 +3062,8 @@ function bindThemeControls() {
     });
 
     const wpToggle = document.getElementById('themeWallpaperEnabled');
-    if (wpToggle) {
+    if (wpToggle && wpToggle.dataset.themeBound !== '1') {
+        wpToggle.dataset.themeBound = '1';
         wpToggle.addEventListener('change', () => {
             if (!guardPremiumThemeAccess()) return;
             applyThemeSettings(getThemeControlsState(), { persist: true });
@@ -3047,7 +3071,8 @@ function bindThemeControls() {
     }
 
     const wpFile = document.getElementById('themeWallpaperFile');
-    if (wpFile) {
+    if (wpFile && wpFile.dataset.themeBound !== '1') {
+        wpFile.dataset.themeBound = '1';
         wpFile.addEventListener('change', async () => {
             if (!guardPremiumThemeAccess()) return;
             const file = wpFile.files?.[0];
@@ -3148,7 +3173,8 @@ function bindThemeControls() {
     }
 
     const wpClear = document.getElementById('themeWallpaperClearBtn');
-    if (wpClear) {
+    if (wpClear && wpClear.dataset.themeBound !== '1') {
+        wpClear.dataset.themeBound = '1';
         wpClear.addEventListener('click', async () => {
             if (!guardPremiumThemeAccess()) return;
             await wallpaperIdbDelete().catch(() => {});
@@ -3169,7 +3195,9 @@ function bindThemeControls() {
         });
     }
 
-    document.querySelectorAll('.theme-preset-btn').forEach((button) => {
+    document.querySelectorAll('#settingsPaneTheme .theme-preset-btn').forEach((button) => {
+        if (button.dataset.themeBound === '1') return;
+        button.dataset.themeBound = '1';
         button.addEventListener('click', () => {
             if (!guardPremiumThemeAccess()) return;
             setThemePreset(button.dataset.themePreset || THEME_DEFAULTS.preset);
@@ -3177,7 +3205,8 @@ function bindThemeControls() {
     });
 
     const saveButton = document.getElementById('themeSaveBtn');
-    if (saveButton) {
+    if (saveButton && saveButton.dataset.themeBound !== '1') {
+        saveButton.dataset.themeBound = '1';
         saveButton.addEventListener('click', () => {
             if (!guardPremiumThemeAccess()) return;
             applyThemeSettings(getThemeControlsState(), { persist: true });
@@ -3186,7 +3215,8 @@ function bindThemeControls() {
     }
 
     const resetButton = document.getElementById('themeResetBtn');
-    if (resetButton) {
+    if (resetButton && resetButton.dataset.themeBound !== '1') {
+        resetButton.dataset.themeBound = '1';
         resetButton.addEventListener('click', () => {
             if (!guardPremiumThemeAccess()) return;
             void resetThemeSettings();
@@ -3787,8 +3817,11 @@ function updateUserUI() {
 
 window.applyOwnerRestrictedVisibility = applyOwnerRestrictedVisibility;
 
-document.addEventListener('eyedbot:screen-mounted', () => {
+document.addEventListener('eyedbot:screen-mounted', (event) => {
     applyOwnerRestrictedVisibility();
+    if (event?.detail?.sectionId === 'profileSettingsSection') {
+        wireSettingsSectionControls();
+    }
 });
 
 document.addEventListener('eyedbot:screens-all-ready', () => {
@@ -3810,9 +3843,8 @@ function setupEventListeners() {
         return el;
     };
 
-    bindSettingsPaneNavigation();
+    initSettingsPaneNavigation();
     refreshPremiumLocks();
-    bindThemeControls();
 
     window.addEventListener('popstate', (event) => {
         const state = event.state;
@@ -4556,11 +4588,11 @@ function showSection(sectionId, options = {}) {
         refreshActiveSectionReveal();
     } else if (sectionId === 'profileSettingsSection') {
         updateProfileSettingsData();
-        syncThemeControls(themeSettings);
         if (!isOwnerUser && currentSettingsPaneId === 'settingsPaneOwner') {
             currentSettingsPaneId = 'settingsPaneAccount';
         }
-        switchSettingsPane(currentSettingsPaneId, { silent: true });
+        wireSettingsSectionControls();
+        syncThemeControls(themeSettings);
     } else if (sectionId === 'dashboard') {
         void loadGuilds();
     }
