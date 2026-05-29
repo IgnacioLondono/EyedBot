@@ -2522,6 +2522,7 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--text-primary', textPrimaryAuto);
     root.style.setProperty('--text-secondary', textSecondaryAuto);
     root.style.setProperty('--text-muted', textMutedAuto);
+    root.style.setProperty('--text-secondary-rgb', `${rgbTextSecondary.r}, ${rgbTextSecondary.g}, ${rgbTextSecondary.b}`);
     root.style.setProperty('--border-color', rgbaFromHex(normalized.borderColor, 0.16 + (borderStrength * 0.24)));
     root.style.setProperty('--border-glow', rgbaFromHex(normalized.borderColor, 0.18 + (borderStrength * 0.25)));
     root.style.setProperty('--accent-blue', normalized.accentPrimary);
@@ -2553,6 +2554,7 @@ function setThemeCssVariables(theme = themeSettings) {
     const rgbAccentPrimary = hexToRgb(normalized.accentPrimary);
     const rgbAccentSecondary = hexToRgb(normalized.accentSecondary);
     const rgbTextPrimary = hexToRgb(textPrimaryAuto);
+    const rgbTextSecondary = hexToRgb(textSecondaryAuto);
     const rgbBorder = hexToRgb(normalized.borderColor);
     const rgbBgPrimary = hexToRgb(normalized.bgPrimary);
     const rgbBgSecondary = hexToRgb(normalized.bgSecondary);
@@ -2572,6 +2574,43 @@ function setThemeCssVariables(theme = themeSettings) {
     root.style.setProperty('--color4', `${rgbBorder.r}, ${rgbBorder.g}, ${rgbBorder.b}`);
     root.style.setProperty('--color5', `${rgbAccentPrimary.r}, ${rgbAccentSecondary.g}, ${rgbTextPrimary.b}`);
     root.style.setProperty('--color-interactive', `${rgbAccentSecondary.r}, ${rgbAccentPrimary.g}, ${rgbBorder.b}`);
+
+    const railShellMix = clampNumber(0.12 + patternStrength * 0.14, 0.08, 0.28);
+    root.style.setProperty('--rail-shell-bg', rgbaFromHex(normalized.bgPrimary, 0.98));
+    root.style.setProperty(
+        '--rail-shell-bg-gradient',
+        `linear-gradient(180deg, ${rgbaFromHex(normalized.bgSecondary, 0.94)} 0%, ${rgbaFromHex(normalized.bgPrimary, 0.98)} 100%)`
+    );
+    root.style.setProperty('--rail-surface', rgbaFromHex(normalized.bgCard, 0.42 + patternStrength * 0.12));
+    root.style.setProperty('--rail-accent', normalized.accentPrimary);
+    root.style.setProperty('--rail-accent-soft', rgbaFromHex(normalized.accentPrimary, 0.22 + patternStrength * 0.18));
+    root.style.setProperty('--rail-accent-glow', rgbaFromHex(normalized.accentPrimary, 0.35 + patternStrength * 0.2));
+    root.style.setProperty('--rail-muted', rgbaFromHex(textMutedAuto, 0.88));
+    root.style.setProperty('--rail-line', rgbaFromHex(normalized.borderColor, 0.14 + borderStrength * 0.22));
+    root.style.setProperty(
+        '--rail-guild-gradient',
+        `linear-gradient(95deg, ${textPrimaryAuto} 8%, ${mixHexColors(normalized.accentPrimary, '#ffffff', 0.5)} 52%, ${mixHexColors(normalized.accentSecondary, '#ffffff', 0.38)} 100%)`
+    );
+    root.style.setProperty(
+        '--rail-header-bg',
+        `linear-gradient(135deg, ${rgbaFromHex(normalized.accentPrimary, 0.16 + railShellMix)}, ${rgbaFromHex(normalized.accentSecondary, 0.08 + railShellMix * 0.5)}), rgba(255, 255, 255, 0.02)`
+    );
+    root.style.setProperty(
+        '--rail-group-surface',
+        `linear-gradient(180deg, ${rgbaFromHex(normalized.bgCard, 0.35 + patternStrength * 0.1)}, ${rgbaFromHex(normalized.bgPrimary, 0.2 + patternStrength * 0.08)})`
+    );
+    root.style.setProperty(
+        '--rail-active-bg',
+        `linear-gradient(135deg, ${rgbaFromHex(normalized.accentPrimary, 0.28 + patternStrength * 0.12)}, ${rgbaFromHex(normalized.accentSecondary, 0.14 + patternStrength * 0.08)})`
+    );
+    root.style.setProperty(
+        '--settings-sidebar-bg',
+        `linear-gradient(165deg, ${rgbaFromHex(normalized.bgCard, 0.92)}, ${rgbaFromHex(normalized.bgPrimary, 0.94)})`
+    );
+    root.style.setProperty(
+        '--settings-side-active-bg',
+        `linear-gradient(145deg, ${rgbaFromHex(normalized.accentPrimary, 0.38)}, ${rgbaFromHex(normalized.accentSecondary, 0.24)})`
+    );
 
     const pattern = document.querySelector('.bg-pattern');
     if (pattern) {

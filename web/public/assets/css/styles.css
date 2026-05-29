@@ -591,8 +591,8 @@ body {
 
 .settings-sidebar {
     border-radius: 18px;
-    border: 1px solid color-mix(in srgb, var(--text-secondary, #cbb7f6) 20%, transparent);
-    background: linear-gradient(165deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.9), rgba(var(--bg-primary-rgb, 17, 9, 33), 0.92));
+    border: 1px solid var(--rail-line, color-mix(in srgb, var(--text-secondary, #cbb7f6) 20%, transparent));
+    background: var(--settings-sidebar-bg, linear-gradient(165deg, rgba(var(--bg-card-rgb, 26, 16, 48), 0.9), rgba(var(--bg-primary-rgb, 17, 9, 33), 0.92)));
     box-shadow: var(--shadow-card);
     padding: 0.8rem;
     display: flex;
@@ -624,8 +624,8 @@ body {
 
 .settings-side-btn.active {
     color: var(--white);
-    background: linear-gradient(145deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.38), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.24));
-    border-color: rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.35);
+    background: var(--settings-side-active-bg, linear-gradient(145deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.38), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.24)));
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.45);
     box-shadow: var(--shadow-blue);
 }
 

@@ -711,8 +711,8 @@ label { color: var(--text-secondary); font-weight: 500; }
 .server-side-menu {
     background:
         radial-gradient(120% 120% at 8% -12%, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.2), transparent 48%),
-        linear-gradient(180deg, rgba(var(--bg-primary-rgb, 16, 10, 34), 0.95), rgba(var(--bg-primary-rgb, 9, 5, 22), 0.97)) !important;
-    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.2) !important;
+        var(--rail-shell-bg-gradient, linear-gradient(180deg, rgba(var(--bg-secondary-rgb, 16, 10, 34), 0.95), rgba(var(--bg-primary-rgb, 9, 5, 22), 0.97))) !important;
+    border: 1px solid var(--rail-line, rgba(var(--border-rgb, 190, 155, 255), 0.2)) !important;
     border-radius: 22px !important;
     padding: 0.95rem !important;
     box-shadow:
@@ -736,7 +736,7 @@ label { color: var(--text-secondary); font-weight: 500; }
 }
 .server-side-guild-name {
     font-weight: 800;
-    color: #f4eeff;
+    color: var(--text-primary, #f4eeff);
     font-size: 1.04rem;
     margin-top: 0.18rem;
     letter-spacing: -0.01em;

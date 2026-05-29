@@ -2902,11 +2902,6 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu.server-side-menu--rail {
-    --rail-shell-bg: rgba(10, 8, 20, 0.98);
-    --rail-accent: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.95);
-    --rail-muted: rgba(168, 152, 198, 0.78);
-    --rail-surface: rgba(255, 255, 255, 0.055);
-    --rail-line: rgba(var(--border-rgb, 190, 155, 255), 0.18);
     --rail-ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
     --rail-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     position: relative;
@@ -2923,8 +2918,10 @@ body {
     border-radius: 0 !important;
     border: none !important;
     border-right: 1px solid var(--rail-line) !important;
-    background: var(--rail-shell-bg) !important;
-    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04) !important;
+    background: var(--rail-shell-bg-gradient, var(--rail-shell-bg)) !important;
+    box-shadow:
+        inset -1px 0 0 rgba(255, 255, 255, 0.04),
+        4px 0 28px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.08) !important;
     backdrop-filter: blur(18px) saturate(168%);
     -webkit-backdrop-filter: blur(18px) saturate(168%);
     overflow: hidden !important;
@@ -2963,11 +2960,9 @@ body {
 #serverSection.server-config-shell .server-side-menu--rail .server-side-header {
     padding: 0.58rem 0.62rem;
     margin: 0 0 0.45rem;
-    border: 1px solid rgba(var(--border-rgb, 190, 155, 255), 0.14);
+    border: 1px solid var(--rail-line);
     border-radius: 13px;
-    background:
-        linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 77, 255), 0.14), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.06)),
-        rgba(255, 255, 255, 0.02);
+    background: var(--rail-header-bg);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     transition: border-color 0.25s var(--rail-ease-out), box-shadow 0.25s var(--rail-ease-out);
 }
@@ -3014,7 +3009,7 @@ body {
     font-size: 1rem;
     font-weight: 800;
     letter-spacing: -0.02em;
-    background: linear-gradient(95deg, #fff 10%, #ebe2ff 55%, #f5c4ec 100%);
+    background: var(--rail-guild-gradient);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -3164,8 +3159,8 @@ body {
     margin-top: 0.12rem;
     padding: 0.3rem 0.28rem;
     border-radius: 11px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--rail-line);
+    background: var(--rail-group-surface);
     overflow: hidden;
     max-height: 720px;
     opacity: 1;
@@ -3211,18 +3206,18 @@ body {
     width: 3px;
     height: 0;
     border-radius: 3px;
-    background: linear-gradient(180deg, var(--rail-accent), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.9));
+    background: linear-gradient(180deg, var(--rail-accent), rgba(var(--accent-secondary-rgb, 255, 120, 209), 0.92));
     transform: translateY(-50%);
     transition: height 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
     opacity: 0;
-    box-shadow: none;
+    box-shadow: 0 0 12px var(--rail-accent-glow);
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn-inner {
     gap: 0.62rem !important;
     padding: 0.48rem 0.55rem 0.48rem 0.6rem !important;
     min-height: 38px !important;
-    color: rgba(210, 198, 238, 0.92) !important;
+    color: var(--text-secondary, rgba(210, 198, 238, 0.92)) !important;
     font-size: 0.845rem !important;
     font-weight: 500 !important;
     transition: color 0.22s ease;
@@ -3284,14 +3279,17 @@ body {
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active {
-    background: rgba(255, 255, 255, 0.08) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    background: var(--rail-active-bg) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 0 1px rgba(var(--accent-primary-rgb, 124, 77, 255), 0.12) !important;
     transform: translateX(3px);
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active::before {
     height: 64%;
     opacity: 1;
+    box-shadow: 0 0 14px var(--rail-accent-glow);
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active .side-menu-btn-inner {
@@ -3302,9 +3300,10 @@ body {
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active .side-menu-icon {
     color: var(--rail-accent) !important;
     opacity: 1;
-    background: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.18) !important;
-    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.35) !important;
+    background: var(--rail-accent-soft) !important;
+    border-color: rgba(var(--accent-primary-rgb, 124, 77, 255), 0.42) !important;
     transform: scale(1.04);
+    box-shadow: 0 0 12px var(--rail-accent-glow);
 }
 
 #serverSection.server-config-shell .server-side-menu--rail .side-menu-btn.active .side-menu-icon svg {
