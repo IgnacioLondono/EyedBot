@@ -113,7 +113,8 @@ module.exports = {
                             '• Música y TTS **no funcionan solo** con una conexión: **`/stop`** en música primero.',
                             '• **`ffmpeg`** requerido (**`ffmpeg-static`** en el proyecto).',
                             '• El bot **permanece en llamada** aunque no haya mensajes; solo sale si **no queda nadie** en el canal de voz o con **`/tts desconectar`**.',
-                            '• **`TTS_READ_CHAT=false`** desactiva leer mensajes · **`TTS_READ_SKIP_PREFIX`** evita líneas con prefijo del bot.'
+                            '• **`TTS_READ_CHAT=false`** desactiva leer mensajes · **`TTS_READ_SKIP_PREFIX`** evita líneas con prefijo del bot.',
+                            '• No se leen mensajes de **bots/webhooks** ni mensajes que sean **solo enlaces**.'
                         ].join('\n')
                 });
 

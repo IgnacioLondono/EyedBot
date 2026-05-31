@@ -64,13 +64,48 @@ function normalizeSpeakLine(raw) {
     return String(raw || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
 }
 
+/** @param {import('discord.js').Message} message */
+function shouldSkipTtsChatMessage(message) {
+    if (!message?.guild) return true;
+    if (message.author?.bot) return true;
+    if (message.webhookId) return true;
+    if (message.system) return true;
+    if (message.applicationId && message.author?.id === message.applicationId) return true;
+    return false;
+}
+
+function stripUrlsFromText(raw) {
+    let t = String(raw || '');
+
+    // Markdown [texto](url)
+    t = t.replace(/\[([^\]]*)\]\([^)]+\)/gi, ' $1 ');
+
+    // <https://...> o <http://...>
+    t = t.replace(/<(?:https?:\/\/|ftp:\/\/)[^\s>]+>/gi, ' ');
+
+    // Invites y URLs de Discord (con o sin protocolo)
+    t = t.replace(
+        /(?:https?:\/\/)?(?:www\.)?(?:discord(?:app)?\.(?:com\/invite|gg)|discord\.gg)\/[^\s<]+/gi,
+        ' '
+    );
+
+    // http(s):// y www.
+    t = t.replace(/https?:\/\/[^\s<]+/gi, ' ');
+    t = t.replace(/(?:^|\s)www\.[^\s<]+/gi, ' ');
+
+    // discord.gg/xxx sin protocolo
+    t = t.replace(/(?:^|\s)discord\.gg\/[^\s<]+/gi, ' ');
+
+    return t;
+}
+
 function sanitizeDiscordPlaintext(raw) {
     let t = String(raw || '');
     t = t.replace(/<@!?[0-9]+>/g, ' ');
     t = t.replace(/<@&[0-9]+>/g, ' ');
     t = t.replace(/<#[0-9]+>/g, ' ');
     t = t.replace(/<a?:[\w~]+:[0-9]+>/gi, ' ');
-    t = t.replace(/https?:\/\/[^\s<]+/gi, ' ');
+    t = stripUrlsFromText(t);
     return t;
 }
 
@@ -80,6 +115,11 @@ function prepareChatLineForTts(raw) {
     if (!t.length) return '';
     if (t.length > READ_MAX_CHARS) return t.slice(0, READ_MAX_CHARS);
     return t;
+}
+
+/** Mensaje sin texto hablable tras quitar enlaces y menciones. */
+function chatMessageHasSpeakableText(raw) {
+    return prepareChatLineForTts(raw).length > 0;
 }
 
 /**
@@ -486,9 +526,9 @@ function attachCleanupListeners(client) {
 
     if (READ_CHAT) {
         client.on('messageCreate', (message) => {
-            if (!message.guild || message.author.bot) return;
-            if (message.webhookId) return;
+            if (shouldSkipTtsChatMessage(message)) return;
             if (!String(message.content || '').trim()) return;
+            if (!chatMessageHasSpeakableText(message.content)) return;
 
             const gid = message.guildId;
             const s = sessions.get(gid);
