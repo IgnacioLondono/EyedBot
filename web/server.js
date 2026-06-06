@@ -6006,8 +6006,10 @@ app.get('/dashboard', (req, res) => {
 });
 
 // Iniciar servidor con manejo de errores
-const server = app.listen(PORT, () => {
-    console.log(`🌐 Panel web iniciado en http://localhost:${PORT}`);
+const BIND_HOST = String(process.env.WEB_BIND_HOST || '0.0.0.0').trim() || '0.0.0.0';
+const server = app.listen(PORT, BIND_HOST, () => {
+    const bindLabel = BIND_HOST === '0.0.0.0' ? 'todas las interfaces' : BIND_HOST;
+    console.log(`🌐 Panel web iniciado en http://${bindLabel}:${PORT}`);
     const push = buildStreamPushStatus();
     if (push.publicOriginConfigured) {
         console.log('📡 Directos push (HTTPS):');

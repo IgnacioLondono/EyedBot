@@ -18,7 +18,7 @@ const {
     formatGuildVoiceDisplay
 } = require('./tts-voice-catalog');
 
-/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: string[], processing: boolean, voiceId: string, idleTimer?: NodeJS.Timeout | null, listenChannelId: string }} TtsGuildSession */
+/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: string[], processing: boolean, voiceId: string, idleTimer?: NodeJS.Timeout | null, listenChannelId: string, ownerUserId: string }} TtsGuildSession */
 
 /** @type {Map<string, TtsGuildSession>} */
 const sessions = new Map();
@@ -39,11 +39,13 @@ const MAX_QUEUE = 14;
 const IDLE_MS = Number.parseInt(process.env.TTS_IDLE_DISCONNECT_MS || '0', 10);
 const READ_CHAT = (process.env.TTS_READ_CHAT || 'true').toLowerCase() !== 'false';
 const READ_SKIP_PREFIX = (process.env.TTS_READ_SKIP_PREFIX || 'true').toLowerCase() !== 'false';
+const READ_OWNER_ONLY = (process.env.TTS_READ_OWNER_ONLY || 'true').toLowerCase() !== 'false';
 
-const READ_MAX_CHARS = Math.min(
-    900,
-    Math.max(40, Number.parseInt(process.env.TTS_READ_MAX_CHARS || '400', 10) || 400)
-);
+/** 0 = sin límite (hasta el máximo de Discord ~2000); >0 recorta el mensaje leído del chat */
+const READ_MAX_CHARS = (() => {
+    const n = Number.parseInt(process.env.TTS_READ_MAX_CHARS || '0', 10);
+    return Number.isFinite(n) && n > 0 ? Math.min(2000, n) : 0;
+})();
 
 function envTtsEnabled() {
     return (process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false';
@@ -113,7 +115,7 @@ function prepareChatLineForTts(raw) {
     let t = sanitizeDiscordPlaintext(raw);
     t = normalizeSpeakLine(t);
     if (!t.length) return '';
-    if (t.length > READ_MAX_CHARS) return t.slice(0, READ_MAX_CHARS);
+    if (READ_MAX_CHARS > 0 && t.length > READ_MAX_CHARS) return t.slice(0, READ_MAX_CHARS);
     return t;
 }
 
@@ -324,7 +326,10 @@ async function joinSession(interaction) {
         const curVc = interaction.client.guilds.cache.get(guildId)?.members?.me?.voice?.channelId;
         if (curVc === ch.id) {
             const sess = sessions.get(guildId);
-            if (sess) sess.listenChannelId = resolveListenChannelIdFromInteraction(interaction);
+            if (sess) {
+                sess.listenChannelId = resolveListenChannelIdFromInteraction(interaction);
+                sess.ownerUserId = interaction.user.id;
+            }
             return { ok: true, reason: 'ya_conectado' };
         }
         destroyGuildSession(guildId, 'reemplazo');
@@ -392,7 +397,8 @@ async function joinSession(interaction) {
         processing: false,
         voiceId: guildPendingVoiceId.get(guildId) || envDefaultVoiceId(),
         idleTimer: null,
-        listenChannelId
+        listenChannelId,
+        ownerUserId: interaction.user.id
     });
 
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
@@ -533,6 +539,7 @@ function attachCleanupListeners(client) {
             const gid = message.guildId;
             const s = sessions.get(gid);
             if (!s?.listenChannelId) return;
+            if (READ_OWNER_ONLY && s.ownerUserId && message.author.id !== s.ownerUserId) return;
             if (!messageMatchesListenChannel(message, s.listenChannelId)) return;
 
             Promise.resolve()

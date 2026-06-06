@@ -1,0 +1,20 @@
+# MySQL externo (host OMV u otro servidor) — sin contenedor mysql en el stack
+# Uso en Portainer (modo bridge):
+#   Compose path: docker-compose.yml
+#   Additional compose files: docker-compose.external-mysql.yml
+#
+# En host mode usa solo docker-compose.host.yml (no incluye mysql).
+
+services:
+  bot:
+    depends_on: []
+    environment:
+      - DB_HOST=${DB_HOST:-127.0.0.1}
+      - DB_PORT=${DB_PORT:-3306}
+      - WEB_BIND_HOST=${WEB_BIND_HOST:-127.0.0.1}
+      - WEB_PUBLIC_ORIGIN=${WEB_PUBLIC_ORIGIN:-}
+      - REDIRECT_URI=${REDIRECT_URI:-}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+
+  mysql:
+    profiles: ["bundled-mysql-only"]

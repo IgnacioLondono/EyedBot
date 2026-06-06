@@ -31,6 +31,8 @@ Notas:
 
 - En host mode, para musica en el mismo host, usa `LAVALINK_HOST=127.0.0.1`.
 - En host mode, define `DB_HOST` con IP/host real de tu MySQL (por defecto: `127.0.0.1`).
+- Si migraste MySQL al host (carpeta tipo `/srv/.../Eyedbot/mysql/`), usa **`docker-compose.host.yml`** y **no** levantes el servicio `mysql` del compose bridge.
+- Detrás de **nginx**: `WEB_BIND_HOST=127.0.0.1`, `WEB_PUBLIC_ORIGIN=https://tu-dominio`, `SESSION_COOKIE_SECURE=true`. Ver **`NGINX_OMV.md`** y `docker/nginx/eyedbot.conf`.
 
 ## 3. Variables de entorno del Stack
 

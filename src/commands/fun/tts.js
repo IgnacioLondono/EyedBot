@@ -11,7 +11,7 @@ function truncateChoiceName(s, max = 100) {
 
 const REASON_MESSAGES = {
     no_voice: 'Entra primero a un **canal de voz**. Luego ejecuta **`/tts unir`** en el canal de texto del que quieres leer mensajes.',
-    ya_conectado: 'EyedBot ya está en tu **canal de voz**. Este canal de texto queda configurado para leer mensajes (o usa **`/tts escuchar`**).',
+    ya_conectado: 'EyedBot ya está en tu **canal de voz**. Solo se leen **tus** mensajes en el canal de texto configurado (o usa **`/tts escuchar`**).',
     voz_ocupada: 'El bot **ya tiene conexión de voz** (suele ser la **música**). Pon **`/stop`**, espera que salga del canal y vuelve con **`/tts unir`**.',
     sin_permiso: 'Al bot le faltan permisos **Conectar** y **Hablar** en ese canal de voz.',
     fallo_red: 'No se pudo establecer la conexión de voz. Intenta de nuevo más tarde.',
@@ -98,7 +98,7 @@ module.exports = {
                         '**`/tts idioma`** → campo **voz**: escribe y elige país, **♀ mujer · tono aguda** o **♂ hombre · tono grave**, o inglés/US, etc.',
                         'El motor es **Google Translate TTS**: una voz sintética por idioma/región real; ♀♂ **imita** registros graves/agudos con **ffmpeg**.',
                         '',
-                        'Tras **`/tts unir`**, se leen en voz los mensajes del **canal de texto configurado**. **`/tts escuchar`** cambia ese canal.'
+                        'Tras **`/tts unir`**, se leen en voz **solo tus mensajes** en el **canal de texto configurado**. **`/tts escuchar`** cambia ese canal.'
                     ].join('\n')
                 )
                 .addFields({
@@ -114,7 +114,9 @@ module.exports = {
                             '• **`ffmpeg`** requerido (**`ffmpeg-static`** en el proyecto).',
                             '• El bot **permanece en llamada** aunque no haya mensajes; solo sale si **no queda nadie** en el canal de voz o con **`/tts desconectar`**.',
                             '• **`TTS_READ_CHAT=false`** desactiva leer mensajes · **`TTS_READ_SKIP_PREFIX`** evita líneas con prefijo del bot.',
-                            '• No se leen mensajes de **bots/webhooks** ni mensajes que sean **solo enlaces**.'
+                            '• No se leen mensajes de **bots/webhooks** ni mensajes que sean **solo enlaces**.',
+                            '• Por defecto solo se lee al usuario que ejecutó **`/tts unir`** (no al resto del chat).',
+                            '• Por defecto se lee el **mensaje completo** (sin límite de 400 caracteres).'
                         ].join('\n')
                 });
 
@@ -155,7 +157,7 @@ module.exports = {
             const msg = result.ok
                 ? (result.reason === 'ya_conectado'
                     ? REASON_MESSAGES.ya_conectado
-                    : `Conectado a **${interaction.member?.voice?.channel?.name || 'voz'}**. Mensajes escritos aquí (**y en hilos de este canal**) se leen en llamada.`)
+                    : `Conectado a **${interaction.member?.voice?.channel?.name || 'voz'}**. Solo se leen en voz **tus** mensajes en este canal (**y en hilos de este canal**).`)
                 : (REASON_MESSAGES[result.reason] || 'No se pudo conectar.');
 
             return interaction.reply({ content: `${result.ok ? '✅' : '❌'} ${msg}`, flags: 64 });

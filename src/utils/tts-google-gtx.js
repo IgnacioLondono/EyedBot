@@ -11,7 +11,11 @@ const os = require('os');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 const CHUNK_SIZE = 165;
-const MAX_INPUT = 900;
+/** 0 = sin tope (el texto se trocea para Google); >0 limita caracteres totales por línea */
+const MAX_INPUT = (() => {
+    const n = Number.parseInt(process.env.TTS_MAX_INPUT || '0', 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+})();
 
 function resolveFfmpegBinary() {
     try {
@@ -145,7 +149,7 @@ async function textToMp3TempFiles(fullText, langOrVoice = 'es') {
         tl = String(langOrVoice || 'es').trim().slice(0, 24) || 'es';
     }
 
-    const clipped = text.slice(0, MAX_INPUT);
+    const clipped = MAX_INPUT > 0 ? text.slice(0, MAX_INPUT) : text;
     const parts = chunkText(clipped);
     const out = [];
     const base = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
