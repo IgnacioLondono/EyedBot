@@ -1,0 +1,4 @@
+[mysqld]
+# Evita llenar el disco con cientos de binlogs (EyedBot no usa replicación).
+binlog_expire_logs_seconds = 604800
+max_binlog_size = 256M

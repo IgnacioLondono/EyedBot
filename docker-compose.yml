@@ -9,8 +9,9 @@ services:
       MYSQL_USER: ${DB_USER:-tulabot}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - mysql-data:/var/lib/mysql
+      - ${MYSQL_DATA_PATH:-/srv/dev-disk-by-uuid-a5b4e34c-5e9b-430c-93ad-0473fe6143d2/data/Etc/Eyedbot/mysql}:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 15s
@@ -90,6 +91,3 @@ services:
 networks:
   eyedbot-net:
     driver: bridge
-
-volumes:
-  mysql-data:
