@@ -45,9 +45,20 @@ async function handleCountingMessage(message) {
 
         const expected = Math.max(0, Number.parseInt(state.current || 0, 10) || 0) + 1;
         const parsed = Number.parseInt(content, 10);
+        const authorId = String(message.author.id);
 
         if (parsed === expected) {
-            await countingStore.setProgress(guildId, { current: parsed });
+            if (state.lastUserId && state.lastUserId === authorId) {
+                await resetCountingDueToFailure(
+                    message,
+                    guildId,
+                    state,
+                    'no puede contar **dos veces seguidas**. Deben turnarse distintos miembros.'
+                );
+                return;
+            }
+
+            await countingStore.setProgress(guildId, { current: parsed, lastUserId: authorId });
             await message.react('✅').catch(() => null);
             return;
         }

@@ -51,10 +51,12 @@ function writeStore(data) {
 
 function normalizeConfig(raw) {
     const current = Math.max(0, Number.parseInt(raw?.current || 0, 10) || 0);
+    const lastUserId = raw?.lastUserId ? String(raw.lastUserId) : null;
     return {
         enabled: raw?.enabled === true,
         channelId: raw?.channelId ? String(raw.channelId) : null,
         current,
+        lastUserId,
         updatedAt: raw?.updatedAt || null
     };
 }
@@ -133,16 +135,21 @@ async function resetProgress(guildId) {
     const current = await getGuildConfig(guildId);
     return setGuildConfig(guildId, {
         ...current,
-        current: 0
+        current: 0,
+        lastUserId: null
     });
 }
 
 async function setProgress(guildId, progress) {
     const current = await getGuildConfig(guildId);
-    return setGuildConfig(guildId, {
+    const next = {
         ...current,
         current: Math.max(0, Number.parseInt(progress?.current || 0, 10) || 0)
-    });
+    };
+    if (Object.prototype.hasOwnProperty.call(progress || {}, 'lastUserId')) {
+        next.lastUserId = progress.lastUserId ? String(progress.lastUserId) : null;
+    }
+    return setGuildConfig(guildId, next);
 }
 
 module.exports = {
