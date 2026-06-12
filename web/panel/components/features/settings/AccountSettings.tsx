@@ -28,9 +28,17 @@ export function AccountSettings() {
         <div className="space-y-3">
           <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
             <span className="text-sm text-zinc-400">Premium</span>
-            <Badge variant={hasPremium ? "premium" : "default"}>
-              {hasPremium ? "EyedPlus+ activo" : "Plan base"}
-            </Badge>
+            {hasPremium ? (
+              <Badge variant="premium">
+                {billing?.grantType === "granted"
+                  ? "EyedPlus+ concedido"
+                  : billing?.grantType === "owner"
+                    ? "EyedPlus+ owner"
+                    : "EyedPlus+ activo"}
+              </Badge>
+            ) : (
+              <Badge variant="default">Plan base</Badge>
+            )}
           </div>
           <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
             <span className="text-sm text-zinc-400">Estado facturación</span>

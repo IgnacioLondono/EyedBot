@@ -83,7 +83,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       refresh,
-      hasPremium: Boolean(billing?.active),
+      hasPremium: Boolean(billing?.active || bootstrap?.hasPremium || bootstrap?.isOwner),
     }),
     [bootstrap, billing, loading, error, refresh]
   );

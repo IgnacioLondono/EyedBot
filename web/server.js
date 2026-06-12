@@ -332,6 +332,14 @@ const OWNER_DISCORD_IDS = (() => {
         .map((value) => String(value || '').trim().replace(/^['"]+|['"]+$/g, ''))
         .filter(Boolean);
 })();
+const PREMIUM_DISCORD_IDS = (() => {
+    const raw = envValue('WEB_PREMIUM_DISCORD_IDS', '399740358101303316');
+
+    return raw
+        .split(',')
+        .map((value) => String(value || '').trim().replace(/^['"]+|['"]+$/g, ''))
+        .filter(Boolean);
+})();
 /** Tarjeta PNG / imagen con fondo en bienvenidas — desactivado en panel y API hasta nuevo aviso. */
 const WELCOME_CARD_STYLE_ENABLED = false;
 const WEB_PUBLIC_ORIGIN = envValue('WEB_PUBLIC_ORIGIN') || envValue('PUBLIC_ORIGIN');
@@ -868,6 +876,133 @@ function isOwnerUser(user = null) {
     const userId = String(user?.id || '').trim();
     if (!userId) return false;
     return OWNER_DISCORD_IDS.includes(userId);
+}
+
+function hasPremiumGrant(user = null) {
+    const userId = String(user?.id || '').trim();
+    if (!userId) return false;
+    if (isOwnerUser(user)) return true;
+    return PREMIUM_DISCORD_IDS.includes(userId);
+}
+
+function moduleConfigActive(config, channelKey = 'channelId') {
+    if (!config || typeof config !== 'object') return false;
+    if (config.enabled === false) return false;
+    if (config.enabled === true) return true;
+    return Boolean(String(config[channelKey] || config.channel || config.panelChannelId || '').trim());
+}
+
+async function buildGuildDashboardSummary(guildId) {
+    const guild = botClient?.guilds.cache.get(String(guildId));
+    if (!guild) return null;
+
+    const ownerMember = guild.members.cache.get(guild.ownerId);
+    const ownerUser = ownerMember?.user;
+
+    const [
+        welcomeCfg,
+        goodbyeCfg,
+        verifyCfg,
+        ticketCfg,
+        levelingCfg,
+        gachaCfg,
+        freeGamesCfg,
+        tempVoiceCfg,
+        antiRaidCfg,
+        streamCfg,
+        trackedUsers,
+        guildActivity,
+        gachaStats
+    ] = await Promise.all([
+        welcomeStore.getWelcomeConfig(guildId).catch(() => null),
+        welcomeStore.getGoodbyeConfig(guildId).catch(() => null),
+        verifyStore.getVerifyConfig(guildId).catch(() => null),
+        ticketStore.getTicketConfig(guildId).catch(() => null),
+        levelingStore.getLevelingConfig(guildId).catch(() => null),
+        gachaStore.getConfig(guildId).catch(() => null),
+        freeGamesStore.getFreeGamesConfig(guildId).catch(() => null),
+        tempVoiceStore.getTempVoiceConfig(guildId).catch(() => null),
+        antiRaidStore.getAntiRaidConfig(guildId).catch(() => null),
+        streamAlertStore.getStreamAlertConfig(guildId).catch(() => null),
+        levelingStore.listGuildUsersMerged(guildId).catch(() => []),
+        guildActivityStore.getGuildActivity(guildId).catch(() => null),
+        gachaStore.getGuildStats(guildId).catch(() => null)
+    ]);
+
+    const activeTracked = (Array.isArray(trackedUsers) ? trackedUsers : []).filter((entry) => (
+        Number.parseInt(entry.messageCount || 0, 10) > 0
+        || Number.parseInt(entry.voiceMinutes || 0, 10) > 0
+    ));
+
+    const totalMessages = activeTracked.reduce(
+        (sum, entry) => sum + (Number.parseInt(entry.messageCount || 0, 10) || 0),
+        0
+    );
+    const totalVoiceMinutes = activeTracked.reduce(
+        (sum, entry) => sum + (Number.parseInt(entry.voiceMinutes || 0, 10) || 0),
+        0
+    );
+
+    const joins = Number.parseInt(guildActivity?.totals?.joins || 0, 10) || 0;
+    const leaves = Number.parseInt(guildActivity?.totals?.leaves || 0, 10) || 0;
+    const nonBotMembers = guild.members.cache.filter((member) => !member.user?.bot).size;
+    const botMembers = guild.members.cache.filter((member) => member.user?.bot).size;
+
+    return {
+        id: guild.id,
+        name: guild.name,
+        icon: guild.iconURL({ dynamic: true, size: 128 }),
+        banner: typeof guild.bannerURL === 'function' ? guild.bannerURL({ dynamic: true, size: 512 }) : null,
+        memberCount: guild.memberCount,
+        channelCount: guild.channels.cache.size,
+        roleCount: guild.roles.cache.size,
+        premiumTier: guild.premiumTier,
+        premiumSubscriptionCount: guild.premiumSubscriptionCount || 0,
+        createdAt: guild.createdAt.toISOString(),
+        owner: {
+            id: guild.ownerId,
+            tag: ownerUser?.tag || ownerMember?.displayName || 'Desconocido',
+            avatar: ownerUser?.displayAvatarURL({ dynamic: true, size: 128 })
+                || (ownerMember && typeof ownerMember.displayAvatarURL === 'function'
+                    ? ownerMember.displayAvatarURL({ dynamic: true, size: 128 })
+                    : null)
+        },
+        members: {
+            humans: nonBotMembers,
+            bots: botMembers
+        },
+        channels: {
+            text: guild.channels.cache.filter((c) => c.type === 0 || c.type === 5).size,
+            voice: guild.channels.cache.filter((c) => c.type === 2 || c.type === 13).size,
+            category: guild.channels.cache.filter((c) => c.type === 4).size
+        },
+        activity: {
+            trackedUsers: activeTracked.length,
+            totalMessages,
+            totalVoiceMinutes,
+            joins,
+            leaves,
+            net: joins - leaves
+        },
+        modules: {
+            welcome: moduleConfigActive(welcomeCfg),
+            goodbye: moduleConfigActive(goodbyeCfg),
+            verify: moduleConfigActive(verifyCfg),
+            tickets: moduleConfigActive(ticketCfg),
+            leveling: moduleConfigActive(levelingCfg, 'announceChannelId') || levelingCfg?.enabled === true,
+            gacha: moduleConfigActive(gachaCfg, 'shopChannelId') || gachaCfg?.enabled === true,
+            freeGames: moduleConfigActive(freeGamesCfg),
+            tempVoice: moduleConfigActive(tempVoiceCfg, 'hubChannelId'),
+            antiRaid: antiRaidCfg?.enabled === true,
+            streamAlerts: moduleConfigActive(streamCfg, 'channelId') || (Array.isArray(streamCfg?.watchlist) && streamCfg.watchlist.length > 0)
+        },
+        economy: gachaStats && typeof gachaStats === 'object'
+            ? {
+                profiles: Number.parseInt(gachaStats.totalUsers || 0, 10) || 0,
+                cards: Number.parseInt(gachaStats.totalCollection || 0, 10) || 0
+            }
+            : null
+    };
 }
 
 function sanitizeGuildSnapshot(guild) {
@@ -1597,8 +1732,7 @@ async function requirePremium(req, res, next) {
         return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
     }
 
-    // El owner del bot siempre tiene acceso premium en el panel.
-    if (isOwnerUser(req.session?.user)) {
+    if (hasPremiumGrant(req.session?.user)) {
         return next();
     }
 
@@ -1619,6 +1753,42 @@ async function requirePremium(req, res, next) {
         console.error('Error validando premium:', error);
         return res.status(500).json({ error: 'No se pudo validar premium' });
     }
+}
+
+async function resolveBillingStatusForUser(user) {
+    const userId = String(user?.id || '').trim();
+    if (!userId) {
+        return {
+            active: false,
+            status: 'inactive',
+            grantType: null
+        };
+    }
+
+    if (hasPremiumGrant(user)) {
+        return {
+            active: true,
+            status: isOwnerUser(user) ? 'owner' : 'granted',
+            grantType: isOwnerUser(user) ? 'owner' : 'allowlist',
+            customerId: '',
+            subscriptionId: '',
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: false,
+            updatedAt: new Date().toISOString()
+        };
+    }
+
+    const subscription = await billingStore.getUserSubscription(userId);
+    return {
+        active: billingStore.isPremiumActive(subscription),
+        status: subscription?.status || 'inactive',
+        grantType: billingStore.isPremiumActive(subscription) ? 'subscription' : null,
+        customerId: subscription?.customerId || '',
+        subscriptionId: subscription?.subscriptionId || '',
+        currentPeriodEnd: subscription?.currentPeriodEnd || null,
+        cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd === true,
+        updatedAt: subscription?.updatedAt || null
+    };
 }
 
 // Rutas protegidas
@@ -1686,12 +1856,32 @@ app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
             guilds,
             inviteUrl,
             isOwner: isOwnerUser(req.session.user),
+            hasPremium: hasPremiumGrant(req.session.user),
             botConnected: Boolean(botClient?.user?.id),
             guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0
         });
     } catch (error) {
         console.error('❌ Error en /api/panel/bootstrap:', error);
         res.status(500).json({ error: 'No se pudo iniciar el panel' });
+    }
+});
+
+app.get('/api/panel/dashboard-summary', requireAuth, async (req, res) => {
+    try {
+        const forceRefresh = String(req.query?.refresh || '') === '1';
+        const guilds = await resolvePanelGuildsForUser(req, { force: forceRefresh });
+        const summaries = [];
+
+        for (const guild of guilds) {
+            const summary = await buildGuildDashboardSummary(guild.id);
+            if (summary) summaries.push(summary);
+        }
+
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({ guilds: summaries, generatedAt: new Date().toISOString() });
+    } catch (error) {
+        console.error('❌ Error en /api/panel/dashboard-summary:', error);
+        res.status(500).json({ error: 'No se pudo cargar el resumen del dashboard' });
     }
 });
 
@@ -1705,16 +1895,8 @@ app.get('/api/billing/status', requireAuth, async (req, res) => {
     }
 
     try {
-        const subscription = await billingStore.getUserSubscription(userId);
-        return res.json({
-            active: billingStore.isPremiumActive(subscription),
-            status: subscription?.status || 'inactive',
-            customerId: subscription?.customerId || '',
-            subscriptionId: subscription?.subscriptionId || '',
-            currentPeriodEnd: subscription?.currentPeriodEnd || null,
-            cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd === true,
-            updatedAt: subscription?.updatedAt || null
-        });
+        const billing = await resolveBillingStatusForUser(req.session.user);
+        return res.json(billing);
     } catch (error) {
         console.error('Error consultando estado de facturación:', error);
         return res.status(500).json({ error: 'No se pudo obtener estado premium' });
