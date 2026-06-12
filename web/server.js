@@ -1299,7 +1299,7 @@ app.get('/auth/discord', (req, res) => {
             })
             .catch((sessionError) => {
                 console.error('❌ Error guardando estado OAuth en sesión:', sessionError);
-                res.redirect('/login.html?error=session_error');
+                res.redirect('/login?error=session_error');
             });
     } catch (error) {
         console.error('❌ Error generando URL de autorización:', error);
@@ -1324,18 +1324,18 @@ app.get('/callback', async (req, res) => {
         // Si Discord devuelve un error
         if (error) {
             console.error('❌ Error de Discord OAuth2:', error);
-            return res.redirect('/login.html?error=discord_error');
+            return res.redirect('/login?error=discord_error');
         }
 
         if (!code) {
             console.error('❌ No se recibió código de autorización');
-            return res.redirect('/login.html?error=no_code');
+            return res.redirect('/login?error=no_code');
         }
 
         // Verificar que CLIENT_SECRET esté configurado
         if (!CLIENT_SECRET) {
             console.error('❌ CLIENT_SECRET no está configurado en .env');
-            return res.redirect('/login.html?error=config_error');
+            return res.redirect('/login?error=config_error');
         }
 
         // Verificar estado (CSRF protection). Si la sesión llegó tarde/rota, usa fallback temporal.
@@ -1346,7 +1346,7 @@ app.get('/callback', async (req, res) => {
 
         if (!stateMatchesSession && !fallbackStateEntry) {
             console.error('❌ Estado OAuth no coincide - posible ataque CSRF');
-            return res.redirect('/login.html?error=auth_failed');
+            return res.redirect('/login?error=auth_failed');
         }
         if (!stateMatchesSession && fallbackStateEntry) {
             console.warn('⚠️ OAuth state validado por fallback temporal (sesión no sincronizada a tiempo)');
@@ -1365,7 +1365,7 @@ app.get('/callback', async (req, res) => {
 
         if (!tokenData || !tokenData.access_token) {
             console.error('❌ No se recibió token de acceso');
-            return res.redirect('/login.html?error=auth_failed');
+            return res.redirect('/login?error=auth_failed');
         }
 
         console.log('👤 Obteniendo información del usuario...');
@@ -1373,7 +1373,7 @@ app.get('/callback', async (req, res) => {
 
         if (!user || !user.id) {
             console.error('❌ No se pudo obtener información del usuario');
-            return res.redirect('/login.html?error=auth_failed');
+            return res.redirect('/login?error=auth_failed');
         }
 
         const previousGuilds = Array.isArray(req.session.guilds) ? req.session.guilds : [];
@@ -1402,7 +1402,7 @@ app.get('/callback', async (req, res) => {
             await saveSession(req);
         } catch (err) {
             console.error('❌ Error guardando sesión:', err);
-            return res.redirect('/login.html?error=session_error');
+            return res.redirect('/login?error=session_error');
         }
 
         const userId = String(user.id || '').trim();
@@ -1435,10 +1435,10 @@ app.get('/callback', async (req, res) => {
             console.error('   1. CLIENT_SECRET en .env coincide con Discord Developer Portal');
             console.error('   2. Redirect URI coincide exactamente: ' + redirectUri);
             console.error('   3. La aplicación OAuth2 está habilitada en Discord');
-            return res.redirect('/login.html?error=invalid_secret');
+            return res.redirect('/login?error=invalid_secret');
         }
 
-        res.redirect('/login.html?error=auth_failed');
+        res.redirect('/login?error=auth_failed');
     }
 });
 
@@ -1450,7 +1450,7 @@ app.get('/logout', (req, res) => {
             secure: cookieSecure,
             sameSite: 'lax'
         });
-        res.redirect('/login.html');
+        res.redirect('/login');
     });
 });
 
@@ -1459,16 +1459,16 @@ function requireAuth(req, res, next) {
     if (!req.session || !req.session.user) {
         console.log('⚠️ Intento de acceso sin autenticación a:', req.path);
         if (req.path.startsWith('/api/')) {
-            return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+            return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
         }
-        return res.redirect('/login.html');
+        return res.redirect('/login');
     }
     next();
 }
 
 function requireOwner(req, res, next) {
     if (!req.session || !req.session.user) {
-        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
     }
 
     if (!isOwnerUser(req.session.user)) {
@@ -1594,7 +1594,7 @@ async function persistMercadoPagoSubscriptionForUser(userId, subscription, sourc
 async function requirePremium(req, res, next) {
     const userId = String(req.session?.user?.id || '').trim();
     if (!userId) {
-        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
     }
 
     // El owner del bot siempre tiene acceso premium en el panel.
@@ -1701,7 +1701,7 @@ app.use('/api/guild/:guildId', requireAuth, requireGuildManagementAccess);
 app.get('/api/billing/status', requireAuth, async (req, res) => {
     const userId = String(req.session?.user?.id || '').trim();
     if (!userId) {
-        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
     }
 
     try {
@@ -1728,7 +1728,7 @@ app.post('/api/billing/checkout-session', requireAuth, async (req, res) => {
 
     const userId = String(req.session?.user?.id || '').trim();
     if (!userId) {
-        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
     }
 
     try {
@@ -1772,7 +1772,7 @@ app.post('/api/billing/portal', requireAuth, async (req, res) => {
 
     const userId = String(req.session?.user?.id || '').trim();
     if (!userId) {
-        return res.status(401).json({ error: 'No autenticado', redirect: '/login.html' });
+        return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
     }
 
     try {
