@@ -939,8 +939,7 @@ async function buildGuildDashboardSummary(guildId) {
     const guild = botClient?.guilds.cache.get(String(guildId));
     if (!guild) return null;
 
-    const ownerMember = guild.members.cache.get(guild.ownerId);
-    const ownerUser = ownerMember?.user;
+    const owner = await resolveGuildOwnerProfile(guild);
 
     const [
         welcomeCfg,
@@ -1002,14 +1001,7 @@ async function buildGuildDashboardSummary(guildId) {
         premiumTier: guild.premiumTier,
         premiumSubscriptionCount: guild.premiumSubscriptionCount || 0,
         createdAt: guild.createdAt.toISOString(),
-        owner: {
-            id: guild.ownerId,
-            tag: ownerUser?.tag || ownerMember?.displayName || 'Desconocido',
-            avatar: ownerUser?.displayAvatarURL({ dynamic: true, size: 128 })
-                || (ownerMember && typeof ownerMember.displayAvatarURL === 'function'
-                    ? ownerMember.displayAvatarURL({ dynamic: true, size: 128 })
-                    : null)
-        },
+        owner,
         members: {
             humans: nonBotMembers,
             bots: botMembers
@@ -1051,6 +1043,9 @@ async function buildGuildDashboardSummary(guildId) {
 function sanitizeGuildSnapshot(guild) {
     const guildId = String(guild?.id || '');
     const iconHash = String(guild?.icon || '').trim();
+    const isOwner = guild?.owner === true;
+    const isAdmin = hasAdminOrManageGuildPermission(guild);
+    const botGuild = botClient?.guilds?.cache?.get(guildId);
 
     return {
         name: String(guild?.name || 'Servidor sin nombre').slice(0, 120),
@@ -1058,8 +1053,101 @@ function sanitizeGuildSnapshot(guild) {
         idSuffix: guildId.slice(-4),
         iconUrl: guildId && iconHash
             ? `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.png?size=128`
-            : null
+            : null,
+        isOwner,
+        manages: isOwner || isAdmin,
+        role: isOwner ? 'owner' : (isAdmin ? 'admin' : 'member'),
+        botInGuild: Boolean(botGuild),
+        memberCount: botGuild?.memberCount ?? null
     };
+}
+
+async function resolveGuildOwnerProfile(guild) {
+    const ownerId = String(guild?.ownerId || '').trim();
+    if (!ownerId) {
+        return { id: '', tag: 'Desconocido', avatar: null };
+    }
+
+    const cachedMember = guild.members?.cache?.get(ownerId);
+    const cachedUser = cachedMember?.user;
+    if (cachedUser?.tag) {
+        return {
+            id: ownerId,
+            tag: cachedUser.tag,
+            avatar: cachedUser.displayAvatarURL({ dynamic: true, size: 128 })
+        };
+    }
+    if (cachedMember?.displayName) {
+        return {
+            id: ownerId,
+            tag: cachedMember.displayName,
+            avatar: typeof cachedMember.displayAvatarURL === 'function'
+                ? cachedMember.displayAvatarURL({ dynamic: true, size: 128 })
+                : null
+        };
+    }
+
+    if (!botClient) {
+        return { id: ownerId, tag: `···${ownerId.slice(-4)}`, avatar: null };
+    }
+
+    try {
+        const user = await botClient.users.fetch(ownerId);
+        return {
+            id: ownerId,
+            tag: user.tag || user.username || `···${ownerId.slice(-4)}`,
+            avatar: user.displayAvatarURL({ dynamic: true, size: 128 })
+        };
+    } catch {
+        try {
+            const member = await guild.members.fetch(ownerId);
+            return {
+                id: ownerId,
+                tag: member.user?.tag || member.displayName || `···${ownerId.slice(-4)}`,
+                avatar: typeof member.displayAvatarURL === 'function'
+                    ? member.displayAvatarURL({ dynamic: true, size: 128 })
+                    : null
+            };
+        } catch {
+            return { id: ownerId, tag: `···${ownerId.slice(-4)}`, avatar: null };
+        }
+    }
+}
+
+async function enrichUserRegistryGuilds(guilds = [], userId = '') {
+    const list = Array.isArray(guilds) ? guilds : [];
+    return Promise.all(list.map(async (guildEntry) => {
+        const guildId = String(guildEntry?.id || '');
+        const botGuild = botClient?.guilds?.cache?.get(guildId);
+        const isOwner = guildEntry?.isOwner === true
+            || (botGuild && String(botGuild.ownerId) === String(userId));
+        const isAdmin = guildEntry?.role === 'admin' || (guildEntry?.manages === true && !isOwner);
+        const manages = isOwner || isAdmin || guildEntry?.manages === true;
+
+        let guildOwnerTag = '';
+        let memberCount = guildEntry?.memberCount ?? null;
+        const botInGuild = Boolean(botGuild);
+
+        if (botGuild) {
+            const ownerProfile = await resolveGuildOwnerProfile(botGuild);
+            guildOwnerTag = ownerProfile.tag;
+            memberCount = botGuild.memberCount;
+        }
+
+        return {
+            id: guildId,
+            name: String(guildEntry?.name || 'Servidor sin nombre').slice(0, 120),
+            idSuffix: String(guildEntry?.idSuffix || guildId.slice(-4)),
+            iconUrl: guildEntry?.iconUrl || null,
+            isOwner,
+            isAdmin: isAdmin && !isOwner,
+            manages,
+            role: isOwner ? 'owner' : (isAdmin ? 'admin' : 'member'),
+            botInGuild,
+            memberCount,
+            guildOwnerTag
+        };
+    }));
 }
 
 function hasAdminOrManageGuildPermission(guild = {}) {
@@ -2053,14 +2141,7 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
                 firstLoginAt: entry.firstLoginAt || null,
                 lastLoginAt: entry.lastLoginAt || null,
                 guildCount: Number(entry.guildCount) || 0,
-                guilds: Array.isArray(entry.guilds)
-                    ? entry.guilds.map((g) => ({
-                        id: String(g?.id || ''),
-                        name: String(g?.name || 'Servidor sin nombre').slice(0, 120),
-                        idSuffix: String(g?.idSuffix || '').slice(-4),
-                        iconUrl: g?.iconUrl || null
-                    }))
-                    : []
+                guilds: Array.isArray(entry.guilds) ? entry.guilds : []
             }))
             .sort((a, b) => {
                 const aTime = new Date(a.lastLoginAt || 0).getTime();
@@ -2070,8 +2151,14 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
 
         const users = await Promise.all(usersRaw.map(async (entry) => {
             const sub = await billingStore.getUserSubscription(entry.userId);
+            const guilds = await enrichUserRegistryGuilds(entry.guilds, entry.userId);
+            const managedGuilds = guilds.filter((guild) => guild.manages);
             return {
                 ...entry,
+                guildCount: guilds.length,
+                managedGuildCount: managedGuilds.length,
+                guilds,
+                managedGuilds,
                 billing: {
                     active: billingStore.isPremiumActive(sub),
                     status: sub?.status || 'inactive',
@@ -5624,8 +5711,7 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'No tienes acceso a este servidor' });
         }
 
-        const ownerMember = guild.members.cache.get(guild.ownerId);
-        const ownerUser = ownerMember?.user;
+        const owner = await resolveGuildOwnerProfile(guild);
 
         const guildAgeDays = Math.max(1, Math.ceil((Date.now() - guild.createdTimestamp) / 86400000));
         const trackedUsers = await levelingStore.listGuildUsers(guildId);
@@ -5757,9 +5843,11 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             name: guild.name,
             icon: guild.iconURL({ dynamic: true, size: 256 }),
             owner: {
-                id: guild.ownerId,
-                tag: ownerUser?.tag || 'Desconocido',
-                avatar: ownerUser?.displayAvatarURL({ dynamic: true, size: 256 }) || null
+                id: owner.id || guild.ownerId,
+                tag: owner.tag,
+                avatar: owner.avatar
+                    ? owner.avatar.replace('size=128', 'size=256')
+                    : null
             },
             memberCount: guild.memberCount,
             channelCount: guild.channels.cache.size,

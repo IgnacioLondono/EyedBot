@@ -1,42 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
-import {
-  applyChannelSetup,
-  getAntiRaidConfig,
-  getChannelSetup,
-  saveAntiRaidConfig,
-} from "@/lib/api/endpoints";
+import { ShieldAlert } from "lucide-react";
+import { getAntiRaidConfig, saveAntiRaidConfig } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
-import { Button } from "@/components/ui/Button";
 import {
   ChannelSelect,
   Field,
   FormActions,
   Input,
   LockedOverlay,
-  PaneGrid,
   PremiumLock,
   SectionCard,
   Select,
-  Textarea,
 } from "@/components/features/shared";
 import { asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
 
 const SECURITY_TABS = [
   { id: "raid", label: "Anti-raid" },
-  { id: "setup", label: "Canales" },
   { id: "antispam", label: "Anti-spam" },
   { id: "content", label: "Contenido" },
 ];
-
-type SetupState = { categoryName: string; channels: string };
 
 type AntiRaidState = {
   enabled: boolean;
@@ -120,25 +109,16 @@ export function SecurityPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
   const [tab, setTab] = useState("raid");
-  const [setup, setSetup] = useState<SetupState>({ categoryName: "", channels: "" });
   const [antiRaid, setAntiRaid] = useState<AntiRaidState>(defaultAntiRaid);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([getChannelSetup(guildId), getAntiRaidConfig(guildId)])
-      .then(([setupData, antiRaidData]) => {
+    void getAntiRaidConfig(guildId)
+      .then((antiRaidData) => {
         if (!active) return;
-        const normalizedSetup = asRecord(setupData);
-        setSetup({
-          categoryName: toStringValue(normalizedSetup.categoryName || normalizedSetup.name),
-          channels: Array.isArray(normalizedSetup.channels)
-            ? normalizedSetup.channels.map((item) => toStringValue(asRecord(item).name || item)).join("\n")
-            : toStringValue(normalizedSetup.channels),
-        });
         setAntiRaid(normalizeAntiRaid(antiRaidData));
       })
       .catch((err) => {
@@ -165,25 +145,7 @@ export function SecurityPane({ guildId }: { guildId: string }) {
     }
   }
 
-  async function applySetup() {
-    setApplying(true);
-    try {
-      await applyChannelSetup(guildId, {
-        categoryName: setup.categoryName,
-        channels: setup.channels
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      });
-      toast({ title: "Setup enviado", description: "La creación de canales fue solicitada.", tone: "success" });
-    } catch (err) {
-      toast({ title: "No se pudo aplicar", description: getErrorMessage(err), tone: "danger" });
-    } finally {
-      setApplying(false);
-    }
-  }
-
-  if (loading) return <Alert title="Cargando seguridad" description="Consultando anti-raid y setup de canales." />;
+  if (loading) return <Alert title="Cargando seguridad" description="Consultando anti-raid y filtros." />;
   if (error) return <Alert title="No se pudo cargar seguridad" description={error} variant="danger" />;
 
   return (
@@ -287,36 +249,6 @@ export function SecurityPane({ guildId }: { guildId: string }) {
             </div>
           ) : null}
 
-          {tab === "setup" ? (
-            <PaneGrid>
-              <div className="space-y-5">
-                <Field label="Nombre de la categoría principal">
-                  <Input
-                    value={setup.categoryName}
-                    onChange={(event) => setSetup((c) => ({ ...c, categoryName: event.target.value }))}
-                  />
-                </Field>
-                <Field label="Canales a crear" description="Un canal por línea.">
-                  <Textarea
-                    value={setup.channels}
-                    onChange={(event) => setSetup((c) => ({ ...c, channels: event.target.value }))}
-                  />
-                </Field>
-                <Button onClick={() => void applySetup()} disabled={applying}>
-                  {applying ? "Aplicando..." : "Crear estructura"}
-                </Button>
-              </div>
-              <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-100">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
-                <p className="text-sm text-zinc-300">
-                  Crea una base de canales para moderación, reglas y soporte sin salir del panel.
-                </p>
-              </div>
-            </PaneGrid>
-          ) : null}
-
           {tab === "antispam" ? (
             <div className="space-y-5">
               <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
@@ -418,7 +350,7 @@ export function SecurityPane({ guildId }: { guildId: string }) {
           <ShieldAlert className="h-4 w-4" />
           Entrada y confianza
         </div>
-        Combina este módulo con Verificación y Moderación para cubrir el flujo completo del backup.
+        Combina este módulo con Automatización, Verificación y Moderación para cubrir el flujo completo.
       </div>
     </div>
   );

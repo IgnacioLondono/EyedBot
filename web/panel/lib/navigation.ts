@@ -17,7 +17,6 @@ import {
   User,
   Crown,
   Palette,
-  Globe,
   Settings,
 } from "lucide-react";
 
@@ -38,7 +37,6 @@ export const PRIMARY_NAV: NavItem[] = [
 export const SETTINGS_NAV: NavItem[] = [
   { href: "/settings/account", label: "Cuenta", icon: User },
   { href: "/settings/owner", label: "Propietario", icon: Crown },
-  { href: "/settings/web", label: "Sistema", icon: Globe },
   { href: "/settings/theme", label: "Personalización", icon: Palette, premium: true },
 ];
 

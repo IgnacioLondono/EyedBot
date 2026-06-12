@@ -54,7 +54,11 @@ function GuildDashboardCard({
               <h2 className="truncate font-medium text-white">{guild.name}</h2>
               <p className="mt-0.5 text-sm text-zinc-500">
                 {guild.memberCount.toLocaleString("es-ES")} miembros
-                {guild.owner.tag ? ` · ${guild.owner.tag}` : ""}
+                {guild.owner.tag && guild.owner.tag !== "Desconocido"
+                  ? ` · ${guild.owner.tag}`
+                  : guild.owner.id
+                    ? ` · ···${guild.owner.id.slice(-4)}`
+                    : ""}
               </p>
             </div>
             <button

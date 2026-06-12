@@ -2,14 +2,15 @@
 
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { SETTINGS_NAV } from "@/lib/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
+import { Alert } from "@/components/ui/Alert";
 import { AccountSettings } from "@/components/features/settings/AccountSettings";
 import { OwnerSettings } from "@/components/features/settings/OwnerSettings";
-import { WebSettings } from "@/components/features/settings/WebSettings";
 import { ThemeSettings } from "@/components/features/settings/ThemeSettings";
 import { ModuleContent, ModuleSidebar } from "@/components/features/shared";
 
@@ -20,11 +21,7 @@ const PANE_COPY: Record<string, { title: string; body: string }> = {
   },
   owner: {
     title: "Propietario",
-    body: "Estadísticas globales, registros de login y herramientas de administración.",
-  },
-  web: {
-    title: "Sistema",
-    body: "Ajustes del panel web y comportamiento general.",
+    body: "Usuarios del panel, EyedPlus+, logs, estadísticas y sistema (solo creador).",
   },
   theme: {
     title: "Personalización",
@@ -35,7 +32,6 @@ const PANE_COPY: Record<string, { title: string; body: string }> = {
 const SETTINGS_COMPONENTS = {
   account: AccountSettings,
   owner: OwnerSettings,
-  web: WebSettings,
   theme: ThemeSettings,
 } satisfies Record<string, ComponentType>;
 
@@ -43,13 +39,20 @@ type SettingsPaneSlug = keyof typeof SETTINGS_COMPONENTS;
 
 export default function SettingsPage() {
   const params = useParams<{ pane?: string[] }>();
+  const router = useRouter();
   const pane = params.pane?.[0] || "account";
   const { bootstrap, hasPremium } = usePanel();
+  const isOwner = Boolean(bootstrap?.isOwner);
   const copy = PANE_COPY[pane] || PANE_COPY.account;
   const SettingsComponent = SETTINGS_COMPONENTS[pane as SettingsPaneSlug] || AccountSettings;
 
+  useEffect(() => {
+    if (pane === "web") router.replace("/settings/owner");
+    if (pane === "owner" && !isOwner) router.replace("/settings/account");
+  }, [pane, isOwner, router]);
+
   const visibleNav = SETTINGS_NAV.filter((item) => {
-    if (item.href.includes("/owner") && !bootstrap?.isOwner) return false;
+    if (item.href.includes("/owner")) return isOwner;
     return true;
   });
 
@@ -87,7 +90,11 @@ export default function SettingsPage() {
             actions={pane === "theme" && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
           />
           <div className="mt-5">
-            <SettingsComponent />
+            {pane === "owner" && !isOwner ? (
+              <Alert title="Acceso restringido" description="El panel de propietario solo está disponible para el creador del bot." variant="danger" />
+            ) : (
+              <SettingsComponent />
+            )}
           </div>
         </ModuleContent>
       </div>
