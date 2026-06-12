@@ -30,6 +30,7 @@ import {
   TicketsShowcase,
   WelcomeShowcase,
 } from "@/components/features/about/AboutShowcases";
+import { EyedBioPromo } from "@/components/features/about/EyedBioPromo";
 
 const ABOUT_TABS = [
   { id: "overview", label: "General" },
@@ -49,15 +50,6 @@ const HIGHLIGHT_MODULES = [
   { icon: Palette, title: "Personalización", desc: "Temas, fondo propio, blur on/off y paleta completa." },
   { icon: Terminal, title: "Comandos", desc: "Catálogo completo disponible en la sección Comandos del panel." },
 ];
-
-function formatUptime(ms: number | null) {
-  if (!ms || ms < 0) return "—";
-  const hours = Math.floor(ms / 3_600_000);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `${days}d ${hours % 24}h`;
-  const minutes = Math.floor((ms % 3_600_000) / 60_000);
-  return `${hours}h ${minutes}m`;
-}
 
 export default function AboutPage() {
   const [overview, setOverview] = useState<AboutOverview | null>(null);
@@ -84,7 +76,7 @@ export default function AboutPage() {
         }
       />
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <Card>
           <p className="text-xs uppercase tracking-wide text-zinc-500">Servidores</p>
           <p className="mt-2 text-3xl font-bold text-white">
@@ -96,16 +88,6 @@ export default function AboutPage() {
           <p className="mt-2 text-3xl font-bold text-white">
             {overview ? overview.totalCommands.toLocaleString("es-ES") : "—"}
           </p>
-        </Card>
-        <Card>
-          <p className="text-xs uppercase tracking-wide text-zinc-500">Latencia</p>
-          <p className="mt-2 text-3xl font-bold text-white">
-            {overview?.ping != null ? `${overview.ping} ms` : "—"}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs uppercase tracking-wide text-zinc-500">Uptime</p>
-          <p className="mt-2 text-3xl font-bold text-emerald-300">{formatUptime(overview?.uptime ?? null)}</p>
         </Card>
       </div>
 
@@ -125,6 +107,7 @@ export default function AboutPage() {
                 alertas de directos, seguridad, gacha y más sin tocar archivos ni reiniciar el bot.
               </p>
             </Card>
+            <EyedBioPromo />
             <div className="grid gap-5 lg:grid-cols-2">
               <div>
                 <h3 className="mb-3 text-sm font-medium text-zinc-400">Ejemplo: dashboard</h3>

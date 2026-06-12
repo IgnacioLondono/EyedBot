@@ -2196,7 +2196,7 @@ app.post('/api/billing/portal', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/about-overview', requireAuth, (req, res) => {
+app.get('/api/about-overview', (req, res) => {
     const totalServers = botClient?.guilds?.cache?.size || 0;
     const totalCommands = botClient?.commands?.size || 0;
     const botName = String(botClient?.user?.username || 'EyedBot');
@@ -5816,7 +5816,7 @@ app.get('/api/logs/stream', requireAuth, (req, res) => {
 });
 
 // Ruta para obtener lista de comandos
-app.get('/api/commands', requireAuth, (req, res) => {
+app.get('/api/commands', (req, res) => {
     if (!botClient || !botClient.commands) {
         return res.status(500).json({ error: 'Bot no disponible' });
     }

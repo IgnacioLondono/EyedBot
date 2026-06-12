@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronDown, Eye, LogOut, Plus } from "lucide-react";
+import { ChevronDown, Eye, LogIn, LogOut, Plus } from "lucide-react";
 import { useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
+import { isPublicPanelRoute } from "@/lib/public-routes";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { discordAvatarUrl } from "@/lib/discord-media";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,9 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   const { hasActiveWallpaper } = useThemeSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const user = bootstrap?.user;
+  const isGuest = !user;
   const displayName = user?.global_name || user?.username || "Usuario";
+  const homeHref = isGuest ? "/about" : "/dashboard";
 
   return (
     <div className={cn("relative min-h-screen text-zinc-100", !hasActiveWallpaper && "bg-[var(--color-bg)]")}>
@@ -31,7 +34,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
 
       <nav className="sticky top-0 z-40 border-b border-white/10 bg-black/30 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 lg:px-6">
-          <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-white">
+          <Link href={homeHref} className="flex items-center gap-2 font-semibold text-white">
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-white shadow-[0_0_40px_var(--shadow-accent)]">
               <Eye className="h-5 w-5" />
             </span>
@@ -42,16 +45,19 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             {PRIMARY_NAV.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
+              const guestLocked = isGuest && !isPublicPanelRoute(item.href);
+              const href = guestLocked ? "/login" : item.href;
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   className={cn(
                     "flex items-center gap-2 rounded-2xl px-3 py-2 text-sm transition",
                     active
                       ? "border border-white/10 bg-white/10 text-white"
                       : "text-zinc-400 hover:bg-white/5 hover:text-white",
-                    item.premium && "text-fuchsia-200"
+                    item.premium && "text-fuchsia-200",
+                    guestLocked && !active && "opacity-70"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -83,38 +89,46 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             ) : null}
 
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setMenuOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-2 py-1.5 hover:bg-white/8"
-              >
-                {user ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={discordAvatarUrl(user.id, user.avatar, 64)} alt="" className="h-8 w-8 rounded-full" />
-                ) : (
-                  <span className="h-8 w-8 rounded-full bg-zinc-800" />
-                )}
-                <span className="hidden max-w-[8rem] truncate text-sm sm:inline">{displayName}</span>
-                <ChevronDown className="h-4 w-4 text-zinc-500" />
-              </button>
-              {menuOpen ? (
-                <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-white/10 bg-[#12101a]/95 p-1 shadow-xl backdrop-blur-xl">
-                  <Link
-                    href="/settings/account"
-                    className="block rounded-lg px-3 py-2 text-sm hover:bg-white/5"
-                    onClick={() => setMenuOpen(false)}
+              {isGuest ? (
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3 py-2 text-sm font-medium text-violet-100 hover:bg-violet-500/25"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span className="hidden sm:inline">Iniciar sesión</span>
+                </Link>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((v) => !v)}
+                    className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-2 py-1.5 hover:bg-white/8"
                   >
-                    Configuración
-                  </Link>
-                  <a
-                    href="/logout"
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-300 hover:bg-red-500/10"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Cerrar sesión
-                  </a>
-                </div>
-              ) : null}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={discordAvatarUrl(user.id, user.avatar, 64)} alt="" className="h-8 w-8 rounded-full" />
+                    <span className="hidden max-w-[8rem] truncate text-sm sm:inline">{displayName}</span>
+                    <ChevronDown className="h-4 w-4 text-zinc-500" />
+                  </button>
+                  {menuOpen ? (
+                    <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-white/10 bg-[#12101a]/95 p-1 shadow-xl backdrop-blur-xl">
+                      <Link
+                        href="/settings/account"
+                        className="block rounded-lg px-3 py-2 text-sm hover:bg-white/5"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Configuración
+                      </Link>
+                      <a
+                        href="/logout"
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-300 hover:bg-red-500/10"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Cerrar sesión
+                      </a>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -134,13 +148,16 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
           {PRIMARY_NAV.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
+            const guestLocked = isGuest && !isPublicPanelRoute(item.href);
+            const href = guestLocked ? "/login" : item.href;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={href}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] text-zinc-400 transition",
-                  active && "bg-white/10 text-white"
+                  active && "bg-white/10 text-white",
+                  guestLocked && !active && "opacity-70"
                 )}
               >
                 <Icon className="h-4 w-4" />

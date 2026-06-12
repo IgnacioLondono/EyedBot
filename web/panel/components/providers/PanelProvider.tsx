@@ -9,8 +9,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { ApiRequestError } from "@/lib/api/client";
 import * as api from "@/lib/api/endpoints";
+import { isPublicPanelRoute } from "@/lib/public-routes";
 import type { BillingStatus, PanelBootstrap } from "@/lib/types";
 
 type PanelContextValue = {
@@ -25,9 +27,11 @@ type PanelContextValue = {
 const PanelContext = createContext<PanelContextValue | null>(null);
 
 export function PanelProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const isPublicRoute = isPublicPanelRoute(pathname);
   const [bootstrap, setBootstrap] = useState<PanelBootstrap | null>(null);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isPublicRoute);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (forceGuilds = false) => {
@@ -43,16 +47,18 @@ export function PanelProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : "No se pudo cargar el panel";
       setError(message);
-      if (err instanceof ApiRequestError && err.status === 401) {
+      if (err instanceof ApiRequestError && err.status === 401 && !isPublicPanelRoute(pathname)) {
         window.location.href = "/login";
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     let active = true;
+    const publicRoute = isPublicPanelRoute(pathname);
+
     void Promise.all([api.getPanelBootstrap(false), api.getBillingStatus().catch(() => null)])
       .then(([boot, bill]) => {
         if (!active) return;
@@ -61,11 +67,14 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         if (!active) return;
+        if (err instanceof ApiRequestError && err.status === 401) {
+          if (!publicRoute) {
+            window.location.href = "/login";
+          }
+          return;
+        }
         const message = err instanceof ApiRequestError ? err.message : "No se pudo cargar el panel";
         setError(message);
-        if (err instanceof ApiRequestError && err.status === 401) {
-          window.location.href = "/login";
-        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -74,7 +83,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [refresh]);
+  }, [pathname]);
 
   const value = useMemo<PanelContextValue>(
     () => ({

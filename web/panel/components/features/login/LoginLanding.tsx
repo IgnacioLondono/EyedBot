@@ -8,6 +8,7 @@ import {
   Bell,
   Bolt,
   Eye,
+  Info,
   LayoutDashboard,
   Palette,
   Shield,
@@ -17,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { OverviewShowcase } from "@/components/features/about/AboutShowcases";
+import { EyedBioPromo } from "@/components/features/about/EyedBioPromo";
 
 const FEATURES = [
   {
@@ -171,6 +173,24 @@ export function LoginLanding() {
                 configurable desde un solo lugar.
               </p>
               <RotatingHighlight />
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  href="/about"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:border-violet-400/40 hover:bg-violet-500/10"
+                >
+                  <Info className="h-4 w-4 text-violet-300" />
+                  Conoce el proyecto
+                </Link>
+                <Link
+                  href="/commands"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:border-violet-400/40 hover:bg-violet-500/10"
+                >
+                  <Terminal className="h-4 w-4 text-violet-300" />
+                  Ver comandos
+                </Link>
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">Sin iniciar sesión — información pública del bot.</p>
             </motion.section>
 
             <motion.section
@@ -236,6 +256,14 @@ export function LoginLanding() {
 
             <motion.div
               {...fadeUp}
+              transition={{ duration: 0.5, delay: 0.28 }}
+              className="max-w-2xl"
+            >
+              <EyedBioPromo variant="banner" />
+            </motion.div>
+
+            <motion.div
+              {...fadeUp}
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex flex-wrap gap-3 text-sm text-zinc-500"
             >
@@ -284,17 +312,6 @@ export function LoginLanding() {
               <p className="mt-5 text-center text-xs text-zinc-500">
                 Al continuar aceptas que EyedBot acceda a tu perfil y lista de servidores para el panel.
               </p>
-
-              <div className="mt-6 space-y-2 border-t border-white/8 pt-6 text-sm">
-                <Link href="/about" className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-300 hover:bg-white/5">
-                  Conoce el proyecto
-                  <span className="text-zinc-500">→</span>
-                </Link>
-                <Link href="/commands" className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-300 hover:bg-white/5">
-                  Ver comandos
-                  <span className="text-zinc-500">→</span>
-                </Link>
-              </div>
             </div>
           </motion.aside>
         </div>
