@@ -810,11 +810,16 @@ app.use(session({
     name: 'tulabot.session'
 }));
 
-const panelFaviconPath = path.join(__dirname, 'panel', 'app', 'favicon.ico');
+const panelFaviconPath = path.join(__dirname, 'panel', 'public', 'eyedbot-icon.svg');
+const panelFaviconFallbackPath = path.join(__dirname, 'panel', 'app', 'favicon.ico');
 app.get('/favicon.ico', (req, res) => {
-    res.type('image/x-icon');
     res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
-    res.sendFile(panelFaviconPath);
+    if (fs.existsSync(panelFaviconPath)) {
+        res.type('image/svg+xml');
+        return res.sendFile(panelFaviconPath);
+    }
+    res.type('image/x-icon');
+    return res.sendFile(panelFaviconFallbackPath);
 });
 
 const uploadsRoot = path.join(__dirname, 'uploads');

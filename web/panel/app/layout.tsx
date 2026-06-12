@@ -15,7 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EyedBot Panel",
   description: "Panel de administración de EyedBot",
-  icons: { icon: "/favicon.ico" },
+  icons: {
+    icon: [
+      { url: "/eyedbot-icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: [{ url: "/eyedbot-icon.svg", type: "image/svg+xml" }],
+    shortcut: "/eyedbot-icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
