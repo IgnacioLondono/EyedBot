@@ -774,6 +774,8 @@ function sendProtectedPanelPage(fileName, req, res) {
     return res.sendFile(path.join(publicDir, 'pages', fileName));
 }
 
+const { isNextPanelEnabled } = require('./next-panel');
+
 const PROTECTED_PANEL_PAGES = {
     '/pages/dashboard.html': 'dashboard.html',
     '/pages/about.html': 'about.html',
@@ -783,9 +785,11 @@ const PROTECTED_PANEL_PAGES = {
     '/pages/server.html': 'server.html'
 };
 
-Object.entries(PROTECTED_PANEL_PAGES).forEach(([routePath, fileName]) => {
-    app.get(routePath, (req, res) => sendProtectedPanelPage(fileName, req, res));
-});
+if (!isNextPanelEnabled()) {
+    Object.entries(PROTECTED_PANEL_PAGES).forEach(([routePath, fileName]) => {
+        app.get(routePath, (req, res) => sendProtectedPanelPage(fileName, req, res));
+    });
+}
 
 app.use(express.static(publicDir, {
     maxAge: 0,
@@ -1306,10 +1310,12 @@ function setBotClient(client) {
 }
 
 // Rutas de autenticación
-app.get('/login', (req, res) => {
-    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-    res.redirect(`/login.html${query}`);
-});
+if (!isNextPanelEnabled()) {
+    app.get('/login', (req, res) => {
+        const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+        res.redirect(`/login.html${query}`);
+    });
+}
 
 app.get('/auth/discord', (req, res) => {
     if (!CLIENT_ID) {
@@ -5980,56 +5986,70 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
     }
 });
 
-// Ruta para login (mostrar página de login)
-app.get('/login', (req, res) => {
-    // Si ya está autenticado, redirigir al dashboard
-    if (req.session.user) {
-        return res.redirect('/');
-    }
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
+// Rutas HTML legacy (solo si Next panel está desactivado)
+if (!isNextPanelEnabled()) {
+    app.get('/login', (req, res) => {
+        if (req.session.user) {
+            return res.redirect('/');
+        }
+        res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    });
 
-// Ruta principal - verificar autenticación antes de servir
-app.get('/', (req, res) => {
-    if (!req.session.user) {
-        return res.redirect('/login');
-    }
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+    app.get('/', (req, res) => {
+        if (!req.session.user) {
+            return res.redirect('/login');
+        }
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    });
 
-// Ruta para dashboard (alias de /)
-app.get('/dashboard', (req, res) => {
-    if (!req.session.user) {
-        return res.redirect('/login');
-    }
-    res.redirect('/');
-});
+    app.get('/dashboard', (req, res) => {
+        if (!req.session.user) {
+            return res.redirect('/login');
+        }
+        res.redirect('/');
+    });
+}
 
-// Iniciar servidor con manejo de errores
 const BIND_HOST = String(process.env.WEB_BIND_HOST || '0.0.0.0').trim() || '0.0.0.0';
-const server = app.listen(PORT, BIND_HOST, () => {
-    const bindLabel = BIND_HOST === '0.0.0.0' ? 'todas las interfaces' : BIND_HOST;
-    console.log(`🌐 Panel web iniciado en http://${bindLabel}:${PORT}`);
-    const push = buildStreamPushStatus();
-    if (push.publicOriginConfigured) {
-        console.log('📡 Directos push (HTTPS):');
-        if (push.twitch.configured) console.log(`   Twitch EventSub → ${push.twitch.callbackUrl}`);
-        if (push.youtube.configured) console.log(`   YouTube WebSub → ${push.youtube.callbackUrl}`);
-        if (push.feed.configured) console.log(`   Feed WebSub (TikTok/custom) → ${push.feed.callbackUrl}`);
-    } else {
-        console.log('ℹ️ Directos instantáneos: configura WEB_PUBLIC_ORIGIN=https://tu-dominio en .env');
-    }
-}).on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Error: El puerto ${PORT} ya está en uso`);
-        console.log(`💡 Soluciones:`);
-        console.log(`   1. Cambia el puerto en .env: WEB_PORT=3001`);
-        console.log(`   2. O detén el proceso que usa el puerto ${PORT}`);
-        console.log(`   3. O deshabilita el panel: WEB_ENABLED=false`);
-        console.log(`\n⚠️  El bot continuará funcionando sin el panel web.`);
-    } else {
-        console.error(`❌ Error iniciando panel web:`, error);
-    }
-});
+let server;
 
-module.exports = { setBotClient, app, server };
+async function startWebServer() {
+    try {
+        const { attachNextPanel } = require('./next-panel');
+        await attachNextPanel(app);
+    } catch (error) {
+        console.error('❌ No se pudo montar el panel Next.js:', error?.message || error);
+        if (isNextPanelEnabled()) {
+            console.warn('⚠️ Revisa que web/panel esté compilado (npm run build en web/panel).');
+        }
+    }
+
+    server = app.listen(PORT, BIND_HOST, () => {
+        const bindLabel = BIND_HOST === '0.0.0.0' ? 'todas las interfaces' : BIND_HOST;
+        console.log(`🌐 Panel web iniciado en http://${bindLabel}:${PORT}`);
+        const push = buildStreamPushStatus();
+        if (push.publicOriginConfigured) {
+            console.log('📡 Directos push (HTTPS):');
+            if (push.twitch.configured) console.log(`   Twitch EventSub → ${push.twitch.callbackUrl}`);
+            if (push.youtube.configured) console.log(`   YouTube WebSub → ${push.youtube.callbackUrl}`);
+            if (push.feed.configured) console.log(`   Feed WebSub (TikTok/custom) → ${push.feed.callbackUrl}`);
+        } else {
+            console.log('ℹ️ Directos instantáneos: configura WEB_PUBLIC_ORIGIN=https://tu-dominio en .env');
+        }
+    }).on('error', (error) => {
+        if (error.code === 'EADDRINUSE') {
+            console.error(`❌ Error: El puerto ${PORT} ya está en uso`);
+            console.log('💡 Soluciones:');
+            console.log('   1. Cambia el puerto en .env: WEB_PORT=3001');
+            console.log('   2. O detén el proceso que usa el puerto');
+            console.log('   3. O deshabilita el panel: WEB_ENABLED=false');
+            console.log('\n⚠️  El bot continuará funcionando sin el panel web.');
+        } else {
+            console.error('❌ Error iniciando panel web:', error);
+        }
+    });
+}
+
+void startWebServer();
+
+module.exports = { setBotClient, app, get server() { return server; } };
