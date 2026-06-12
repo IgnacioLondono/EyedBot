@@ -25,6 +25,8 @@ import {
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
+import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
+import { plainColorToHex } from "@/lib/embed-utils";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
 type ConfigState = {
@@ -307,20 +309,34 @@ export function WelcomePane({ guildId }: { guildId: string }) {
         title={tab === "welcome" ? "Vista narrativa" : "Mensaje de salida"}
         description="Resumen rápido del tono y entrega actual."
       >
-        <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.28),_rgba(0,0,0,0.12)_55%)] p-6">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
-            {tab === "welcome" ? <PartyPopper className="h-6 w-6" /> : <DoorOpen className="h-6 w-6" />}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
+              {tab === "welcome" ? <PartyPopper className="h-5 w-5" /> : <DoorOpen className="h-5 w-5" />}
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">
+                {active.enabled ? "Activo" : "Inactivo"}
+                {active.dmEnabled ? " · DM activo" : ""}
+              </p>
+              <p className="text-sm text-zinc-400">
+                Canal: {channels.find((channel) => channel.id === active.channelId)?.name || "Sin canal"}
+              </p>
+            </div>
           </div>
-          <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">
-            {active.enabled ? "Activo" : "Inactivo"}
-            {active.dmEnabled ? " · DM activo" : ""}
-          </p>
-          <p className="mt-2 text-sm font-medium text-white">{active.title || "Sin título"}</p>
-          <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-100">
-            {active.message || "Aún no hay un mensaje configurado para esta pestaña."}
-          </p>
+
+          <DiscordEmbedPreview
+            title={active.title || "Sin título"}
+            description={active.message || "Aún no hay un mensaje configurado para esta pestaña."}
+            color={plainColorToHex(active.color)}
+            footer={active.footer}
+            imageUrl={active.imageUrl}
+            thumbnailUrl={active.thumbnailMode === "url" ? active.thumbnailUrl : ""}
+            thumbnailLabel={active.thumbnailMode === "avatar" ? "Avatar del usuario" : undefined}
+          />
+
           {active.dmEnabled ? (
-            <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 p-3">
+            <div className="rounded-2xl border border-white/8 bg-black/20 p-3">
               <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-zinc-500">
                 <Mail className="h-3.5 w-3.5" />
                 DM
@@ -328,9 +344,6 @@ export function WelcomePane({ guildId }: { guildId: string }) {
               <p className="text-sm text-zinc-300">{active.dmMessage || "Sin mensaje DM configurado."}</p>
             </div>
           ) : null}
-          <p className="mt-4 text-sm text-zinc-400">
-            Canal: {channels.find((channel) => channel.id === active.channelId)?.name || "Sin canal"}
-          </p>
         </div>
       </SectionCard>
     </PaneGrid>

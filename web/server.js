@@ -4344,6 +4344,7 @@ app.post('/api/guild/:guildId/free-games/config', requireAuth, requirePremium, a
                 epic: body?.sources?.epic !== false,
                 steam: body?.sources?.steam !== false
             },
+            minDiscount: body.minDiscount ?? current?.minDiscount,
             color: String(body.color || current.color || '4ccb81').replace('#', '').slice(0, 6),
             footerText: String(body.footerText || current.footerText || 'EyedBot · Juegos gratis').slice(0, 200),
             notifiedIds: current.notifiedIds || [],

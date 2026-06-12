@@ -21,6 +21,8 @@ import {
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
+import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
+import { plainColorToHex } from "@/lib/embed-utils";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
 type VerifyState = {
@@ -208,16 +210,23 @@ export function VerifyPane({ guildId }: { guildId: string }) {
       </SectionCard>
 
       <SectionCard title="Resumen de acceso" description="Previsualización del mensaje principal y destino.">
-        <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-100">
-            <BadgeCheck className="h-6 w-6" />
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/20 text-violet-100">
+              <BadgeCheck className="h-5 w-5" />
+            </div>
+            <p className="text-sm text-zinc-400">
+              Canal: {channels.find((channel) => channel.id === form.channelId)?.name || "Sin canal"} · Rol:{" "}
+              {roles.find((role) => role.id === form.roleId)?.name || "Sin rol"}
+            </p>
           </div>
-          <h3 className="text-lg font-semibold text-white">{form.title}</h3>
-          <p className="mt-3 text-sm text-zinc-300">{form.description}</p>
-          <p className="mt-4 text-sm text-zinc-500">
-            Canal: {channels.find((channel) => channel.id === form.channelId)?.name || "Sin canal"} · Rol:{" "}
-            {roles.find((role) => role.id === form.roleId)?.name || "Sin rol"}
-          </p>
+          <DiscordEmbedPreview
+            title={form.title}
+            description={form.description}
+            color={plainColorToHex(form.color)}
+            footer={form.footer}
+            imageUrl={form.imageUrl}
+          />
         </div>
       </SectionCard>
     </PaneGrid>

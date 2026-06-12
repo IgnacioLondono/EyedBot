@@ -40,6 +40,8 @@ export function EmbedPane({ guildId }: { guildId: string }) {
   const [form, setForm] = useState<EmbedFormState>(DEFAULT_EMBED_FORM);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState("");
   const [templates, setTemplates] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -50,6 +52,26 @@ export function EmbedPane({ guildId }: { guildId: string }) {
     const payload = await getEmbedTemplates(guildId);
     setTemplates(asArray(payload).map((entry) => asRecord(entry)));
   }
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
+  useEffect(() => {
+    if (!thumbnailFile) {
+      setThumbnailPreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(thumbnailFile);
+    setThumbnailPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [thumbnailFile]);
 
   useEffect(() => {
     let active = true;
@@ -332,7 +354,11 @@ export function EmbedPane({ guildId }: { guildId: string }) {
 
       <div className="space-y-5">
         <SectionCard title="Vista previa" description="Así se verá aproximadamente en Discord.">
-          <EmbedPreview form={form} />
+          <EmbedPreview
+            form={form}
+            imageOverride={imagePreviewUrl || undefined}
+            thumbnailOverride={thumbnailPreviewUrl || undefined}
+          />
         </SectionCard>
 
         <SectionCard title="Templates" description="Biblioteca rápida para reutilizar mensajes.">

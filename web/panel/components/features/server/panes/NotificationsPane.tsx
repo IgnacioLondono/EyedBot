@@ -27,6 +27,8 @@ import {
   Select,
   Textarea,
 } from "@/components/features/shared";
+import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
+import { plainColorToHex } from "@/lib/embed-utils";
 import { asArray, asRecord, formatDate, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
 type StreamPlatform = "twitch" | "youtube" | "tiktok" | "custom";
@@ -393,15 +395,23 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
       </SectionCard>
 
       <SectionCard title="Preview del aviso" description="Tono y destino actual del disparador.">
-        <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-50">
-            <BellRing className="h-6 w-6" />
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/20 text-violet-50">
+              <BellRing className="h-5 w-5" />
+            </div>
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+              {form.mentionText || "Sin mención"} · {form.sources.filter((s) => s.enabled).length} fuentes activas
+            </p>
           </div>
-          <p className="text-sm font-medium text-white">{previewTitle}</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{previewDescription}</p>
-          <p className="mt-4 text-xs uppercase tracking-[0.2em] text-zinc-500">
-            {form.mentionText || "Sin mención"} · {form.sources.filter((s) => s.enabled).length} fuentes activas
-          </p>
+          <DiscordEmbedPreview
+            title={previewTitle}
+            description={previewDescription}
+            color={plainColorToHex(form.color)}
+            footer={form.footerText}
+            imageUrl={form.embedLargePreview ? previewSource?.imageUrl : ""}
+            thumbnailUrl={!form.embedLargePreview ? previewSource?.imageUrl : ""}
+          />
         </div>
       </SectionCard>
     </PaneGrid>
