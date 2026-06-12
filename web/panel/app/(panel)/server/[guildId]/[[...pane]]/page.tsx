@@ -23,6 +23,7 @@ import { NotificationsPane } from "@/components/features/server/panes/Notificati
 import { FreeGamesPane } from "@/components/features/server/panes/FreeGamesPane";
 import { SecurityPane } from "@/components/features/server/panes/SecurityPane";
 import { EmbedPane } from "@/components/features/server/panes/EmbedPane";
+import { ModuleContent, ModuleNav } from "@/components/features/shared";
 
 const PANE_COMPONENTS = {
   overview: OverviewPane,
@@ -78,8 +79,8 @@ export default function ServerPage() {
         actions={pane.premium && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-        <aside className="flex flex-row gap-2 overflow-x-auto lg:flex-col">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <ModuleNav>
           {SERVER_PANES.map((item) => {
             const Icon = item.icon;
             const active = item.slug === paneSlug;
@@ -87,11 +88,11 @@ export default function ServerPage() {
               <Link
                 key={item.id}
                 href={serverPaneHref(guildId, item.slug)}
-                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm whitespace-nowrap ${
+                className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm whitespace-nowrap ${
                   active ? "bg-violet-600/25 text-white" : "text-zinc-400 hover:bg-white/5"
                 }`}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
                 {item.premium && !hasPremium ? (
                   <span className="text-[10px] text-fuchsia-300">+</span>
@@ -99,9 +100,11 @@ export default function ServerPage() {
               </Link>
             );
           })}
-        </aside>
+        </ModuleNav>
 
-        <PaneComponent guildId={guildId} />
+        <ModuleContent>
+          <PaneComponent guildId={guildId} />
+        </ModuleContent>
       </div>
     </>
   );

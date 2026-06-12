@@ -12,6 +12,35 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
 
+export function ModuleNav({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <aside
+      className={cn(
+        "panel-scroll sticky top-20 z-20 flex shrink-0 gap-2",
+        "max-h-[min(42dvh,18rem)] flex-row overflow-x-auto overflow-y-hidden pb-1",
+        "lg:max-h-[calc(100dvh-9rem)] lg:w-[240px] lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0",
+        className
+      )}
+    >
+      {children}
+    </aside>
+  );
+}
+
+export function ModuleContent({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "panel-scroll min-w-0 flex-1",
+        "lg:max-h-[calc(100dvh-9rem)] lg:overflow-y-auto lg:pr-1",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function PaneGrid({ children }: { children: ReactNode }) {
   return <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">{children}</div>;
 }

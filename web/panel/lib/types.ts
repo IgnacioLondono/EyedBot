@@ -98,8 +98,12 @@ export type BillingStatus = {
 };
 
 export type AboutOverview = {
+  botName: string;
   totalServers: number;
   totalCommands: number;
+  purpose: string;
+  ping: number | null;
+  uptime: number | null;
 };
 
 export type CommandCatalogItem = {

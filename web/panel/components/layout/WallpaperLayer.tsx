@@ -11,13 +11,14 @@ export function WallpaperLayer() {
 
   const bloom = theme.wallpaperBloom / 100;
   const veil = theme.wallpaperVeil / 100;
-  const blurPx = 8 + bloom * 72;
+  const blurEnabled = theme.wallpaperBlur !== false;
+  const blurPx = blurEnabled ? 8 + bloom * 72 : 0;
   const veilOpacity = 0.35 + veil * 0.45;
   const isVideo = theme.wallpaperKind === "video";
 
   const mediaStyle = {
-    filter: `blur(${blurPx}px)`,
-    transform: "scale(1.08)",
+    filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
+    transform: blurPx > 0 ? "scale(1.08)" : undefined,
   };
 
   return (

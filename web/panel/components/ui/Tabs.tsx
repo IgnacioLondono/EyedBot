@@ -18,7 +18,12 @@ type TabsProps = {
 
 export function Tabs({ items, value, onValueChange, className }: TabsProps) {
   return (
-    <div className={cn("inline-flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-white/5 p-1", className)}>
+    <div
+      className={cn(
+        "panel-scroll flex w-full max-w-full gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-white/5 p-1",
+        className
+      )}
+    >
       {items.map((item) => {
         const active = item.id === value;
         return (
@@ -27,7 +32,7 @@ export function Tabs({ items, value, onValueChange, className }: TabsProps) {
             type="button"
             onClick={() => onValueChange(item.id)}
             className={cn(
-              "relative inline-flex items-center gap-2 overflow-hidden rounded-2xl px-4 py-2 text-sm transition",
+              "relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-2xl px-4 py-2 text-sm whitespace-nowrap transition",
               active ? "text-white" : "text-zinc-400 hover:text-white"
             )}
           >

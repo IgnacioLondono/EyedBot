@@ -2027,12 +2027,16 @@ app.get('/api/about-overview', requireAuth, (req, res) => {
     const totalServers = botClient?.guilds?.cache?.size || 0;
     const totalCommands = botClient?.commands?.size || 0;
     const botName = String(botClient?.user?.username || 'EyedBot');
+    const rawPing = Number(botClient?.ws?.ping);
+    const ping = Number.isFinite(rawPing) && rawPing >= 0 ? Math.round(rawPing) : null;
 
     res.json({
         botName,
         totalServers,
         totalCommands,
-        purpose: 'Ayudar a gestionar comunidades de Discord con herramientas de organización, moderación y participación.'
+        purpose: 'Ayudar a gestionar comunidades de Discord con herramientas de organización, moderación y participación.',
+        ping,
+        uptime: Number.isFinite(Number(botClient?.uptime)) ? Number(botClient.uptime) : null
     });
 });
 

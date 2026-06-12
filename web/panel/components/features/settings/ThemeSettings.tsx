@@ -172,9 +172,24 @@ export function ThemeSettings() {
             />
           </div>
 
+          <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+            <div>
+              <p className="font-medium text-white">Desenfoque del fondo</p>
+              <p className="text-sm text-zinc-400">Desactívalo para ver la imagen o vídeo nítido detrás del panel.</p>
+            </div>
+            <Switch
+              checked={theme.wallpaperBlur}
+              onCheckedChange={(wallpaperBlur) => setTheme({ wallpaperBlur })}
+            />
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
-            <SliderField label="Bloom" value={theme.wallpaperBloom} onChange={(wallpaperBloom) => setTheme({ wallpaperBloom })} />
-            <SliderField label="Velo" value={theme.wallpaperVeil} onChange={(wallpaperVeil) => setTheme({ wallpaperVeil })} />
+            <SliderField
+              label={theme.wallpaperBlur ? "Intensidad del blur" : "Bloom (activa el blur)"}
+              value={theme.wallpaperBloom}
+              onChange={(wallpaperBloom) => setTheme({ wallpaperBloom })}
+            />
+            <SliderField label="Velo oscuro" value={theme.wallpaperVeil} onChange={(wallpaperVeil) => setTheme({ wallpaperVeil })} />
           </div>
 
           <div className="flex flex-wrap gap-3">
