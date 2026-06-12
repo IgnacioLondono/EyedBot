@@ -12,13 +12,36 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
 
+export function ModuleSidebar({
+  search,
+  children,
+  className,
+}: {
+  search?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex w-full shrink-0 flex-col gap-3",
+        "lg:sticky lg:top-[5.25rem] lg:z-20 lg:w-52 xl:w-56",
+        className
+      )}
+    >
+      {search}
+      <ModuleNav className="lg:w-full">{children}</ModuleNav>
+    </div>
+  );
+}
+
 export function ModuleNav({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <aside
       className={cn(
-        "panel-scroll sticky top-20 z-20 flex shrink-0 gap-2",
-        "max-h-[min(42dvh,18rem)] flex-row overflow-x-auto overflow-y-hidden pb-1",
-        "lg:max-h-[calc(100dvh-9rem)] lg:w-[240px] lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0",
+        "panel-scroll flex shrink-0 gap-1.5",
+        "max-h-[min(38dvh,16rem)] flex-row overflow-x-auto overflow-y-hidden pb-1",
+        "lg:max-h-[calc(100dvh-11rem)] lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0",
         className
       )}
     >
@@ -28,17 +51,7 @@ export function ModuleNav({ children, className }: { children: ReactNode; classN
 }
 
 export function ModuleContent({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        "panel-scroll min-w-0 flex-1",
-        "lg:max-h-[calc(100dvh-9rem)] lg:overflow-y-auto lg:pr-1",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <div className={cn("min-w-0 w-full flex-1", className)}>{children}</div>;
 }
 
 export function PaneGrid({ children }: { children: ReactNode }) {

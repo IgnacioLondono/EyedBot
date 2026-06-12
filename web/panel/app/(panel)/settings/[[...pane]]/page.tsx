@@ -11,7 +11,7 @@ import { AccountSettings } from "@/components/features/settings/AccountSettings"
 import { OwnerSettings } from "@/components/features/settings/OwnerSettings";
 import { WebSettings } from "@/components/features/settings/WebSettings";
 import { ThemeSettings } from "@/components/features/settings/ThemeSettings";
-import { ModuleContent, ModuleNav } from "@/components/features/shared";
+import { ModuleContent, ModuleSidebar } from "@/components/features/shared";
 
 const PANE_COPY: Record<string, { title: string; body: string }> = {
   account: {
@@ -55,15 +55,8 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader
-        kicker="Configuración"
-        title={copy.title}
-        description={copy.body}
-        actions={pane === "theme" && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
-      />
-
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        <ModuleNav className="lg:w-[220px]">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6 xl:gap-8">
+        <ModuleSidebar className="lg:w-48">
           {visibleNav.map((item) => {
             const slug = item.href.split("/").pop() || "account";
             const active = pane === slug;
@@ -84,10 +77,18 @@ export default function SettingsPage() {
               </Link>
             );
           })}
-        </ModuleNav>
+        </ModuleSidebar>
 
         <ModuleContent>
-          <SettingsComponent />
+          <PageHeader
+            kicker="Configuración"
+            title={copy.title}
+            description={copy.body}
+            actions={pane === "theme" && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
+          />
+          <div className="mt-5">
+            <SettingsComponent />
+          </div>
         </ModuleContent>
       </div>
     </>

@@ -131,7 +131,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="relative z-10 mx-auto max-w-7xl px-4 py-8 pb-24 lg:px-6 lg:pb-8"
+        className="relative z-10 mx-auto w-full max-w-[90rem] px-4 py-6 pb-24 lg:px-8 lg:pb-8"
       >
         {children}
       </motion.main>
