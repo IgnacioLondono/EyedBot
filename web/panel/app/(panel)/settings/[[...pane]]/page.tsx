@@ -1,11 +1,16 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { SETTINGS_NAV } from "@/lib/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { AccountSettings } from "@/components/features/settings/AccountSettings";
+import { OwnerSettings } from "@/components/features/settings/OwnerSettings";
+import { WebSettings } from "@/components/features/settings/WebSettings";
+import { ThemeSettings } from "@/components/features/settings/ThemeSettings";
 
 const PANE_COPY: Record<string, { title: string; body: string }> = {
   account: {
@@ -26,12 +31,21 @@ const PANE_COPY: Record<string, { title: string; body: string }> = {
   },
 };
 
+const SETTINGS_COMPONENTS = {
+  account: AccountSettings,
+  owner: OwnerSettings,
+  web: WebSettings,
+  theme: ThemeSettings,
+} satisfies Record<string, ComponentType>;
+
+type SettingsPaneSlug = keyof typeof SETTINGS_COMPONENTS;
+
 export default function SettingsPage() {
   const params = useParams<{ pane?: string[] }>();
   const pane = params.pane?.[0] || "account";
   const { bootstrap, hasPremium } = usePanel();
-  const user = bootstrap?.user;
   const copy = PANE_COPY[pane] || PANE_COPY.account;
+  const SettingsComponent = SETTINGS_COMPONENTS[pane as SettingsPaneSlug] || AccountSettings;
 
   const visibleNav = SETTINGS_NAV.filter((item) => {
     if (item.href.includes("/owner") && !bootstrap?.isOwner) return false;
@@ -40,7 +54,12 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader kicker="Configuración" title={copy.title} description={copy.body} />
+      <PageHeader
+        kicker="Configuración"
+        title={copy.title}
+        description={copy.body}
+        actions={pane === "theme" && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
         <aside className="flex flex-row gap-2 overflow-x-auto lg:flex-col">
@@ -66,23 +85,7 @@ export default function SettingsPage() {
           })}
         </aside>
 
-        <Card>
-          {pane === "account" && user ? (
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="text-zinc-500">Usuario:</span> {user.global_name || user.username}
-              </p>
-              <p>
-                <span className="text-zinc-500">ID:</span> {user.id}
-              </p>
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-400">
-              Módulo <strong className="text-white">{copy.title}</strong> en construcción en el panel
-              Next.js. Las APIs ya están disponibles en <code className="text-violet-300">lib/api/endpoints.ts</code>.
-            </p>
-          )}
-        </Card>
+        <SettingsComponent />
       </div>
     </>
   );

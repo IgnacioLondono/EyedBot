@@ -8,7 +8,7 @@ const BUNDLED_CHARACTERS_PATH = path.join(__dirname, '..', 'bundled', 'gacha-cha
 const SYSTEM_MARKET_SELLER_ID = 'system';
 const DEFAULT_MARKET_LISTING_COUNT = 16;
 const MAX_SHOP_CATALOG_IMAGE_BYTES = 8 * 1024 * 1024;
-const SHOP_CATALOG_UPLOAD_DIR = path.join(__dirname, '..', '..', 'web', 'public', 'uploads', 'gacha-catalog');
+const SHOP_CATALOG_UPLOAD_DIR = path.join(__dirname, '..', '..', 'web', 'uploads', 'gacha-catalog');
 
 function ensureShopCatalogUploadDir() {
     if (!fs.existsSync(SHOP_CATALOG_UPLOAD_DIR)) {
@@ -1134,7 +1134,7 @@ function deleteGuildCatalogShopDiskImage(guildId, characterId) {
     return removed;
 }
 
-/** MySQL primero; si falla, copia en web/public/uploads/gacha-catalog */
+/** MySQL primero; si falla, copia en web/uploads/gacha-catalog */
 async function resolveGuildCatalogShopImage(guildId, characterId) {
     const blob = await getGuildCatalogShopImageBlob(guildId, characterId);
     if (blob?.data?.length) return blob;

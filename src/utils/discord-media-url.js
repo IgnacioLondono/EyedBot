@@ -33,7 +33,7 @@ const MAX_EMBED_IMAGE_BYTES = 8 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 12_000;
 const ROOT_WALK_MAX = 14;
 
-/** Raíces `.../web/public` detectadas solo (cwd, proceso principal, ascendientes). Opcionalmente EYEDBOT_WEB_PUBLIC_DIRS. */
+/** Raíces del directorio `web/` (uploads servidos en /uploads). Opcionalmente EYEDBOT_WEB_PUBLIC_DIRS. */
 function collectWebPublicRoots() {
     /** @type {string[]} */
     const out = [];
@@ -50,6 +50,7 @@ function collectWebPublicRoots() {
         add(raw);
     }
 
+    add(path.join(__dirname, '..', '..', 'web'));
     add(path.join(__dirname, '..', '..', 'web', 'public'));
 
     const seeds = [];
@@ -69,7 +70,9 @@ function collectWebPublicRoots() {
     for (const start of uniqueSeeds) {
         let cur = start;
         for (let i = 0; i < ROOT_WALK_MAX; i++) {
+            add(path.join(cur, 'web'));
             add(path.join(cur, 'web', 'public'));
+            add(path.join(cur, 'EyedBot-main', 'web'));
             add(path.join(cur, 'EyedBot-main', 'web', 'public'));
             add(path.join(cur, 'public'));
 

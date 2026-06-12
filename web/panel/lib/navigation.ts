@@ -3,12 +3,12 @@ import {
   Bell,
   Bolt,
   DoorOpen,
+  FileBadge2,
   Gamepad2,
   Gift,
   Info,
   LayoutDashboard,
   LayoutGrid,
-  MessageSquare,
   Mic,
   Shield,
   Sparkles,
@@ -63,6 +63,7 @@ export const SERVER_PANES: ServerPane[] = [
   { id: "security", slug: "security", label: "Seguridad", icon: Shield, premium: true },
   { id: "notifications", slug: "notifications", label: "Alertas", icon: Bell },
   { id: "free-games", slug: "free-games", label: "Juegos gratis", icon: Gift, premium: true },
+  { id: "embed", slug: "embed", label: "Embeds", icon: FileBadge2 },
 ];
 
 export function serverPaneHref(guildId: string, slug = "overview") {

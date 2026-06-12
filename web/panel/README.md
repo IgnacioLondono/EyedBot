@@ -30,8 +30,6 @@ Express monta el build de Next automáticamente (`web/next-panel.js`).
 cd web/panel && npm run build
 ```
 
-Variable `PANEL_NEXT_ENABLED=false` vuelve al frontend legacy en `web/public/`.
-
 ## Rutas
 
 | Ruta | Descripción |

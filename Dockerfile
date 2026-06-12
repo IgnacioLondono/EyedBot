@@ -27,7 +27,7 @@ COPY src/ ./src/
 COPY web/ ./web/
 RUN cd web && npm ci --no-audit --no-fund && \
     cd panel && npm ci --no-audit --no-fund && npm run build && cd .. && \
-    npm run build:assets && npm prune --production && \
+    npm prune --production && \
     cd panel && npm prune --production && cd .. && \
     npm cache clean --force
 COPY verificar-*.js ./

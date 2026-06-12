@@ -759,62 +759,18 @@ app.use(session({
     name: 'tulabot.session'
 }));
 
-const panelFaviconPath = path.join(__dirname, 'public', 'assets', 'img', 'favicon.png');
+const panelFaviconPath = path.join(__dirname, 'panel', 'app', 'favicon.ico');
 app.get('/favicon.ico', (req, res) => {
-    res.type('image/png');
+    res.type('image/x-icon');
     res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
     res.sendFile(panelFaviconPath);
 });
-const publicDir = path.join(__dirname, 'public');
 
-function sendProtectedPanelPage(fileName, req, res) {
-    if (!req.session?.user) {
-        return res.redirect('/login');
-    }
-    return res.sendFile(path.join(publicDir, 'pages', fileName));
-}
-
-const { isNextPanelEnabled } = require('./next-panel');
-
-const PROTECTED_PANEL_PAGES = {
-    '/pages/dashboard.html': 'dashboard.html',
-    '/pages/about.html': 'about.html',
-    '/pages/commands.html': 'commands.html',
-    '/pages/premium.html': 'premium.html',
-    '/pages/settings.html': 'settings.html',
-    '/pages/server.html': 'server.html'
-};
-
-if (!isNextPanelEnabled()) {
-    Object.entries(PROTECTED_PANEL_PAGES).forEach(([routePath, fileName]) => {
-        app.get(routePath, (req, res) => sendProtectedPanelPage(fileName, req, res));
-    });
-}
-
-app.use(express.static(publicDir, {
-    maxAge: 0,
+const uploadsRoot = path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsRoot, {
+    maxAge: '1h',
     etag: true,
-    setHeaders: (res, filePath) => {
-        const relativePath = path.relative(publicDir, filePath).replace(/\\/g, '/').toLowerCase();
-        const isHtml = relativePath.endsWith('.html');
-        const isAssetFile = relativePath.startsWith('assets/');
-        const isLongCacheAsset = isAssetFile && /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|otf|mp4|webm)$/i.test(relativePath);
-
-        if (isHtml) {
-            // Evita usar HTML viejo en navegador o CDN tras despliegues.
-            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
-            res.setHeader('Surrogate-Control', 'no-store');
-            return;
-        }
-
-        if (isLongCacheAsset) {
-            // Archivos estáticos versionados: caché agresiva para bajar TTFB y transferencias.
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-            return;
-        }
-
+    setHeaders: (res) => {
         res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
     }
 }));
@@ -849,19 +805,19 @@ function writeTemplateStore(data) {
 }
 
 function ensureWelcomeUploadsDir() {
-    const uploadsDir = path.join(__dirname, 'public', 'uploads', 'welcome');
+    const uploadsDir = path.join(uploadsRoot, 'welcome');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
     return uploadsDir;
 }
 
 function ensureVerifyUploadsDir() {
-    const uploadsDir = path.join(__dirname, 'public', 'uploads', 'verify');
+    const uploadsDir = path.join(uploadsRoot, 'verify');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
     return uploadsDir;
 }
 
 function ensureGachaCatalogUploadsDir() {
-    const uploadsDir = path.join(__dirname, 'public', 'uploads', 'gacha-catalog');
+    const uploadsDir = path.join(uploadsRoot, 'gacha-catalog');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
     return uploadsDir;
 }
@@ -1310,13 +1266,6 @@ function setBotClient(client) {
 }
 
 // Rutas de autenticación
-if (!isNextPanelEnabled()) {
-    app.get('/login', (req, res) => {
-        const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-        res.redirect(`/login.html${query}`);
-    });
-}
-
 app.get('/auth/discord', (req, res) => {
     if (!CLIENT_ID) {
         return res.status(500).send(`
@@ -5986,30 +5935,6 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
     }
 });
 
-// Rutas HTML legacy (solo si Next panel está desactivado)
-if (!isNextPanelEnabled()) {
-    app.get('/login', (req, res) => {
-        if (req.session.user) {
-            return res.redirect('/');
-        }
-        res.sendFile(path.join(__dirname, 'public', 'login.html'));
-    });
-
-    app.get('/', (req, res) => {
-        if (!req.session.user) {
-            return res.redirect('/login');
-        }
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    });
-
-    app.get('/dashboard', (req, res) => {
-        if (!req.session.user) {
-            return res.redirect('/login');
-        }
-        res.redirect('/');
-    });
-}
-
 const BIND_HOST = String(process.env.WEB_BIND_HOST || '0.0.0.0').trim() || '0.0.0.0';
 let server;
 
@@ -6019,9 +5944,7 @@ async function startWebServer() {
         await attachNextPanel(app);
     } catch (error) {
         console.error('❌ No se pudo montar el panel Next.js:', error?.message || error);
-        if (isNextPanelEnabled()) {
-            console.warn('⚠️ Revisa que web/panel esté compilado (npm run build en web/panel).');
-        }
+        console.warn('⚠️ Revisa que web/panel esté compilado (npm run build en web/panel).');
     }
 
     server = app.listen(PORT, BIND_HOST, () => {

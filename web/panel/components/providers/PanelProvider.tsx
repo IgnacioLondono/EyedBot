@@ -52,7 +52,28 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    let active = true;
+    void Promise.all([api.getPanelBootstrap(false), api.getBillingStatus().catch(() => null)])
+      .then(([boot, bill]) => {
+        if (!active) return;
+        setBootstrap(boot);
+        setBilling(bill);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const message = err instanceof ApiRequestError ? err.message : "No se pudo cargar el panel";
+        setError(message);
+        if (err instanceof ApiRequestError && err.status === 401) {
+          window.location.href = "/login";
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [refresh]);
 
   const value = useMemo<PanelContextValue>(

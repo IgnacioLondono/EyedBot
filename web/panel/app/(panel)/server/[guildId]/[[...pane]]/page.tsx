@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,7 +9,36 @@ import { getGuildInfo } from "@/lib/api/endpoints";
 import { SERVER_PANES, serverPaneHref } from "@/lib/navigation";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { OverviewPane } from "@/components/features/server/panes/OverviewPane";
+import { WelcomePane } from "@/components/features/server/panes/WelcomePane";
+import { VerifyPane } from "@/components/features/server/panes/VerifyPane";
+import { TicketsPane } from "@/components/features/server/panes/TicketsPane";
+import { LevelsPane } from "@/components/features/server/panes/LevelsPane";
+import { VoicePane } from "@/components/features/server/panes/VoicePane";
+import { AutomationPane } from "@/components/features/server/panes/AutomationPane";
+import { GachaPane } from "@/components/features/server/panes/GachaPane";
+import { ModerationPane } from "@/components/features/server/panes/ModerationPane";
+import { NotificationsPane } from "@/components/features/server/panes/NotificationsPane";
+import { FreeGamesPane } from "@/components/features/server/panes/FreeGamesPane";
+import { EmbedPane } from "@/components/features/server/panes/EmbedPane";
+
+const PANE_COMPONENTS = {
+  overview: OverviewPane,
+  welcome: WelcomePane,
+  verify: VerifyPane,
+  tickets: TicketsPane,
+  levels: LevelsPane,
+  voice: VoicePane,
+  automation: AutomationPane,
+  gacha: GachaPane,
+  moderation: ModerationPane,
+  notifications: NotificationsPane,
+  "free-games": FreeGamesPane,
+  embed: EmbedPane,
+} satisfies Record<string, ComponentType<{ guildId: string }>>;
+
+type ServerPaneSlug = keyof typeof PANE_COMPONENTS;
 
 export default function ServerPage() {
   const params = useParams<{ guildId: string; pane?: string[] }>();
@@ -18,6 +48,7 @@ export default function ServerPage() {
   const [guildName, setGuildName] = useState("Servidor");
 
   const pane = SERVER_PANES.find((p) => p.slug === paneSlug) ?? SERVER_PANES[0];
+  const PaneComponent = PANE_COMPONENTS[pane.slug as ServerPaneSlug] ?? OverviewPane;
 
   useEffect(() => {
     void getGuildInfo(guildId)
@@ -42,6 +73,7 @@ export default function ServerPage() {
         kicker="Servidor"
         title={guildName}
         description={`Módulo: ${pane.label}`}
+        actions={pane.premium && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
       />
 
       <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
@@ -67,15 +99,7 @@ export default function ServerPage() {
           })}
         </aside>
 
-        <Card>
-          <p className="text-sm text-zinc-400">
-            Vista <strong className="text-white">{pane.label}</strong> para el servidor{" "}
-            <code className="text-violet-300">{guildId}</code>. Conecta los formularios usando las
-            funciones de <code className="text-violet-300">lib/api/endpoints.ts</code> (p. ej.{" "}
-            <code className="text-violet-300">getWelcomeConfig</code>,{" "}
-            <code className="text-violet-300">getTicketConfig</code>, etc.).
-          </p>
-        </Card>
+        <PaneComponent guildId={guildId} />
       </div>
     </>
   );
