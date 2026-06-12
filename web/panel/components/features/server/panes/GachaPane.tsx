@@ -1,18 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gem, ShoppingBag, Sparkles } from "lucide-react";
+import { Gem, Package, Search, ShoppingBag, Sparkles } from "lucide-react";
 import {
+  gachaCatalogImageUrl,
   getGachaConfig,
+  getGachaInventory,
   getGachaLeaderboard,
   getGachaMarket,
   getGachaShop,
   getGachaStats,
   saveGachaConfig,
 } from "@/lib/api/endpoints";
+import {
+  LeaderboardPodium,
+  LeaderboardRow,
+  type LeaderboardEntry,
+} from "@/components/features/shared/LeaderboardPodium";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
@@ -24,27 +32,57 @@ import {
   PaneGrid,
   PremiumLock,
   SectionCard,
+  ChannelSelect,
 } from "@/components/features/shared";
-import { asArray, asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
+import { asArray, asRecord, extractLeaderboard, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
+import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 
 type GachaState = {
   enabled: boolean;
-  dailyPulls: number;
-  bannerName: string;
+  channelId: string;
+  rollCooldownSec: number;
+  claimCooldownSec: number;
+  economyEnabled: boolean;
+  shopEnabled: boolean;
+  coinsPerXp: number;
+  coinsPerLevelUp: number;
 };
 
+type InventoryItem = Record<string, unknown>;
+
 export function GachaPane({ guildId }: { guildId: string }) {
-  const { hasPremium } = usePanel();
+  const { bootstrap, hasPremium } = usePanel();
+  const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
   const [tab, setTab] = useState("config");
-  const [form, setForm] = useState<GachaState>({ enabled: false, dailyPulls: 3, bannerName: "" });
+  const [form, setForm] = useState<GachaState>({
+    enabled: false,
+    channelId: "",
+    rollCooldownSec: 60,
+    claimCooldownSec: 30,
+    economyEnabled: false,
+    shopEnabled: true,
+    coinsPerXp: 1,
+    coinsPerLevelUp: 75,
+  });
   const [stats, setStats] = useState<Record<string, unknown>>({});
   const [shop, setShop] = useState<Record<string, unknown>[]>([]);
   const [market, setMarket] = useState<Record<string, unknown>[]>([]);
   const [leaders, setLeaders] = useState<Record<string, unknown>[]>([]);
+  const [inventoryUserId, setInventoryUserId] = useState("");
+  const [inventoryQuery, setInventoryQuery] = useState("");
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [inventoryTotal, setInventoryTotal] = useState(0);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (bootstrap?.user?.id && !inventoryUserId) {
+      setInventoryUserId(bootstrap.user.id);
+    }
+  }, [bootstrap?.user?.id, inventoryUserId]);
 
   useEffect(() => {
     let active = true;
@@ -58,15 +96,21 @@ export function GachaPane({ guildId }: { guildId: string }) {
       .then(([configData, statsData, shopData, marketData, leaderboardData]) => {
         if (!active) return;
         const config = asRecord(configData);
+        const shopPayload = asRecord(shopData);
         setForm({
           enabled: toBooleanValue(config.enabled),
-          dailyPulls: toNumberValue(config.dailyPulls, 3),
-          bannerName: toStringValue(config.bannerName || config.banner, "Banner principal"),
+          channelId: toStringValue(config.channelId),
+          rollCooldownSec: toNumberValue(config.rollCooldownSec, 60),
+          claimCooldownSec: toNumberValue(config.claimCooldownSec, 30),
+          economyEnabled: toBooleanValue(config.economyEnabled),
+          shopEnabled: toBooleanValue(config.shopEnabled, true),
+          coinsPerXp: toNumberValue(config.coinsPerXp, 1),
+          coinsPerLevelUp: toNumberValue(config.coinsPerLevelUp, 75),
         });
         setStats(asRecord(statsData));
-        setShop(asArray(shopData).map((entry) => asRecord(entry)));
+        setShop(asArray(shopPayload.items || shopData).map((entry) => asRecord(entry)));
         setMarket(asArray(asRecord(marketData).listings || marketData).map((entry) => asRecord(entry)));
-        setLeaders(asArray(leaderboardData).map((entry) => asRecord(entry)));
+        setLeaders(extractLeaderboard(leaderboardData).map((entry) => asRecord(entry)));
       })
       .catch((err) => {
         if (active) setError(getErrorMessage(err));
@@ -79,6 +123,25 @@ export function GachaPane({ guildId }: { guildId: string }) {
       active = false;
     };
   }, [guildId]);
+
+  async function loadInventory() {
+    const userId = inventoryUserId.trim();
+    if (!userId) {
+      toast({ title: "Falta userId", description: "Indica el ID de Discord del usuario.", tone: "danger" });
+      return;
+    }
+
+    setInventoryLoading(true);
+    try {
+      const payload = asRecord(await getGachaInventory(guildId, { userId, q: inventoryQuery.trim() || undefined }));
+      setInventory(asArray(payload.items).map((entry) => asRecord(entry)));
+      setInventoryTotal(toNumberValue(payload.total ?? payload.filteredTotal));
+    } catch (err) {
+      toast({ title: "No se pudo cargar inventario", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setInventoryLoading(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -97,7 +160,11 @@ export function GachaPane({ guildId }: { guildId: string }) {
 
   return (
     <div className="relative">
-      <LockedOverlay visible={!hasPremium} title="Gacha premium" description="El sistema gacha, tienda y estadísticas avanzadas requieren una suscripción activa." />
+      <LockedOverlay
+        visible={!hasPremium}
+        title="Gacha premium"
+        description="El sistema gacha, tienda y estadísticas avanzadas requieren una suscripción activa."
+      />
       <SectionCard
         title="Centro gacha"
         description="Administra banner, economía ligera y actividad del sistema."
@@ -109,6 +176,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
             { id: "economy", label: "Economía" },
             { id: "shop", label: "Tienda" },
             { id: "market", label: "Mercado" },
+            { id: "inventory", label: "Inventario" },
             { id: "top", label: "Ranking" },
           ]}
           value={tab}
@@ -125,14 +193,44 @@ export function GachaPane({ guildId }: { guildId: string }) {
                     <p className="font-medium text-white">Activar banner</p>
                     <p className="text-sm text-zinc-400">Permite tiradas diarias y recompensas.</p>
                   </div>
-                  <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
+                  <Switch
+                    checked={form.enabled}
+                    onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))}
+                  />
                 </div>
-                <Field label="Nombre del banner">
-                  <Input value={form.bannerName} onChange={(event) => setForm((current) => ({ ...current, bannerName: event.target.value }))} />
+                <Field label="Canal del gacha">
+                  <ChannelSelect
+                    value={form.channelId}
+                    onChange={(channelId) => setForm((current) => ({ ...current, channelId }))}
+                    options={channels}
+                  />
                 </Field>
-                <Field label="Tiradas diarias">
-                  <Input type="number" value={form.dailyPulls} onChange={(event) => setForm((current) => ({ ...current, dailyPulls: Number(event.target.value) }))} />
-                </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Cooldown tirada (seg)">
+                    <Input
+                      type="number"
+                      value={form.rollCooldownSec}
+                      onChange={(event) => setForm((current) => ({ ...current, rollCooldownSec: Number(event.target.value) }))}
+                    />
+                  </Field>
+                  <Field label="Cooldown claim (seg)">
+                    <Input
+                      type="number"
+                      value={form.claimCooldownSec}
+                      onChange={(event) => setForm((current) => ({ ...current, claimCooldownSec: Number(event.target.value) }))}
+                    />
+                  </Field>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div>
+                    <p className="font-medium text-white">Economía activa</p>
+                    <p className="text-sm text-zinc-400">Monedas por XP, voz y nivel.</p>
+                  </div>
+                  <Switch
+                    checked={form.economyEnabled}
+                    onCheckedChange={(economyEnabled) => setForm((current) => ({ ...current, economyEnabled }))}
+                  />
+                </div>
                 <FormActions onSave={handleSave} saving={saving} />
               </div>
             </div>
@@ -140,10 +238,10 @@ export function GachaPane({ guildId }: { guildId: string }) {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-100">
                 <Gem className="h-6 w-6" />
               </div>
-              <p className="text-lg font-semibold text-white">{form.bannerName}</p>
+              <p className="text-lg font-semibold text-white">Banner gacha</p>
               <p className="mt-2 text-sm text-zinc-300">
                 {form.enabled
-                  ? `${form.dailyPulls} tiradas por día activas para la comunidad.`
+                  ? `Cooldown ${form.rollCooldownSec}s · economía ${form.economyEnabled ? "on" : "off"}`
                   : "El banner está desactivado en este momento."}
               </p>
             </div>
@@ -153,9 +251,21 @@ export function GachaPane({ guildId }: { guildId: string }) {
         {tab === "economy" ? (
           <div className="grid gap-4 md:grid-cols-3">
             {[
-              { label: "Tiradas", value: toStringValue(stats.totalRolls || stats.totalPulls, "0"), icon: <Sparkles className="h-5 w-5" /> },
-              { label: "Usuarios", value: toStringValue(stats.totalUsers || stats.activeUsers, "0"), icon: <Gem className="h-5 w-5" /> },
-              { label: "Colección", value: toStringValue(stats.totalCollection, "0"), icon: <ShoppingBag className="h-5 w-5" /> },
+              {
+                label: "Tiradas",
+                value: toStringValue(stats.totalRolls || stats.totalPulls, "0"),
+                icon: <Sparkles className="h-5 w-5" />,
+              },
+              {
+                label: "Usuarios",
+                value: toStringValue(stats.totalUsers || stats.activeUsers, "0"),
+                icon: <Gem className="h-5 w-5" />,
+              },
+              {
+                label: "Colección",
+                value: toStringValue(stats.totalCollection, "0"),
+                icon: <ShoppingBag className="h-5 w-5" />,
+              },
             ].map((item) => (
               <div key={item.label} className="rounded-3xl border border-white/10 bg-white/5 p-5">
                 <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/8">{item.icon}</div>
@@ -167,8 +277,13 @@ export function GachaPane({ guildId }: { guildId: string }) {
               <p className="mb-4 font-medium text-white">Leaderboard rápido</p>
               <div className="space-y-2">
                 {leaders.slice(0, 5).map((entry, index) => (
-                  <div key={`${entry.userId ?? index}`} className="flex items-center justify-between rounded-2xl border border-white/8 px-4 py-3">
-                    <span className="text-sm text-white">{toStringValue(entry.username || entry.userTag || entry.userId, "Jugador")}</span>
+                  <div
+                    key={`${entry.userId ?? index}`}
+                    className="flex items-center justify-between rounded-2xl border border-white/8 px-4 py-3"
+                  >
+                    <span className="text-sm text-white">
+                      {toStringValue(entry.username || entry.userTag || entry.userId, "Jugador")}
+                    </span>
                     <span className="text-sm text-zinc-400">{toStringValue(entry.score || entry.points, "0")}</span>
                   </div>
                 ))}
@@ -180,16 +295,35 @@ export function GachaPane({ guildId }: { guildId: string }) {
         {tab === "shop" ? (
           shop.length ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {shop.map((item, index) => (
-                <div key={`${item.id ?? index}`} className="rounded-3xl border border-white/10 bg-black/20 p-5">
+              {shop.map((item, index) => {
+                const id = toStringValue(item.id, `shop-${index}`);
+                const hasDbImage = item.catalogDbImage === true;
+                return (
+                <div key={id} className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+                  {hasDbImage ? (
+                    <img
+                      src={gachaCatalogImageUrl(guildId, id)}
+                      alt=""
+                      className="h-40 w-full object-cover"
+                    />
+                  ) : null}
+                  <div className="p-5">
                   <p className="font-medium text-white">{toStringValue(item.name, "Item")}</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-fuchsia-300">
+                    {toStringValue(item.rarity, "común")} · {toStringValue(item.series, "sin serie")}
+                  </p>
                   <p className="mt-2 text-sm text-zinc-400">{toStringValue(item.description, "Sin descripción")}</p>
                   <p className="mt-4 text-sm text-fuchsia-200">{toStringValue(item.price, "0")} monedas</p>
+                  </div>
                 </div>
-              ))}
+              );})}
             </div>
           ) : (
-            <EmptyState icon={<ShoppingBag className="h-6 w-6" />} title="Tienda vacía" description="No hay artículos cargados en la tienda del servidor." />
+            <EmptyState
+              icon={<ShoppingBag className="h-6 w-6" />}
+              title="Tienda vacía"
+              description="No hay artículos cargados en la tienda del servidor."
+            />
           )
         ) : null}
 
@@ -205,22 +339,89 @@ export function GachaPane({ guildId }: { guildId: string }) {
               ))}
             </div>
           ) : (
-            <EmptyState icon={<ShoppingBag className="h-6 w-6" />} title="Mercado vacío" description="No hay listings activos en el mercado del servidor." />
+            <EmptyState
+              icon={<ShoppingBag className="h-6 w-6" />}
+              title="Mercado vacío"
+              description="No hay listings activos en el mercado del servidor."
+            />
           )
+        ) : null}
+
+        {tab === "inventory" ? (
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+              <Field label="ID de usuario">
+                <Input
+                  value={inventoryUserId}
+                  onChange={(event) => setInventoryUserId(event.target.value)}
+                  placeholder="Discord user ID"
+                />
+              </Field>
+              <Field label="Buscar carta">
+                <Input
+                  value={inventoryQuery}
+                  onChange={(event) => setInventoryQuery(event.target.value)}
+                  placeholder="Nombre, serie o rareza"
+                />
+              </Field>
+              <div className="flex items-end">
+                <Button onClick={() => void loadInventory()} disabled={inventoryLoading || !hasPremium}>
+                  {inventoryLoading ? "Buscando..." : "Consultar"}
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-400">
+              {inventory.length
+                ? `${inventory.length} resultados · ${inventoryTotal} cartas totales del perfil`
+                : "Consulta el inventario de un miembro para revisar su colección."}
+            </p>
+            {inventory.length ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {inventory.map((item, index) => {
+                  const charId = toStringValue(item.characterId || item.id);
+                  return (
+                  <div key={`${item.uid ?? item.id ?? index}`} className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+                    {charId ? (
+                      <img src={gachaCatalogImageUrl(guildId, charId)} alt="" className="h-36 w-full object-cover" />
+                    ) : null}
+                    <div className="p-5">
+                    <div className="mb-3 flex items-center gap-2 text-fuchsia-200">
+                      <Package className="h-4 w-4" />
+                      <span className="text-xs uppercase tracking-[0.2em]">
+                        {toStringValue(item.rarity, "común")}
+                      </span>
+                    </div>
+                    <p className="font-medium text-white">{toStringValue(item.name || item.characterName, "Carta")}</p>
+                    <p className="mt-2 text-sm text-zinc-400">{toStringValue(item.series, "Sin serie")}</p>
+                    </div>
+                  </div>
+                );})}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Search className="h-6 w-6" />}
+                title="Sin inventario cargado"
+                description="Introduce un ID y pulsa Consultar para ver las cartas."
+              />
+            )}
+          </div>
         ) : null}
 
         {tab === "top" ? (
           leaders.length ? (
-            <div className="space-y-2">
-              {leaders.slice(0, 10).map((entry, index) => (
-                <div key={`${entry.userId ?? index}`} className="flex items-center justify-between rounded-2xl border border-white/8 px-4 py-3">
-                  <span className="text-sm text-white">{toStringValue(entry.username || entry.userTag || entry.userId, "Jugador")}</span>
-                  <span className="text-sm text-zinc-400">{toStringValue(entry.totalClaims || entry.score || entry.points, "0")}</span>
-                </div>
+            <div className="space-y-3">
+              <LeaderboardPodium entries={leaders as LeaderboardEntry[]} mode="gacha" />
+              {leaders.slice(3, 15).map((entry, index) => (
+                <LeaderboardRow
+                  key={`${entry.userId ?? index}`}
+                  entry={entry as LeaderboardEntry}
+                  rank={index + 4}
+                  mode="gacha"
+                />
               ))}
             </div>
           ) : (
-            <EmptyState title="Sin ranking" description="Aún no hay datos de gacha para mostrar." />
+            <EmptyState title="Sin ranking" description="Aún no hay datos de gacha en la base de datos." />
           )
         ) : null}
       </SectionCard>

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } = require('discord.js');
 const Embeds = require('../../utils/embeds');
 const levelingStore = require('../../utils/leveling-store');
 
@@ -30,7 +30,7 @@ module.exports = {
         if (!interaction.guild) {
             return interaction.reply({
                 content: 'Este comando solo se puede usar en un servidor.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -49,7 +49,7 @@ module.exports = {
                             'Necesito poder enviar mensajes en ese canal.'
                         )
                     ],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -96,7 +96,7 @@ module.exports = {
                             'No hay canal configurado. Usa `/canal-niveles establecer` para definir uno.'
                         )
                     ],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -107,13 +107,13 @@ module.exports = {
                         `Canal actual: <#${id}>\nLos avisos son mensajes de texto cuando alguien sube de nivel.`
                     )
                 ],
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
         return interaction.reply({
             embeds: [Embeds.error('Error', 'Subcomando no reconocido.')],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DoorOpen, PartyPopper } from "lucide-react";
+import { DoorOpen, Mail, PartyPopper } from "lucide-react";
 import {
   getGoodbyeConfig,
   getWelcomeConfig,
@@ -29,24 +29,51 @@ import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/
 type ConfigState = {
   enabled: boolean;
   channelId: string;
+  mentionUser: boolean;
+  title: string;
   message: string;
+  color: string;
+  footer: string;
   imageUrl: string;
+  thumbnailMode: string;
+  thumbnailUrl: string;
+  dmEnabled: boolean;
+  dmMessage: string;
 };
 
 const defaultState: ConfigState = {
   enabled: false,
   channelId: "",
+  mentionUser: false,
+  title: "",
   message: "",
+  color: "7c4dff",
+  footer: "",
   imageUrl: "",
+  thumbnailMode: "avatar",
+  thumbnailUrl: "",
+  dmEnabled: false,
+  dmMessage: "",
 };
 
-function normalizeConfig(value: unknown): ConfigState {
+function normalizeConfig(value: unknown, mode: "welcome" | "goodbye"): ConfigState {
   const data = asRecord(value);
   return {
     enabled: toBooleanValue(data.enabled),
     channelId: toStringValue(data.channelId || data.channel_id),
+    mentionUser: toBooleanValue(data.mentionUser),
+    title: toStringValue(data.title, mode === "goodbye" ? "Hasta pronto" : "¡Bienvenido!"),
     message: toStringValue(data.message || data.content),
+    color: toStringValue(data.color, mode === "goodbye" ? "ff5f9e" : "7c4dff").replace("#", ""),
+    footer: toStringValue(data.footer),
     imageUrl: toStringValue(data.imageUrl || data.image_url),
+    thumbnailMode: toStringValue(data.thumbnailMode, "avatar"),
+    thumbnailUrl: toStringValue(data.thumbnailUrl),
+    dmEnabled: toBooleanValue(data.dmEnabled),
+    dmMessage: toStringValue(
+      data.dmMessage,
+      mode === "welcome" ? "Bienvenido a {server}, {username}." : ""
+    ),
   };
 }
 
@@ -67,8 +94,8 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     void Promise.all([getWelcomeConfig(guildId), getGoodbyeConfig(guildId)])
       .then(([welcomeData, goodbyeData]) => {
         if (!active) return;
-        setWelcome(normalizeConfig(welcomeData));
-        setGoodbye(normalizeConfig(goodbyeData));
+        setWelcome(normalizeConfig(welcomeData, "welcome"));
+        setGoodbye(normalizeConfig(goodbyeData, "goodbye"));
       })
       .catch((err) => {
         if (active) setError(getErrorMessage(err));
@@ -164,36 +191,115 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                   <p className="font-medium text-white">Activar {tab === "welcome" ? "bienvenida" : "despedida"}</p>
                   <p className="text-sm text-zinc-400">Envía mensajes automáticos al canal seleccionado.</p>
                 </div>
-                <Switch checked={active.enabled} onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))} />
+                <Switch
+                  checked={active.enabled}
+                  onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))}
+                />
               </div>
               <Field label="Canal" description="Destino donde se publicará el mensaje del evento.">
-                <ChannelSelect value={active.channelId} onChange={(channelId) => setActive((current) => ({ ...current, channelId }))} options={channels} />
+                <ChannelSelect
+                  value={active.channelId}
+                  onChange={(channelId) => setActive((current) => ({ ...current, channelId }))}
+                  options={channels}
+                />
               </Field>
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                <div>
+                  <p className="font-medium text-white">Mencionar usuario</p>
+                  <p className="text-sm text-zinc-400">Incluye una mención al miembro en el mensaje.</p>
+                </div>
+                <Switch
+                  checked={active.mentionUser}
+                  onCheckedChange={(checked) => setActive((current) => ({ ...current, mentionUser: checked }))}
+                />
+              </div>
             </>
           ) : null}
 
           {sectionTab === "message" ? (
-            <Field label="Mensaje" description="Puedes usar variables si el backend las soporta.">
-              <Textarea
-                value={active.message}
-                onChange={(event) => setActive((current) => ({ ...current, message: event.target.value }))}
-                placeholder="Ej. Bienvenido {user} a {server}"
-              />
-            </Field>
+            <>
+              <Field label="Título del embed">
+                <Input
+                  value={active.title}
+                  onChange={(event) => setActive((current) => ({ ...current, title: event.target.value }))}
+                />
+              </Field>
+              <Field label="Mensaje" description="Variables: {user}, {username}, {server}, {memberCount}">
+                <Textarea
+                  value={active.message}
+                  onChange={(event) => setActive((current) => ({ ...current, message: event.target.value }))}
+                  placeholder="Ej. Bienvenido {user} a {server}"
+                />
+              </Field>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Color (hex)">
+                  <Input
+                    value={active.color}
+                    onChange={(event) => setActive((current) => ({ ...current, color: event.target.value.replace("#", "") }))}
+                    placeholder="7c4dff"
+                  />
+                </Field>
+                <Field label="Pie de embed">
+                  <Input
+                    value={active.footer}
+                    onChange={(event) => setActive((current) => ({ ...current, footer: event.target.value }))}
+                  />
+                </Field>
+              </div>
+            </>
           ) : null}
 
           {sectionTab === "media" ? (
-            <Field label="Imagen o fondo" description="URL opcional para reforzar el aspecto visual del mensaje.">
-              <Input
-                value={active.imageUrl}
-                onChange={(event) => setActive((current) => ({ ...current, imageUrl: event.target.value }))}
-                placeholder="https://..."
-              />
-            </Field>
+            <>
+              <Field label="Imagen principal" description="URL opcional para el embed.">
+                <Input
+                  value={active.imageUrl}
+                  onChange={(event) => setActive((current) => ({ ...current, imageUrl: event.target.value }))}
+                  placeholder="https://..."
+                />
+              </Field>
+              <Field label="Miniatura" description="avatar, url o none">
+                <Input
+                  value={active.thumbnailMode}
+                  onChange={(event) => setActive((current) => ({ ...current, thumbnailMode: event.target.value }))}
+                />
+              </Field>
+              {active.thumbnailMode === "url" ? (
+                <Field label="URL miniatura">
+                  <Input
+                    value={active.thumbnailUrl}
+                    onChange={(event) => setActive((current) => ({ ...current, thumbnailUrl: event.target.value }))}
+                    placeholder="https://..."
+                  />
+                </Field>
+              ) : null}
+            </>
           ) : null}
 
           {sectionTab === "dm" ? (
-            <Alert title="Mensaje privado" description="El envío por DM del panel legacy se migrará en la siguiente iteración. Por ahora configura canal + mensaje." />
+            <>
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                <div>
+                  <p className="font-medium text-white">Enviar mensaje privado</p>
+                  <p className="text-sm text-zinc-400">
+                    {tab === "welcome"
+                      ? "Recibe al usuario por DM además del canal."
+                      : "Opcional: avisa por DM al salir del servidor."}
+                  </p>
+                </div>
+                <Switch
+                  checked={active.dmEnabled}
+                  onCheckedChange={(checked) => setActive((current) => ({ ...current, dmEnabled: checked }))}
+                />
+              </div>
+              <Field label="Texto del DM" description="Variables: {username}, {server}, {memberCount}">
+                <Textarea
+                  value={active.dmMessage}
+                  onChange={(event) => setActive((current) => ({ ...current, dmMessage: event.target.value }))}
+                  placeholder="Mensaje privado para el miembro"
+                />
+              </Field>
+            </>
           ) : null}
 
           <FormActions onSave={handleSave} onTest={handleTest} saving={saving} testing={testing} />
@@ -210,10 +316,21 @@ export function WelcomePane({ guildId }: { guildId: string }) {
           </div>
           <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">
             {active.enabled ? "Activo" : "Inactivo"}
+            {active.dmEnabled ? " · DM activo" : ""}
           </p>
+          <p className="mt-2 text-sm font-medium text-white">{active.title || "Sin título"}</p>
           <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-100">
-            {active.message || "Aun no hay un mensaje configurado para esta pestaña."}
+            {active.message || "Aún no hay un mensaje configurado para esta pestaña."}
           </p>
+          {active.dmEnabled ? (
+            <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-zinc-500">
+                <Mail className="h-3.5 w-3.5" />
+                DM
+              </div>
+              <p className="text-sm text-zinc-300">{active.dmMessage || "Sin mensaje DM configurado."}</p>
+            </div>
+          ) : null}
           <p className="mt-4 text-sm text-zinc-400">
             Canal: {channels.find((channel) => channel.id === active.channelId)?.name || "Sin canal"}
           </p>

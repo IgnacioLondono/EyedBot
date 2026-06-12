@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags, PermissionFlagsBits } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -43,7 +43,7 @@ module.exports = {
         const canal = interaction.options.getChannel('canal') || interaction.channel;
 
         if (!canal.isTextBased()) {
-            return interaction.reply({ content: '❌ El canal seleccionado no es un canal de texto.', ephemeral: true });
+            return interaction.reply({ content: '❌ El canal seleccionado no es un canal de texto.', flags: MessageFlags.Ephemeral });
         }
 
         const embed = new EmbedBuilder()
@@ -60,13 +60,13 @@ module.exports = {
             await canal.send({ embeds: [embed] });
             
             if (canal.id !== interaction.channel.id) {
-                await interaction.reply({ content: `✅ Embed enviado correctamente al canal ${canal}.`, ephemeral: true });
+                await interaction.reply({ content: `✅ Embed enviado correctamente al canal ${canal}.`, flags: MessageFlags.Ephemeral });
             } else {
-                await interaction.reply({ content: '✅ Embed enviado.', ephemeral: true });
+                await interaction.reply({ content: '✅ Embed enviado.', flags: MessageFlags.Ephemeral });
             }
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: '❌ Hubo un error al enviar el embed. Verifica mis permisos y que el color sea válido.', ephemeral: true });
+            await interaction.reply({ content: '❌ Hubo un error al enviar el embed. Verifica mis permisos y que el color sea válido.', flags: MessageFlags.Ephemeral });
         }
     },
 };

@@ -518,9 +518,57 @@ async function safeDbSet(key, value, timeoutMs = 3000) {
     }
 }
 
-const SESSION_STORE_TIMEOUT_MS = Number.parseInt(process.env.SESSION_STORE_TIMEOUT_MS || '4000', 10) || 4000;
+const SESSION_STORE_TIMEOUT_MS = Number.parseInt(process.env.SESSION_STORE_TIMEOUT_MS || '12000', 10) || 12000;
 const SESSION_L1_TTL_MS = Number.parseInt(process.env.SESSION_L1_TTL_MS || '60000', 10) || 60000;
+const SESSION_PERSIST_DEBOUNCE_MS = Number.parseInt(process.env.SESSION_PERSIST_DEBOUNCE_MS || '750', 10) || 750;
 const sessionL1Cache = new Map();
+const sessionPersistTimers = new Map();
+let lastSessionPersistWarnAt = 0;
+
+function warnSessionPersistThrottled(message) {
+    const now = Date.now();
+    if (now - lastSessionPersistWarnAt < 60_000) return;
+    lastSessionPersistWarnAt = now;
+    console.warn(message);
+}
+
+function queueSessionPersist(store, sid, sessionData, expires) {
+    const key = String(sid || '').trim();
+    if (!key || !sessionData) return;
+
+    const dbKey = `${store.prefix}${key}`;
+    const payload = {
+        session: sessionData,
+        expires: expires ? expires.toISOString() : null
+    };
+
+    const pending = sessionPersistTimers.get(key);
+    if (pending?.timer) clearTimeout(pending.timer);
+
+    const timer = setTimeout(() => {
+        sessionPersistTimers.delete(key);
+        db.set(dbKey, payload).catch((error) => {
+            warnSessionPersistThrottled(`⚠️ session persist error: ${error?.message || error}`);
+        });
+    }, SESSION_PERSIST_DEBOUNCE_MS);
+
+    sessionPersistTimers.set(key, { timer, dbKey, payload });
+}
+
+async function flushSessionPersist(sid) {
+    const key = String(sid || '').trim();
+    const pending = sessionPersistTimers.get(key);
+    if (!pending) return;
+
+    clearTimeout(pending.timer);
+    sessionPersistTimers.delete(key);
+
+    try {
+        await db.set(pending.dbKey, pending.payload);
+    } catch (error) {
+        warnSessionPersistThrottled(`⚠️ session flush error: ${error?.message || error}`);
+    }
+}
 
 function readSessionL1(sid) {
     const key = String(sid || '').trim();
@@ -607,31 +655,28 @@ class MySqlSessionStore extends session.Store {
 
     set(sid, sessionData, callback) {
         writeSessionL1(sid, sessionData);
-        const expires = this.getExpiration(sessionData);
-        const timeoutId = setTimeout(() => {
-            console.warn('⚠️ session.set timeout — la sesión puede no persistir en MySQL');
-            if (callback) callback(null);
-        }, SESSION_STORE_TIMEOUT_MS);
-
-        db.set(`${this.prefix}${sid}`, {
-            session: sessionData,
-            expires: expires ? expires.toISOString() : null
-        })
-            .then(() => {
-                clearTimeout(timeoutId);
-                if (callback) callback(null);
-            })
-            .catch((error) => {
-                clearTimeout(timeoutId);
-                console.warn('⚠️ session.set error:', error?.message || error);
-                if (callback) callback(null);
-            });
+        queueSessionPersist(this, sid, sessionData, this.getExpiration(sessionData));
+        if (callback) callback(null);
     }
 
     destroy(sid, callback) {
-        db.delete(`${this.prefix}${sid}`)
-            .then(() => callback && callback(null))
-            .catch((error) => callback && callback(error));
+        clearSessionL1(sid);
+        const key = String(sid || '').trim();
+        const pending = sessionPersistTimers.get(key);
+        if (pending?.timer) clearTimeout(pending.timer);
+        sessionPersistTimers.delete(key);
+
+        const finish = (error) => callback && callback(error || null);
+        const flushPromise = pending
+            ? db.set(pending.dbKey, pending.payload).catch((error) => {
+                warnSessionPersistThrottled(`⚠️ session flush error: ${error?.message || error}`);
+            })
+            : Promise.resolve();
+
+        flushPromise
+            .then(() => db.delete(`${this.prefix}${sid}`))
+            .then(() => finish(null))
+            .catch((error) => finish(error));
     }
 
     touch(sid, sessionData, callback) {

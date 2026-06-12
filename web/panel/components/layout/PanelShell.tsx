@@ -8,6 +8,7 @@ import { useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { cn } from "@/lib/utils";
+import { WallpaperLayer } from "@/components/layout/WallpaperLayer";
 
 function avatarUrl(user: { id: string; avatar?: string | null }) {
   if (user.avatar) {
@@ -26,11 +27,16 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-zinc-100">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      <WallpaperLayer />
+      <div className="theme-bubbles pointer-events-none fixed inset-0 overflow-hidden opacity-0 transition-opacity">
         <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-[color:var(--color-accent)]/20 blur-3xl" />
         <div className="absolute right-0 top-32 h-80 w-80 rounded-full bg-[color:var(--color-accent-2)]/15 blur-3xl" />
         <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-[color:var(--color-glow)]/10 blur-3xl" />
       </div>
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{ background: `rgba(0,0,0,var(--user-wallpaper-veil-opacity, 0))` }}
+      />
 
       <nav className="sticky top-0 z-40 border-b border-white/10 bg-black/30 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 lg:px-6">

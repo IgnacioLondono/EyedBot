@@ -31,12 +31,40 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(circle at top left, rgba(139, 92, 246, 0.22), transparent 25%),
-    radial-gradient(circle at top right, rgba(217, 70, 239, 0.16), transparent 22%),
-    linear-gradient(180deg, #090811 0%, #07060d 100%);
+  background: var(--color-bg, #07060d);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 25%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-accent-2) 16%, transparent), transparent 22%),
+    linear-gradient(180deg, var(--color-surface-strong, #090811) 0%, var(--color-bg, #07060d) 100%);
+}
+
+html[data-wallpaper="image"] body::before,
+html[data-wallpaper="video"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background-image: var(--user-wallpaper-image);
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--user-wallpaper-blur, 40px));
+  opacity: var(--user-wallpaper-bloom-opacity, 0.35);
+  transform: scale(1.08);
+}
+
+html[data-theme-bubbles="1"] .theme-bubbles {
+  opacity: 1;
 }
 
 ::selection {

@@ -1,21 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Inbox, MessageSquareMore, Settings2, Ticket } from "lucide-react";
+import { Eye, FlaskConical, Layers } from "lucide-react";
 import {
-  acceptTicket,
-  claimTicket,
-  closeTicket,
   getTicketConfig,
-  getTicketsOverview,
   publishTickets,
   saveTicketConfig,
+  updateTicketEmbed,
 } from "@/lib/api/endpoints";
+import { TicketsManagePanel } from "@/components/features/server/panes/TicketsManagePanel";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import {
@@ -34,31 +31,113 @@ import { asArray, asRecord, getErrorMessage, toBooleanValue, toStringValue } fro
 const TICKET_TABS = [
   { id: "panel", label: "Panel" },
   { id: "roles", label: "Roles" },
+  { id: "preview", label: "Preview" },
+  { id: "categories", label: "Categorías" },
+  { id: "labs", label: "Labs" },
   { id: "manage", label: "Gestión" },
   { id: "guide", label: "Guía" },
 ];
 
-type TicketItem = { id: string; title: string; owner: string };
+type TicketOption = { value: string; label: string; description: string };
 
 type TicketConfigState = {
   enabled: boolean;
   panelChannelId: string;
+  requestChannelId: string;
+  receiptHistoryChannelId: string;
+  sendDmReceipt: boolean;
+  sendDmPendingStatus: boolean;
   title: string;
   message: string;
   buttonLabel: string;
+  color: string;
+  footer: string;
   adminRoleIds: string;
+  ticketCategories: TicketOption[];
+  commonProblems: TicketOption[];
+  minecraftServers: TicketOption[];
+  caseRoleMapText: string;
 };
 
-function normalizeTickets(value: unknown, idKeys: string[]): TicketItem[] {
+function normalizeOptions(value: unknown): TicketOption[] {
   return asArray(value).map((entry, index) => {
     const item = asRecord(entry);
-    const id = idKeys.map((key) => toStringValue(item[key])).find(Boolean) || `item-${index}`;
     return {
-      id,
-      title: toStringValue(item.title || item.channelName || item.reason || item.topic, id),
-      owner: toStringValue(item.username || item.userTag || item.owner || item.userId, "Sin asignar"),
+      value: toStringValue(item.value, `option-${index + 1}`),
+      label: toStringValue(item.label || item.name, `Opción ${index + 1}`),
+      description: toStringValue(item.description),
     };
   });
+}
+
+function OptionEditor({
+  title,
+  options,
+  onChange,
+}: {
+  title: string;
+  options: TicketOption[];
+  onChange: (next: TicketOption[]) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-white">{title}</h4>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            onChange([...options, { value: "", label: "", description: "" }])
+          }
+        >
+          Añadir
+        </Button>
+      </div>
+      {options.map((option, index) => (
+        <div key={`${title}-${index}`} className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Etiqueta">
+              <Input
+                value={option.label}
+                onChange={(event) => {
+                  const next = [...options];
+                  next[index] = { ...next[index], label: event.target.value };
+                  onChange(next);
+                }}
+              />
+            </Field>
+            <Field label="Valor">
+              <Input
+                value={option.value}
+                onChange={(event) => {
+                  const next = [...options];
+                  next[index] = { ...next[index], value: event.target.value };
+                  onChange(next);
+                }}
+              />
+            </Field>
+          </div>
+          <Field label="Descripción">
+            <Input
+              value={option.description}
+              onChange={(event) => {
+                const next = [...options];
+                next[index] = { ...next[index], description: event.target.value };
+                onChange(next);
+              }}
+            />
+          </Field>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => onChange(options.filter((_, i) => i !== index))}
+          >
+            Eliminar
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function TicketsPane({ guildId }: { guildId: string }) {
@@ -69,42 +148,53 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   const [config, setConfig] = useState<TicketConfigState>({
     enabled: false,
     panelChannelId: "",
+    requestChannelId: "",
+    receiptHistoryChannelId: "",
+    sendDmReceipt: true,
+    sendDmPendingStatus: false,
     title: "Soporte",
     message: "",
     buttonLabel: "Solicitar ticket",
+    color: "7c4dff",
+    footer: "Sistema de Tickets",
     adminRoleIds: "",
+    ticketCategories: [],
+    commonProblems: [],
+    minecraftServers: [],
+    caseRoleMapText: "{}",
   });
-  const [pending, setPending] = useState<TicketItem[]>([]);
-  const [active, setActive] = useState<TicketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [updatingEmbed, setUpdatingEmbed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function reloadOverview() {
-    const payload = asRecord(await getTicketsOverview(guildId));
-    setPending(normalizeTickets(payload.pending, ["requestId", "id"]));
-    setActive(normalizeTickets(payload.active, ["channelId", "id"]));
-  }
 
   useEffect(() => {
     let mounted = true;
-    void Promise.all([getTicketConfig(guildId).catch(() => ({})), getTicketsOverview(guildId).catch(() => ({}))])
-      .then(([configData, overviewData]) => {
+    void getTicketConfig(guildId)
+      .catch(() => ({}))
+      .then((configData) => {
         if (!mounted) return;
         const cfg = asRecord(configData);
+        const caseRoleMap = asRecord(cfg.caseRoleMap);
         setConfig({
           enabled: toBooleanValue(cfg.enabled),
           panelChannelId: toStringValue(cfg.panelChannelId || cfg.channelId),
+          requestChannelId: toStringValue(cfg.requestChannelId),
+          receiptHistoryChannelId: toStringValue(cfg.receiptHistoryChannelId),
+          sendDmReceipt: toBooleanValue(cfg.sendDmReceipt, true),
+          sendDmPendingStatus: toBooleanValue(cfg.sendDmPendingStatus),
           title: toStringValue(cfg.title, "Soporte"),
           message: toStringValue(cfg.message),
           buttonLabel: toStringValue(cfg.buttonLabel, "Solicitar ticket"),
+          color: toStringValue(cfg.color, "7c4dff").replace("#", ""),
+          footer: toStringValue(cfg.footer, "Sistema de Tickets"),
           adminRoleIds: asArray(cfg.adminRoleIds).map((id) => toStringValue(id)).filter(Boolean).join(", "),
+          ticketCategories: normalizeOptions(cfg.ticketCategories),
+          commonProblems: normalizeOptions(cfg.commonProblems),
+          minecraftServers: normalizeOptions(cfg.minecraftServers),
+          caseRoleMapText: JSON.stringify(caseRoleMap, null, 2),
         });
-        const payload = asRecord(overviewData);
-        setPending(normalizeTickets(payload.pending, ["requestId", "id"]));
-        setActive(normalizeTickets(payload.active, ["channelId", "id"]));
       })
       .catch((err) => {
         if (mounted) setError(getErrorMessage(err));
@@ -118,16 +208,31 @@ export function TicketsPane({ guildId }: { guildId: string }) {
     };
   }, [guildId]);
 
+  function buildPayload() {
+    let caseRoleMap: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(config.caseRoleMapText || "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        caseRoleMap = parsed as Record<string, unknown>;
+      }
+    } catch {
+      caseRoleMap = {};
+    }
+
+    return {
+      ...config,
+      adminRoleIds: config.adminRoleIds
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+      caseRoleMap,
+    };
+  }
+
   async function handleSaveConfig() {
     setSaving(true);
     try {
-      await saveTicketConfig(guildId, {
-        ...config,
-        adminRoleIds: config.adminRoleIds
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean),
-      });
+      await saveTicketConfig(guildId, buildPayload());
       toast({ title: "Tickets guardados", description: "La configuración del panel quedó actualizada.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
@@ -139,7 +244,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   async function handlePublish() {
     setPublishing(true);
     try {
-      await publishTickets(guildId, config);
+      await publishTickets(guildId, buildPayload());
       toast({ title: "Panel publicado", description: "El mensaje de tickets se envió al canal.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo publicar", description: getErrorMessage(err), tone: "danger" });
@@ -148,20 +253,21 @@ export function TicketsPane({ guildId }: { guildId: string }) {
     }
   }
 
-  async function runAction(id: string, action: () => Promise<unknown>, label: string) {
-    setBusyId(id);
+  async function handleUpdateEmbed() {
+    setUpdatingEmbed(true);
     try {
-      await action();
-      toast({ title: label, description: "La acción se ejecutó correctamente.", tone: "success" });
-      await reloadOverview();
+      await updateTicketEmbed(guildId, buildPayload());
+      toast({ title: "Embed actualizado", description: "El panel en Discord fue refrescado.", tone: "success" });
     } catch (err) {
-      toast({ title: "No se pudo completar", description: getErrorMessage(err), tone: "danger" });
+      toast({ title: "No se pudo actualizar", description: getErrorMessage(err), tone: "danger" });
     } finally {
-      setBusyId(null);
+      setUpdatingEmbed(false);
     }
   }
 
   if (error) return <Alert title="No se pudo cargar tickets" description={error} variant="danger" />;
+
+  const previewColor = `#${config.color.replace("#", "").slice(0, 6) || "7c4dff"}`;
 
   return (
     <div className="relative space-y-5">
@@ -173,7 +279,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
 
       <SectionCard
         title="Gestión de tickets"
-        description="Equivalente al panel legacy con pestañas de panel, roles y operación."
+        description="Equivalente al panel legacy con panel, categorías, preview y operación."
         action={<PremiumLock locked={!hasPremium} />}
       >
         <Tabs items={TICKET_TABS} value={tab} onValueChange={setTab} className="mb-6" />
@@ -198,6 +304,13 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                     options={channels}
                   />
                 </Field>
+                <Field label="Canal de solicitudes">
+                  <ChannelSelect
+                    value={config.requestChannelId}
+                    onChange={(requestChannelId) => setConfig((c) => ({ ...c, requestChannelId }))}
+                    options={channels}
+                  />
+                </Field>
                 <Field label="Título del embed">
                   <Input value={config.title} onChange={(event) => setConfig((c) => ({ ...c, title: event.target.value }))} />
                 </Field>
@@ -205,12 +318,29 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                   <Textarea value={config.message} onChange={(event) => setConfig((c) => ({ ...c, message: event.target.value }))} />
                 </Field>
                 <Field label="Texto del botón">
-                  <Input value={config.buttonLabel} onChange={(event) => setConfig((c) => ({ ...c, buttonLabel: event.target.value }))} />
+                  <Input
+                    value={config.buttonLabel}
+                    onChange={(event) => setConfig((c) => ({ ...c, buttonLabel: event.target.value }))}
+                  />
                 </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Color embed">
+                    <Input
+                      value={config.color}
+                      onChange={(event) => setConfig((c) => ({ ...c, color: event.target.value.replace("#", "") }))}
+                    />
+                  </Field>
+                  <Field label="Footer">
+                    <Input value={config.footer} onChange={(event) => setConfig((c) => ({ ...c, footer: event.target.value }))} />
+                  </Field>
+                </div>
                 <div className="flex flex-wrap gap-3">
                   <FormActions onSave={handleSaveConfig} saving={saving} />
                   <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing}>
                     {publishing ? "Publicando..." : "Publicar panel"}
+                  </Button>
+                  <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={updatingEmbed}>
+                    {updatingEmbed ? "Actualizando..." : "Actualizar embed"}
                   </Button>
                 </div>
               </div>
@@ -230,93 +360,125 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             </div>
           ) : null}
 
-          {tab === "manage" ? (
+          {tab === "preview" ? (
             <div className="grid gap-5 xl:grid-cols-2">
-              <div>
-                <h3 className="mb-3 flex items-center gap-2 font-medium text-white">
-                  <Inbox className="h-4 w-4" />
-                  Pendientes
-                </h3>
-                {loading ? (
-                  <Alert title="Cargando pendientes" description="Consultando solicitudes entrantes." />
-                ) : pending.length ? (
-                  <div className="space-y-3">
-                    {pending.map((item) => (
-                      <div key={item.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-white">{item.title}</p>
-                            <p className="text-sm text-zinc-400">{item.owner}</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => void runAction(item.id, () => acceptTicket(guildId, item.id), "Solicitud aceptada")}
-                            disabled={busyId === item.id}
-                          >
-                            Aceptar
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+              <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+                <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400">
+                  <Eye className="h-4 w-4" />
+                  Vista previa del embed
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#2f3136]">
+                  <div className="h-1" style={{ backgroundColor: previewColor }} />
+                  <div className="p-4">
+                    <p className="font-semibold text-white">{config.title || "Soporte"}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-[#dcddde]">
+                      {config.message || "Presiona el botón para abrir un ticket."}
+                    </p>
+                    <p className="mt-4 text-xs text-[#949ba4]">{config.footer || "Sistema de Tickets"}</p>
+                    <div className="mt-4">
+                      <span className="inline-flex rounded-lg bg-[#5865f2] px-4 py-2 text-sm font-medium text-white">
+                        {config.buttonLabel || "Solicitar ticket"}
+                      </span>
+                    </div>
                   </div>
-                ) : (
-                  <EmptyState icon={<Ticket className="h-6 w-6" />} title="Nada pendiente" description="No hay solicitudes nuevas." />
-                )}
+                </div>
               </div>
-
-              <div>
-                <h3 className="mb-3 flex items-center gap-2 font-medium text-white">
-                  <MessageSquareMore className="h-4 w-4" />
-                  Activos
-                </h3>
-                {loading ? (
-                  <Alert title="Cargando activos" description="Sincronizando conversaciones abiertas." />
-                ) : active.length ? (
-                  <div className="space-y-3">
-                    {active.map((item) => (
-                      <div key={item.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-white">{item.title}</p>
-                            <p className="text-sm text-zinc-400">{item.owner}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => void runAction(item.id, () => claimTicket(guildId, item.id), "Ticket reclamado")}
-                              disabled={busyId === item.id}
-                            >
-                              Reclamar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              onClick={() => void runAction(item.id, () => closeTicket(guildId, item.id, {}), "Ticket cerrado")}
-                              disabled={busyId === item.id}
-                            >
-                              Cerrar
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState icon={<Settings2 className="h-6 w-6" />} title="Sin tickets activos" description="Cuando haya conversaciones abiertas aparecerán aquí." />
-                )}
-              </div>
+              <Alert
+                title="Publicación"
+                description="Guarda los cambios y usa Publicar panel para enviar este embed al canal configurado."
+              />
             </div>
           ) : null}
+
+          {tab === "categories" ? (
+            <div className="space-y-8">
+              <OptionEditor
+                title="Categorías de ticket"
+                options={config.ticketCategories}
+                onChange={(ticketCategories) => setConfig((c) => ({ ...c, ticketCategories }))}
+              />
+              <OptionEditor
+                title="Problemas comunes"
+                options={config.commonProblems}
+                onChange={(commonProblems) => setConfig((c) => ({ ...c, commonProblems }))}
+              />
+              <OptionEditor
+                title="Servidores Minecraft"
+                options={config.minecraftServers}
+                onChange={(minecraftServers) => setConfig((c) => ({ ...c, minecraftServers }))}
+              />
+              <FormActions onSave={handleSaveConfig} saving={saving} />
+            </div>
+          ) : null}
+
+          {tab === "labs" ? (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                <div>
+                  <p className="font-medium text-white">Recibo por DM</p>
+                  <p className="text-sm text-zinc-400">Envía confirmación privada al abrir ticket.</p>
+                </div>
+                <Switch
+                  checked={config.sendDmReceipt}
+                  onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmReceipt: checked }))}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                <div>
+                  <p className="font-medium text-white">Estado pendiente por DM</p>
+                  <p className="text-sm text-zinc-400">Notifica al usuario mientras espera aceptación.</p>
+                </div>
+                <Switch
+                  checked={config.sendDmPendingStatus}
+                  onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmPendingStatus: checked }))}
+                />
+              </div>
+              <Field label="Canal historial de recibos">
+                <ChannelSelect
+                  value={config.receiptHistoryChannelId}
+                  onChange={(receiptHistoryChannelId) => setConfig((c) => ({ ...c, receiptHistoryChannelId }))}
+                  options={channels}
+                />
+              </Field>
+              <Field
+                label="Mapa caso → roles"
+                description='JSON. Ej: {"reportes":["123456789012345678"]}'
+              >
+                <Textarea
+                  value={config.caseRoleMapText}
+                  onChange={(event) => setConfig((c) => ({ ...c, caseRoleMapText: event.target.value }))}
+                  rows={8}
+                />
+              </Field>
+              <FormActions onSave={handleSaveConfig} saving={saving} />
+            </div>
+          ) : null}
+
+          {tab === "manage" ? <TicketsManagePanel guildId={guildId} /> : null}
 
           {tab === "guide" ? (
             <Alert
               title="Flujo recomendado"
-              description="1) Configura panel y roles. 2) Publica el embed. 3) Gestiona pendientes y activos desde la pestaña Gestión."
+              description="1) Configura panel, roles y categorías. 2) Revisa preview y publica. 3) Ajusta labs si necesitas DMs o historial. 4) Gestiona pendientes y activos."
             />
           ) : null}
         </div>
       </SectionCard>
+
+      <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
+        <div className="mb-2 flex items-center gap-2 font-medium text-zinc-200">
+          <Layers className="h-4 w-4" />
+          Categorías activas
+        </div>
+        {config.ticketCategories.length
+          ? config.ticketCategories.map((cat) => cat.label).join(" · ")
+          : "Sin categorías personalizadas cargadas."}
+        <div className="mt-3 flex items-center gap-2">
+          <FlaskConical className="h-4 w-4" />
+          Labs: DM recibo {config.sendDmReceipt ? "on" : "off"} · pendiente DM{" "}
+          {config.sendDmPendingStatus ? "on" : "off"}
+        </div>
+      </div>
     </div>
   );
 }

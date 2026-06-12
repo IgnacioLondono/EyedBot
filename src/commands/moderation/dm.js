@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { safeDeferReply, safeEditReply } = require('../../utils/interactions');
+const { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { safeDeferReply, safeEditReply, safeReply } = require('../../utils/interactions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -20,14 +20,14 @@ module.exports = {
         const message = interaction.options.getString('mensaje', true).trim();
 
         if (!message) {
-            await interaction.reply({
+            await safeReply(interaction, {
                 content: 'El mensaje no puede estar vacío.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
 
-        await safeDeferReply(interaction, { ephemeral: true });
+        await safeDeferReply(interaction, { flags: MessageFlags.Ephemeral });
 
         try {
             await targetUser.send({

@@ -10,79 +10,160 @@ import {
   type ReactNode,
 } from "react";
 import { usePanel } from "@/components/providers/PanelProvider";
+import {
+  DEFAULT_THEME,
+  normalizePanelTheme,
+  type PanelThemeSettings,
+  type ThemePresetId,
+  applyPreset,
+} from "@/lib/theme-presets";
+import { clearWallpaperFromIdb, useWallpaperBlobUrl } from "@/lib/hooks/useWallpaperStorage";
 
-export type ThemeSettings = {
-  accent: string;
-  accent2: string;
-  panelGlow: string;
-};
+const STORAGE_KEY = "eyedbot_theme_settings_v1";
+const LEGACY_STORAGE_KEY = "eyedbot-panel-theme";
 
 type ThemeContextValue = {
-  theme: ThemeSettings;
-  setTheme: (theme: Partial<ThemeSettings>) => void;
+  theme: PanelThemeSettings;
+  wallpaperUrl: string | null;
+  setTheme: (theme: Partial<PanelThemeSettings>) => void;
+  applyThemePreset: (presetId: ThemePresetId) => void;
   resetTheme: () => void;
+  refreshWallpaper: () => Promise<void>;
   premiumLocked: boolean;
 };
 
-const STORAGE_KEY = "eyedbot-panel-theme";
+function readInitialTheme(): PanelThemeSettings {
+  if (typeof window === "undefined") return DEFAULT_THEME;
 
-const defaultTheme: ThemeSettings = {
-  accent: "#8b5cf6",
-  accent2: "#d946ef",
-  panelGlow: "#7c3aed",
-};
-
-function readInitialTheme(): ThemeSettings {
-  if (typeof window === "undefined") return defaultTheme;
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return defaultTheme;
-  try {
-    return { ...defaultTheme, ...(JSON.parse(raw) as Partial<ThemeSettings>) };
-  } catch {
-    return defaultTheme;
+  if (raw) {
+    try {
+      return normalizePanelTheme(JSON.parse(raw) as Partial<PanelThemeSettings>);
+    } catch {
+      return DEFAULT_THEME;
+    }
   }
+
+  const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy) as { accent?: string; accent2?: string; panelGlow?: string };
+      return normalizePanelTheme({
+        ...DEFAULT_THEME,
+        accentPrimary: parsed.accent || DEFAULT_THEME.accentPrimary,
+        accentSecondary: parsed.accent2 || DEFAULT_THEME.accentSecondary,
+      });
+    } catch {
+      return DEFAULT_THEME;
+    }
+  }
+
+  return DEFAULT_THEME;
+}
+
+function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
+  const root = document.documentElement;
+  const patternStrength = theme.atmosphere / 100;
+  const borderStrength = theme.borderStrength / 100;
+
+  root.style.setProperty("--color-accent", theme.accentPrimary);
+  root.style.setProperty("--color-accent-2", theme.accentSecondary);
+  root.style.setProperty("--color-glow", theme.accentPrimary);
+  root.style.setProperty("--color-ring", theme.accentSecondary);
+  root.style.setProperty("--shadow-accent", `${theme.accentPrimary}55`);
+  root.style.setProperty("--color-bg", theme.bgPrimary);
+  root.style.setProperty("--background", theme.bgPrimary);
+  root.style.setProperty("--color-surface", theme.bgCard);
+  root.style.setProperty("--color-surface-strong", theme.bgSecondary);
+  root.style.setProperty("--color-border", `${theme.borderColor}${Math.round(40 + borderStrength * 60).toString(16).padStart(2, "0")}`);
+  root.style.setProperty("--foreground", theme.textPrimary);
+  root.style.setProperty("--theme-text-secondary", theme.textSecondary);
+  root.style.setProperty("--theme-atmosphere", String(patternStrength));
+  root.style.setProperty("--user-wallpaper-blur", `${28 + (theme.wallpaperBloom / 100) * 76}px`);
+  root.style.setProperty("--user-wallpaper-bloom-opacity", String(0.14 + (theme.wallpaperBloom / 100) * 0.52));
+  root.style.setProperty("--user-wallpaper-veil-opacity", String(0.35 + (theme.wallpaperVeil / 100) * 0.45));
+
+  const hasWallpaper =
+    theme.wallpaperEnabled &&
+    ((theme.wallpaperStorage === "inline" && theme.wallpaperUrl) ||
+      (theme.wallpaperStorage === "indexeddb" && wallpaperUrl));
+
+  if (hasWallpaper) {
+    const url = theme.wallpaperStorage === "indexeddb" ? wallpaperUrl : theme.wallpaperUrl;
+    root.style.setProperty("--user-wallpaper-image", `url("${url}")`);
+    root.dataset.wallpaper = theme.wallpaperKind === "video" ? "video" : "image";
+    root.dataset.wallpaperVideo = theme.wallpaperKind === "video" ? url || "" : "";
+  } else {
+    root.style.removeProperty("--user-wallpaper-image");
+    delete root.dataset.wallpaper;
+    delete root.dataset.wallpaperVideo;
+  }
+
+  root.dataset.themeBubbles = theme.backgroundBubbles ? "1" : "0";
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function applyTheme(theme: ThemeSettings) {
-  const root = document.documentElement;
-  root.style.setProperty("--color-accent", theme.accent);
-  root.style.setProperty("--color-accent-2", theme.accent2);
-  root.style.setProperty("--color-glow", theme.panelGlow);
-  root.style.setProperty("--shadow-accent", `${theme.panelGlow}55`);
-  root.style.setProperty("--color-ring", theme.accent2);
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { hasPremium } = usePanel();
-  const [theme, setThemeState] = useState<ThemeSettings>(readInitialTheme);
+  const [theme, setThemeState] = useState<PanelThemeSettings>(readInitialTheme);
+  const { blobUrl, refreshWallpaper } = useWallpaperBlobUrl(
+    theme.wallpaperEnabled,
+    theme.wallpaperStorage
+  );
+
+  const wallpaperUrl =
+    theme.wallpaperEnabled && theme.wallpaperStorage === "indexeddb"
+      ? blobUrl
+      : theme.wallpaperEnabled && theme.wallpaperStorage === "inline"
+        ? theme.wallpaperUrl
+        : null;
 
   useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+    applyThemeCss(theme, wallpaperUrl);
+  }, [theme, wallpaperUrl]);
 
-  const setTheme = useCallback((next: Partial<ThemeSettings>) => {
-    if (!hasPremium) return;
-    setThemeState((current) => {
-      const merged = { ...current, ...next };
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-      return merged;
-    });
-  }, [hasPremium]);
-  const resetTheme = useCallback(() => {
-    setThemeState(defaultTheme);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultTheme));
+  const persist = useCallback((next: PanelThemeSettings) => {
+    const forDisk = { ...next };
+    if (forDisk.wallpaperStorage === "indexeddb") {
+      forDisk.wallpaperUrl = "";
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(forDisk));
+    return next;
   }, []);
+
+  const setTheme = useCallback(
+    (patch: Partial<PanelThemeSettings>) => {
+      if (!hasPremium) return;
+      setThemeState((current) => persist(normalizePanelTheme({ ...current, ...patch })));
+    },
+    [hasPremium, persist]
+  );
+
+  const applyThemePreset = useCallback(
+    (presetId: ThemePresetId) => {
+      if (!hasPremium) return;
+      setThemeState((current) => persist(applyPreset(presetId, current)));
+    },
+    [hasPremium, persist]
+  );
+
+  const resetTheme = useCallback(() => {
+    void clearWallpaperFromIdb();
+    setThemeState(persist(DEFAULT_THEME));
+  }, [persist]);
 
   const value = useMemo(
     () => ({
       theme,
+      wallpaperUrl,
       setTheme,
+      applyThemePreset,
       resetTheme,
+      refreshWallpaper,
       premiumLocked: !hasPremium,
     }),
-    [theme, hasPremium, resetTheme, setTheme]
+    [theme, wallpaperUrl, setTheme, applyThemePreset, resetTheme, refreshWallpaper, hasPremium]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -93,3 +174,10 @@ export function useThemeSettings() {
   if (!context) throw new Error("useThemeSettings debe usarse dentro de ThemeProvider");
   return context;
 }
+
+// Compat alias for old 3-color API
+export type ThemeSettings = {
+  accent: string;
+  accent2: string;
+  panelGlow: string;
+};

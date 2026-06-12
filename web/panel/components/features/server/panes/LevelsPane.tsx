@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Award, Plus, Trash2, Trophy } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { getLevelingConfig, getLevelingLeaderboard, saveLevelingConfig } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
@@ -26,7 +26,12 @@ import {
   sanitizeXpMultiplier,
   xpForLevel,
 } from "@/lib/leveling-math";
-import { asArray, asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
+import {
+  LeaderboardPodium,
+  LeaderboardRow,
+  type LeaderboardEntry,
+} from "@/components/features/shared/LeaderboardPodium";
+import { asArray, asRecord, extractLeaderboard, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
 
 type LevelReward = { level: number; roleId: string };
 
@@ -96,7 +101,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
       .then(([configData, boardData]) => {
         if (!active) return;
         setForm(normalizeConfig(configData));
-        setLeaderboard(asArray(boardData).map((entry) => asRecord(entry)));
+        setLeaderboard(extractLeaderboard(boardData).map((entry) => asRecord(entry)));
       })
       .catch((err) => {
         if (active) setError(getErrorMessage(err));
@@ -408,28 +413,17 @@ export function LevelsPane({ guildId }: { guildId: string }) {
       ) : null}
 
       {tab === "leaderboard" ? (
-        <SectionCard title="Leaderboard" description="Top de miembros con más experiencia acumulada.">
+        <SectionCard title="Leaderboard" description="Datos en vivo desde la base de datos de niveles.">
           {leaderboard.length ? (
             <div className="space-y-3">
-              {leaderboard.slice(0, 25).map((entry, index) => (
-                <div
-                  key={`${entry.userId ?? entry.id ?? index}`}
-                  className="flex items-center gap-4 rounded-2xl border border-white/8 bg-black/20 px-4 py-3"
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-100">
-                    {index === 0 ? <Trophy className="h-5 w-5" /> : <Award className="h-5 w-5" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-white">
-                      {toStringValue(entry.username || entry.userTag || entry.tag || entry.userId, "Usuario")}
-                    </p>
-                    <p className="text-sm text-zinc-400">
-                      Nivel {toStringValue(entry.level, "0")} · XP {toStringValue(entry.xp || entry.totalXp, "0")}
-                      {entry.messageCount ? ` · ${toStringValue(entry.messageCount)} msgs` : ""}
-                      {entry.voiceMinutes ? ` · ${toStringValue(entry.voiceMinutes)} min voz` : ""}
-                    </p>
-                  </div>
-                </div>
+              <LeaderboardPodium entries={leaderboard as LeaderboardEntry[]} mode="leveling" />
+              {leaderboard.slice(3, 25).map((entry, index) => (
+                <LeaderboardRow
+                  key={`${entry.userId ?? index}`}
+                  entry={entry as LeaderboardEntry}
+                  rank={index + 4}
+                  mode="leveling"
+                />
               ))}
             </div>
           ) : (

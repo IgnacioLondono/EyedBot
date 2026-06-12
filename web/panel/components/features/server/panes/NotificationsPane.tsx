@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellRing } from "lucide-react";
+import { BellRing, Plus, Radio, Trash2 } from "lucide-react";
 import {
   getStreamAlertConfig,
   saveStreamAlertConfig,
@@ -10,6 +10,8 @@ import {
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import {
@@ -19,27 +21,103 @@ import {
   Input,
   PaneGrid,
   SectionCard,
+  Select,
   Textarea,
 } from "@/components/features/shared";
-import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
+import { asArray, asRecord, formatDate, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
-type NotificationState = {
+type StreamPlatform = "twitch" | "youtube" | "tiktok" | "custom";
+
+type StreamSource = {
+  id: string;
+  enabled: boolean;
+  platform: StreamPlatform;
+  name: string;
+  url: string;
+  feedUrl: string;
+  imageUrl: string;
+  lastItemId: string;
+  lastPostedAt: string;
+};
+
+type StreamAlertState = {
   enabled: boolean;
   channelId: string;
-  streamerName: string;
-  message: string;
+  mentionText: string;
+  titleTemplate: string;
+  descriptionTemplate: string;
+  color: string;
+  footerText: string;
+  embedLargePreview: boolean;
+  sources: StreamSource[];
 };
+
+const defaultForm: StreamAlertState = {
+  enabled: false,
+  channelId: "",
+  mentionText: "",
+  titleTemplate: "🔴 {platform}: {name} en directo",
+  descriptionTemplate: "{title}\n{url}",
+  color: "7c4dff",
+  footerText: "EyedBot Stream Alerts",
+  embedLargePreview: false,
+  sources: [],
+};
+
+function normalizeSource(entry: unknown, index: number): StreamSource {
+  const data = asRecord(entry);
+  const platformRaw = toStringValue(data.platform, "custom").toLowerCase();
+  const platform = (["twitch", "youtube", "tiktok", "custom"] as const).includes(platformRaw as StreamPlatform)
+    ? (platformRaw as StreamPlatform)
+    : "custom";
+
+  return {
+    id: toStringValue(data.id, `src_${index + 1}`),
+    enabled: toBooleanValue(data.enabled, true),
+    platform,
+    name: toStringValue(data.name, "Fuente"),
+    url: toStringValue(data.url),
+    feedUrl: toStringValue(data.feedUrl),
+    imageUrl: toStringValue(data.imageUrl),
+    lastItemId: toStringValue(data.lastItemId),
+    lastPostedAt: toStringValue(data.lastPostedAt),
+  };
+}
+
+function normalizeForm(value: unknown): StreamAlertState {
+  const data = asRecord(value);
+  return {
+    enabled: toBooleanValue(data.enabled),
+    channelId: toStringValue(data.channelId),
+    mentionText: toStringValue(data.mentionText),
+    titleTemplate: toStringValue(data.titleTemplate, defaultForm.titleTemplate),
+    descriptionTemplate: toStringValue(data.descriptionTemplate, defaultForm.descriptionTemplate),
+    color: toStringValue(data.color, defaultForm.color).replace("#", ""),
+    footerText: toStringValue(data.footerText, defaultForm.footerText),
+    embedLargePreview: toBooleanValue(data.embedLargePreview),
+    sources: asArray(data.sources).map(normalizeSource),
+  };
+}
+
+function emptySource(): StreamSource {
+  return {
+    id: `src_${Date.now()}`,
+    enabled: true,
+    platform: "twitch",
+    name: "",
+    url: "",
+    feedUrl: "",
+    imageUrl: "",
+    lastItemId: "",
+    lastPostedAt: "",
+  };
+}
 
 export function NotificationsPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("stream");
-  const [form, setForm] = useState<NotificationState>({
-    enabled: false,
-    channelId: "",
-    streamerName: "",
-    message: "",
-  });
+  const [tab, setTab] = useState("channel");
+  const [form, setForm] = useState<StreamAlertState>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -47,24 +125,24 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
 
   useEffect(() => {
     void getStreamAlertConfig(guildId)
-      .then((payload) => {
-        const data = asRecord(payload);
-        setForm({
-          enabled: toBooleanValue(data.enabled),
-          channelId: toStringValue(data.channelId),
-          streamerName: toStringValue(data.streamerName || data.username),
-          message: toStringValue(data.message || data.template),
-        });
-      })
+      .then((payload) => setForm(normalizeForm(payload)))
       .catch((err) => setError(getErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [guildId]);
+
+  function updateSource(index: number, patch: Partial<StreamSource>) {
+    setForm((current) => {
+      const sources = [...current.sources];
+      sources[index] = { ...sources[index], ...patch };
+      return { ...current, sources };
+    });
+  }
 
   async function handleSave() {
     setSaving(true);
     try {
       await saveStreamAlertConfig(guildId, form);
-      toast({ title: "Alertas guardadas", description: "La notificación de stream fue actualizada.", tone: "success" });
+      toast({ title: "Alertas guardadas", description: "La configuración de stream alerts fue actualizada.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -87,9 +165,17 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
   if (loading) return <Alert title="Cargando alertas" description="Consultando configuración actual de stream alerts." />;
   if (error) return <Alert title="No se pudo cargar alertas" description={error} variant="danger" />;
 
+  const previewSource = form.sources.find((source) => source.enabled) || form.sources[0];
+  const previewTitle = form.titleTemplate
+    .replace("{platform}", previewSource?.platform || "twitch")
+    .replace("{name}", previewSource?.name || "Canal");
+  const previewDescription = form.descriptionTemplate
+    .replace("{title}", previewSource?.name || "En directo")
+    .replace("{url}", previewSource?.url || "https://...");
+
   return (
     <PaneGrid>
-      <SectionCard title="Centro de alertas" description="Canales, directos y eventos del panel legacy.">
+      <SectionCard title="Centro de alertas" description="Canales, fuentes en directo y resumen de publicaciones.">
         <Tabs
           items={[
             { id: "channel", label: "Canal" },
@@ -102,33 +188,196 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
           className="mb-5"
         />
 
-        {tab === "stream" || tab === "channel" ? (
+        {tab === "channel" ? (
           <div className="space-y-5">
             <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
               <div>
                 <p className="font-medium text-white">Alertas habilitadas</p>
                 <p className="text-sm text-zinc-400">Activa publicaciones automáticas en vivo.</p>
               </div>
-              <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
+              <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((c) => ({ ...c, enabled: checked }))} />
             </div>
             <Field label="Canal de publicación">
-              <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((current) => ({ ...current, channelId }))} options={channels} />
+              <ChannelSelect
+                value={form.channelId}
+                onChange={(channelId) => setForm((c) => ({ ...c, channelId }))}
+                options={channels}
+              />
             </Field>
-            {tab === "stream" ? (
-              <>
-                <Field label="Streamer o fuente">
-                  <Input value={form.streamerName} onChange={(event) => setForm((current) => ({ ...current, streamerName: event.target.value }))} placeholder="Nombre del canal o creador" />
-                </Field>
-                <Field label="Mensaje">
-                  <Textarea value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} />
-                </Field>
-              </>
-            ) : null}
+            <Field label="Mención o texto extra">
+              <Input
+                value={form.mentionText}
+                onChange={(event) => setForm((c) => ({ ...c, mentionText: event.target.value }))}
+                placeholder="@everyone o <@&roleId>"
+              />
+            </Field>
+            <Field label="Plantilla del título" description="Variables: {platform}, {name}">
+              <Input
+                value={form.titleTemplate}
+                onChange={(event) => setForm((c) => ({ ...c, titleTemplate: event.target.value }))}
+              />
+            </Field>
+            <Field label="Plantilla de descripción" description="Variables: {title}, {url}">
+              <Textarea
+                value={form.descriptionTemplate}
+                onChange={(event) => setForm((c) => ({ ...c, descriptionTemplate: event.target.value }))}
+              />
+            </Field>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Color embed">
+                <Input
+                  value={form.color}
+                  onChange={(event) => setForm((c) => ({ ...c, color: event.target.value.replace("#", "") }))}
+                />
+              </Field>
+              <Field label="Footer">
+                <Input
+                  value={form.footerText}
+                  onChange={(event) => setForm((c) => ({ ...c, footerText: event.target.value }))}
+                />
+              </Field>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
+                <p className="font-medium text-white">Preview grande</p>
+                <p className="text-sm text-zinc-400">Usa imagen grande en el embed cuando esté disponible.</p>
+              </div>
+              <Switch
+                checked={form.embedLargePreview}
+                onCheckedChange={(checked) => setForm((c) => ({ ...c, embedLargePreview: checked }))}
+              />
+            </div>
             <FormActions onSave={handleSave} onTest={handleTest} saving={saving} testing={testing} />
           </div>
-        ) : (
-          <Alert title={tab === "events" ? "Eventos" : "Resumen diario"} description="Estas pestañas del backup se conectarán en la siguiente iteración. Usa Directos para stream alerts." />
-        )}
+        ) : null}
+
+        {tab === "stream" || tab === "events" ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-zinc-400">
+                {tab === "stream"
+                  ? "Añade fuentes de Twitch, YouTube, TikTok o URLs personalizadas."
+                  : "Activa o desactiva fuentes por plataforma."}
+              </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setForm((c) => ({ ...c, sources: [...c.sources, emptySource()] }))}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Añadir fuente
+              </Button>
+            </div>
+
+            {form.sources.length ? (
+              form.sources.map((source, index) => (
+                <div key={source.id} className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Radio className="h-4 w-4 text-violet-300" />
+                      <span className="font-medium text-white">{source.name || `Fuente ${index + 1}`}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={source.enabled}
+                        onCheckedChange={(checked) => updateSource(index, { enabled: checked })}
+                      />
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() =>
+                          setForm((c) => ({
+                            ...c,
+                            sources: c.sources.filter((_, i) => i !== index),
+                          }))
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Plataforma">
+                      <Select
+                        value={source.platform}
+                        onChange={(event) =>
+                          updateSource(index, { platform: event.target.value as StreamPlatform })
+                        }
+                      >
+                        <option value="twitch">Twitch</option>
+                        <option value="youtube">YouTube</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="custom">Custom</option>
+                      </Select>
+                    </Field>
+                    <Field label="Nombre">
+                      <Input
+                        value={source.name}
+                        onChange={(event) => updateSource(index, { name: event.target.value })}
+                      />
+                    </Field>
+                    <Field label="URL principal">
+                      <Input
+                        value={source.url}
+                        onChange={(event) => updateSource(index, { url: event.target.value })}
+                        placeholder="https://..."
+                      />
+                    </Field>
+                    <Field label="Feed / RSS">
+                      <Input
+                        value={source.feedUrl}
+                        onChange={(event) => updateSource(index, { feedUrl: event.target.value })}
+                        placeholder="https://..."
+                      />
+                    </Field>
+                    {tab === "stream" ? (
+                      <Field label="Imagen">
+                        <Input
+                          value={source.imageUrl}
+                          onChange={(event) => updateSource(index, { imageUrl: event.target.value })}
+                          placeholder="https://..."
+                        />
+                      </Field>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState title="Sin fuentes" description="Añade al menos una fuente para recibir alertas." />
+            )}
+
+            <FormActions onSave={handleSave} onTest={handleTest} saving={saving} testing={testing} />
+          </div>
+        ) : null}
+
+        {tab === "digest" ? (
+          <div className="space-y-4">
+            {form.sources.length ? (
+              form.sources.map((source) => (
+                <div
+                  key={source.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium text-white">
+                      {source.name || source.id} · {source.platform}
+                    </p>
+                    <p className="text-sm text-zinc-400">
+                      Último item: {source.lastItemId || "N/D"}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm text-zinc-400">
+                    <p>{source.enabled ? "Activa" : "Pausada"}</p>
+                    <p>{source.lastPostedAt ? formatDate(source.lastPostedAt) : "Sin publicaciones"}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState title="Sin historial" description="Cuando haya fuentes configuradas verás su último aviso aquí." />
+            )}
+            <FormActions onSave={handleSave} saving={saving} />
+          </div>
+        ) : null}
       </SectionCard>
 
       <SectionCard title="Preview del aviso" description="Tono y destino actual del disparador.">
@@ -136,8 +385,11 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-50">
             <BellRing className="h-6 w-6" />
           </div>
-          <p className="text-sm text-zinc-200">{form.message || "Configura un mensaje para ver el resultado aquí."}</p>
-          <p className="mt-4 text-xs uppercase tracking-[0.2em] text-zinc-500">{form.streamerName || "Fuente sin definir"}</p>
+          <p className="text-sm font-medium text-white">{previewTitle}</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{previewDescription}</p>
+          <p className="mt-4 text-xs uppercase tracking-[0.2em] text-zinc-500">
+            {form.mentionText || "Sin mención"} · {form.sources.filter((s) => s.enabled).length} fuentes activas
+          </p>
         </div>
       </SectionCard>
     </PaneGrid>

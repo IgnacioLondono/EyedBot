@@ -6,7 +6,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    PermissionFlagsBits
+    PermissionFlagsBits,
+    MessageFlags
 } = require('discord.js');
 const config = require('../../config');
 
@@ -214,21 +215,21 @@ async function handleHelpButton(interaction) {
 
     const parts = interaction.customId.split(':');
     if (parts.length < 3 || parts[0] !== 'help_nav') {
-        await interaction.reply({ content: 'Menú de ayuda no válido.', ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: 'Menú de ayuda no válido.', flags: MessageFlags.Ephemeral }).catch(() => {});
         return true;
     }
 
     const category = parts[1];
     const ownerId = parts.slice(2).join(':');
     if (!ownerId || !CATEGORY_META[category]) {
-        await interaction.reply({ content: 'Categoría no válida.', ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: 'Categoría no válida.', flags: MessageFlags.Ephemeral }).catch(() => {});
         return true;
     }
 
     if (interaction.user.id !== ownerId) {
         await interaction.reply({
             content: '🔒 Solo quien usó `/help` puede usar estos botones.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
         return true;
     }
@@ -237,7 +238,7 @@ async function handleHelpButton(interaction) {
     if (category === 'moderation' && !showModeration) {
         await interaction.reply({
             content: '🔒 No tienes permiso para ver la ayuda de moderación.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
         return true;
     }
@@ -252,7 +253,7 @@ async function handleHelpButton(interaction) {
         await interaction.followUp({
             embeds: [embed],
             components: rows,
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         }).catch(() => null);
     }
 
@@ -276,7 +277,7 @@ module.exports = {
             return interaction.reply({
                 embeds: [embed],
                 components: rows,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         } catch (error) {
             console.error('Error en help:', error);
@@ -287,7 +288,7 @@ module.exports = {
                         .setTitle('❌ Error')
                         .setDescription('No se pudo mostrar la ayuda.')
                 ],
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     }

@@ -49,6 +49,14 @@ export function formatDate(value: unknown) {
   }).format(date);
 }
 
+export function extractLeaderboard<T = Record<string, unknown>>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  const record = asRecord(payload);
+  if (Array.isArray(record.leaderboard)) return record.leaderboard as T[];
+  if (Array.isArray(record.items)) return record.items as T[];
+  return [];
+}
+
 export function getErrorMessage(error: unknown, fallback = "Ocurrió un error inesperado") {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error) return error;

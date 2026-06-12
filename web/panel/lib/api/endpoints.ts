@@ -141,8 +141,12 @@ export const saveTicketConfig = (guildId: string, body: Record<string, unknown>)
 export const publishTickets = (guildId: string, body?: Record<string, unknown>) =>
   apiFetch(`/api/guild/${g(guildId)}/ticket-publish`, { method: "POST", body });
 
-export const getTicketsOverview = (guildId: string) =>
-  apiFetch(`/api/guild/${g(guildId)}/tickets/overview`);
+export const getTicketsOverview = (guildId: string, params?: { historyLimit?: number }) => {
+  const search = new URLSearchParams();
+  if (params?.historyLimit) search.set("historyLimit", String(params.historyLimit));
+  const query = search.toString();
+  return apiFetch(`/api/guild/${g(guildId)}/tickets/overview${query ? `?${query}` : ""}`);
+};
 
 export const acceptTicket = (guildId: string, requestId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/tickets/pending/${encodeURIComponent(requestId)}/accept`, {
@@ -168,6 +172,22 @@ export const sendTicketMessage = (guildId: string, channelId: string, body: { co
     method: "POST",
     body,
   });
+
+export const unclaimTicket = (guildId: string, channelId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/tickets/active/${encodeURIComponent(channelId)}/unclaim`, {
+    method: "POST",
+  });
+
+export const getTicketReport = (guildId: string, reportId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/tickets/report/${encodeURIComponent(reportId)}`);
+
+export const deleteTicketReport = (guildId: string, reportId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/tickets/reports/${encodeURIComponent(reportId)}`, {
+    method: "DELETE",
+  });
+
+export const updateTicketEmbed = (guildId: string, body?: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/ticket-embed-update`, { method: "POST", body });
 
 // ─── Leveling ───────────────────────────────────────────────────────
 
@@ -228,6 +248,23 @@ export const getGachaShop = (guildId: string) =>
 
 export const getGachaMarket = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/gacha-market`);
+
+export const gachaCatalogImageUrl = (guildId: string, characterId: string) =>
+  `/api/guild/${g(guildId)}/gacha-catalog/${encodeURIComponent(characterId)}/image`;
+
+export const getGachaInventory = (
+  guildId: string,
+  params?: { userId?: string; q?: string; rarity?: string; series?: string; limit?: number }
+) => {
+  const search = new URLSearchParams();
+  if (params?.userId) search.set("userId", params.userId);
+  if (params?.q) search.set("q", params.q);
+  if (params?.rarity) search.set("rarity", params.rarity);
+  if (params?.series) search.set("series", params.series);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const query = search.toString();
+  return apiFetch(`/api/guild/${g(guildId)}/gacha-inventory${query ? `?${query}` : ""}`);
+};
 
 // ─── Free games ─────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-const { AttachmentBuilder, SlashCommandBuilder } = require('discord.js');
+const { AttachmentBuilder, MessageFlags, SlashCommandBuilder } = require('discord.js');
 const Embeds = require('../../utils/embeds');
 const gachaStore = require('../../utils/gacha-store');
 const {
@@ -31,7 +31,7 @@ async function handleShopButton(interaction) {
     if (!ownerId || ownerId !== interaction.user.id) {
         await interaction.reply({
             content: 'Solo quien abrió la tienda puede usar estos botones.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         }).catch(() => null);
         return true;
     }
@@ -40,7 +40,7 @@ async function handleShopButton(interaction) {
     if (!config.economyEnabled) {
         await interaction.reply({
             embeds: [Embeds.warning('Economía desactivada', 'Un admin debe activar la economía desde el panel web o `/gacha configurar`.')],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         }).catch(() => null);
         return true;
     }
@@ -71,7 +71,7 @@ async function handleShopButton(interaction) {
                 : 'No se pudo completar la compra.';
             await interaction.reply({
                 embeds: [Embeds.error('Compra fallida', message)],
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             }).catch(() => null);
             return true;
         }

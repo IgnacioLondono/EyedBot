@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../../config');
 const levelingStore = require('../../utils/leveling-store');
 const { getLevelFromXp, getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
@@ -153,7 +153,7 @@ async function runNivelSelf(interaction) {
         }
     }
 
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 /** Lista roles de nivel configurados en el servidor (`roleRewards`); si no hay, muestra referencia Eyed. */
@@ -170,7 +170,7 @@ async function runRangos(interaction) {
             .setDescription(`Sin roles en el panel.\n\n${refLines}`)
             .setFooter({ text: interaction.user.username })
             .setTimestamp();
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     const MAX_FIELDS = 25;
@@ -205,7 +205,7 @@ async function runRangos(interaction) {
         .setFooter({ text: interaction.user.username })
         .setTimestamp();
 
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function runTop(interaction) {
