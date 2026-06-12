@@ -117,3 +117,8 @@ html:not([data-wallpaper]) body::before {
 .panel-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.28);
 }
+
+select option {
+  background-color: #18181b;
+  color: #f4f4f5;
+}
