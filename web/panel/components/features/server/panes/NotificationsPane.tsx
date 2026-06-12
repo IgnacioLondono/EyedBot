@@ -10,6 +10,7 @@ import {
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
+import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import {
   ChannelSelect,
@@ -32,6 +33,7 @@ type NotificationState = {
 export function NotificationsPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
+  const [tab, setTab] = useState("stream");
   const [form, setForm] = useState<NotificationState>({
     enabled: false,
     channelId: "",
@@ -87,26 +89,46 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
 
   return (
     <PaneGrid>
-      <SectionCard title="Alertas de streaming" description="Publica avisos automáticos cuando un creador se conecte.">
-        <div className="space-y-5">
-          <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-            <div>
-              <p className="font-medium text-white">Alertas habilitadas</p>
-              <p className="text-sm text-zinc-400">Activa publicaciones automáticas en vivo.</p>
+      <SectionCard title="Centro de alertas" description="Canales, directos y eventos del panel legacy.">
+        <Tabs
+          items={[
+            { id: "channel", label: "Canal" },
+            { id: "stream", label: "Directos" },
+            { id: "events", label: "Eventos" },
+            { id: "digest", label: "Resumen" },
+          ]}
+          value={tab}
+          onValueChange={setTab}
+          className="mb-5"
+        />
+
+        {tab === "stream" || tab === "channel" ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
+                <p className="font-medium text-white">Alertas habilitadas</p>
+                <p className="text-sm text-zinc-400">Activa publicaciones automáticas en vivo.</p>
+              </div>
+              <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
             </div>
-            <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
+            <Field label="Canal de publicación">
+              <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((current) => ({ ...current, channelId }))} options={channels} />
+            </Field>
+            {tab === "stream" ? (
+              <>
+                <Field label="Streamer o fuente">
+                  <Input value={form.streamerName} onChange={(event) => setForm((current) => ({ ...current, streamerName: event.target.value }))} placeholder="Nombre del canal o creador" />
+                </Field>
+                <Field label="Mensaje">
+                  <Textarea value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} />
+                </Field>
+              </>
+            ) : null}
+            <FormActions onSave={handleSave} onTest={handleTest} saving={saving} testing={testing} />
           </div>
-          <Field label="Canal de publicación">
-            <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((current) => ({ ...current, channelId }))} options={channels} />
-          </Field>
-          <Field label="Streamer o fuente">
-            <Input value={form.streamerName} onChange={(event) => setForm((current) => ({ ...current, streamerName: event.target.value }))} placeholder="Nombre del canal o creador" />
-          </Field>
-          <Field label="Mensaje">
-            <Textarea value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} />
-          </Field>
-          <FormActions onSave={handleSave} onTest={handleTest} saving={saving} testing={testing} />
-        </div>
+        ) : (
+          <Alert title={tab === "events" ? "Eventos" : "Resumen diario"} description="Estas pestañas del backup se conectarán en la siguiente iteración. Usa Directos para stream alerts." />
+        )}
       </SectionCard>
 
       <SectionCard title="Preview del aviso" description="Tono y destino actual del disparador.">

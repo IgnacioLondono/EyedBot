@@ -125,6 +125,29 @@ export function ChannelSelect({
   );
 }
 
+export function RoleSelect({
+  value,
+  onChange,
+  options,
+  placeholder = "Selecciona un rol",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ id: string; name: string; color?: string }>;
+  placeholder?: string;
+}) {
+  return (
+    <Select value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">{placeholder}</option>
+      {options.map((role) => (
+        <option key={role.id} value={role.id}>
+          {role.name}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
 export function FormActions({
   onSave,
   onTest,

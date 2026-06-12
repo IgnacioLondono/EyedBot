@@ -21,6 +21,7 @@ import { GachaPane } from "@/components/features/server/panes/GachaPane";
 import { ModerationPane } from "@/components/features/server/panes/ModerationPane";
 import { NotificationsPane } from "@/components/features/server/panes/NotificationsPane";
 import { FreeGamesPane } from "@/components/features/server/panes/FreeGamesPane";
+import { SecurityPane } from "@/components/features/server/panes/SecurityPane";
 import { EmbedPane } from "@/components/features/server/panes/EmbedPane";
 
 const PANE_COMPONENTS = {
@@ -33,6 +34,7 @@ const PANE_COMPONENTS = {
   automation: AutomationPane,
   gacha: GachaPane,
   moderation: ModerationPane,
+  security: SecurityPane,
   notifications: NotificationsPane,
   "free-games": FreeGamesPane,
   embed: EmbedPane,

@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { BadgeCheck } from "lucide-react";
-import { getVerifyConfig, publishVerify, saveVerifyConfig } from "@/lib/api/endpoints";
+import { getVerifyConfig, publishVerify, saveVerifyConfig, updateVerifyEmbed } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
+import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
 import {
@@ -25,6 +26,9 @@ type VerifyState = {
   roleId: string;
   title: string;
   description: string;
+  color: string;
+  footer: string;
+  imageUrl: string;
 };
 
 function normalizeVerify(value: unknown): VerifyState {
@@ -34,19 +38,32 @@ function normalizeVerify(value: unknown): VerifyState {
     channelId: toStringValue(data.channelId || data.channel_id),
     roleId: toStringValue(data.roleId || data.role_id),
     title: toStringValue(data.title, "Verifica tu acceso"),
-    description: toStringValue(data.description, "Completa el proceso para obtener acceso al servidor."),
+    description: toStringValue(data.description || data.message, "Completa el proceso para obtener acceso al servidor."),
+    color: toStringValue(data.color, "7c4dff"),
+    footer: toStringValue(data.footer),
+    imageUrl: toStringValue(data.imageUrl || data.image_url),
   };
 }
+
+const VERIFY_TABS = [
+  { id: "config", label: "Configuración" },
+  { id: "embed", label: "Embed" },
+  { id: "media", label: "Imagen" },
+];
 
 export function VerifyPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
+  const [tab, setTab] = useState("config");
   const [form, setForm] = useState<VerifyState>({
     enabled: false,
     channelId: "",
     roleId: "",
     title: "",
     description: "",
+    color: "7c4dff",
+    footer: "",
+    imageUrl: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,43 +101,75 @@ export function VerifyPane({ guildId }: { guildId: string }) {
     }
   }
 
+  async function handleUpdateEmbed() {
+    setPublishing(true);
+    try {
+      await updateVerifyEmbed(guildId, form);
+      toast({ title: "Embed actualizado", description: "El mensaje publicado fue editado.", tone: "success" });
+    } catch (err) {
+      toast({ title: "No se pudo actualizar", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   if (loading) return <Alert title="Cargando verificación" description="Consultando el estado del módulo." />;
   if (error) return <Alert title="No se pudo cargar verificación" description={error} variant="danger" />;
 
   return (
     <PaneGrid>
       <SectionCard title="Panel de verificación" description="Configura el mensaje y la entrega del rol de acceso.">
-        <div className="space-y-5">
-          <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-            <div>
-              <p className="font-medium text-white">Activar verificación</p>
-              <p className="text-sm text-zinc-400">Protege el acceso inicial al servidor.</p>
+        <Tabs items={VERIFY_TABS} value={tab} onValueChange={setTab} className="mb-5" />
+
+        {tab === "config" ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
+                <p className="font-medium text-white">Activar verificación</p>
+                <p className="text-sm text-zinc-400">Protege el acceso inicial al servidor.</p>
+              </div>
+              <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
             </div>
-            <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
+            <Field label="Canal de publicación">
+              <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((current) => ({ ...current, channelId }))} options={channels} />
+            </Field>
+            <Field label="ID del rol a entregar">
+              <Input value={form.roleId} onChange={(event) => setForm((current) => ({ ...current, roleId: event.target.value }))} placeholder="1234567890" />
+            </Field>
           </div>
+        ) : null}
 
-          <Field label="Canal de publicación">
-            <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((current) => ({ ...current, channelId }))} options={channels} />
-          </Field>
-
-          <Field label="ID del rol a entregar">
-            <Input value={form.roleId} onChange={(event) => setForm((current) => ({ ...current, roleId: event.target.value }))} placeholder="1234567890" />
-          </Field>
-
-          <Field label="Título">
-            <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
-          </Field>
-
-          <Field label="Descripción">
-            <Textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
-          </Field>
-
-          <div className="flex flex-wrap gap-3">
-            <FormActions onSave={handleSave} saving={saving} />
-            <Button variant="secondary" onClick={handlePublish} disabled={publishing}>
-              {publishing ? "Publicando..." : "Publicar mensaje"}
-            </Button>
+        {tab === "embed" ? (
+          <div className="space-y-5">
+            <Field label="Título">
+              <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
+            </Field>
+            <Field label="Descripción">
+              <Textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+            </Field>
+            <Field label="Color embed (hex sin #)">
+              <Input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} />
+            </Field>
+            <Field label="Footer">
+              <Input value={form.footer} onChange={(event) => setForm((current) => ({ ...current, footer: event.target.value }))} />
+            </Field>
           </div>
+        ) : null}
+
+        {tab === "media" ? (
+          <Field label="URL de imagen del embed">
+            <Input value={form.imageUrl} onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="https://..." />
+          </Field>
+        ) : null}
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <FormActions onSave={handleSave} saving={saving} />
+          <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing}>
+            {publishing ? "Publicando..." : "Publicar mensaje"}
+          </Button>
+          <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={publishing}>
+            Actualizar embed
+          </Button>
         </div>
       </SectionCard>
 

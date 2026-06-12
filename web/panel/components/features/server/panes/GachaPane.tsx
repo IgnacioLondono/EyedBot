@@ -5,6 +5,7 @@ import { Gem, ShoppingBag, Sparkles } from "lucide-react";
 import {
   getGachaConfig,
   getGachaLeaderboard,
+  getGachaMarket,
   getGachaShop,
   getGachaStats,
   saveGachaConfig,
@@ -39,6 +40,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
   const [form, setForm] = useState<GachaState>({ enabled: false, dailyPulls: 3, bannerName: "" });
   const [stats, setStats] = useState<Record<string, unknown>>({});
   const [shop, setShop] = useState<Record<string, unknown>[]>([]);
+  const [market, setMarket] = useState<Record<string, unknown>[]>([]);
   const [leaders, setLeaders] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,9 +52,10 @@ export function GachaPane({ guildId }: { guildId: string }) {
       getGachaConfig(guildId),
       getGachaStats(guildId),
       getGachaShop(guildId),
+      getGachaMarket(guildId),
       getGachaLeaderboard(guildId),
     ])
-      .then(([configData, statsData, shopData, leaderboardData]) => {
+      .then(([configData, statsData, shopData, marketData, leaderboardData]) => {
         if (!active) return;
         const config = asRecord(configData);
         setForm({
@@ -62,6 +65,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
         });
         setStats(asRecord(statsData));
         setShop(asArray(shopData).map((entry) => asRecord(entry)));
+        setMarket(asArray(asRecord(marketData).listings || marketData).map((entry) => asRecord(entry)));
         setLeaders(asArray(leaderboardData).map((entry) => asRecord(entry)));
       })
       .catch((err) => {
@@ -102,8 +106,10 @@ export function GachaPane({ guildId }: { guildId: string }) {
         <Tabs
           items={[
             { id: "config", label: "Config" },
-            { id: "stats", label: "Stats" },
-            { id: "shop", label: "Shop" },
+            { id: "economy", label: "Economía" },
+            { id: "shop", label: "Tienda" },
+            { id: "market", label: "Mercado" },
+            { id: "top", label: "Ranking" },
           ]}
           value={tab}
           onValueChange={setTab}
@@ -144,12 +150,12 @@ export function GachaPane({ guildId }: { guildId: string }) {
           </PaneGrid>
         ) : null}
 
-        {tab === "stats" ? (
+        {tab === "economy" ? (
           <div className="grid gap-4 md:grid-cols-3">
             {[
-              { label: "Tiradas", value: toStringValue(stats.totalPulls, "0"), icon: <Sparkles className="h-5 w-5" /> },
-              { label: "Usuarios", value: toStringValue(stats.activeUsers, "0"), icon: <Gem className="h-5 w-5" /> },
-              { label: "Top score", value: toStringValue(stats.highestScore, "0"), icon: <ShoppingBag className="h-5 w-5" /> },
+              { label: "Tiradas", value: toStringValue(stats.totalRolls || stats.totalPulls, "0"), icon: <Sparkles className="h-5 w-5" /> },
+              { label: "Usuarios", value: toStringValue(stats.totalUsers || stats.activeUsers, "0"), icon: <Gem className="h-5 w-5" /> },
+              { label: "Colección", value: toStringValue(stats.totalCollection, "0"), icon: <ShoppingBag className="h-5 w-5" /> },
             ].map((item) => (
               <div key={item.label} className="rounded-3xl border border-white/10 bg-white/5 p-5">
                 <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/8">{item.icon}</div>
@@ -184,6 +190,37 @@ export function GachaPane({ guildId }: { guildId: string }) {
             </div>
           ) : (
             <EmptyState icon={<ShoppingBag className="h-6 w-6" />} title="Tienda vacía" description="No hay artículos cargados en la tienda del servidor." />
+          )
+        ) : null}
+
+        {tab === "market" ? (
+          market.length ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {market.map((item, index) => (
+                <div key={`${item.id ?? index}`} className="rounded-3xl border border-white/10 bg-black/20 p-5">
+                  <p className="font-medium text-white">{toStringValue(item.title || item.name, "Listing")}</p>
+                  <p className="mt-2 text-sm text-zinc-400">{toStringValue(item.seller || item.userId, "Vendedor")}</p>
+                  <p className="mt-4 text-sm text-fuchsia-200">{toStringValue(item.price, "0")} monedas</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={<ShoppingBag className="h-6 w-6" />} title="Mercado vacío" description="No hay listings activos en el mercado del servidor." />
+          )
+        ) : null}
+
+        {tab === "top" ? (
+          leaders.length ? (
+            <div className="space-y-2">
+              {leaders.slice(0, 10).map((entry, index) => (
+                <div key={`${entry.userId ?? index}`} className="flex items-center justify-between rounded-2xl border border-white/8 px-4 py-3">
+                  <span className="text-sm text-white">{toStringValue(entry.username || entry.userTag || entry.userId, "Jugador")}</span>
+                  <span className="text-sm text-zinc-400">{toStringValue(entry.totalClaims || entry.score || entry.points, "0")}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Sin ranking" description="Aún no hay datos de gacha para mostrar." />
           )
         ) : null}
       </SectionCard>

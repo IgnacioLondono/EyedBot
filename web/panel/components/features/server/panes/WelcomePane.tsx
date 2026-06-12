@@ -54,6 +54,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
   const [tab, setTab] = useState("welcome");
+  const [sectionTab, setSectionTab] = useState("general");
   const [welcome, setWelcome] = useState<ConfigState>(defaultState);
   const [goodbye, setGoodbye] = useState<ConfigState>(defaultState);
   const [loading, setLoading] = useState(true);
@@ -129,36 +130,71 @@ export function WelcomePane({ guildId }: { guildId: string }) {
       <SectionCard
         title="Flujos de entrada y salida"
         description="Personaliza mensajes de bienvenida y despedida con un tono consistente."
-        action={<Tabs items={[{ id: "welcome", label: "Bienvenida" }, { id: "goodbye", label: "Despedida" }]} value={tab} onValueChange={setTab} />}
+        action={
+          <Tabs
+            items={[
+              { id: "welcome", label: "Bienvenida" },
+              { id: "goodbye", label: "Despedida" },
+            ]}
+            value={tab}
+            onValueChange={(value) => {
+              setTab(value);
+              setSectionTab("general");
+            }}
+          />
+        }
       >
+        <Tabs
+          items={[
+            { id: "general", label: "General" },
+            { id: "message", label: "Mensaje" },
+            { id: "media", label: "Imágenes" },
+            { id: "dm", label: "DM" },
+          ]}
+          value={sectionTab}
+          onValueChange={setSectionTab}
+          className="mb-5"
+        />
+
         <div className="space-y-5">
-          <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-            <div>
-              <p className="font-medium text-white">Activar {tab === "welcome" ? "bienvenida" : "despedida"}</p>
-              <p className="text-sm text-zinc-400">Envía mensajes automáticos al canal seleccionado.</p>
-            </div>
-            <Switch checked={active.enabled} onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))} />
-          </div>
+          {sectionTab === "general" ? (
+            <>
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                <div>
+                  <p className="font-medium text-white">Activar {tab === "welcome" ? "bienvenida" : "despedida"}</p>
+                  <p className="text-sm text-zinc-400">Envía mensajes automáticos al canal seleccionado.</p>
+                </div>
+                <Switch checked={active.enabled} onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))} />
+              </div>
+              <Field label="Canal" description="Destino donde se publicará el mensaje del evento.">
+                <ChannelSelect value={active.channelId} onChange={(channelId) => setActive((current) => ({ ...current, channelId }))} options={channels} />
+              </Field>
+            </>
+          ) : null}
 
-          <Field label="Canal" description="Destino donde se publicará el mensaje del evento.">
-            <ChannelSelect value={active.channelId} onChange={(channelId) => setActive((current) => ({ ...current, channelId }))} options={channels} />
-          </Field>
+          {sectionTab === "message" ? (
+            <Field label="Mensaje" description="Puedes usar variables si el backend las soporta.">
+              <Textarea
+                value={active.message}
+                onChange={(event) => setActive((current) => ({ ...current, message: event.target.value }))}
+                placeholder="Ej. Bienvenido {user} a {server}"
+              />
+            </Field>
+          ) : null}
 
-          <Field label="Mensaje" description="Puedes usar variables si el backend las soporta.">
-            <Textarea
-              value={active.message}
-              onChange={(event) => setActive((current) => ({ ...current, message: event.target.value }))}
-              placeholder="Ej. Bienvenido {user} a {server}"
-            />
-          </Field>
+          {sectionTab === "media" ? (
+            <Field label="Imagen o fondo" description="URL opcional para reforzar el aspecto visual del mensaje.">
+              <Input
+                value={active.imageUrl}
+                onChange={(event) => setActive((current) => ({ ...current, imageUrl: event.target.value }))}
+                placeholder="https://..."
+              />
+            </Field>
+          ) : null}
 
-          <Field label="Imagen o fondo" description="URL opcional para reforzar el aspecto visual del mensaje.">
-            <Input
-              value={active.imageUrl}
-              onChange={(event) => setActive((current) => ({ ...current, imageUrl: event.target.value }))}
-              placeholder="https://..."
-            />
-          </Field>
+          {sectionTab === "dm" ? (
+            <Alert title="Mensaje privado" description="El envío por DM del panel legacy se migrará en la siguiente iteración. Por ahora configura canal + mensaje." />
+          ) : null}
 
           <FormActions onSave={handleSave} onTest={handleTest} saving={saving} testing={testing} />
         </div>
