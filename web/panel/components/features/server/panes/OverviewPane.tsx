@@ -334,7 +334,7 @@ export function OverviewPane({ guildId }: { guildId: string }) {
                     <LeaderRow
                       key={toStringValue(user.id, `t-${index}`)}
                       rank={index + 1}
-                      name={toStringValue(user.tag, "Usuario")}
+                      name={toStringValue(user.tag || user.username, "Usuario")}
                       avatar={toStringValue(user.avatar) || null}
                       primary={`${toNumberValue(user.messageCount)} msgs`}
                       secondary={`${toNumberValue(user.voiceMinutes)} min voz`}
@@ -353,7 +353,7 @@ export function OverviewPane({ guildId }: { guildId: string }) {
                     <LeaderRow
                       key={toStringValue(user.id, `v-${index}`)}
                       rank={index + 1}
-                      name={toStringValue(user.tag, "Usuario")}
+                      name={toStringValue(user.tag || user.username, "Usuario")}
                       avatar={toStringValue(user.avatar) || null}
                       primary={`${toNumberValue(user.voiceMinutes)} min`}
                       secondary={`${toNumberValue(user.messageCount)} msgs`}

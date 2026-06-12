@@ -1398,6 +1398,10 @@ function resolveGuildUserTag(guild, userId) {
     if (!guild || !userId) return 'Desconocido';
     const member = guild.members.cache.get(userId);
     if (member?.user?.tag) return member.user.tag;
+    if (member?.displayName) return member.displayName;
+    const cachedUser = botClient?.users?.cache?.get(String(userId));
+    if (cachedUser?.tag) return cachedUser.tag;
+    if (cachedUser?.username) return cachedUser.username;
     return `Usuario ${String(userId).slice(-4)}`;
 }
 
@@ -1410,7 +1414,81 @@ function resolveGuildUserAvatar(guild, userId) {
     if (typeof member?.user?.displayAvatarURL === 'function') {
         return member.user.displayAvatarURL({ dynamic: true, size: 128 });
     }
+    const cachedUser = botClient?.users?.cache?.get(String(userId));
+    if (typeof cachedUser?.displayAvatarURL === 'function') {
+        return cachedUser.displayAvatarURL({ dynamic: true, size: 128 });
+    }
     return null;
+}
+
+async function resolveGuildMemberProfile(guild, userId) {
+    const id = String(userId || '').trim();
+    if (!id || !guild) {
+        return { id, tag: 'Desconocido', username: 'Usuario', avatar: null };
+    }
+
+    const cachedMember = guild.members.cache.get(id);
+    if (cachedMember?.user) {
+        return {
+            id,
+            tag: cachedMember.user.tag || cachedMember.displayName || cachedMember.user.username,
+            username: cachedMember.user.username || cachedMember.displayName || 'Usuario',
+            avatar: typeof cachedMember.displayAvatarURL === 'function'
+                ? cachedMember.displayAvatarURL({ dynamic: true, size: 128 })
+                : cachedMember.user.displayAvatarURL?.({ dynamic: true, size: 128 }) || null
+        };
+    }
+
+    const cachedUser = botClient?.users?.cache?.get(id);
+    if (cachedUser) {
+        return {
+            id,
+            tag: cachedUser.tag || cachedUser.username || `···${id.slice(-4)}`,
+            username: cachedUser.username || cachedUser.globalName || 'Usuario',
+            avatar: cachedUser.displayAvatarURL?.({ dynamic: true, size: 128 }) || null
+        };
+    }
+
+    if (!botClient) {
+        return { id, tag: `Usuario ···${id.slice(-4)}`, username: 'Usuario', avatar: null };
+    }
+
+    try {
+        const member = await guild.members.fetch(id);
+        return {
+            id,
+            tag: member.user?.tag || member.displayName || member.user?.username || `···${id.slice(-4)}`,
+            username: member.user?.username || member.displayName || 'Usuario',
+            avatar: typeof member.displayAvatarURL === 'function'
+                ? member.displayAvatarURL({ dynamic: true, size: 128 })
+                : member.user?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null
+        };
+    } catch {
+        try {
+            const user = await botClient.users.fetch(id);
+            return {
+                id,
+                tag: user.tag || user.username || `···${id.slice(-4)}`,
+                username: user.username || user.globalName || 'Usuario',
+                avatar: user.displayAvatarURL({ dynamic: true, size: 128 })
+            };
+        } catch {
+            return { id, tag: `Usuario ···${id.slice(-4)}`, username: 'Usuario', avatar: null };
+        }
+    }
+}
+
+async function resolveGuildMemberProfilesMap(guild, userIds = []) {
+    const unique = [...new Set((Array.isArray(userIds) ? userIds : [])
+        .map((value) => String(value || '').trim())
+        .filter(Boolean))];
+
+    const pairs = await Promise.all(unique.map(async (userId) => {
+        const profile = await resolveGuildMemberProfile(guild, userId);
+        return [userId, profile];
+    }));
+
+    return new Map(pairs);
 }
 
 function summarizeChannelType(channel) {
@@ -4329,15 +4407,13 @@ app.get('/api/guild/:guildId/gacha-leaderboard', requireAuth, requirePremium, as
         const topCoins = Math.max(1, sorted[0]?.coins || 0);
 
         const leaderboard = await Promise.all(sorted.slice(0, 25).map(async (entry) => {
-            const member = guild?.members?.cache?.get(entry.userId)
-                || await guild?.members?.fetch?.(entry.userId).catch(() => null);
-            const user = member?.user || botClient.users.cache.get(entry.userId) || null;
+            const profile = await resolveGuildMemberProfile(guild, entry.userId);
             const coins = Number(entry.coins || 0);
             return {
                 userId: entry.userId,
-                username: user?.username || 'Usuario',
-                tag: user?.tag || `ID ${entry.userId}`,
-                avatar: user?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null,
+                username: profile.username || profile.tag || 'Usuario',
+                tag: profile.tag || profile.username || `···${String(entry.userId).slice(-4)}`,
+                avatar: profile.avatar,
                 coins,
                 totalClaims: Number(entry.totalClaims || 0),
                 totalRolls: Number(entry.totalRolls || 0),
@@ -4737,25 +4813,25 @@ app.get('/api/guild/:guildId/leveling-leaderboard', requireAuth, async (req, res
         const config = await levelingStore.getLevelingConfig(guildId);
         const users = await levelingStore.listGuildUsers(guildId);
 
-        const top = users
+        const sortedUsers = users
             .sort((a, b) => (b.xp || 0) - (a.xp || 0))
-            .slice(0, 25)
-            .map((entry) => {
-                const member = guild.members.cache.get(entry.userId);
-                const user = member?.user || botClient.users.cache.get(entry.userId) || null;
-                const progress = getProgress(entry.xp || 0, config?.difficulty || {});
-                return {
-                    userId: entry.userId,
-                    username: user?.username || 'Usuario',
-                    tag: user?.tag || `ID ${entry.userId}`,
-                    avatar: user?.displayAvatarURL?.({ dynamic: true, size: 128 }) || null,
-                    xp: entry.xp || 0,
-                    level: progress.level,
-                    messageCount: entry.messageCount || 0,
-                    voiceMinutes: entry.voiceMinutes || 0,
-                    progressPercent: progress.percent
-                };
-            });
+            .slice(0, 25);
+
+        const top = await Promise.all(sortedUsers.map(async (entry) => {
+            const profile = await resolveGuildMemberProfile(guild, entry.userId);
+            const progress = getProgress(entry.xp || 0, config?.difficulty || {});
+            return {
+                userId: entry.userId,
+                username: profile.username || profile.tag || 'Usuario',
+                tag: profile.tag || profile.username || `···${String(entry.userId).slice(-4)}`,
+                avatar: profile.avatar,
+                xp: entry.xp || 0,
+                level: progress.level,
+                messageCount: entry.messageCount || 0,
+                voiceMinutes: entry.voiceMinutes || 0,
+                progressPercent: progress.percent
+            };
+        }));
 
         res.json({
             enabled: config?.enabled === true,
@@ -5736,14 +5812,12 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
             return best;
         }, null);
 
-        const topActiveUsers = activeTrackedUsers
+        const rankedEntries = activeTrackedUsers
             .map((entry) => {
                 const messageCount = Number.parseInt(entry.messageCount || 0, 10) || 0;
                 const voiceMinutes = Number.parseInt(entry.voiceMinutes || 0, 10) || 0;
                 return {
                     id: entry.userId,
-                    tag: resolveGuildUserTag(guild, entry.userId),
-                    avatar: resolveGuildUserAvatar(guild, entry.userId),
                     messageCount,
                     voiceMinutes,
                     score: messageCount + voiceMinutes
@@ -5753,8 +5827,27 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                 if (b.score !== a.score) return b.score - a.score;
                 if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
                 return b.voiceMinutes - a.voiceMinutes;
-            })
-            .slice(0, 8);
+            });
+
+        const leaderboardUserIds = new Set(
+            rankedEntries.slice(0, 12).map((entry) => String(entry.id))
+        );
+        if (topMessageEntry?.userId) leaderboardUserIds.add(String(topMessageEntry.userId));
+        if (topVoiceEntry?.userId) leaderboardUserIds.add(String(topVoiceEntry.userId));
+        const memberProfiles = await resolveGuildMemberProfilesMap(guild, [...leaderboardUserIds]);
+
+        const topActiveUsers = rankedEntries.slice(0, 8).map((entry) => {
+            const profile = memberProfiles.get(String(entry.id));
+            return {
+                id: entry.id,
+                tag: profile?.tag || resolveGuildUserTag(guild, entry.id),
+                username: profile?.username || profile?.tag || resolveGuildUserTag(guild, entry.id),
+                avatar: profile?.avatar || resolveGuildUserAvatar(guild, entry.id),
+                messageCount: entry.messageCount,
+                voiceMinutes: entry.voiceMinutes,
+                score: entry.score
+            };
+        });
 
         const guildActivity = await guildActivityStore.getGuildActivity(guildId);
         const activityDaily = guildActivity?.daily || {};
@@ -5883,7 +5976,10 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                     avgPerDay: Number((totalTrackedMessages / guildAgeDays).toFixed(2)),
                     topUser: {
                         id: topMessageEntry?.userId || null,
-                        tag: topMessageEntry?.userId ? resolveGuildUserTag(guild, topMessageEntry.userId) : 'N/A',
+                        tag: topMessageEntry?.userId
+                            ? (memberProfiles.get(String(topMessageEntry.userId))?.tag
+                                || resolveGuildUserTag(guild, topMessageEntry.userId))
+                            : 'N/A',
                         count: topMessageEntry?.value || 0
                     },
                     leaders: textLeaders
@@ -5894,7 +5990,10 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
                     avgHoursPerDay: Number(((totalTrackedVoiceMinutes / guildAgeDays) / 60).toFixed(2)),
                     topUser: {
                         id: topVoiceEntry?.userId || null,
-                        tag: topVoiceEntry?.userId ? resolveGuildUserTag(guild, topVoiceEntry.userId) : 'N/A',
+                        tag: topVoiceEntry?.userId
+                            ? (memberProfiles.get(String(topVoiceEntry.userId))?.tag
+                                || resolveGuildUserTag(guild, topVoiceEntry.userId))
+                            : 'N/A',
                         minutes: topVoiceEntry?.value || 0
                     },
                     live: {
