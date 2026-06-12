@@ -17,7 +17,11 @@ import {
   type ThemePresetId,
   applyPreset,
 } from "@/lib/theme-presets";
-import { clearWallpaperFromIdb, useWallpaperBlobUrl } from "@/lib/hooks/useWallpaperStorage";
+import {
+  clearWallpaperFromIdb,
+  saveWallpaperToIdb,
+  useWallpaperBlobUrl,
+} from "@/lib/hooks/useWallpaperStorage";
 
 const STORAGE_KEY = "eyedbot_theme_settings_v1";
 const LEGACY_STORAGE_KEY = "eyedbot-panel-theme";
@@ -29,7 +33,9 @@ type ThemeContextValue = {
   applyThemePreset: (presetId: ThemePresetId) => void;
   resetTheme: () => void;
   refreshWallpaper: () => Promise<void>;
+  uploadWallpaper: (file: File) => Promise<{ kind: "image" | "video"; mime: string } | null>;
   premiumLocked: boolean;
+  hasActiveWallpaper: boolean;
 };
 
 function readInitialTheme(): PanelThemeSettings {
@@ -83,16 +89,18 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
   root.style.setProperty("--user-wallpaper-bloom-opacity", String(0.14 + (theme.wallpaperBloom / 100) * 0.52));
   root.style.setProperty("--user-wallpaper-veil-opacity", String(0.35 + (theme.wallpaperVeil / 100) * 0.45));
 
-  const hasWallpaper =
+  const hasWallpaperMedia =
     theme.wallpaperEnabled &&
     ((theme.wallpaperStorage === "inline" && theme.wallpaperUrl) ||
       (theme.wallpaperStorage === "indexeddb" && wallpaperUrl));
 
-  if (hasWallpaper) {
-    const url = theme.wallpaperStorage === "indexeddb" ? wallpaperUrl : theme.wallpaperUrl;
-    root.style.setProperty("--user-wallpaper-image", `url("${url}")`);
+  if (theme.wallpaperEnabled && theme.wallpaperStorage !== "none") {
     root.dataset.wallpaper = theme.wallpaperKind === "video" ? "video" : "image";
-    root.dataset.wallpaperVideo = theme.wallpaperKind === "video" ? url || "" : "";
+    if (hasWallpaperMedia) {
+      const url = theme.wallpaperStorage === "indexeddb" ? wallpaperUrl : theme.wallpaperUrl;
+      root.style.setProperty("--user-wallpaper-image", `url("${url}")`);
+      root.dataset.wallpaperVideo = theme.wallpaperKind === "video" ? url || "" : "";
+    }
   } else {
     root.style.removeProperty("--user-wallpaper-image");
     delete root.dataset.wallpaper;
@@ -107,7 +115,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { hasPremium } = usePanel();
   const [theme, setThemeState] = useState<PanelThemeSettings>(readInitialTheme);
-  const { blobUrl, refreshWallpaper } = useWallpaperBlobUrl(
+  const { blobUrl, refreshWallpaper, primeBlobUrl } = useWallpaperBlobUrl(
     theme.wallpaperEnabled,
     theme.wallpaperStorage
   );
@@ -118,6 +126,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       : theme.wallpaperEnabled && theme.wallpaperStorage === "inline"
         ? theme.wallpaperUrl
         : null;
+
+  const hasActiveWallpaper = Boolean(
+    theme.wallpaperEnabled &&
+      ((theme.wallpaperStorage === "indexeddb" && blobUrl) ||
+        (theme.wallpaperStorage === "inline" && theme.wallpaperUrl))
+  );
 
   useEffect(() => {
     applyThemeCss(theme, wallpaperUrl);
@@ -153,6 +167,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(persist(DEFAULT_THEME));
   }, [persist]);
 
+  const uploadWallpaper = useCallback(
+    async (file: File) => {
+      if (!hasPremium) return null;
+      primeBlobUrl(file);
+      const { kind, mime } = await saveWallpaperToIdb(file);
+      setThemeState((current) =>
+        persist(
+          normalizePanelTheme({
+            ...current,
+            wallpaperEnabled: true,
+            wallpaperStorage: "indexeddb",
+            wallpaperKind: kind,
+            wallpaperMime: mime,
+            wallpaperUrl: "",
+          })
+        )
+      );
+      return { kind, mime };
+    },
+    [hasPremium, primeBlobUrl, persist]
+  );
+
   const value = useMemo(
     () => ({
       theme,
@@ -161,9 +197,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyThemePreset,
       resetTheme,
       refreshWallpaper,
+      uploadWallpaper,
       premiumLocked: !hasPremium,
+      hasActiveWallpaper,
     }),
-    [theme, wallpaperUrl, setTheme, applyThemePreset, resetTheme, refreshWallpaper, hasPremium]
+    [
+      theme,
+      wallpaperUrl,
+      setTheme,
+      applyThemePreset,
+      resetTheme,
+      refreshWallpaper,
+      uploadWallpaper,
+      hasPremium,
+      hasActiveWallpaper,
+    ]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

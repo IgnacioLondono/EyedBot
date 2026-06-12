@@ -10,6 +10,7 @@ import {
 } from "@/lib/api/endpoints";
 import { TicketsManagePanel } from "@/components/features/server/panes/TicketsManagePanel";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
+import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -17,10 +18,12 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import {
   ChannelSelect,
+  ColorInput,
   Field,
   FormActions,
   Input,
   LockedOverlay,
+  MultiRoleSelect,
   PremiumLock,
   SectionCard,
   Textarea,
@@ -52,12 +55,31 @@ type TicketConfigState = {
   buttonLabel: string;
   color: string;
   footer: string;
-  adminRoleIds: string;
+  adminRoleIds: string[];
   ticketCategories: TicketOption[];
   commonProblems: TicketOption[];
   minecraftServers: TicketOption[];
-  caseRoleMapText: string;
+  caseRoleMap: Record<string, string[]>;
 };
+
+function normalizeRoleIds(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((id) => toStringValue(id)).filter(Boolean);
+  }
+  return String(value || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+function normalizeCaseRoleMap(value: unknown): Record<string, string[]> {
+  const map = asRecord(value);
+  const result: Record<string, string[]> = {};
+  for (const [key, roles] of Object.entries(map)) {
+    result[key] = normalizeRoleIds(roles);
+  }
+  return result;
+}
 
 function normalizeOptions(value: unknown): TicketOption[] {
   return asArray(value).map((entry, index) => {
@@ -144,6 +166,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   const { toast } = useToast();
   const { hasPremium } = usePanel();
   const { channels } = useGuildChannels(guildId);
+  const { roles } = useGuildRoles(guildId);
   const [tab, setTab] = useState("manage");
   const [config, setConfig] = useState<TicketConfigState>({
     enabled: false,
@@ -157,11 +180,11 @@ export function TicketsPane({ guildId }: { guildId: string }) {
     buttonLabel: "Solicitar ticket",
     color: "7c4dff",
     footer: "Sistema de Tickets",
-    adminRoleIds: "",
+    adminRoleIds: [],
     ticketCategories: [],
     commonProblems: [],
     minecraftServers: [],
-    caseRoleMapText: "{}",
+    caseRoleMap: {},
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -176,7 +199,6 @@ export function TicketsPane({ guildId }: { guildId: string }) {
       .then((configData) => {
         if (!mounted) return;
         const cfg = asRecord(configData);
-        const caseRoleMap = asRecord(cfg.caseRoleMap);
         setConfig({
           enabled: toBooleanValue(cfg.enabled),
           panelChannelId: toStringValue(cfg.panelChannelId || cfg.channelId),
@@ -189,11 +211,11 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           buttonLabel: toStringValue(cfg.buttonLabel, "Solicitar ticket"),
           color: toStringValue(cfg.color, "7c4dff").replace("#", ""),
           footer: toStringValue(cfg.footer, "Sistema de Tickets"),
-          adminRoleIds: asArray(cfg.adminRoleIds).map((id) => toStringValue(id)).filter(Boolean).join(", "),
+          adminRoleIds: normalizeRoleIds(cfg.adminRoleIds),
           ticketCategories: normalizeOptions(cfg.ticketCategories),
           commonProblems: normalizeOptions(cfg.commonProblems),
           minecraftServers: normalizeOptions(cfg.minecraftServers),
-          caseRoleMapText: JSON.stringify(caseRoleMap, null, 2),
+          caseRoleMap: normalizeCaseRoleMap(cfg.caseRoleMap),
         });
       })
       .catch((err) => {
@@ -209,25 +231,21 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   }, [guildId]);
 
   function buildPayload() {
-    let caseRoleMap: Record<string, unknown> = {};
-    try {
-      const parsed = JSON.parse(config.caseRoleMapText || "{}");
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        caseRoleMap = parsed as Record<string, unknown>;
-      }
-    } catch {
-      caseRoleMap = {};
-    }
-
     return {
       ...config,
-      adminRoleIds: config.adminRoleIds
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean),
-      caseRoleMap,
+      adminRoleIds: config.adminRoleIds,
+      caseRoleMap: config.caseRoleMap,
     };
   }
+
+  const caseEntries = [
+    ...config.ticketCategories.map((item) => ({ key: item.value || item.label, label: item.label || item.value })),
+    ...config.commonProblems.map((item) => ({ key: item.value || item.label, label: item.label || item.value })),
+    ...Object.keys(config.caseRoleMap)
+      .filter((key) => !config.ticketCategories.some((item) => (item.value || item.label) === key))
+      .filter((key) => !config.commonProblems.some((item) => (item.value || item.label) === key))
+      .map((key) => ({ key, label: key })),
+  ].filter((entry) => entry.key);
 
   async function handleSaveConfig() {
     setSaving(true);
@@ -325,10 +343,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                 </Field>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Color embed">
-                    <Input
-                      value={config.color}
-                      onChange={(event) => setConfig((c) => ({ ...c, color: event.target.value.replace("#", "") }))}
-                    />
+                    <ColorInput value={config.color} onChange={(color) => setConfig((c) => ({ ...c, color }))} />
                   </Field>
                   <Field label="Footer">
                     <Input value={config.footer} onChange={(event) => setConfig((c) => ({ ...c, footer: event.target.value }))} />
@@ -349,11 +364,11 @@ export function TicketsPane({ guildId }: { guildId: string }) {
 
           {tab === "roles" ? (
             <div className="space-y-5">
-              <Field label="Roles de staff" description="IDs separados por coma con permiso para gestionar tickets.">
-                <Textarea
+              <Field label="Roles de staff" description="Selecciona los roles que pueden gestionar tickets.">
+                <MultiRoleSelect
                   value={config.adminRoleIds}
-                  onChange={(event) => setConfig((c) => ({ ...c, adminRoleIds: event.target.value }))}
-                  placeholder="123..., 456..."
+                  onChange={(adminRoleIds) => setConfig((c) => ({ ...c, adminRoleIds }))}
+                  options={roles}
                 />
               </Field>
               <FormActions onSave={handleSaveConfig} saving={saving} />
@@ -440,16 +455,29 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                   options={channels}
                 />
               </Field>
-              <Field
-                label="Mapa caso → roles"
-                description='JSON. Ej: {"reportes":["123456789012345678"]}'
-              >
-                <Textarea
-                  value={config.caseRoleMapText}
-                  onChange={(event) => setConfig((c) => ({ ...c, caseRoleMapText: event.target.value }))}
-                  rows={8}
-                />
-              </Field>
+              <div className="space-y-4">
+                <p className="text-sm text-zinc-400">
+                  Asigna roles de staff por categoría o caso. Las claves coinciden con el valor de cada opción del panel.
+                </p>
+                {caseEntries.length ? (
+                  caseEntries.map((entry) => (
+                    <Field key={entry.key} label={entry.label}>
+                      <MultiRoleSelect
+                        value={config.caseRoleMap[entry.key] || []}
+                        onChange={(roleIds) =>
+                          setConfig((c) => ({
+                            ...c,
+                            caseRoleMap: { ...c.caseRoleMap, [entry.key]: roleIds },
+                          }))
+                        }
+                        options={roles}
+                      />
+                    </Field>
+                  ))
+                ) : (
+                  <p className="text-sm text-zinc-500">Añade categorías en la pestaña Categorías para mapear roles por caso.</p>
+                )}
+              </div>
               <FormActions onSave={handleSaveConfig} saving={saving} />
             </div>
           ) : null}

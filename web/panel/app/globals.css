@@ -36,6 +36,10 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+html[data-wallpaper] body {
+  background: transparent;
+}
+
 body::after {
   content: "";
   position: fixed;
@@ -48,19 +52,8 @@ body::after {
     linear-gradient(180deg, var(--color-surface-strong, #090811) 0%, var(--color-bg, #07060d) 100%);
 }
 
-html[data-wallpaper="image"] body::before,
-html[data-wallpaper="video"] body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -3;
-  pointer-events: none;
-  background-image: var(--user-wallpaper-image);
-  background-size: cover;
-  background-position: center;
-  filter: blur(var(--user-wallpaper-blur, 40px));
-  opacity: var(--user-wallpaper-bloom-opacity, 0.35);
-  transform: scale(1.08);
+html[data-wallpaper] body::after {
+  opacity: 0.35;
 }
 
 html[data-theme-bubbles="1"] .theme-bubbles {
@@ -84,10 +77,11 @@ select {
   font: inherit;
 }
 
-body::before {
+html:not([data-wallpaper]) body::before {
   content: "";
   position: fixed;
   inset: 0;
+  z-index: -1;
   pointer-events: none;
   background:
     linear-gradient(rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.02)),

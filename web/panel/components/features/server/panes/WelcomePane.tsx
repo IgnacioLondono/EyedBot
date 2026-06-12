@@ -17,6 +17,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import {
   ChannelSelect,
+  ColorInput,
   Field,
   FormActions,
   Input,
@@ -232,12 +233,8 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                 />
               </Field>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Color (hex)">
-                  <Input
-                    value={active.color}
-                    onChange={(event) => setActive((current) => ({ ...current, color: event.target.value.replace("#", "") }))}
-                    placeholder="7c4dff"
-                  />
+                <Field label="Color del embed">
+                  <ColorInput value={active.color} onChange={(color) => setActive((current) => ({ ...current, color }))} />
                 </Field>
                 <Field label="Pie de embed">
                   <Input

@@ -8,6 +8,7 @@ import {
   testStreamAlert,
 } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
+import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -16,10 +17,12 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import {
   ChannelSelect,
+  ColorInput,
   Field,
   FormActions,
   Input,
   PaneGrid,
+  RoleSelect,
   SectionCard,
   Select,
   Textarea,
@@ -115,6 +118,7 @@ function emptySource(): StreamSource {
 
 export function NotificationsPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
+  const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
   const [tab, setTab] = useState("channel");
   const [form, setForm] = useState<StreamAlertState>(defaultForm);
@@ -208,7 +212,18 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
               <Input
                 value={form.mentionText}
                 onChange={(event) => setForm((c) => ({ ...c, mentionText: event.target.value }))}
-                placeholder="@everyone o <@&roleId>"
+                placeholder="@everyone o mención de rol"
+              />
+            </Field>
+            <Field label="Mencionar rol">
+              <RoleSelect
+                value=""
+                onChange={(roleId) => {
+                  if (!roleId) return;
+                  setForm((c) => ({ ...c, mentionText: `<@&${roleId}>` }));
+                }}
+                options={roles}
+                placeholder="Elegir rol para mencionar"
               />
             </Field>
             <Field label="Plantilla del título" description="Variables: {platform}, {name}">
@@ -225,10 +240,7 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
             </Field>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Color embed">
-                <Input
-                  value={form.color}
-                  onChange={(event) => setForm((c) => ({ ...c, color: event.target.value.replace("#", "") }))}
-                />
+                <ColorInput value={form.color} onChange={(color) => setForm((c) => ({ ...c, color }))} />
               </Field>
               <Field label="Footer">
                 <Input

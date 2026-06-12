@@ -12,7 +12,6 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { serverPaneHref } from "@/lib/navigation";
-import { formatDate } from "@/lib/utils";
 
 const MODULE_LABELS: Array<{ key: keyof DashboardGuildSummary["modules"]; label: string }> = [
   { key: "welcome", label: "Bienvenida" },
@@ -33,84 +32,65 @@ function GuildDashboardCard({
   onToggleFavorite: () => void;
 }) {
   const activeModules = MODULE_LABELS.filter(({ key }) => guild.modules[key]);
+  const moduleSummary = activeModules.length
+    ? activeModules.map(({ label }) => label).join(" · ")
+    : "Sin módulos activos";
 
   return (
-    <Card className="overflow-hidden p-0 transition hover:border-violet-500/40 hover:bg-white/[0.06]">
-      <div
-        className="relative h-20 bg-gradient-to-br from-violet-950/80 to-zinc-950"
-        style={
-          guild.banner
-            ? { backgroundImage: `url(${guild.banner})`, backgroundSize: "cover", backgroundPosition: "center" }
-            : undefined
-        }
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-[#09090b]/70 to-transparent" />
-        <button
-          type="button"
-          onClick={onToggleFavorite}
-          className="absolute right-3 top-3 rounded-full border border-white/10 bg-black/40 p-2 text-zinc-200 hover:bg-black/60"
-          aria-label={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-        >
-          <Star className={`h-4 w-4 ${favorite ? "fill-amber-300 text-amber-300" : ""}`} />
-        </button>
-        {guild.premiumTier > 0 ? (
-          <div className="absolute left-3 top-3">
-            <Badge variant="premium">
-              <Crown className="mr-1 h-3 w-3" />
-              Boost {guild.premiumTier}
-            </Badge>
+    <Card className="p-4 shadow-none backdrop-blur-sm transition hover:border-white/15 hover:bg-white/5">
+      <div className="flex items-start gap-3">
+        {guild.icon ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={guild.icon} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+        ) : (
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/5 text-zinc-400">
+            <Server className="h-5 w-5" />
           </div>
-        ) : null}
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="truncate font-medium text-white">{guild.name}</h2>
+              <p className="mt-0.5 text-sm text-zinc-500">
+                {guild.memberCount.toLocaleString("es-ES")} miembros
+                {guild.owner.tag ? ` · ${guild.owner.tag}` : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onToggleFavorite}
+              className="shrink-0 rounded-lg p-1.5 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+              aria-label={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+            >
+              <Star className={`h-4 w-4 ${favorite ? "fill-amber-300 text-amber-300" : ""}`} />
+            </button>
+          </div>
+
+          <p className="mt-2 truncate text-xs text-zinc-500">{moduleSummary}</p>
+
+          {guild.premiumTier > 0 ? (
+            <p className="mt-1 flex items-center gap-1 text-xs text-fuchsia-300/80">
+              <Crown className="h-3 w-3" />
+              Boost {guild.premiumTier}
+            </p>
+          ) : null}
+        </div>
       </div>
 
-      <div className="px-5 pb-5 pt-10">
-        <div className="-mt-14 mb-4 flex items-end gap-3">
-          {guild.icon ? (
-            <img src={guild.icon} alt="" className="h-14 w-14 rounded-2xl border-4 border-[#09090b] object-cover shadow-lg" />
-          ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-4 border-[#09090b] bg-violet-600/30 text-violet-100 shadow-lg">
-              <Server className="h-6 w-6" />
-            </div>
-          )}
-          <div className="min-w-0 flex-1 pb-1">
-            <h2 className="truncate text-lg font-semibold text-white">{guild.name}</h2>
-            <p className="text-xs text-zinc-500">
-              {guild.memberCount.toLocaleString("es-ES")} miembros · {guild.owner.tag}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {activeModules.length ? (
-            activeModules.map(({ key, label }) => (
-              <span
-                key={key}
-                className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200"
-              >
-                {label}
-              </span>
-            ))
-          ) : (
-            <span className="text-xs text-zinc-500">Sin módulos activos</span>
-          )}
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={serverPaneHref(guild.id, "overview")}
-            className="rounded-xl bg-violet-600/80 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600"
-          >
-            Ver resumen
-          </Link>
-          <Link
-            href={serverPaneHref(guild.id)}
-            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5"
-          >
-            Configurar
-          </Link>
-        </div>
-
-        <p className="mt-3 text-xs text-zinc-600">Creado {formatDate(guild.createdAt)}</p>
+      <div className="mt-4 flex gap-2 border-t border-white/5 pt-4">
+        <Link
+          href={serverPaneHref(guild.id, "overview")}
+          className="flex-1 rounded-lg bg-white/8 py-2 text-center text-sm text-white hover:bg-white/12"
+        >
+          Resumen
+        </Link>
+        <Link
+          href={serverPaneHref(guild.id)}
+          className="flex-1 rounded-lg border border-white/10 py-2 text-center text-sm text-zinc-300 hover:bg-white/5"
+        >
+          Configurar
+        </Link>
       </div>
     </Card>
   );
@@ -207,8 +187,8 @@ export default function DashboardPage() {
         <div className="space-y-8">
           {filtered.favs.length ? (
             <section>
-              <h3 className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-zinc-500">Favoritos</h3>
-              <div className="grid gap-5 xl:grid-cols-2">
+              <h3 className="mb-3 text-sm text-zinc-500">Favoritos</h3>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {filtered.favs.map((guild) => (
                   <GuildDashboardCard
                     key={guild.id}
@@ -222,10 +202,10 @@ export default function DashboardPage() {
           ) : null}
 
           <section>
-            <h3 className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-zinc-500">
+            <h3 className="mb-3 text-sm text-zinc-500">
               {filtered.favs.length ? "Otros servidores" : "Servidores"}
             </h3>
-            <div className="grid gap-5 xl:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filtered.rest.map((guild) => (
                 <GuildDashboardCard
                   key={guild.id}

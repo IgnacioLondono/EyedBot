@@ -125,6 +125,12 @@ export function ChannelSelect({
   );
 }
 
+function roleColorStyle(color?: string) {
+  const hex = String(color || "").replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return "#99aab5";
+  return `#${hex}`;
+}
+
 export function RoleSelect({
   value,
   onChange,
@@ -136,15 +142,122 @@ export function RoleSelect({
   options: Array<{ id: string; name: string; color?: string }>;
   placeholder?: string;
 }) {
+  const selected = options.find((role) => role.id === value);
+
   return (
-    <Select value={value} onChange={(event) => onChange(event.target.value)}>
-      <option value="">{placeholder}</option>
-      {options.map((role) => (
-        <option key={role.id} value={role.id}>
-          {role.name}
-        </option>
-      ))}
-    </Select>
+    <div className="space-y-2">
+      <Select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{placeholder}</option>
+        {options.map((role) => (
+          <option key={role.id} value={role.id}>
+            {role.name}
+          </option>
+        ))}
+      </Select>
+      {selected ? (
+        <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <span
+            className="h-3 w-3 rounded-full border border-white/10"
+            style={{ backgroundColor: roleColorStyle(selected.color) }}
+          />
+          <span>{selected.name}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function MultiRoleSelect({
+  value,
+  onChange,
+  options,
+  emptyLabel = "No hay roles disponibles.",
+}: {
+  value: string[];
+  onChange: (value: string[]) => void;
+  options: Array<{ id: string; name: string; color?: string }>;
+  emptyLabel?: string;
+}) {
+  if (!options.length) {
+    return <p className="text-sm text-zinc-500">{emptyLabel}</p>;
+  }
+
+  function toggle(roleId: string) {
+    if (value.includes(roleId)) {
+      onChange(value.filter((id) => id !== roleId));
+      return;
+    }
+    onChange([...value, roleId]);
+  }
+
+  return (
+    <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-white/8 bg-black/20 p-2">
+      {options.map((role) => {
+        const checked = value.includes(role.id);
+        return (
+          <label
+            key={role.id}
+            className={cn(
+              "flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm transition",
+              checked ? "bg-violet-500/15 text-white" : "text-zinc-300 hover:bg-white/5"
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => toggle(role.id)}
+              className="accent-violet-500"
+            />
+            <span
+              className="h-3 w-3 shrink-0 rounded-full border border-white/10"
+              style={{ backgroundColor: roleColorStyle(role.color) }}
+            />
+            <span className="truncate">{role.name}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ColorInput({
+  value,
+  onChange,
+  format = "plain",
+  placeholder = "7c4dff",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  format?: "plain" | "hash";
+  placeholder?: string;
+}) {
+  const raw = String(value || "").replace("#", "");
+  const pickerFallback = format === "hash" ? "#8b5cf6" : "#7c4dff";
+  const pickerValue = /^[0-9a-fA-F]{6}$/.test(raw) ? `#${raw}` : pickerFallback;
+  const displayValue = format === "hash" ? (value.startsWith("#") ? value : raw ? `#${raw}` : "") : raw;
+
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={pickerValue}
+        onChange={(event) => {
+          const next = event.target.value;
+          onChange(format === "hash" ? next : next.replace("#", ""));
+        }}
+        className="h-11 w-14 shrink-0 cursor-pointer rounded-xl border border-white/10 bg-transparent p-1"
+        aria-label="Elegir color"
+      />
+      <Input
+        value={displayValue}
+        onChange={(event) => {
+          const next = event.target.value.trim();
+          onChange(format === "hash" ? (next.startsWith("#") ? next : `#${next.replace("#", "")}`) : next.replace("#", ""));
+        }}
+        placeholder={placeholder}
+        className="font-mono text-sm"
+      />
+    </div>
   );
 }
 

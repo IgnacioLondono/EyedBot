@@ -18,10 +18,7 @@ import {
   THEME_PRESET_LABELS,
   type ThemePresetId,
 } from "@/lib/theme-presets";
-import {
-  clearWallpaperFromIdb,
-  saveWallpaperToIdb,
-} from "@/lib/hooks/useWallpaperStorage";
+import { clearWallpaperFromIdb } from "@/lib/hooks/useWallpaperStorage";
 
 function SliderField({
   label,
@@ -48,7 +45,7 @@ function SliderField({
 
 export function ThemeSettings() {
   const { hasPremium } = usePanel();
-  const { theme, setTheme, applyThemePreset, resetTheme, refreshWallpaper, premiumLocked } =
+  const { theme, setTheme, applyThemePreset, resetTheme, refreshWallpaper, uploadWallpaper, premiumLocked } =
     useThemeSettings();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -60,15 +57,7 @@ export function ThemeSettings() {
       if (file.size > 180 * 1024 * 1024) {
         throw new Error("El archivo supera el límite de 180 MB.");
       }
-      const { kind, mime } = await saveWallpaperToIdb(file);
-      setTheme({
-        wallpaperEnabled: true,
-        wallpaperStorage: "indexeddb",
-        wallpaperKind: kind,
-        wallpaperMime: mime,
-        wallpaperUrl: "",
-      });
-      await refreshWallpaper();
+      await uploadWallpaper(file);
     } finally {
       setUploading(false);
     }

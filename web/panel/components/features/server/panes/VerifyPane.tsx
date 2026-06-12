@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BadgeCheck } from "lucide-react";
 import { getVerifyConfig, publishVerify, saveVerifyConfig, updateVerifyEmbed } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
+import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
@@ -11,10 +12,12 @@ import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
 import {
   ChannelSelect,
+  ColorInput,
   Field,
   FormActions,
   Input,
   PaneGrid,
+  RoleSelect,
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
@@ -24,11 +27,14 @@ type VerifyState = {
   enabled: boolean;
   channelId: string;
   roleId: string;
+  newMemberRoleId: string;
+  emoji: string;
   title: string;
   description: string;
   color: string;
   footer: string;
   imageUrl: string;
+  removeRoleOnUnreact: boolean;
 };
 
 function normalizeVerify(value: unknown): VerifyState {
@@ -37,11 +43,14 @@ function normalizeVerify(value: unknown): VerifyState {
     enabled: toBooleanValue(data.enabled),
     channelId: toStringValue(data.channelId || data.channel_id),
     roleId: toStringValue(data.roleId || data.role_id),
+    newMemberRoleId: toStringValue(data.newMemberRoleId || data.new_member_role_id),
+    emoji: toStringValue(data.emoji, "✅"),
     title: toStringValue(data.title, "Verifica tu acceso"),
     description: toStringValue(data.description || data.message, "Completa el proceso para obtener acceso al servidor."),
     color: toStringValue(data.color, "7c4dff"),
     footer: toStringValue(data.footer),
     imageUrl: toStringValue(data.imageUrl || data.image_url),
+    removeRoleOnUnreact: toBooleanValue(data.removeRoleOnUnreact),
   };
 }
 
@@ -53,17 +62,21 @@ const VERIFY_TABS = [
 
 export function VerifyPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
+  const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
   const [tab, setTab] = useState("config");
   const [form, setForm] = useState<VerifyState>({
     enabled: false,
     channelId: "",
     roleId: "",
+    newMemberRoleId: "",
+    emoji: "✅",
     title: "",
     description: "",
     color: "7c4dff",
     footer: "",
     imageUrl: "",
+    removeRoleOnUnreact: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -133,9 +146,30 @@ export function VerifyPane({ guildId }: { guildId: string }) {
             <Field label="Canal de publicación">
               <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((current) => ({ ...current, channelId }))} options={channels} />
             </Field>
-            <Field label="ID del rol a entregar">
-              <Input value={form.roleId} onChange={(event) => setForm((current) => ({ ...current, roleId: event.target.value }))} placeholder="1234567890" />
+            <Field label="Rol al verificar">
+              <RoleSelect value={form.roleId} onChange={(roleId) => setForm((current) => ({ ...current, roleId }))} options={roles} />
             </Field>
+            <Field label="Rol inicial de nuevo miembro" description="Opcional. Se quita al verificar.">
+              <RoleSelect
+                value={form.newMemberRoleId}
+                onChange={(newMemberRoleId) => setForm((current) => ({ ...current, newMemberRoleId }))}
+                options={roles}
+                placeholder="Sin rol inicial"
+              />
+            </Field>
+            <Field label="Emoji de reacción">
+              <Input value={form.emoji} onChange={(event) => setForm((current) => ({ ...current, emoji: event.target.value }))} placeholder="✅" />
+            </Field>
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
+                <p className="font-medium text-white">Quitar rol al quitar reacción</p>
+                <p className="text-sm text-zinc-400">Revoca el acceso si el usuario elimina la reacción.</p>
+              </div>
+              <Switch
+                checked={form.removeRoleOnUnreact}
+                onCheckedChange={(removeRoleOnUnreact) => setForm((current) => ({ ...current, removeRoleOnUnreact }))}
+              />
+            </div>
           </div>
         ) : null}
 
@@ -147,8 +181,8 @@ export function VerifyPane({ guildId }: { guildId: string }) {
             <Field label="Descripción">
               <Textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
             </Field>
-            <Field label="Color embed (hex sin #)">
-              <Input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} />
+            <Field label="Color del embed">
+              <ColorInput value={form.color} onChange={(color) => setForm((current) => ({ ...current, color }))} />
             </Field>
             <Field label="Footer">
               <Input value={form.footer} onChange={(event) => setForm((current) => ({ ...current, footer: event.target.value }))} />
@@ -181,7 +215,8 @@ export function VerifyPane({ guildId }: { guildId: string }) {
           <h3 className="text-lg font-semibold text-white">{form.title}</h3>
           <p className="mt-3 text-sm text-zinc-300">{form.description}</p>
           <p className="mt-4 text-sm text-zinc-500">
-            Canal: {channels.find((channel) => channel.id === form.channelId)?.name || "Sin canal"} · Rol: {form.roleId || "Sin rol"}
+            Canal: {channels.find((channel) => channel.id === form.channelId)?.name || "Sin canal"} · Rol:{" "}
+            {roles.find((role) => role.id === form.roleId)?.name || "Sin rol"}
           </p>
         </div>
       </SectionCard>

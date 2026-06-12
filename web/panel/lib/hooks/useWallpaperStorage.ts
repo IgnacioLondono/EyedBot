@@ -78,6 +78,15 @@ export async function clearWallpaperFromIdb() {
 export function useWallpaperBlobUrl(enabled: boolean, storage: string) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
+  const primeBlobUrl = useCallback((file: File) => {
+    const url = URL.createObjectURL(file);
+    setBlobUrl((current) => {
+      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
+      return url;
+    });
+    return url;
+  }, []);
+
   const refresh = useCallback(async () => {
     if (!enabled || storage !== "indexeddb") {
       setBlobUrl((current) => {
@@ -104,5 +113,5 @@ export function useWallpaperBlobUrl(enabled: boolean, storage: string) {
     };
   }, [refresh]);
 
-  return { blobUrl, refreshWallpaper: refresh };
+  return { blobUrl, refreshWallpaper: refresh, primeBlobUrl };
 }
