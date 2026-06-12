@@ -1754,17 +1754,20 @@ async function fetchTicketReportKeys(pattern, limit) {
         `SELECT \`key\` FROM key_value_store WHERE ${counterGuard} AND \`key\` LIKE ? LIMIT ${lim}`
     ];
 
+    let lastError = null;
     for (const sql of variants) {
         try {
             const rows = await db.query(sql, [pattern]);
             const keys = (rows || []).map((r) => String(r.key ?? r.KEY ?? '')).filter(Boolean);
             if (keys.length) return keys;
         } catch (err) {
-            /* siguiente variante */
+            lastError = err;
         }
     }
 
-    console.warn('fetchTicketReportKeys: sin filas para patron', pattern);
+    if (lastError) {
+        console.warn('fetchTicketReportKeys: consulta fallida para patron', pattern, '-', lastError?.message || lastError);
+    }
     return [];
 }
 

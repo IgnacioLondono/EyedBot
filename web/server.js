@@ -51,8 +51,6 @@ const {
     claimTicketFromWeb,
     closeTicketFromWeb,
     listPendingRequests,
-    listTicketReports,
-    listTicketReportsWithFallback,
     listTicketReportSummaries,
     deleteTicketReportFromGuild,
     countTicketReports,
@@ -3250,16 +3248,7 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, requirePremium, asy
         const rawPending = await listPendingRequests(guildId);
         const closedReportsTotal = await countTicketReports(guildId).catch(() => 0);
 
-        let rawReports = await listTicketReportSummaries(guildId, historyLimit);
-        if (!rawReports?.length) {
-            try {
-                if (typeof listTicketReportsWithFallback === 'function') {
-                    rawReports = await listTicketReportsWithFallback(guildId, historyLimit);
-                }
-            } catch (e) {
-                console.warn('Fallback listTicketReports fallo:', e?.message || e);
-            }
-        }
+        const rawReports = await listTicketReportSummaries(guildId, historyLimit);
 
         const [active, pending, history] = await Promise.all([
             enrichActiveTickets(guild, botClient, rawActive),
