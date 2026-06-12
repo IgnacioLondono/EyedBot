@@ -26,6 +26,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Field, PaneGrid, SectionCard } from "@/components/features/shared";
+import { discordAvatarUrl, discordGuildIconUrl } from "@/lib/discord-media";
 import { asArray, asRecord, formatDate, getErrorMessage, toNumberValue, toStringValue } from "@/lib/utils";
 
 const OWNER_TABS = [
@@ -54,6 +55,7 @@ type RegistryUser = {
   username: string;
   globalName: string;
   avatar: string | null;
+  avatarUrl: string;
   loginCount: number;
   firstLoginAt: string;
   lastLoginAt: string;
@@ -100,12 +102,17 @@ function guildRoleLabel(guild: RegistryGuild) {
   return "Miembro";
 }
 
+function guildIconSrc(guild: RegistryGuild) {
+  return discordGuildIconUrl(guild.id, guild.iconUrl) || guild.iconUrl;
+}
+
 function GuildChip({ guild }: { guild: RegistryGuild }) {
+  const iconSrc = guildIconSrc(guild);
   return (
     <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-300">
-      {guild.iconUrl ? (
+      {iconSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={guild.iconUrl} alt="" className="h-4 w-4 rounded-full object-cover" />
+        <img src={iconSrc} alt="" className="h-4 w-4 rounded-full object-cover" />
       ) : (
         <Server className="h-3.5 w-3.5 text-zinc-500" />
       )}
@@ -115,11 +122,12 @@ function GuildChip({ guild }: { guild: RegistryGuild }) {
 }
 
 function GuildCard({ guild }: { guild: RegistryGuild }) {
+  const iconSrc = guildIconSrc(guild);
   return (
     <div className="flex items-start gap-3 rounded-xl border border-white/8 bg-white/5 px-3 py-2.5">
-      {guild.iconUrl ? (
+      {iconSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={guild.iconUrl} alt="" className="h-9 w-9 rounded-lg object-cover" />
+        <img src={iconSrc} alt="" className="h-9 w-9 rounded-lg object-cover" />
       ) : (
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-800">
           <Server className="h-4 w-4 text-zinc-500" />
@@ -168,6 +176,7 @@ function parseRegistryUser(entry: unknown): RegistryUser {
     username: toStringValue(data.username, "Usuario"),
     globalName: toStringValue(data.globalName || data.username, "Usuario"),
     avatar: toStringValue(data.avatar) || null,
+    avatarUrl: toStringValue(data.avatarUrl) || discordAvatarUrl(toStringValue(data.userId), toStringValue(data.avatar)),
     loginCount: toNumberValue(data.loginCount),
     firstLoginAt: toStringValue(data.firstLoginAt),
     lastLoginAt: toStringValue(data.lastLoginAt),
@@ -214,9 +223,9 @@ function UserRow({
     <div className="rounded-2xl border border-white/8 bg-black/20">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          {user.avatar ? (
+          {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+            <img src={user.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">
               <Users className="h-5 w-5" />

@@ -7,17 +7,10 @@ import { ChevronDown, Eye, LogOut, Plus } from "lucide-react";
 import { useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
 import { usePanel } from "@/components/providers/PanelProvider";
+import { discordAvatarUrl } from "@/lib/discord-media";
 import { cn } from "@/lib/utils";
 import { WallpaperLayer } from "@/components/layout/WallpaperLayer";
 import { useThemeSettings } from "@/components/providers/ThemeProvider";
-
-function avatarUrl(user: { id: string; avatar?: string | null }) {
-  if (user.avatar) {
-    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`;
-  }
-  const index = Number(BigInt(user.id) % BigInt(6));
-  return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
-}
 
 export function PanelShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -97,7 +90,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
               >
                 {user ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl(user)} alt="" className="h-8 w-8 rounded-full" />
+                  <img src={discordAvatarUrl(user.id, user.avatar, 64)} alt="" className="h-8 w-8 rounded-full" />
                 ) : (
                   <span className="h-8 w-8 rounded-full bg-zinc-800" />
                 )}

@@ -1133,17 +1133,19 @@ async function enrichUserRegistryGuilds(guilds = [], userId = '') {
         let memberCount = guildEntry?.memberCount ?? null;
         const botInGuild = Boolean(botGuild);
 
+        let iconUrl = guildEntry?.iconUrl || null;
         if (botGuild) {
             const ownerProfile = await resolveGuildOwnerProfile(botGuild);
             guildOwnerTag = ownerProfile.tag;
             memberCount = botGuild.memberCount;
+            iconUrl = botGuild.iconURL({ dynamic: true, size: 128 }) || iconUrl;
         }
 
         return {
             id: guildId,
             name: String(guildEntry?.name || 'Servidor sin nombre').slice(0, 120),
             idSuffix: String(guildEntry?.idSuffix || guildId.slice(-4)),
-            iconUrl: guildEntry?.iconUrl || null,
+            iconUrl,
             isOwner,
             isAdmin: isAdmin && !isOwner,
             manages,
@@ -2220,6 +2222,7 @@ app.get('/api/admin/login-registry', requireOwner, async (req, res) => {
                 username: String(entry.username || 'Usuario'),
                 globalName: String(entry.globalName || entry.username || 'Usuario'),
                 avatar: entry.avatar || null,
+                avatarUrl: sessionUserAvatarUrl({ id: entry.userId, avatar: entry.avatar }),
                 loginCount: Number(entry.loginCount) || 0,
                 firstLoginAt: entry.firstLoginAt || null,
                 lastLoginAt: entry.lastLoginAt || null,
