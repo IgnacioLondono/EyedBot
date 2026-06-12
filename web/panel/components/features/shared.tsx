@@ -144,23 +144,45 @@ export function Field({
   );
 }
 
+export type ChannelFilter = "all" | "text" | "voice" | "category";
+
+function channelMatchesFilter(channel: { type?: string }, filter: ChannelFilter) {
+  const type = String(channel.type || "");
+  if (filter === "all") return true;
+  if (filter === "voice") return type === "2" || type === "13";
+  if (filter === "category") return type === "4";
+  if (filter === "text") return type === "0" || type === "5";
+  return true;
+}
+
+function channelOptionLabel(channel: { name: string; type?: string }) {
+  const type = String(channel.type || "");
+  if (type === "2" || type === "13") return `🔊 ${channel.name}`;
+  if (type === "4") return `📁 ${channel.name}`;
+  return `#${channel.name}`;
+}
+
 export function ChannelSelect({
   value,
   onChange,
   options,
   placeholder = "Selecciona un canal",
+  filter = "all",
 }: {
   value: string;
   onChange: (value: string) => void;
   options: Array<{ id: string; name: string; type?: string }>;
   placeholder?: string;
+  filter?: ChannelFilter;
 }) {
+  const filtered = options.filter((channel) => channelMatchesFilter(channel, filter));
+
   return (
     <Select value={value} onChange={(event) => onChange(event.target.value)}>
       <option value="">{placeholder}</option>
-      {options.map((channel) => (
+      {filtered.map((channel) => (
         <option key={channel.id} value={channel.id}>
-          #{channel.name}
+          {channelOptionLabel(channel)}
         </option>
       ))}
     </Select>

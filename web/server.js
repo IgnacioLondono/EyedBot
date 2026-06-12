@@ -3822,7 +3822,7 @@ app.post('/api/guild/:guildId/temp-voice-config', requireAuth, async (req, res) 
         const current = await tempVoiceStore.getTempVoiceConfig(guildId);
         const config = normalizeTempVoiceConfigInput(req.body || {}, current, req.session.user?.id || 'unknown');
 
-        if (!config.creatorChannelId) {
+        if (config.enabled && !config.creatorChannelId) {
             return res.status(400).json({ error: 'Debes seleccionar un canal creador de voz' });
         }
 
