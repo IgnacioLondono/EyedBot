@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { DoorOpen, Mail, PartyPopper } from "lucide-react";
 import {
+  deleteWelcomeImage,
   getGoodbyeConfig,
   getWelcomeConfig,
   saveGoodbyeConfig,
   saveWelcomeConfig,
   testGoodbye,
   testWelcome,
+  uploadWelcomeImage,
 } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -23,8 +25,10 @@ import {
   Input,
   PaneGrid,
   SectionCard,
+  Select,
   Textarea,
 } from "@/components/features/shared";
+import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { plainColorToHex } from "@/lib/embed-utils";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
@@ -90,6 +94,10 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [uploadingMainImage, setUploadingMainImage] = useState(false);
+  const [uploadingThumbImage, setUploadingThumbImage] = useState(false);
+  const [deletingMainImage, setDeletingMainImage] = useState(false);
+  const [deletingThumbImage, setDeletingThumbImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,6 +122,59 @@ export function WelcomePane({ guildId }: { guildId: string }) {
 
   const active = tab === "welcome" ? welcome : goodbye;
   const setActive = tab === "welcome" ? setWelcome : setGoodbye;
+  const imageSlot = tab === "welcome" ? "welcome" : "goodbye";
+  const thumbSlot = tab === "welcome" ? "welcome_thumb" : "goodbye_thumb";
+
+  function applyConfigFromUpload(payload: unknown) {
+    const root = asRecord(payload);
+    const config = asRecord(root.config);
+    if (Object.keys(config).length) {
+      setActive(normalizeConfig(config, tab as "welcome" | "goodbye"));
+      return;
+    }
+    const nextUrl = toStringValue(root.path || root.url);
+    if (nextUrl) {
+      setActive((current) => ({ ...current, imageUrl: nextUrl }));
+    }
+  }
+
+  async function handleUploadImage(file: File, slot: string, kind: "main" | "thumb") {
+    const setUploading = kind === "main" ? setUploadingMainImage : setUploadingThumbImage;
+    setUploading(true);
+    try {
+      const result = await uploadWelcomeImage(guildId, file, slot);
+      applyConfigFromUpload(result);
+      if (kind === "thumb") {
+        setActive((current) => ({ ...current, thumbnailMode: "url" }));
+      }
+      toast({ title: "Imagen subida", description: "La imagen del embed fue guardada.", tone: "success" });
+    } catch (err) {
+      toast({ title: "No se pudo subir", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDeleteImage(slot: string, kind: "main" | "thumb") {
+    const setDeleting = kind === "main" ? setDeletingMainImage : setDeletingThumbImage;
+    setDeleting(true);
+    try {
+      const result = await deleteWelcomeImage(guildId, slot);
+      const config = asRecord(asRecord(result).config);
+      if (Object.keys(config).length) {
+        setActive(normalizeConfig(config, tab as "welcome" | "goodbye"));
+      } else if (kind === "main") {
+        setActive((current) => ({ ...current, imageUrl: "" }));
+      } else {
+        setActive((current) => ({ ...current, thumbnailUrl: "" }));
+      }
+      toast({ title: "Imagen eliminada", description: "Se quitó la imagen del embed.", tone: "success" });
+    } catch (err) {
+      toast({ title: "No se pudo eliminar", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -250,27 +311,37 @@ export function WelcomePane({ guildId }: { guildId: string }) {
 
           {sectionTab === "media" ? (
             <>
-              <Field label="Imagen principal" description="URL opcional para el embed.">
-                <Input
-                  value={active.imageUrl}
-                  onChange={(event) => setActive((current) => ({ ...current, imageUrl: event.target.value }))}
-                  placeholder="https://..."
-                />
-              </Field>
-              <Field label="Miniatura" description="avatar, url o none">
-                <Input
+              <EmbedImageField
+                label="Imagen principal"
+                description="URL externa o archivo subido al panel."
+                value={active.imageUrl}
+                onChange={(imageUrl) => setActive((current) => ({ ...current, imageUrl }))}
+                uploading={uploadingMainImage}
+                deleting={deletingMainImage}
+                onUpload={(file) => handleUploadImage(file, imageSlot, "main")}
+                onDelete={() => handleDeleteImage(imageSlot, "main")}
+              />
+              <Field label="Miniatura" description="Avatar del usuario, URL personalizada o sin miniatura.">
+                <Select
                   value={active.thumbnailMode}
                   onChange={(event) => setActive((current) => ({ ...current, thumbnailMode: event.target.value }))}
-                />
+                >
+                  <option value="avatar">Avatar del usuario</option>
+                  <option value="url">URL / imagen subida</option>
+                  <option value="none">Sin miniatura</option>
+                </Select>
               </Field>
               {active.thumbnailMode === "url" ? (
-                <Field label="URL miniatura">
-                  <Input
-                    value={active.thumbnailUrl}
-                    onChange={(event) => setActive((current) => ({ ...current, thumbnailUrl: event.target.value }))}
-                    placeholder="https://..."
-                  />
-                </Field>
+                <EmbedImageField
+                  label="Miniatura del embed"
+                  description="Se muestra arriba a la derecha en Discord."
+                  value={active.thumbnailUrl}
+                  onChange={(thumbnailUrl) => setActive((current) => ({ ...current, thumbnailUrl }))}
+                  uploading={uploadingThumbImage}
+                  deleting={deletingThumbImage}
+                  onUpload={(file) => handleUploadImage(file, thumbSlot, "thumb")}
+                  onDelete={() => handleDeleteImage(thumbSlot, "thumb")}
+                />
               ) : null}
             </>
           ) : null}

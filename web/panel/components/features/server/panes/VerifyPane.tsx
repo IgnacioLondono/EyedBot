@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { BadgeCheck } from "lucide-react";
-import { getVerifyConfig, publishVerify, saveVerifyConfig, updateVerifyEmbed } from "@/lib/api/endpoints";
+import {
+  deleteVerifyImage,
+  getVerifyConfig,
+  publishVerify,
+  saveVerifyConfig,
+  updateVerifyEmbed,
+  uploadVerifyImage,
+} from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -21,6 +28,7 @@ import {
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
+import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { plainColorToHex } from "@/lib/embed-utils";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
@@ -83,6 +91,8 @@ export function VerifyPane({ guildId }: { guildId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingImage, setDeletingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -193,9 +203,45 @@ export function VerifyPane({ guildId }: { guildId: string }) {
         ) : null}
 
         {tab === "media" ? (
-          <Field label="URL de imagen del embed">
-            <Input value={form.imageUrl} onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="https://..." />
-          </Field>
+          <EmbedImageField
+            label="Imagen del embed"
+            description="URL externa o archivo subido al panel."
+            value={form.imageUrl}
+            onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))}
+            uploading={uploadingImage}
+            deleting={deletingImage}
+            onUpload={async (file) => {
+              setUploadingImage(true);
+              try {
+                const result = asRecord(await uploadVerifyImage(guildId, file));
+                const config = asRecord(result.config);
+                if (Object.keys(config).length) {
+                  setForm(normalizeVerify(config));
+                } else {
+                  const imageUrl = toStringValue(result.path || result.url);
+                  setForm((current) => ({ ...current, imageUrl }));
+                }
+                toast({ title: "Imagen subida", description: "La imagen de verificación fue guardada.", tone: "success" });
+              } catch (err) {
+                toast({ title: "No se pudo subir", description: getErrorMessage(err), tone: "danger" });
+              } finally {
+                setUploadingImage(false);
+              }
+            }}
+            onDelete={async () => {
+              setDeletingImage(true);
+              try {
+                const result = asRecord(await deleteVerifyImage(guildId));
+                const config = asRecord(result.config);
+                setForm(normalizeVerify(config));
+                toast({ title: "Imagen eliminada", description: "Se quitó la imagen del embed.", tone: "success" });
+              } catch (err) {
+                toast({ title: "No se pudo eliminar", description: getErrorMessage(err), tone: "danger" });
+              } finally {
+                setDeletingImage(false);
+              }
+            }}
+          />
         ) : null}
 
         <div className="mt-5 flex flex-wrap gap-3">

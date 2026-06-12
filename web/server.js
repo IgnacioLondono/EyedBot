@@ -4890,7 +4890,17 @@ app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFi
 
         const publicPath = `/uploads/verify/${fileName}`;
         const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
-        res.json({ success: true, url: publicUrl, path: publicPath });
+        const currentCfg = (await verifyStore.getVerifyConfig(guildId)) || {};
+        const nextCfg = {
+            ...currentCfg,
+            imageUrl: publicPath,
+            image_url: publicPath,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+        await verifyStore.setVerifyConfig(guildId, nextCfg);
+
+        res.json({ success: true, url: publicUrl, path: publicPath, config: nextCfg });
     } catch (error) {
         console.error('Error subiendo imagen de verify:', error);
         res.status(500).json({ error: 'Error al subir imagen de verify' });
@@ -4983,6 +4993,82 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
     } catch (error) {
         console.error('Error subiendo imagen de bienvenida:', error);
         res.status(500).json({ error: 'Error al subir imagen de bienvenida' });
+    }
+});
+
+app.delete('/api/guild/:guildId/welcome-image', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const slot = greetingImageStore.normalizeSlot(req.body?.slot || req.query?.slot || 'welcome');
+        const isGoodbye = slot === 'goodbye' || slot === 'goodbye_thumb';
+        const getCfg = isGoodbye ? welcomeStore.getGoodbyeConfig : welcomeStore.getWelcomeConfig;
+        const setCfg = isGoodbye ? welcomeStore.setGoodbyeConfig : welcomeStore.setWelcomeConfig;
+
+        await greetingImageStore.deleteImage(guildId, slot);
+
+        const currentCfg = (await getCfg(guildId)) || {};
+        const nextCfg = {
+            ...currentCfg,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+
+        if (slot.endsWith('_thumb')) {
+            nextCfg.thumbnailUrl = '';
+        } else {
+            nextCfg.imageUrl = '';
+            nextCfg.image_url = '';
+        }
+
+        await setCfg(guildId, nextCfg);
+        welcomeStore.invalidateConfigCache(guildId);
+
+        res.json({ success: true, config: nextCfg });
+    } catch (error) {
+        console.error('Error eliminando imagen de bienvenida:', error);
+        res.status(500).json({ error: 'Error al eliminar imagen de bienvenida' });
+    }
+});
+
+app.delete('/api/guild/:guildId/verify-image', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const currentCfg = (await verifyStore.getVerifyConfig(guildId)) || {};
+        const previousUrl = String(currentCfg.imageUrl || currentCfg.image_url || '').trim();
+        const uploadPath = previousUrl.startsWith('/uploads/')
+            ? previousUrl.split('?')[0]
+            : '';
+
+        if (uploadPath) {
+            const diskPath = path.join(uploadsRoot, uploadPath.replace(/^\/uploads\//, ''));
+            if (fs.existsSync(diskPath)) {
+                try {
+                    fs.unlinkSync(diskPath);
+                } catch {
+                    // ignorar si no se puede borrar del disco
+                }
+            }
+        }
+
+        const nextCfg = {
+            ...currentCfg,
+            imageUrl: '',
+            image_url: '',
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+        await verifyStore.setVerifyConfig(guildId, nextCfg);
+
+        res.json({ success: true, config: nextCfg });
+    } catch (error) {
+        console.error('Error eliminando imagen de verify:', error);
+        res.status(500).json({ error: 'Error al eliminar imagen de verificación' });
     }
 });
 

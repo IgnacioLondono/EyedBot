@@ -130,6 +130,12 @@ export const uploadWelcomeImage = (guildId: string, file: File, slot?: string) =
   return apiForm(`/api/guild/${g(guildId)}/welcome-image`, form);
 };
 
+export const deleteWelcomeImage = (guildId: string, slot: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/welcome-image`, { method: "DELETE", body: { slot } });
+
+export const deleteVerifyImage = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/verify-image`, { method: "DELETE" });
+
 // ─── Tickets ────────────────────────────────────────────────────────
 
 export const getTicketConfig = (guildId: string) =>

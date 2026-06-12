@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Layers3, Plus, Send, Trash2 } from "lucide-react";
 import {
   deleteEmbedTemplate,
@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Switch } from "@/components/ui/Switch";
+import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { EmbedPreview } from "@/components/features/embed/EmbedPreview";
 import {
   ChannelSelect,
@@ -35,8 +36,6 @@ import { asArray, asRecord, getErrorMessage, toStringValue } from "@/lib/utils";
 export function EmbedPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
-  const imageFileRef = useRef<HTMLInputElement>(null);
-  const thumbnailFileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<EmbedFormState>(DEFAULT_EMBED_FORM);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -222,43 +221,30 @@ export function EmbedPane({ guildId }: { guildId: string }) {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Imagen (URL)">
-              <Input value={form.imageUrl} onChange={(event) => patchForm({ imageUrl: event.target.value })} placeholder="https://..." />
-            </Field>
-            <Field label="Miniatura (URL)">
-              <Input
-                value={form.thumbnailUrl}
-                onChange={(event) => patchForm({ thumbnailUrl: event.target.value })}
-                placeholder="https://..."
-              />
-            </Field>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Subir imagen principal">
-              <input
-                ref={imageFileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => setImageFile(event.target.files?.[0] || null)}
-              />
-              <Button variant="secondary" onClick={() => imageFileRef.current?.click()}>
-                {imageFile ? imageFile.name : "Elegir archivo"}
-              </Button>
-            </Field>
-            <Field label="Subir miniatura">
-              <input
-                ref={thumbnailFileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => setThumbnailFile(event.target.files?.[0] || null)}
-              />
-              <Button variant="secondary" onClick={() => thumbnailFileRef.current?.click()}>
-                {thumbnailFile ? thumbnailFile.name : "Elegir archivo"}
-              </Button>
-            </Field>
+            <EmbedImageField
+              label="Imagen principal"
+              description="URL o archivo que se adjunta al enviar el embed."
+              value={form.imageUrl}
+              onChange={(imageUrl) => patchForm({ imageUrl })}
+              filePreview={imagePreviewUrl}
+              onFileSelect={setImageFile}
+              onDelete={() => {
+                patchForm({ imageUrl: "" });
+                setImageFile(null);
+              }}
+            />
+            <EmbedImageField
+              label="Miniatura"
+              description="URL o archivo para la miniatura del embed."
+              value={form.thumbnailUrl}
+              onChange={(thumbnailUrl) => patchForm({ thumbnailUrl })}
+              filePreview={thumbnailPreviewUrl}
+              onFileSelect={setThumbnailFile}
+              onDelete={() => {
+                patchForm({ thumbnailUrl: "" });
+                setThumbnailFile(null);
+              }}
+            />
           </div>
 
           <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
