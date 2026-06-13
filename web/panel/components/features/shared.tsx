@@ -266,12 +266,14 @@ export function MultiRoleSelect({
               checked ? "bg-violet-500/15 text-white" : "text-zinc-300 hover:bg-white/5"
             )}
           >
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={() => toggle(role.id)}
-              className="accent-violet-500"
-            />
+      <input
+        type="checkbox"
+        name={`role-${role.id}`}
+        id={`role-${role.id}`}
+        checked={checked}
+        onChange={() => toggle(role.id)}
+        className="accent-violet-500"
+      />
             <span
               className="h-3 w-3 shrink-0 rounded-full border border-white/10"
               style={{ backgroundColor: roleColorStyle(role.color) }}
@@ -304,6 +306,8 @@ export function ColorInput({
     <div className="flex items-center gap-3">
       <input
         type="color"
+        id="embed-color-picker"
+        name="embed-color-picker"
         value={pickerValue}
         onChange={(event) => {
           const next = event.target.value;

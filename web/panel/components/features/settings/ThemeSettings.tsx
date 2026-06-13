@@ -33,6 +33,8 @@ function SliderField({
     <Field label={`${label} (${value}%)`}>
       <input
         type="range"
+        id={`theme-slider-${label.toLowerCase().replace(/\s+/g, "-")}`}
+        name={`theme-slider-${label.toLowerCase().replace(/\s+/g, "-")}`}
         min={0}
         max={100}
         value={value}
@@ -196,6 +198,8 @@ export function ThemeSettings() {
             <input
               ref={fileRef}
               type="file"
+              name="wallpaper-upload"
+              id="wallpaper-upload"
               accept="image/*,video/*"
               className="hidden"
               onChange={(event) => void handleWallpaperUpload(event.target.files?.[0] || null)}

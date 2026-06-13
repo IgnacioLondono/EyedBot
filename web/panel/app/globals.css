@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+@keyframes login-blob-float-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(40px, 24px);
+  }
+}
+
+@keyframes login-blob-float-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-30px, -20px);
+  }
+}
+
+@keyframes login-blob-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.login-blob-a {
+  animation: login-blob-float-a 14s ease-in-out infinite;
+}
+
+.login-blob-b {
+  animation: login-blob-float-b 18s ease-in-out infinite;
+}
+
+.login-blob-c {
+  animation: login-blob-pulse 12s ease-in-out infinite;
+}
+
 :root {
   --background: #07060d;
   --foreground: #f4f4f5;

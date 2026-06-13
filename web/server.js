@@ -746,7 +746,8 @@ console.log(`   Session Cookie Secure: ${cookieSecure ? '✅ true' : '⚠️ fal
 // Middleware
 app.use(helmet({
     contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 app.use(cors({
     origin(origin, callback) {
@@ -778,6 +779,17 @@ app.use((req, res, next) => {
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         res.setHeader('Surrogate-Control', 'no-store');
+    } else if (path.startsWith('/_next/static/')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (/\.(?:svg|ico|png|jpe?g|webp|gif|woff2?|css|js|map)$/i.test(path)) {
+        res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+    } else if (!path.startsWith('/api') && !path.startsWith('/webhooks')) {
+        res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
+    }
+
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (!res.getHeader('Cross-Origin-Resource-Policy')) {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     }
     next();
 });
@@ -814,6 +826,8 @@ const panelFaviconPath = path.join(__dirname, 'panel', 'public', 'eyedbot-icon.s
 const panelFaviconFallbackPath = path.join(__dirname, 'panel', 'app', 'favicon.ico');
 app.get('/favicon.ico', (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     if (fs.existsSync(panelFaviconPath)) {
         res.type('image/svg+xml');
         return res.sendFile(panelFaviconPath);
@@ -828,6 +842,8 @@ app.use('/uploads', express.static(uploadsRoot, {
     etag: true,
     setHeaders: (res) => {
         res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     }
 }));
 
@@ -903,9 +919,13 @@ function buildPublicUploadUrl(req, publicPath) {
     const p = String(publicPath || '').startsWith('/') ? String(publicPath) : `/${publicPath}`;
     const fromEnv = String(process.env.WEB_PUBLIC_ORIGIN || process.env.PUBLIC_ORIGIN || '').trim().replace(/\/+$/, '');
     if (fromEnv) {
-        return `${fromEnv}${p}`;
+        const normalized = fromEnv.replace(/^http:\/\//i, 'https://');
+        return `${IS_PRODUCTION && !fromEnv.startsWith('http://localhost') ? normalized : fromEnv}${p}`;
     }
-    const proto = String(req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+    let proto = String(req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+    if (IS_PRODUCTION || redirectIsHttps) {
+        proto = 'https';
+    }
     const host = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
     if (!host) {
         return p;

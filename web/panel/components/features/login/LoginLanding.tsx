@@ -1,9 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Bell,
   Bolt,
@@ -17,8 +18,15 @@ import {
   Terminal,
   Zap,
 } from "lucide-react";
-import { OverviewShowcase } from "@/components/features/about/AboutShowcases";
 import { EyedBioPromo } from "@/components/features/about/EyedBioPromo";
+
+const OverviewShowcase = dynamic(
+  () => import("@/components/features/about/AboutShowcases").then((mod) => mod.OverviewShowcase),
+  {
+    loading: () => <div className="h-48 animate-pulse rounded-2xl border border-white/8 bg-white/5" />,
+    ssr: false,
+  }
+);
 
 const FEATURES = [
   {
@@ -91,19 +99,8 @@ function RotatingHighlight() {
   }, []);
 
   return (
-    <div className="mt-4 h-6 overflow-hidden">
-      <AnimatePresence mode="wait">
-        <motion.p
-          key={highlights[index]}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.35 }}
-          className="text-sm text-violet-200/90"
-        >
-          {highlights[index]}
-        </motion.p>
-      </AnimatePresence>
+    <div className="mt-4 h-6 overflow-hidden" aria-live="polite">
+      <p className="text-sm text-violet-200/90">{highlights[index]}</p>
     </div>
   );
 }
@@ -115,30 +112,14 @@ export function LoginLanding() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[#07060d] text-zinc-100">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <motion.div
-          className="absolute -left-24 top-20 h-80 w-80 rounded-full bg-violet-600/25 blur-3xl"
-          animate={{ x: [0, 40, 0], y: [0, 24, 0] }}
-          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-fuchsia-500/15 blur-3xl"
-          animate={{ x: [0, -30, 0], y: [0, -20, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl"
-          animate={{ scale: [1, 1.12, 1] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        />
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+        <div className="login-blob-a absolute -left-24 top-20 h-80 w-80 rounded-full bg-violet-600/25 blur-3xl" />
+        <div className="login-blob-b absolute right-0 top-1/3 h-96 w-96 rounded-full bg-fuchsia-500/15 blur-3xl" />
+        <div className="login-blob-c absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-8 lg:px-8 lg:py-12">
-        <motion.header
-          {...fadeUp}
-          transition={{ duration: 0.5 }}
-          className="mb-10 flex items-center justify-between gap-4"
-        >
+        <header className="mb-10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-violet-500/20 text-violet-100 shadow-[0_0_40px_rgba(139,92,246,0.35)]">
               <Eye className="h-5 w-5" />
@@ -156,11 +137,11 @@ export function LoginLanding() {
           >
             Servidor de soporte
           </a>
-        </motion.header>
+        </header>
 
         <div className="grid flex-1 items-start gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14">
           <div className="space-y-10">
-            <motion.section {...fadeUp} transition={{ duration: 0.55, delay: 0.05 }}>
+            <section>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-violet-300/80">Tu comunidad, bajo control</p>
               <h1 className="mt-3 max-w-2xl text-4xl font-bold leading-tight text-white sm:text-5xl">
                 El bot de Discord con panel web para{" "}
@@ -191,7 +172,7 @@ export function LoginLanding() {
                 </Link>
               </div>
               <p className="mt-2 text-xs text-zinc-500">Sin iniciar sesión — información pública del bot.</p>
-            </motion.section>
+            </section>
 
             <motion.section
               initial="initial"
@@ -221,11 +202,7 @@ export function LoginLanding() {
               })}
             </motion.section>
 
-            <motion.section
-              {...fadeUp}
-              transition={{ duration: 0.55, delay: 0.25 }}
-              className="grid gap-6 lg:grid-cols-2"
-            >
+            <section className="grid gap-6 lg:grid-cols-2">
               <div className="rounded-3xl border border-white/8 bg-black/20 p-5">
                 <div className="mb-4 flex items-center gap-2 text-sm font-medium text-white">
                   <Zap className="h-4 w-4 text-amber-300" />
@@ -244,29 +221,15 @@ export function LoginLanding() {
               </div>
               <div>
                 <p className="mb-3 text-sm font-medium text-zinc-400">Vista previa del panel</p>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.6, delay: 0.35 }}
-                >
-                  <OverviewShowcase />
-                </motion.div>
+                <OverviewShowcase />
               </div>
-            </motion.section>
+            </section>
 
-            <motion.div
-              {...fadeUp}
-              transition={{ duration: 0.5, delay: 0.28 }}
-              className="max-w-2xl"
-            >
+            <div className="max-w-2xl">
               <EyedBioPromo variant="banner" />
-            </motion.div>
+            </div>
 
-            <motion.div
-              {...fadeUp}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex flex-wrap gap-3 text-sm text-zinc-500"
-            >
+            <div className="flex flex-wrap gap-3 text-sm text-zinc-500">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 px-3 py-1">
                 <Terminal className="h-3.5 w-3.5" />
                 Comandos slash
@@ -275,15 +238,10 @@ export function LoginLanding() {
                 <Sparkles className="h-3.5 w-3.5 text-fuchsia-300" />
                 EyedPlus+ premium
               </span>
-            </motion.div>
+            </div>
           </div>
 
-          <motion.aside
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.55, delay: 0.1 }}
-            className="lg:sticky lg:top-10"
-          >
+          <aside className="lg:sticky lg:top-10">
             <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/40 to-fuchsia-600/30 text-violet-100">
                 <Eye className="h-8 w-8" />
@@ -313,7 +271,7 @@ export function LoginLanding() {
                 Al continuar aceptas que EyedBot acceda a tu perfil y lista de servidores para el panel.
               </p>
             </div>
-          </motion.aside>
+          </aside>
         </div>
       </div>
     </div>

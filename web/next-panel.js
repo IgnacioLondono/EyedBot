@@ -24,6 +24,27 @@ function appendQuery(req, targetPath) {
     return `${targetPath}${qs}`;
 }
 
+function applyPanelResponseHeaders(req, res) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (!res.getHeader('Cross-Origin-Resource-Policy')) {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
+
+    const path = String(req.path || '');
+    if (path.startsWith('/_next/static/')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (/\.(?:svg|ico|png|jpe?g|webp|gif|woff2?)$/i.test(path)) {
+        res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+    } else if (!res.getHeader('Cache-Control')) {
+        res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
+    }
+}
+
+function handlePanelRequest(handle, req, res) {
+    applyPanelResponseHeaders(req, res);
+    return handle(req, res);
+}
+
 function registerLegacyPanelRedirects(app) {
     Object.entries(LEGACY_PAGE_REDIRECTS).forEach(([from, to]) => {
         app.get(from, (req, res) => {
@@ -64,7 +85,7 @@ async function attachNextPanel(app) {
         if (req.session?.user) {
             return res.redirect('/dashboard');
         }
-        return handle(req, res);
+        return handlePanelRequest(handle, req, res);
     });
 
     app.get('/', (req, res) => {
@@ -78,14 +99,14 @@ async function attachNextPanel(app) {
         if (!req.session?.user) {
             return res.redirect('/login');
         }
-        return handle(req, res);
+        return handlePanelRequest(handle, req, res);
     });
 
     app.use((req, res, nextMiddleware) => {
         if (shouldSkipNextPanel(req.path)) {
             return nextMiddleware();
         }
-        return handle(req, res);
+        return handlePanelRequest(handle, req, res);
     });
 
     console.log('✅ Panel Next.js montado (%s)', dev ? 'desarrollo' : 'producción');

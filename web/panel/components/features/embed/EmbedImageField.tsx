@@ -75,6 +75,8 @@ export function EmbedImageField({
           <input
             ref={inputRef}
             type="file"
+            name="embed-image-upload"
+            id="embed-image-upload"
             accept="image/*"
             className="hidden"
             onChange={(event) => void handleFileChange(event.target.files?.[0] || null)}
