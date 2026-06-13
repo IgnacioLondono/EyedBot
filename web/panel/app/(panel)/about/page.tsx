@@ -30,7 +30,6 @@ import {
   TicketsShowcase,
   WelcomeShowcase,
 } from "@/components/features/about/AboutShowcases";
-import { EyedBioPromo } from "@/components/features/about/EyedBioPromo";
 
 const ABOUT_TABS = [
   { id: "overview", label: "General" },
@@ -107,7 +106,6 @@ export default function AboutPage() {
                 alertas de directos, seguridad, gacha y más sin tocar archivos ni reiniciar el bot.
               </p>
             </Card>
-            <EyedBioPromo />
             <div className="grid gap-5 lg:grid-cols-2">
               <div>
                 <h3 className="mb-3 text-sm font-medium text-zinc-400">Ejemplo: dashboard</h3>
