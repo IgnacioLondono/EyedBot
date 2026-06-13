@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { EyedBioPromo } from "@/components/features/about/EyedBioPromo";
+import { EyedBioNavLink } from "@/components/layout/EyedBioNavLink";
 
 const OverviewShowcase = dynamic(
   () => import("@/components/features/about/AboutShowcases").then((mod) => mod.OverviewShowcase),
@@ -129,14 +130,18 @@ export function LoginLanding() {
               <p className="text-xs text-zinc-500">Panel de administración</p>
             </div>
           </div>
-          <a
-            href="https://discord.gg/eN6eQdGn87"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 sm:inline-flex"
-          >
-            Servidor de soporte
-          </a>
+          <div className="flex items-center gap-2">
+            <EyedBioNavLink showLabel="always" variant="button" className="hidden sm:inline-flex" />
+            <EyedBioNavLink showLabel="never" variant="button" className="sm:hidden" />
+            <a
+              href="https://discord.gg/eN6eQdGn87"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 sm:inline-flex"
+            >
+              Servidor de soporte
+            </a>
+          </div>
         </header>
 
         <div className="grid flex-1 items-start gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14">

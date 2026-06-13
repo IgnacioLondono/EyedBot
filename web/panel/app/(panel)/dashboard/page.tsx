@@ -8,6 +8,7 @@ import type { DashboardGuildSummary } from "@/lib/types";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useDashboardFavorites } from "@/lib/hooks/useDashboardFavorites";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { EyedBioPromo } from "@/components/features/about/EyedBioPromo";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
@@ -160,6 +161,10 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <div className="mb-6">
+        <EyedBioPromo variant="banner" />
+      </div>
 
       <div className="mb-5 max-w-md">
         <div className="relative">

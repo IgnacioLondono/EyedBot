@@ -1,6 +1,5 @@
 import { ExternalLink, Link2, Music2, Palette, Sparkles } from "lucide-react";
-
-const EYEDBIO_URL = "https://eyedbio.eyedcomun.me/";
+import { EYEDBIO_LABEL, EYEDBIO_URL } from "@/lib/eyedbio";
 
 type EyedBioPromoProps = {
   variant?: "card" | "banner";
@@ -39,7 +38,7 @@ export function EyedBioPromo({ variant = "card" }: EyedBioPromoProps) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-300/80">EyedComun</p>
-            <h3 className="mt-1 text-xl font-semibold text-white">Eyed.bio</h3>
+            <h3 className="mt-1 text-xl font-semibold text-white">{EYEDBIO_LABEL}</h3>
             <p className="mt-1 text-sm text-zinc-400">Tu página link-in-bio moderna y personalizable.</p>
           </div>
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/15 text-cyan-200">
@@ -86,5 +85,3 @@ export function EyedBioPromo({ variant = "card" }: EyedBioPromoProps) {
     </div>
   );
 }
-
-export { EYEDBIO_URL };

@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronDown, Eye, LogIn, LogOut, Plus } from "lucide-react";
+import { ChevronDown, Eye, Link2, LogIn, LogOut, Plus } from "lucide-react";
 import { useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
+import { EYEDBIO_URL } from "@/lib/eyedbio";
+import { EyedBioNavLink } from "@/components/layout/EyedBioNavLink";
 import { isPublicPanelRoute } from "@/lib/public-routes";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { discordAvatarUrl } from "@/lib/discord-media";
@@ -65,9 +67,13 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            <EyedBioNavLink showLabel="always" />
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <div className="md:hidden">
+              <EyedBioNavLink showLabel="never" />
+            </div>
             <a
               href="https://discord.gg/eN6eQdGn87"
               target="_blank"
@@ -144,7 +150,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
       </motion.main>
 
       <div className="fixed inset-x-3 bottom-3 z-40 md:hidden">
-        <div className="grid grid-cols-4 rounded-[28px] border border-white/10 bg-black/40 p-2 shadow-2xl backdrop-blur-2xl">
+        <div className="grid grid-cols-5 rounded-[28px] border border-white/10 bg-black/40 p-2 shadow-2xl backdrop-blur-2xl">
           {PRIMARY_NAV.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
@@ -155,7 +161,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={href}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] text-zinc-400 transition",
+                  "flex flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] text-zinc-400 transition",
                   active && "bg-white/10 text-white",
                   guestLocked && !active && "opacity-70"
                 )}
@@ -165,6 +171,15 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          <a
+            href={EYEDBIO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] text-cyan-300 transition hover:bg-cyan-500/10"
+          >
+            <Link2 className="h-4 w-4" />
+            <span className="truncate">Eyed.bio</span>
+          </a>
         </div>
       </div>
     </div>
