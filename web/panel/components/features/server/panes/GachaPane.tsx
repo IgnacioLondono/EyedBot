@@ -51,7 +51,7 @@ type GachaState = {
 type InventoryItem = Record<string, unknown>;
 
 export function GachaPane({ guildId }: { guildId: string }) {
-  const { bootstrap, hasPremium } = usePanel();
+  const { bootstrap, premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
   const [tab, setTab] = useState("config");
@@ -161,14 +161,14 @@ export function GachaPane({ guildId }: { guildId: string }) {
   return (
     <div className="relative">
       <LockedOverlay
-        visible={!hasPremium}
+        visible={premiumLocked}
         title="Gacha premium"
         description="El sistema gacha, tienda y estadísticas avanzadas requieren una suscripción activa."
       />
       <SectionCard
         title="Centro gacha"
         description="Administra banner, economía ligera y actividad del sistema."
-        action={<PremiumLock locked={!hasPremium} />}
+        action={<PremiumLock locked={premiumLocked} />}
       >
         <Tabs
           items={[
@@ -186,7 +186,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
 
         {tab === "config" ? (
           <PaneGrid>
-            <div className={!hasPremium ? "pointer-events-none opacity-50" : ""}>
+            <div className={premiumLocked ? "pointer-events-none opacity-50" : ""}>
               <div className="space-y-5">
                 <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
                   <div>
@@ -365,7 +365,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
                 />
               </Field>
               <div className="flex items-end">
-                <Button onClick={() => void loadInventory()} disabled={inventoryLoading || !hasPremium}>
+                <Button onClick={() => void loadInventory()} disabled={inventoryLoading || premiumLocked}>
                   {inventoryLoading ? "Buscando..." : "Consultar"}
                 </Button>
               </div>

@@ -105,7 +105,7 @@ function normalizeAntiRaid(value: unknown): AntiRaidState {
 }
 
 export function SecurityPane({ guildId }: { guildId: string }) {
-  const { hasPremium } = usePanel();
+  const { premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
   const [tab, setTab] = useState("raid");
@@ -151,7 +151,7 @@ export function SecurityPane({ guildId }: { guildId: string }) {
   return (
     <div className="relative">
       <LockedOverlay
-        visible={!hasPremium}
+        visible={premiumLocked}
         title="Seguridad avanzada premium"
         description="Anti-raid, setup de canales y filtros avanzados requieren EyedPlus+."
       />
@@ -159,11 +159,11 @@ export function SecurityPane({ guildId }: { guildId: string }) {
       <SectionCard
         title="Centro de seguridad"
         description="Protección de entrada, canales y moderación preventiva."
-        action={<PremiumLock locked={!hasPremium} />}
+        action={<PremiumLock locked={premiumLocked} />}
       >
         <Tabs items={SECURITY_TABS} value={tab} onValueChange={setTab} className="mb-6" />
 
-        <div className={!hasPremium ? "pointer-events-none opacity-50" : ""}>
+        <div className={premiumLocked ? "pointer-events-none opacity-50" : ""}>
           {tab === "raid" ? (
             <div className="space-y-5">
               <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">

@@ -65,6 +65,11 @@ const app = express();
 const PORT = process.env.WEB_PORT || 3000;
 const NODE_ENV = String(process.env.NODE_ENV || 'development').trim().toLowerCase();
 const IS_PRODUCTION = NODE_ENV === 'production';
+
+function isPremiumEnforcementEnabled() {
+    const raw = String(process.env.EYEDPLUS_REQUIRED || process.env.PREMIUM_REQUIRED || '').trim().toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
 const {
     handleTwitchEventSubHttpRequest,
     isTwitchEventSubConfigured,
@@ -1963,6 +1968,10 @@ async function persistMercadoPagoSubscriptionForUser(userId, subscription, sourc
 }
 
 async function requirePremium(req, res, next) {
+    if (!isPremiumEnforcementEnabled()) {
+        return next();
+    }
+
     const userId = String(req.session?.user?.id || '').trim();
     if (!userId) {
         return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
@@ -2093,6 +2102,7 @@ app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
             inviteUrl,
             isOwner: isOwnerUser(req.session.user),
             hasPremium: hasPremiumGrant(req.session.user),
+            premiumRequired: isPremiumEnforcementEnabled(),
             botConnected: Boolean(botClient?.user?.id),
             guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0
         });

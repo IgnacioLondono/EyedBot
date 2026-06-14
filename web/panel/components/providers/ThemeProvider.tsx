@@ -113,7 +113,7 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { hasPremium } = usePanel();
+  const { premiumLocked } = usePanel();
   const [theme, setThemeState] = useState<PanelThemeSettings>(readInitialTheme);
   const { blobUrl, refreshWallpaper, primeBlobUrl } = useWallpaperBlobUrl(
     theme.wallpaperEnabled,
@@ -148,18 +148,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback(
     (patch: Partial<PanelThemeSettings>) => {
-      if (!hasPremium) return;
+      if (premiumLocked) return;
       setThemeState((current) => persist(normalizePanelTheme({ ...current, ...patch })));
     },
-    [hasPremium, persist]
+    [premiumLocked, persist]
   );
 
   const applyThemePreset = useCallback(
     (presetId: ThemePresetId) => {
-      if (!hasPremium) return;
+      if (premiumLocked) return;
       setThemeState((current) => persist(applyPreset(presetId, current)));
     },
-    [hasPremium, persist]
+    [premiumLocked, persist]
   );
 
   const resetTheme = useCallback(() => {
@@ -169,7 +169,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const uploadWallpaper = useCallback(
     async (file: File) => {
-      if (!hasPremium) return null;
+      if (premiumLocked) return null;
       primeBlobUrl(file);
       const { kind, mime } = await saveWallpaperToIdb(file);
       setThemeState((current) =>
@@ -186,7 +186,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       );
       return { kind, mime };
     },
-    [hasPremium, primeBlobUrl, persist]
+    [premiumLocked, primeBlobUrl, persist]
   );
 
   const value = useMemo(
@@ -198,7 +198,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       resetTheme,
       refreshWallpaper,
       uploadWallpaper,
-      premiumLocked: !hasPremium,
+      premiumLocked,
       hasActiveWallpaper,
     }),
     [
@@ -209,7 +209,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       resetTheme,
       refreshWallpaper,
       uploadWallpaper,
-      hasPremium,
+      premiumLocked,
       hasActiveWallpaper,
     ]
   );

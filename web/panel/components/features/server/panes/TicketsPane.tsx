@@ -164,7 +164,7 @@ function OptionEditor({
 
 export function TicketsPane({ guildId }: { guildId: string }) {
   const { toast } = useToast();
-  const { hasPremium } = usePanel();
+  const { premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
   const [tab, setTab] = useState("manage");
@@ -290,7 +290,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   return (
     <div className="relative space-y-5">
       <LockedOverlay
-        visible={!hasPremium}
+        visible={premiumLocked}
         title="Tickets premium"
         description="Configura y gestiona tickets con EyedPlus+."
       />
@@ -298,11 +298,11 @@ export function TicketsPane({ guildId }: { guildId: string }) {
       <SectionCard
         title="Gestión de tickets"
         description="Equivalente al panel legacy con panel, categorías, preview y operación."
-        action={<PremiumLock locked={!hasPremium} />}
+        action={<PremiumLock locked={premiumLocked} />}
       >
         <Tabs items={TICKET_TABS} value={tab} onValueChange={setTab} className="mb-6" />
 
-        <div className={!hasPremium ? "pointer-events-none opacity-50" : ""}>
+        <div className={premiumLocked ? "pointer-events-none opacity-50" : ""}>
           {tab === "panel" ? (
             loading ? (
               <Alert title="Cargando panel" description="Consultando configuración de tickets." />

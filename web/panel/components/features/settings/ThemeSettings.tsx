@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImageIcon, Sparkles, Trash2, Upload } from "lucide-react";
+import { Trash2, Upload } from "lucide-react";
 import { useThemeSettings } from "@/components/providers/ThemeProvider";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { Button } from "@/components/ui/Button";
@@ -46,14 +46,15 @@ function SliderField({
 }
 
 export function ThemeSettings() {
-  const { hasPremium } = usePanel();
-  const { theme, setTheme, applyThemePreset, resetTheme, refreshWallpaper, uploadWallpaper, premiumLocked } =
+  const { premiumLocked } = usePanel();
+  const { theme, setTheme, applyThemePreset, resetTheme, refreshWallpaper, uploadWallpaper } =
     useThemeSettings();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const lockedClass = premiumLocked ? "pointer-events-none opacity-50" : "";
 
   async function handleWallpaperUpload(file: File | null) {
-    if (!file || !hasPremium) return;
+    if (!file || premiumLocked) return;
     setUploading(true);
     try {
       if (file.size > 180 * 1024 * 1024) {
@@ -88,9 +89,9 @@ export function ThemeSettings() {
       <SectionCard
         title="Temas preestablecidos"
         description="Aplica una paleta completa con un clic."
-        action={<PremiumLock locked={!hasPremium} />}
+        action={premiumLocked ? <PremiumLock locked /> : null}
       >
-        <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-4 ${!hasPremium ? "pointer-events-none opacity-50" : ""}`}>
+        <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-4 ${lockedClass}`}>
           {(Object.keys(THEME_PRESET_LABELS) as ThemePresetId[]).map((presetId) => (
             <button
               key={presetId}
@@ -113,7 +114,7 @@ export function ThemeSettings() {
       </SectionCard>
 
       <SectionCard title="Colores y atmósfera" description="Ajusta la paleta manualmente.">
-        <div className={`space-y-5 ${!hasPremium ? "pointer-events-none opacity-50" : ""}`}>
+        <div className={`space-y-5 ${lockedClass}`}>
           <div className="grid gap-4 md:grid-cols-3">
             {[
               ["accentPrimary", "Acento principal"],
@@ -158,11 +159,15 @@ export function ThemeSettings() {
               />
             </div>
           </div>
+
+          <Button variant="secondary" onClick={resetTheme}>
+            Restaurar tema por defecto
+          </Button>
         </div>
       </SectionCard>
 
       <SectionCard title="Fondo personalizado" description="Sube imagen o vídeo. Se guarda localmente en tu navegador.">
-        <div className={`space-y-5 ${!hasPremium ? "pointer-events-none opacity-50" : ""}`}>
+        <div className={`space-y-5 ${lockedClass}`}>
           <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
             <div>
               <p className="font-medium text-white">Wallpaper activo</p>
@@ -213,50 +218,6 @@ export function ThemeSettings() {
               Quitar fondo
             </Button>
           </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-            <div className="mb-3 flex items-center gap-2 text-white">
-              <ImageIcon className="h-5 w-5" />
-              Estado del wallpaper
-            </div>
-            <p className="text-sm text-zinc-300">
-              {theme.wallpaperEnabled
-                ? `Activo (${theme.wallpaperStorage === "indexeddb" ? "IndexedDB" : "inline"}) · ${theme.wallpaperKind}`
-                : "Sin fondo personalizado."}
-            </p>
-          </div>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Preview" description="Vista previa del estudio de tema.">
-        <div
-          className="rounded-[28px] border p-6"
-          style={{
-            borderColor: `${theme.borderColor}66`,
-            background: `linear-gradient(180deg, ${theme.bgSecondary} 0%, ${theme.bgCard} 100%)`,
-            color: theme.textPrimary,
-          }}
-        >
-          <div className="mb-3 flex items-center gap-2">
-            <Sparkles className="h-5 w-5" style={{ color: theme.accentPrimary }} />
-            <span className="font-semibold">EyedBot Studio</span>
-          </div>
-          <p style={{ color: theme.textSecondary }}>
-            Los cambios se aplican al instante y se guardan en localStorage.
-          </p>
-          <div className="mt-4 flex gap-2">
-            <span className="rounded-full px-3 py-1 text-xs" style={{ background: `${theme.accentPrimary}33`, color: theme.accentPrimary }}>
-              Acento
-            </span>
-            <span className="rounded-full px-3 py-1 text-xs" style={{ background: `${theme.accentSecondary}33`, color: theme.accentSecondary }}>
-              Secundario
-            </span>
-          </div>
-        </div>
-        <div className="mt-4">
-          <Button variant="secondary" onClick={resetTheme}>
-            Restaurar tema por defecto
-          </Button>
         </div>
       </SectionCard>
     </div>

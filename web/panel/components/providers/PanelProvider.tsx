@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { ApiRequestError } from "@/lib/api/client";
 import * as api from "@/lib/api/endpoints";
 import { isPublicPanelRoute } from "@/lib/public-routes";
+import { isPremiumFeatureLocked } from "@/lib/premium";
 import type { BillingStatus, PanelBootstrap } from "@/lib/types";
 
 type PanelContextValue = {
@@ -22,6 +23,8 @@ type PanelContextValue = {
   error: string | null;
   refresh: (forceGuilds?: boolean) => Promise<void>;
   hasPremium: boolean;
+  premiumRequired: boolean;
+  premiumLocked: boolean;
 };
 
 const PanelContext = createContext<PanelContextValue | null>(null);
@@ -85,17 +88,20 @@ export function PanelProvider({ children }: { children: ReactNode }) {
     };
   }, [pathname]);
 
-  const value = useMemo<PanelContextValue>(
-    () => ({
+  const value = useMemo<PanelContextValue>(() => {
+    const hasPremium = Boolean(billing?.active || bootstrap?.hasPremium || bootstrap?.isOwner);
+    const premiumRequired = Boolean(bootstrap?.premiumRequired);
+    return {
       bootstrap,
       billing,
       loading,
       error,
       refresh,
-      hasPremium: Boolean(billing?.active || bootstrap?.hasPremium || bootstrap?.isOwner),
-    }),
-    [bootstrap, billing, loading, error, refresh]
-  );
+      hasPremium,
+      premiumRequired,
+      premiumLocked: isPremiumFeatureLocked(premiumRequired, hasPremium),
+    };
+  }, [bootstrap, billing, loading, error, refresh]);
 
   return <PanelContext.Provider value={value}>{children}</PanelContext.Provider>;
 }

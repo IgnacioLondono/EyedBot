@@ -25,7 +25,7 @@ const PANE_COPY: Record<string, { title: string; body: string }> = {
   },
   theme: {
     title: "Personalización",
-    body: "Colores, atmósfera y fondo del panel (EyedPlus+).",
+    body: "Colores, atmósfera y fondo del panel.",
   },
 };
 
@@ -41,7 +41,7 @@ export default function SettingsPage() {
   const params = useParams<{ pane?: string[] }>();
   const router = useRouter();
   const pane = params.pane?.[0] || "account";
-  const { bootstrap, hasPremium } = usePanel();
+  const { bootstrap, premiumLocked } = usePanel();
   const isOwner = Boolean(bootstrap?.isOwner);
   const copy = PANE_COPY[pane] || PANE_COPY.account;
   const SettingsComponent = SETTINGS_COMPONENTS[pane as SettingsPaneSlug] || AccountSettings;
@@ -74,7 +74,7 @@ export default function SettingsPage() {
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
-                {item.premium && !hasPremium ? (
+                {item.premium && premiumLocked ? (
                   <span className="text-[10px] text-fuchsia-300">+</span>
                 ) : null}
               </Link>
@@ -87,7 +87,7 @@ export default function SettingsPage() {
             kicker="Configuración"
             title={copy.title}
             description={copy.body}
-            actions={pane === "theme" && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
+            actions={pane === "theme" && premiumLocked ? <Badge variant="premium">Premium</Badge> : null}
           />
           <div className="mt-5">
             {pane === "owner" && !isOwner ? (

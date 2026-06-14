@@ -82,6 +82,7 @@ export type PanelBootstrap = {
   inviteUrl: string;
   isOwner: boolean;
   hasPremium?: boolean;
+  premiumRequired?: boolean;
   botConnected: boolean;
   guildsSyncedAt: number;
 };

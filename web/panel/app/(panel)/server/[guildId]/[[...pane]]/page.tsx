@@ -48,7 +48,7 @@ export default function ServerPage() {
   const params = useParams<{ guildId: string; pane?: string[] }>();
   const guildId = params.guildId;
   const paneSlug = params.pane?.[0] || "overview";
-  const { hasPremium } = usePanel();
+  const { premiumLocked } = usePanel();
   const [guildName, setGuildName] = useState("Servidor");
   const [moduleQuery, setModuleQuery] = useState("");
 
@@ -109,7 +109,7 @@ export default function ServerPage() {
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
-                  {item.premium && !hasPremium ? (
+                  {item.premium && premiumLocked ? (
                     <span className="text-[10px] text-fuchsia-300">+</span>
                   ) : null}
                 </Link>
@@ -125,7 +125,7 @@ export default function ServerPage() {
             kicker="Servidor"
             title={guildName}
             description={`Módulo: ${pane.label}`}
-            actions={pane.premium && !hasPremium ? <Badge variant="premium">Premium</Badge> : null}
+            actions={pane.premium && premiumLocked ? <Badge variant="premium">Premium</Badge> : null}
           />
           <div className="mt-5">
             <PaneComponent guildId={guildId} />

@@ -150,7 +150,7 @@ function FreeGameEmbedPreview({ game, color }: { game: FreeGameItem; color: stri
 }
 
 export function FreeGamesPane({ guildId }: { guildId: string }) {
-  const { hasPremium } = usePanel();
+  const { premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
@@ -284,7 +284,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
   return (
     <div className="relative">
       <LockedOverlay
-        visible={!hasPremium}
+        visible={premiumLocked}
         title="Juegos gratis premium"
         description="El feed de ofertas gratuitas está reservado para comunidades con EyedPlus+."
       />
@@ -292,9 +292,9 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
         <SectionCard
           title="Feed de juegos gratis"
           description="Publica ofertas de Epic Games y Steam automáticamente en tu canal."
-          action={<PremiumLock locked={!hasPremium} />}
+          action={<PremiumLock locked={premiumLocked} />}
         >
-          <div className={!hasPremium ? "pointer-events-none opacity-50" : ""}>
+          <div className={premiumLocked ? "pointer-events-none opacity-50" : ""}>
             <Tabs items={FREE_GAMES_TABS} value={tab} onValueChange={setTab} className="mb-5" />
 
             {tab === "config" ? (
