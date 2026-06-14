@@ -10,6 +10,25 @@ const {
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'owner-bots.json');
 const runtime = new Map();
 
+const INTENTS_SETUP_HINT =
+    'En Discord Developer Portal → tu aplicación → Bot → Privileged Gateway Intents, activa '
+    + '«SERVER MEMBERS INTENT» y «MESSAGE CONTENT INTENT». Guarda los cambios y pulsa Iniciar otra vez.';
+
+function formatBotLoginError(raw) {
+    const msg = String(raw || '').trim();
+    if (/disallowed intents/i.test(msg)) {
+        return `Intents no habilitados en Discord. ${INTENTS_SETUP_HINT}`;
+    }
+    return msg || 'No se pudo conectar el bot';
+}
+
+function asBotError(error, fallback = 'Error en bot auxiliar') {
+    const message = formatBotLoginError(error?.message || error || fallback);
+    return Object.assign(new Error(message), {
+        statusCode: Number.isInteger(error?.statusCode) ? error.statusCode : 400
+    });
+}
+
 function ensureStore() {
     const dir = path.dirname(STORE_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -102,7 +121,7 @@ async function startBotRuntime(record) {
     runtime.set(record.id, rt);
 
     client.on('error', (error) => {
-        rt.lastError = error?.message || String(error);
+        rt.lastError = formatBotLoginError(error?.message || error);
         console.error(`❌ Bot auxiliar ${record.label}:`, rt.lastError);
     });
 
@@ -130,9 +149,9 @@ async function startBotRuntime(record) {
         await client.login(record.token);
     } catch (error) {
         rt.status = 'error';
-        rt.lastError = error?.message || String(error);
+        rt.lastError = formatBotLoginError(error?.message || error);
         runtime.delete(record.id);
-        throw error;
+        throw asBotError(error);
     }
 }
 
@@ -147,7 +166,7 @@ async function initOwnerBots() {
             console.error(`❌ No se pudo iniciar bot auxiliar ${record.label || record.id}:`, error?.message || error);
             const idx = store.bots.findIndex((b) => b.id === record.id);
             if (idx >= 0) {
-                store.bots[idx].lastError = error?.message || String(error);
+                store.bots[idx].lastError = formatBotLoginError(error?.message || error);
                 writeStore(store);
             }
         }
@@ -200,9 +219,10 @@ async function createBot({ label, token }) {
     try {
         await startBotRuntime(record);
     } catch (error) {
-        record.lastError = error?.message || String(error);
+        record.lastError = formatBotLoginError(error?.message || error);
+        record.enabled = false;
         writeStore(store);
-        throw error;
+        throw asBotError(error);
     }
 
     return sanitizePublicRecord(record);
@@ -237,15 +257,36 @@ async function updateBot(id, patch = {}) {
         record.discriminator = user.discriminator;
         record.avatar = user.avatar;
         await stopBotRuntime(id);
-        if (record.enabled !== false) await startBotRuntime(record);
+        if (record.enabled !== false) {
+            try {
+                await startBotRuntime(record);
+                record.lastError = null;
+            } catch (error) {
+                record.enabled = false;
+                record.lastError = formatBotLoginError(error?.message || error);
+                record.updatedAt = new Date().toISOString();
+                writeStore(store);
+                throw asBotError(error);
+            }
+        }
     }
 
     if (patch.enabled != null) {
         record.enabled = patch.enabled === true;
         if (record.enabled) {
-            await startBotRuntime(record);
+            try {
+                await startBotRuntime(record);
+                record.lastError = null;
+            } catch (error) {
+                record.enabled = false;
+                record.lastError = formatBotLoginError(error?.message || error);
+                record.updatedAt = new Date().toISOString();
+                writeStore(store);
+                throw asBotError(error);
+            }
         } else {
             await stopBotRuntime(id);
+            record.lastError = null;
         }
     }
 

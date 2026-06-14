@@ -12,6 +12,7 @@ import {
   Server,
   Trash2,
   Upload,
+  AlertTriangle,
 } from "lucide-react";
 import {
   createOwnerBot,
@@ -90,6 +91,45 @@ function statusBadge(status: string, enabled: boolean) {
   if (status === "starting") return <Badge variant="warning">Conectando…</Badge>;
   if (status === "error") return <Badge variant="danger">Error</Badge>;
   return <Badge variant="default">Desconectado</Badge>;
+}
+
+function isIntentsError(message: string | null) {
+  return /intents?/i.test(message || "");
+}
+
+function developerBotUrl(applicationId: string) {
+  if (!applicationId) return "https://discord.com/developers/applications";
+  return `https://discord.com/developers/applications/${applicationId}/bot`;
+}
+
+function IntentsSetupHelp({ applicationId }: { applicationId?: string }) {
+  return (
+    <div className="flex gap-3 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-amber-50">
+      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+      <div className="min-w-0 text-sm">
+        <p className="font-semibold">Activa los intents en Discord</p>
+        <p className="mt-1 text-sm/6 opacity-90">
+          Cada bot auxiliar necesita los mismos intents privilegiados que EyedBot en su propia aplicación de Discord.
+        </p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 opacity-90">
+          <li>
+            Abre{" "}
+            <a
+              href={developerBotUrl(applicationId || "")}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-violet-200 underline hover:text-white"
+            >
+              Developer Portal → Bot
+            </a>
+          </li>
+          <li>Activa <strong>SERVER MEMBERS INTENT</strong></li>
+          <li>Activa <strong>MESSAGE CONTENT INTENT</strong></li>
+          <li>Guarda y pulsa <strong>Iniciar</strong> aquí</li>
+        </ol>
+      </div>
+    </div>
+  );
 }
 
 export function OwnerBotsTab() {
@@ -241,6 +281,7 @@ export function OwnerBotsTab() {
       setTimeout(() => void loadBots(), 3000);
     } catch (err) {
       toast({ title: "No se pudo crear", description: getErrorMessage(err), tone: "danger" });
+      await loadBots();
     } finally {
       setBusy(null);
     }
@@ -270,6 +311,7 @@ export function OwnerBotsTab() {
       toast({ title: enabled ? "Bot iniciado" : "Bot detenido", tone: "success" });
     } catch (err) {
       toast({ title: "Error", description: getErrorMessage(err), tone: "danger" });
+      await loadBots();
     } finally {
       setBusy(null);
     }
@@ -353,6 +395,9 @@ export function OwnerBotsTab() {
               Crear y conectar
             </Button>
           </div>
+        </div>
+        <div className="mt-4">
+          <IntentsSetupHelp />
         </div>
       </SectionCard>
 
@@ -446,6 +491,12 @@ export function OwnerBotsTab() {
                   ) : null}
                 </div>
               </div>
+
+              {isIntentsError(selected.lastError) ? (
+                <div className="mt-4">
+                  <IntentsSetupHelp applicationId={selected.applicationId} />
+                </div>
+              ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy === "profile"} onClick={() => void handleSaveProfile()}>
