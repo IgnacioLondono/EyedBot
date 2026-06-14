@@ -57,6 +57,77 @@ export const updateUserBilling = (userId: string, body: Record<string, unknown>)
     body,
   });
 
+export type OwnerBotSummary = {
+  id: string;
+  label: string;
+  enabled: boolean;
+  status: string;
+  username: string;
+  displayName: string;
+  applicationId: string;
+  avatar: string | null;
+  avatarUrl: string | null;
+  guildCount: number;
+  ping: number | null;
+  tokenHint: string;
+  lastError: string | null;
+};
+
+export const getOwnerBots = () => apiFetch<{ bots: OwnerBotSummary[] }>("/api/admin/bots");
+
+export const createOwnerBot = (body: { label?: string; token: string }) =>
+  apiFetch<{ bot: OwnerBotSummary }>("/api/admin/bots", { method: "POST", body });
+
+export const updateOwnerBot = (botId: string, body: Record<string, unknown>) =>
+  apiFetch<{ bot: OwnerBotSummary }>(`/api/admin/bots/${encodeURIComponent(botId)}`, {
+    method: "PATCH",
+    body,
+  });
+
+export const deleteOwnerBot = (botId: string) =>
+  apiFetch<{ success: boolean }>(`/api/admin/bots/${encodeURIComponent(botId)}`, { method: "DELETE" });
+
+export const updateOwnerBotProfile = (botId: string, body: { username: string }) =>
+  apiFetch<{ bot: OwnerBotSummary }>(`/api/admin/bots/${encodeURIComponent(botId)}/profile`, {
+    method: "POST",
+    body,
+  });
+
+export const updateOwnerBotAvatar = (botId: string, form: FormData) =>
+  apiForm<{ bot: OwnerBotSummary }>(`/api/admin/bots/${encodeURIComponent(botId)}/avatar`, form);
+
+export const getOwnerBotGuilds = (botId: string) =>
+  apiFetch<{ guilds: unknown[] }>(`/api/admin/bots/${encodeURIComponent(botId)}/guilds`);
+
+export const getOwnerBotChannels = (botId: string, guildId: string) =>
+  apiFetch<{ channels: unknown[] }>(
+    `/api/admin/bots/${encodeURIComponent(botId)}/guilds/${encodeURIComponent(guildId)}/channels`
+  );
+
+export const getOwnerBotChat = (
+  botId: string,
+  params: { guildId: string; channelId: string; limit?: number; before?: string }
+) => {
+  const q = new URLSearchParams({
+    guildId: params.guildId,
+    channelId: params.channelId,
+  });
+  if (params.limit) q.set("limit", String(params.limit));
+  if (params.before) q.set("before", params.before);
+  return apiFetch<{ messages: unknown[]; botId: string }>(
+    `/api/admin/bots/${encodeURIComponent(botId)}/chat?${q}`
+  );
+};
+
+export const sendOwnerBotChat = (
+  botId: string,
+  body: { guildId: string; channelId: string; content: string }
+) =>
+  apiFetch<{ message: unknown }>(`/api/admin/bots/${encodeURIComponent(botId)}/chat`, {
+    method: "POST",
+    body,
+  });
+
 // ─── Guild base ─────────────────────────────────────────────────────
 
 export const getGuildInfo = (guildId: string) =>

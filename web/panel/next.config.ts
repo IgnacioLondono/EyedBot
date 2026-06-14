@@ -6,6 +6,13 @@ const panelRoot = path.dirname(fileURLToPath(import.meta.url));
 const API_ORIGIN = process.env.PANEL_API_ORIGIN || "http://127.0.0.1:3000";
 
 const nextConfig: NextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  productionBrowserSourceMaps: false,
   turbopack: {
     root: panelRoot,
   },

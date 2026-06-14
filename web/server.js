@@ -2392,6 +2392,156 @@ app.put('/api/admin/user/:userId/billing', requireOwner, async (req, res) => {
     }
 });
 
+const ownerBotManager = require('../src/utils/owner-bot-manager');
+
+function handleOwnerBotAvatarUpload(req, res, next) {
+    upload.single('avatar')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'La imagen supera 8 MB' });
+            }
+            return res.status(400).json({ error: err.message || 'Error al procesar la imagen' });
+        }
+        return next();
+    });
+}
+
+function ownerBotError(res, error, fallback = 'Error en bot auxiliar') {
+    const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+    return res.status(statusCode).json({ error: error?.message || fallback });
+}
+
+app.get('/api/admin/bots', requireOwner, (_req, res) => {
+    try {
+        res.json({ bots: ownerBotManager.listBotsPublic() });
+    } catch (error) {
+        console.error('Error listando bots auxiliares:', error);
+        res.status(500).json({ error: 'No se pudieron listar los bots' });
+    }
+});
+
+app.post('/api/admin/bots', requireOwner, async (req, res) => {
+    try {
+        const { label, token } = req.body || {};
+        const bot = await ownerBotManager.createBot({ label, token });
+        return res.status(201).json({ bot });
+    } catch (error) {
+        console.error('Error creando bot auxiliar:', error);
+        return ownerBotError(res, error, 'No se pudo crear el bot');
+    }
+});
+
+app.patch('/api/admin/bots/:botId', requireOwner, async (req, res) => {
+    try {
+        const bot = await ownerBotManager.updateBot(String(req.params.botId || ''), req.body || {});
+        return res.json({ bot });
+    } catch (error) {
+        console.error('Error actualizando bot auxiliar:', error);
+        return ownerBotError(res, error, 'No se pudo actualizar el bot');
+    }
+});
+
+app.delete('/api/admin/bots/:botId', requireOwner, async (req, res) => {
+    try {
+        await ownerBotManager.deleteBot(String(req.params.botId || ''));
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error eliminando bot auxiliar:', error);
+        return ownerBotError(res, error, 'No se pudo eliminar el bot');
+    }
+});
+
+app.post('/api/admin/bots/:botId/profile', requireOwner, async (req, res) => {
+    try {
+        const bot = await ownerBotManager.updateBotProfile(String(req.params.botId || ''), req.body || {});
+        return res.json({ bot });
+    } catch (error) {
+        console.error('Error actualizando perfil del bot:', error);
+        return ownerBotError(res, error, 'No se pudo actualizar el perfil');
+    }
+});
+
+app.post('/api/admin/bots/:botId/avatar', requireOwner, handleOwnerBotAvatarUpload, async (req, res) => {
+    try {
+        if (!req.file?.buffer?.length) {
+            return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+        }
+        const bot = await ownerBotManager.updateBotAvatar(
+            String(req.params.botId || ''),
+            req.file.buffer,
+            req.file.mimetype || 'image/png'
+        );
+        return res.json({ bot });
+    } catch (error) {
+        console.error('Error actualizando avatar del bot:', error);
+        return ownerBotError(res, error, 'No se pudo actualizar el avatar');
+    }
+});
+
+app.get('/api/admin/bots/:botId/guilds', requireOwner, async (req, res) => {
+    try {
+        const guilds = await ownerBotManager.listBotGuilds(String(req.params.botId || ''));
+        return res.json({ guilds });
+    } catch (error) {
+        console.error('Error listando guilds del bot:', error);
+        return ownerBotError(res, error, 'No se pudieron listar servidores');
+    }
+});
+
+app.get('/api/admin/bots/:botId/guilds/:guildId/channels', requireOwner, async (req, res) => {
+    try {
+        const channels = await ownerBotManager.listBotGuildChannels(
+            String(req.params.botId || ''),
+            String(req.params.guildId || '')
+        );
+        return res.json({ channels });
+    } catch (error) {
+        console.error('Error listando canales del bot:', error);
+        return ownerBotError(res, error, 'No se pudieron listar canales');
+    }
+});
+
+app.get('/api/admin/bots/:botId/chat', requireOwner, async (req, res) => {
+    try {
+        const { guildId, channelId, limit, before } = req.query || {};
+        if (!guildId || !channelId) {
+            return res.status(400).json({ error: 'Faltan servidor o canal' });
+        }
+        const data = await ownerBotManager.fetchBotChatMessages(String(req.params.botId || ''), {
+            guildId: String(guildId),
+            channelId: String(channelId),
+            limit,
+            before: before ? String(before) : undefined
+        });
+        return res.json(data);
+    } catch (error) {
+        console.error('Error leyendo chat del bot:', error);
+        return ownerBotError(res, error, 'No se pudo leer el chat');
+    }
+});
+
+app.post('/api/admin/bots/:botId/chat', requireOwner, async (req, res) => {
+    try {
+        const { guildId, channelId, content } = req.body || {};
+        if (!guildId || !channelId) {
+            return res.status(400).json({ error: 'Faltan servidor o canal' });
+        }
+        const ownerTag = req.session.user?.global_name
+            || req.session.user?.username
+            || 'Propietario';
+        const message = await ownerBotManager.sendBotChatMessage(String(req.params.botId || ''), {
+            guildId: String(guildId),
+            channelId: String(channelId),
+            content,
+            ownerTag
+        });
+        return res.json({ message });
+    } catch (error) {
+        console.error('Error enviando mensaje del bot:', error);
+        return ownerBotError(res, error, 'No se pudo enviar el mensaje');
+    }
+});
+
 app.get('/api/guilds', requireAuth, async (req, res) => {
     try {
         const forceRefresh = String(req.query?.refresh || '') === '1';
@@ -6482,6 +6632,9 @@ async function startWebServer() {
     server = app.listen(PORT, BIND_HOST, () => {
         const bindLabel = BIND_HOST === '0.0.0.0' ? 'todas las interfaces' : BIND_HOST;
         console.log(`🌐 Panel web iniciado en http://${bindLabel}:${PORT}`);
+        ownerBotManager.initOwnerBots().catch((error) => {
+            console.warn('⚠️ No se pudieron iniciar bots auxiliares:', error?.message || error);
+        });
         const push = buildStreamPushStatus();
         if (push.publicOriginConfigured) {
             console.log('📡 Directos push (HTTPS):');

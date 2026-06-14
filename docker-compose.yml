@@ -50,6 +50,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NODE_VERSION: 20-alpine
     container_name: eyedbot
     restart: unless-stopped
     environment:

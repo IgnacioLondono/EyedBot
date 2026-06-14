@@ -28,9 +28,11 @@ import { Select } from "@/components/ui/Select";
 import { Field, PaneGrid, SectionCard } from "@/components/features/shared";
 import { discordAvatarUrl, discordGuildIconUrl } from "@/lib/discord-media";
 import { asArray, asRecord, formatDate, getErrorMessage, toNumberValue, toStringValue } from "@/lib/utils";
+import { OwnerBotsTab } from "@/components/features/settings/OwnerBotsTab";
 
 const OWNER_TABS = [
   { id: "overview", label: "Resumen" },
+  { id: "bots", label: "Bots" },
   { id: "users", label: "Usuarios" },
   { id: "logs", label: "Logs" },
   { id: "system", label: "Sistema" },
@@ -468,6 +470,8 @@ export function OwnerSettings() {
           </SectionCard>
         </PaneGrid>
       ) : null}
+
+      {tab === "bots" ? <OwnerBotsTab /> : null}
 
       {tab === "users" ? (
         <SectionCard title="Usuarios del panel" description="Todos los usuarios que han usado la web, sus servidores y EyedPlus+.">

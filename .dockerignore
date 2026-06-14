@@ -1,21 +1,51 @@
+# Dependencias (se instalan en build)
 node_modules
-npm-debug.log
-.env
-.env.local
+web/node_modules
+web/panel/node_modules
+web/panel/.next
+web/panel/out
+web/panel/.turbo
+
+# Git / IDE / agentes
 .git
-.gitignore
-README.md
+.github
+.cursor
+.agent
+**/.vscode
+**/.idea
+
+# Documentación (no necesaria en runtime)
 *.md
-logs/*
-data/*
+!docker/mysql/**
+
+# Datos y logs locales (volúmenes en runtime)
+.env
+.env.*
+logs
+backups
+data
 !data/.gitkeep
-.vscode
-.idea
+
+# Artefactos y cachés
 *.log
+npm-debug.log*
 .DS_Store
 Thumbs.db
-docker-compose.yml
+**/*.tsbuildinfo
+**/coverage
+**/.vercel
+
+# Proyectos duplicados / legacy en el workspace
+TulaBot-main
+EyedBot-clone
+web/public
+web/Dockerfile
+
+# Docker (el contexto no necesita estos archivos dentro de la imagen)
+docker-compose*.yml
 Dockerfile
 .dockerignore
-web/node_modules
 
+# Tests y scripts solo de desarrollo
+**/*.test.js
+**/*.spec.js

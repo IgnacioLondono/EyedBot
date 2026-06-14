@@ -1,46 +1,69 @@
-# Dockerfile para TulaBot
-FROM node:20-alpine
+# syntax=docker/dockerfile:1.7
+# BuildKit recomendado: DOCKER_BUILDKIT=1 (Portainer suele activarlo por defecto).
+# Capas separadas: cambios en src/ no reinstalan deps ni recompilan el panel Next.js.
 
-# Instalar dependencias del sistema para discord-player y ffmpeg
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    ffmpeg \
-    opus \
-    opus-dev \
-    su-exec
+ARG NODE_VERSION=20-alpine
 
-# Crear directorio de trabajo
+# ── Dependencias del bot (compilación nativa: canvas, etc.) ─────────────────
+FROM node:${NODE_VERSION} AS bot-deps
+RUN apk add --no-cache python3 make g++
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm,id=eyedbot-root-npm \
+    npm ci --no-audit --no-fund && \
+    npm prune --production && \
+    npm cache clean --force
+
+# ── Panel Next.js: deps + build (solo se invalida si cambia web/panel/) ─────
+FROM node:${NODE_VERSION} AS panel-build
+WORKDIR /panel
+COPY web/panel/package.json web/panel/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm,id=eyedbot-panel-npm \
+    npm ci --no-audit --no-fund
+COPY web/panel/ ./
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=production
+RUN --mount=type=cache,target=/panel/.next/cache,id=eyedbot-next-cache \
+    npm run build && \
+    npm prune --production && \
+    npm cache clean --force
+
+# ── Dependencias del servidor web (mercadopago, etc.) ───────────────────────
+FROM node:${NODE_VERSION} AS web-deps
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm,id=eyedbot-web-npm \
+    npm ci --omit=dev --no-audit --no-fund && \
+    npm cache clean --force
+
+# ── Imagen final (sin toolchain de compilación) ─────────────────────────────
+FROM node:${NODE_VERSION} AS runtime
+RUN apk add --no-cache ffmpeg opus su-exec
 WORKDIR /app
 
-# Copiar archivos de dependencias
-COPY package*.json ./
+COPY package.json package-lock.json ./
+COPY --from=bot-deps /app/node_modules ./node_modules
 
-# Instalar dependencias de forma reproducible
-RUN npm ci --no-audit --no-fund && \
-    npm prune --production && \
-    npm cache clean --force
-
-# Copiar código fuente (el catálogo va en src/bundled; data/ se monta en runtime)
 COPY src/ ./src/
-COPY web/ ./web/
-RUN cd web && npm ci --no-audit --no-fund && \
-    cd panel && npm ci --no-audit --no-fund && npm run build && cd .. && \
-    npm prune --production && \
-    cd panel && npm prune --production && cd .. && \
-    npm cache clean --force
 COPY verificar-*.js ./
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Crear directorios necesarios; el entrypoint ajusta permisos de volúmenes montados
+COPY web/server.js web/next-panel.js ./web/
+COPY web/uploads/ ./web/uploads/
+COPY --from=web-deps /web/node_modules ./web/node_modules
+COPY --from=web-deps /web/package.json ./web/package.json
+
+COPY --from=panel-build /panel/.next ./web/panel/.next
+COPY --from=panel-build /panel/node_modules ./web/panel/node_modules
+COPY --from=panel-build /panel/package.json ./web/panel/package.json
+COPY --from=panel-build /panel/next.config.ts ./web/panel/next.config.ts
+COPY --from=panel-build /panel/public ./web/panel/public
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
     mkdir -p logs data backups && \
     chown -R node:node /app
 
-# Variables de entorno por defecto
 ENV NODE_ENV=production
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "src/index.js"]
-

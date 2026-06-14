@@ -1,0 +1,82 @@
+# Redeploy rápido: sin compilar en el NAS (imagen preconstruida en GitHub Actions → GHCR).
+# Portainer: cambia Compose path a este archivo (host mode) o combínalo según tu stack.
+# Requiere: imagen publicada (workflow docker-publish.yml) y acceso pull a ghcr.io.
+
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: eyedbot-lavalink
+    profiles: ["music"]
+    restart: always
+    environment:
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
+      - SERVER_PORT=2333
+      - _JAVA_OPTIONS=-Xmx512m
+    volumes:
+      - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    network_mode: host
+    cpus: "0.75"
+    mem_limit: 768m
+    mem_reservation: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  bot:
+    image: ghcr.io/ignaciolondono/eyedbot:latest
+    pull_policy: always
+    container_name: eyedbot
+    restart: always
+    init: true
+    stop_grace_period: 20s
+    network_mode: host
+    environment:
+      - NODE_ENV=production
+      - WEB_PORT=${WEB_PORT:-3000}
+      - WEB_BIND_HOST=${WEB_BIND_HOST:-127.0.0.1}
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - GUILD_ID=${GUILD_ID}
+      - REDIRECT_URI=${REDIRECT_URI}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - WEB_OWNER_DISCORD_ID=${WEB_OWNER_DISCORD_ID}
+      - WEB_PUBLIC_ORIGIN=${WEB_PUBLIC_ORIGIN}
+      - ALLOW_INSECURE_LOCAL_ORIGIN=${ALLOW_INSECURE_LOCAL_ORIGIN:-false}
+      - WEB_ALLOWED_ORIGINS=${WEB_ALLOWED_ORIGINS:-}
+      - MUSIC_ENABLED=${MUSIC_ENABLED:-false}
+      - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
+      - LAVALINK_HOST=${LAVALINK_HOST:-127.0.0.1}
+      - LAVALINK_PORT=${LAVALINK_PORT:-2333}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
+      - CONFIG_CACHE_TTL_MS=${CONFIG_CACHE_TTL_MS:-180000}
+      - SLOW_COMMAND_WARN_MS=${SLOW_COMMAND_WARN_MS:-1200}
+      - DB_HOST=${DB_HOST:-127.0.0.1}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER:-tulabot}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-tulabot}
+      - TENOR_API_KEY=${TENOR_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - NODE_OPTIONS=--max-old-space-size=1024
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    cpus: "1.50"
+    mem_limit: 1536m
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

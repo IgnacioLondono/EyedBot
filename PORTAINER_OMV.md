@@ -86,6 +86,28 @@ Esto conserva conteos y logs entre reinicios.
 - Haz push a `main`
 - En Portainer: **Stacks -> eyedbot -> Pull and redeploy**
 
+### Redeploy más rápido (recomendado en NAS)
+
+El build completo (npm + Next.js) es lo que más tarda. Hay dos modos:
+
+**A) Build optimizado en el NAS (por defecto)**  
+Sigue usando `docker-compose.yml` o `docker-compose.host.yml`. El Dockerfile usa capas separadas y caché BuildKit:
+
+- Cambios solo en `src/` → no reinstala dependencias ni recompila el panel.
+- Cambios solo en `web/panel/` → no reinstala deps del bot.
+- Asegúrate de que Portainer/Docker tenga **BuildKit** activo (`DOCKER_BUILDKIT=1`).
+
+**B) Sin compilar en el NAS (más rápido)**  
+GitHub Actions publica la imagen en cada push a `main` (workflow `docker-publish.yml`).
+
+1. En GitHub: **Packages** → `eyedbot` → **Package settings** → visibility **Public** (o token de lectura en Portainer).
+2. En Portainer cambia **Compose path** a: `docker-compose.ghcr-host.yml`
+3. **Pull and redeploy** ≈ descargar imagen + reiniciar (minutos → segundos en un NAS lento).
+
+Si el repo es privado, crea un PAT con `read:packages` y en Portainer **Registries** → Add registry → `ghcr.io`.
+
+**Forzar build local** (sin GHCR): `docker compose build --no-cache bot && docker compose up -d bot`
+
 ## 7. Troubleshooting rapido
 
 - Si no conecta Discord: revisa `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`
