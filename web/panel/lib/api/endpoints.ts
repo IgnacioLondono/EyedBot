@@ -70,6 +70,7 @@ export type OwnerBotSummary = {
   guildCount: number;
   ping: number | null;
   tokenHint: string;
+  inviteUrl: string;
   lastError: string | null;
 };
 

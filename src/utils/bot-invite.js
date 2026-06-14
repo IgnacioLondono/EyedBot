@@ -3,11 +3,17 @@ function getBotInviteUrl(client) {
     if (override) return override;
 
     const clientId = String(process.env.CLIENT_ID || client?.user?.id || '').trim();
-    if (!clientId) return '';
+    return buildBotInviteUrl(clientId);
+}
 
-    return `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&permissions=8&scope=bot%20applications.commands`;
+function buildBotInviteUrl(clientId, permissions = '8') {
+    const id = String(clientId || '').trim();
+    if (!id) return '';
+    const perms = String(permissions || '8').trim();
+    return `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(id)}&permissions=${encodeURIComponent(perms)}&scope=bot%20applications.commands`;
 }
 
 module.exports = {
-    getBotInviteUrl
+    getBotInviteUrl,
+    buildBotInviteUrl
 };

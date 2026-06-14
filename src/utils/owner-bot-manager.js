@@ -6,6 +6,7 @@ const {
     createEyedBotClient,
     bootstrapAuxiliaryClient
 } = require('./bot-runtime');
+const { buildBotInviteUrl } = require('./bot-invite');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'owner-bots.json');
 const runtime = new Map();
@@ -81,6 +82,7 @@ function sanitizePublicRecord(record) {
         guildCount: client?.guilds?.cache?.size ?? record.guildCount ?? 0,
         ping: client?.ws?.ping ?? null,
         tokenHint: maskToken(record.token),
+        inviteUrl: buildBotInviteUrl(client?.user?.id || record.applicationId),
         createdAt: record.createdAt,
         updatedAt: record.updatedAt,
         lastError: rt?.lastError || record.lastError || null

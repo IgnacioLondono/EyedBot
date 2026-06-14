@@ -11,6 +11,7 @@ import {
   Send,
   Server,
   Trash2,
+  UserPlus,
   Upload,
   AlertTriangle,
 } from "lucide-react";
@@ -49,6 +50,7 @@ type OwnerBot = {
   guildCount: number;
   ping: number | null;
   tokenHint: string;
+  inviteUrl: string;
   lastError: string | null;
 };
 
@@ -81,6 +83,7 @@ function parseBot(raw: unknown): OwnerBot {
     guildCount: Number(row.guildCount) || 0,
     ping: row.ping == null ? null : Number(row.ping),
     tokenHint: toStringValue(row.tokenHint),
+    inviteUrl: toStringValue(row.inviteUrl) || botAdminInviteUrl(appId),
     lastError: toStringValue(row.lastError) || null,
   };
 }
@@ -100,6 +103,12 @@ function isIntentsError(message: string | null) {
 function developerBotUrl(applicationId: string) {
   if (!applicationId) return "https://discord.com/developers/applications";
   return `https://discord.com/developers/applications/${applicationId}/bot`;
+}
+
+function botAdminInviteUrl(applicationId: string, inviteUrl?: string) {
+  if (inviteUrl) return inviteUrl;
+  if (!applicationId) return "";
+  return `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(applicationId)}&permissions=8&scope=bot%20applications.commands`;
 }
 
 function IntentsSetupHelp({ applicationId }: { applicationId?: string }) {
@@ -499,6 +508,16 @@ export function OwnerBotsTab() {
               ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2">
+                {selected.inviteUrl ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => window.open(selected.inviteUrl, "_blank", "noopener,noreferrer")}
+                  >
+                    <UserPlus className="mr-1 h-3.5 w-3.5" />
+                    Invitar con admin
+                  </Button>
+                ) : null}
                 <Button size="sm" disabled={busy === "profile"} onClick={() => void handleSaveProfile()}>
                   Guardar perfil
                 </Button>
@@ -619,7 +638,7 @@ export function OwnerBotsTab() {
                   </div>
                   <p className="mt-2 flex items-center gap-1 text-xs text-zinc-500">
                     <Server className="h-3.5 w-3.5" />
-                    Invita el bot al servidor desde Discord Developer Portal → OAuth2 → URL con permisos de bot.
+                    Usa <strong>Invitar con admin</strong> arriba para añadir el bot a un servidor con permisos de administrador.
                   </p>
                 </>
               )}
