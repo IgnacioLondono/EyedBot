@@ -2580,12 +2580,12 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
         }
 
         const channels = guild.channels.cache
-            .filter(channel => channel.type === 0 || channel.type === 2 || channel.type === 4) // Texto, voz y categorías
-            .map(channel => ({
+            .filter((channel) => channel.type === 0 || channel.type === 2 || channel.type === 4 || channel.type === 5)
+            .map((channel) => ({
                 id: channel.id,
                 name: channel.name,
                 type: channel.type,
-                typeName: channel.type === 0 ? 'texto' : (channel.type === 2 ? 'voz' : 'categoria')
+                typeName: summarizeChannelType(channel).toLowerCase()
             }));
 
         res.json(channels);

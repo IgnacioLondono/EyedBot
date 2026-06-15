@@ -159,6 +159,7 @@ function channelOptionLabel(channel: { name: string; type?: string }) {
   const type = String(channel.type || "");
   if (type === "2" || type === "13") return `🔊 ${channel.name}`;
   if (type === "4") return `📁 ${channel.name}`;
+  if (type === "5") return `📢 ${channel.name}`;
   return `#${channel.name}`;
 }
 

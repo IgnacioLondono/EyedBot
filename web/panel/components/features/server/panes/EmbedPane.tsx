@@ -174,7 +174,12 @@ export function EmbedPane({ guildId }: { guildId: string }) {
         <div className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Canal destino">
-              <ChannelSelect value={form.channelId} onChange={(channelId) => patchForm({ channelId })} options={channels} />
+              <ChannelSelect
+                value={form.channelId}
+                onChange={(channelId) => patchForm({ channelId })}
+                options={channels}
+                filter="text"
+              />
             </Field>
             <Field label="ID de mensaje (opcional)" description="Si lo rellenas, se editará ese mensaje del bot.">
               <Input
@@ -338,7 +343,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
         </div>
       </SectionCard>
 
-      <div className="space-y-5">
+      <div className="space-y-5 xl:sticky xl:top-[5.75rem] xl:self-start">
         <SectionCard title="Vista previa" description="Así se verá aproximadamente en Discord.">
           <EmbedPreview
             form={form}
