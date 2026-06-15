@@ -27,7 +27,7 @@ export const DEFAULT_EMBED_FORM: EmbedFormState = {
   templateName: "",
   title: "",
   description: "",
-  color: "#8b5cf6",
+  color: "#a78bfa",
   footer: "",
   authorName: "",
   authorIconUrl: "",
@@ -38,7 +38,7 @@ export const DEFAULT_EMBED_FORM: EmbedFormState = {
   fields: [],
 };
 
-export function normalizeHexColor(value: string, fallback = "#8b5cf6") {
+export function normalizeHexColor(value: string, fallback = "#a78bfa") {
   const raw = String(value || "").trim().replace("#", "");
   if (/^[0-9a-fA-F]{6}$/.test(raw)) return `#${raw.toLowerCase()}`;
   if (/^[0-9a-fA-F]{3}$/.test(raw)) {
@@ -51,7 +51,7 @@ export function normalizeHexColor(value: string, fallback = "#8b5cf6") {
   return fallback;
 }
 
-export function hexToPlainColor(value: string, fallback = "8b5cf6") {
+export function hexToPlainColor(value: string, fallback = "a78bfa") {
   return normalizeHexColor(value, `#${fallback}`).replace("#", "");
 }
 

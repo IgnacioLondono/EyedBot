@@ -67,7 +67,7 @@ export default function AboutPage() {
         actions={
           <Link
             href="/premium"
-            className="inline-flex items-center gap-2 rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-2 text-sm text-fuchsia-100"
+            className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-accent)]/30 bg-[color:var(--color-accent)]/10 px-3 py-2 text-sm text-[color:var(--color-brand-light)]"
           >
             <Sparkles className="h-4 w-4" />
             EyedPlus+
@@ -192,7 +192,7 @@ export default function AboutPage() {
         {tab === "premium" ? (
           <Card>
             <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-200">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--color-accent)]/15 text-[color:var(--color-brand-light)]">
                 <Crown className="h-7 w-7" />
               </div>
               <div>
@@ -209,7 +209,7 @@ export default function AboutPage() {
                 </ul>
                 <Link
                   href="/premium"
-                  className="mt-5 inline-flex rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-sm font-medium text-white"
+                  className="mt-5 inline-flex rounded-xl bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-2))] px-4 py-2 text-sm font-medium text-white"
                 >
                   Ver planes EyedPlus+
                 </Link>
@@ -223,23 +223,23 @@ export default function AboutPage() {
             <h2 className="text-xl font-semibold text-white">Guía rápida</h2>
             <ol className="mt-4 space-y-4 text-sm text-zinc-300">
               <li className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600/30 text-xs font-bold text-white">1</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-accent)]/30 text-xs font-bold text-white">1</span>
                 <span>Invita el bot a tu servidor desde el dashboard o el botón «Añadir bot».</span>
               </li>
               <li className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600/30 text-xs font-bold text-white">2</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-accent)]/30 text-xs font-bold text-white">2</span>
                 <span>Entra al servidor en el panel y configura Bienvenida o Verificación primero.</span>
               </li>
               <li className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600/30 text-xs font-bold text-white">3</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-accent)]/30 text-xs font-bold text-white">3</span>
                 <span>Activa Tickets o Niveles según lo que necesite tu comunidad.</span>
               </li>
               <li className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600/30 text-xs font-bold text-white">4</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-accent)]/30 text-xs font-bold text-white">4</span>
                 <span>En Configuración → Personalización sube un fondo y desactiva el blur si quieres verlo nítido.</span>
               </li>
               <li className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600/30 text-xs font-bold text-white">5</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-accent)]/30 text-xs font-bold text-white">5</span>
                 <span>Consulta Comandos para ver todo lo disponible en Discord.</span>
               </li>
             </ol>

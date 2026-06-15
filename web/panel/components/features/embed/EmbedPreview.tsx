@@ -27,7 +27,7 @@ function resolveMediaUrl(value?: string) {
 export function DiscordEmbedPreview({
   title,
   description,
-  color = "#8b5cf6",
+  color = "#a78bfa",
   footer,
   imageUrl,
   thumbnailUrl,

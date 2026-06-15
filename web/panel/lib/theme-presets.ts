@@ -15,14 +15,14 @@ export type ThemePresetColors = {
 
 export const THEME_PRESETS: Record<ThemePresetId, ThemePresetColors> = {
   midnight: {
-    accentPrimary: "#9a6dff",
-    accentSecondary: "#ff78d1",
-    bgPrimary: "#090512",
-    bgSecondary: "#150c26",
-    bgCard: "#1a1030",
-    textPrimary: "#f4eeff",
-    textSecondary: "#cbb7f6",
-    borderColor: "#be9bff",
+    accentPrimary: "#a78bfa",
+    accentSecondary: "#c4b5fd",
+    bgPrimary: "#08070f",
+    bgSecondary: "#12101c",
+    bgCard: "#181525",
+    textPrimary: "#f5f3ff",
+    textSecondary: "#c4b5fd",
+    borderColor: "#a78bfa",
     atmosphere: 55,
     borderStrength: 28,
   },

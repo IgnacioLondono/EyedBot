@@ -30,18 +30,58 @@ type TicketRow = {
   raw: Record<string, unknown>;
 };
 
+type TicketReportDetail = {
+  reportId: string;
+  channelName: string;
+  category: string;
+  reason: string;
+  common: string;
+  createdAt: string;
+  messagesCount: number;
+  transcriptText: string;
+  transcriptFileName: string;
+  owner?: { username?: string; tag?: string; displayName?: string };
+  closer?: { username?: string; tag?: string; displayName?: string };
+  transcriptEntries?: Array<Record<string, unknown>>;
+};
+
 function mapTickets(value: unknown, idKeys: string[]): TicketRow[] {
   return asArray(value).map((entry, index) => {
     const item = asRecord(entry);
+    const ownerObj = asRecord(item.owner);
     const id = idKeys.map((key) => toStringValue(item[key])).find(Boolean) || `item-${index}`;
     return {
       id,
       title: toStringValue(item.title || item.channelName || item.reason || item.topic, id),
-      owner: toStringValue(item.username || item.userTag || item.ownerName || item.userId, "Sin asignar"),
+      owner: toStringValue(
+        item.username || item.userTag || ownerObj.username || ownerObj.tag || item.ownerName || item.userId,
+        "Sin asignar"
+      ),
       claimedBy: toStringValue(item.claimedBy || item.claimedByTag),
       raw: item,
     };
   });
+}
+
+function parseTicketReport(payload: unknown): TicketReportDetail | null {
+  const root = asRecord(payload);
+  const report = asRecord(root.report ?? root);
+  const reportId = toStringValue(report.reportId);
+  if (!reportId) return null;
+  return {
+    reportId,
+    channelName: toStringValue(report.channelName, "Canal"),
+    category: toStringValue(report.category),
+    reason: toStringValue(report.reason),
+    common: toStringValue(report.common),
+    createdAt: toStringValue(report.createdAt || report.channelCreatedAt),
+    messagesCount: toNumberValue(report.messagesCount),
+    transcriptText: toStringValue(report.transcriptText),
+    transcriptFileName: toStringValue(report.transcriptFileName),
+    owner: asRecord(report.owner) as TicketReportDetail["owner"],
+    closer: asRecord(report.closer) as TicketReportDetail["closer"],
+    transcriptEntries: asArray(report.transcriptEntries).map((entry) => asRecord(entry)),
+  };
 }
 
 export function TicketsManagePanel({ guildId }: { guildId: string }) {
@@ -55,7 +95,8 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Array<Record<string, unknown>>>([]);
   const [draft, setDraft] = useState("");
-  const [reportText, setReportText] = useState<string | null>(null);
+  const [selectedReport, setSelectedReport] = useState<TicketReportDetail | null>(null);
+  const [loadingReportId, setLoadingReportId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -116,6 +157,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
     try {
       await action();
       toast({ title: label, description: "Acción completada.", tone: "success" });
+      if (label === "Informe borrado") setSelectedReport(null);
       await reload();
     } catch (err) {
       toast({ title: "Error", description: getErrorMessage(err), tone: "danger" });
@@ -140,11 +182,19 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
   }
 
   async function viewReport(reportId: string) {
+    setLoadingReportId(reportId);
     try {
-      const payload = asRecord(await getTicketReport(guildId, reportId));
-      setReportText(toStringValue(payload.content || payload.text || JSON.stringify(payload, null, 2)));
+      const payload = await getTicketReport(guildId, reportId);
+      const report = parseTicketReport(payload);
+      if (!report) {
+        throw new Error("El informe no tiene datos válidos");
+      }
+      setSelectedReport(report);
     } catch (err) {
+      setSelectedReport(null);
       toast({ title: "No se pudo abrir informe", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setLoadingReportId(null);
     }
   }
 
@@ -317,9 +367,14 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => void viewReport(item.id)}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={loadingReportId === item.id}
+                        onClick={() => void viewReport(item.id)}
+                      >
                         <History className="mr-1 h-3.5 w-3.5" />
-                        Ver informe
+                        {loadingReportId === item.id ? "Abriendo…" : "Ver informe"}
                       </Button>
                       <Button
                         size="sm"
@@ -337,10 +392,68 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
           ) : (
             <EmptyState title="Historial vacío" description="No hay informes cerrados para mostrar." />
           )}
-          {reportText ? (
-            <div className="rounded-2xl border border-white/8 bg-black/30 p-4">
-              <p className="mb-2 text-sm font-medium text-white">Comprobante</p>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-zinc-300">{reportText}</pre>
+          {selectedReport ? (
+            <div className="rounded-2xl border border-violet-400/25 bg-violet-500/5 p-4">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">Informe {selectedReport.reportId}</p>
+                  <p className="text-sm text-zinc-400">
+                    {selectedReport.channelName}
+                    {selectedReport.category ? ` · ${selectedReport.category}` : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {selectedReport.createdAt ? formatDate(selectedReport.createdAt) : "—"}
+                    {selectedReport.messagesCount ? ` · ${selectedReport.messagesCount} mensajes` : ""}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedReport(null)}>
+                    Cerrar
+                  </Button>
+                  <a
+                    href={`/api/guild/${encodeURIComponent(guildId)}/tickets/report/${encodeURIComponent(selectedReport.reportId)}/download`}
+                    className="inline-flex h-9 items-center rounded-2xl border border-white/12 bg-white/8 px-3 text-sm text-white hover:bg-white/12"
+                  >
+                    Descargar TXT
+                  </a>
+                </div>
+              </div>
+
+              <div className="mb-4 grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
+                <p>
+                  <span className="text-zinc-500">Usuario:</span>{" "}
+                  {selectedReport.owner?.tag || selectedReport.owner?.username || "—"}
+                </p>
+                <p>
+                  <span className="text-zinc-500">Cerrado por:</span>{" "}
+                  {selectedReport.closer?.tag || selectedReport.closer?.username || "—"}
+                </p>
+                {selectedReport.reason ? (
+                  <p className="sm:col-span-2">
+                    <span className="text-zinc-500">Motivo:</span> {selectedReport.reason}
+                  </p>
+                ) : null}
+              </div>
+
+              {selectedReport.transcriptEntries?.length ? (
+                <div className="max-h-80 space-y-2 overflow-y-auto rounded-xl border border-white/8 bg-black/30 p-3">
+                  {selectedReport.transcriptEntries.map((entry, index) => (
+                    <div key={`${entry.id ?? index}`} className="rounded-lg border border-white/8 bg-black/20 px-3 py-2 text-sm">
+                      <p className="text-xs text-zinc-500">
+                        {toStringValue(entry.authorDisplayName || entry.authorTag, "Usuario")}
+                        {entry.timestamp ? ` · ${formatDate(entry.timestamp)}` : ""}
+                      </p>
+                      <p className="whitespace-pre-wrap text-zinc-200">{toStringValue(entry.content, "—")}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : selectedReport.transcriptText ? (
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-white/8 bg-black/30 p-3 text-xs text-zinc-300">
+                  {selectedReport.transcriptText}
+                </pre>
+              ) : (
+                <p className="text-sm text-zinc-500">Este informe no incluye transcripción guardada.</p>
+              )}
             </div>
           ) : null}
         </div>

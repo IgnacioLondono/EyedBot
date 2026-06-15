@@ -47,7 +47,7 @@ export function OverviewShowcase() {
           {SERVER_PANES.slice(0, 6).map((pane, index) => (
             <div
               key={pane.id}
-              className={`rounded-lg px-2 py-1 text-[10px] ${index === 0 ? "bg-violet-600/30 text-white" : "text-zinc-500"}`}
+              className={`rounded-lg px-2 py-1 text-[10px] ${index === 0 ? "bg-[color:var(--color-accent)]/30 text-white" : "text-zinc-500"}`}
             >
               {pane.label}
             </div>
@@ -62,7 +62,7 @@ export function OverviewShowcase() {
               </div>
             ))}
           </div>
-          <div className="h-16 rounded-xl border border-white/8 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10" />
+          <div className="h-16 rounded-xl border border-white/8 bg-gradient-to-r from-[#a78bfa]/10 to-[#c4b5fd]/10" />
         </div>
       </div>
     </MockFrame>
@@ -100,7 +100,7 @@ export function ThemeShowcase() {
     <MockFrame title="Personalización · Tema y fondo">
       <div className="p-4">
         <div className="mb-3 grid grid-cols-4 gap-2">
-          {["#9a6dff", "#39d98a", "#ff8a4c", "#4aa3ff"].map((color) => (
+          {["#a78bfa", "#39d98a", "#ff8a4c", "#4aa3ff"].map((color) => (
             <div key={color} className="h-8 rounded-lg border border-white/10" style={{ background: color }} />
           ))}
         </div>
@@ -110,7 +110,7 @@ export function ThemeShowcase() {
             <span className="rounded-full bg-zinc-600 px-2 py-0.5 text-[10px] text-white">OFF</span>
           </div>
           <div className="mt-2 h-14 overflow-hidden rounded-lg border border-white/10">
-            <div className="h-full w-full bg-gradient-to-br from-violet-600 via-fuchsia-500 to-indigo-700" />
+            <div className="h-full w-full bg-gradient-to-br from-[#7c3aed] via-[#a78bfa] to-[#c4b5fd]" />
           </div>
           <p className="mt-2 text-[10px] text-zinc-500">Fondo nítido con velo ajustable</p>
         </div>

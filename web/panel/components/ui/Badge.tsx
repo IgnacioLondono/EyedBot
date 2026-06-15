@@ -5,7 +5,7 @@ type BadgeVariant = "default" | "premium" | "success" | "warning" | "danger";
 
 const styles: Record<BadgeVariant, string> = {
   default: "border-white/10 bg-white/8 text-zinc-200",
-  premium: "border-fuchsia-400/20 bg-fuchsia-500/15 text-fuchsia-100",
+  premium: "border-[color:var(--color-accent)]/25 bg-[color:var(--color-accent)]/15 text-[color:var(--color-brand-light)]",
   success: "border-emerald-400/20 bg-emerald-500/15 text-emerald-100",
   warning: "border-amber-400/20 bg-amber-500/15 text-amber-100",
   danger: "border-red-400/20 bg-red-500/15 text-red-100",

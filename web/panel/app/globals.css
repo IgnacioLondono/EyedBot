@@ -43,17 +43,20 @@
 }
 
 :root {
-  --background: #07060d;
+  --background: #08070f;
   --foreground: #f4f4f5;
-  --color-bg: #07060d;
-  --color-surface: rgba(255, 255, 255, 0.06);
-  --color-surface-strong: rgba(255, 255, 255, 0.1);
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-accent: #8b5cf6;
-  --color-accent-2: #d946ef;
+  --color-bg: #08070f;
+  --color-surface: rgba(167, 139, 250, 0.06);
+  --color-surface-strong: rgba(167, 139, 250, 0.1);
+  --color-border: rgba(167, 139, 250, 0.14);
+  --color-accent: #a78bfa;
+  --color-accent-2: #c4b5fd;
   --color-glow: #7c3aed;
-  --color-ring: #d946ef;
-  --shadow-accent: rgba(139, 92, 246, 0.35);
+  --color-ring: #c4b5fd;
+  --shadow-accent: rgba(167, 139, 250, 0.35);
+  --color-brand: #a78bfa;
+  --color-brand-light: #c4b5fd;
+  --color-brand-deep: #7c3aed;
 }
 
 @theme inline {
@@ -103,8 +106,12 @@ html[data-theme-bubbles="1"] .theme-bubbles {
 }
 
 ::selection {
-  background: rgba(217, 70, 239, 0.35);
+  background: rgba(167, 139, 250, 0.35);
   color: white;
+}
+
+.eyedbot-mark-glow {
+  box-shadow: 0 0 28px color-mix(in srgb, var(--color-brand) 40%, transparent);
 }
 
 a {

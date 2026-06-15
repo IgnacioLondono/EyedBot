@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronDown, Eye, Link2, LogIn, LogOut, Plus } from "lucide-react";
+import { ChevronDown, Link2, LogIn, LogOut, Plus } from "lucide-react";
 import { useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
 import { EYEDBIO_URL } from "@/lib/eyedbio";
 import { EyedBioNavLink } from "@/components/layout/EyedBioNavLink";
+import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
 import { isPublicPanelRoute } from "@/lib/public-routes";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { discordAvatarUrl } from "@/lib/discord-media";
@@ -36,12 +37,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
 
       <nav className="sticky top-0 z-40 border-b border-white/10 bg-black/30 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 lg:px-6">
-          <Link href={homeHref} className="flex items-center gap-2 font-semibold text-white">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-white shadow-[0_0_40px_var(--shadow-accent)]">
-              <Eye className="h-5 w-5" />
-            </span>
-            <span className="hidden sm:inline">EyedBot Panel</span>
-          </Link>
+          <EyedBotLogo href={homeHref} label="EyedBot Panel" showText="desktop" className="font-semibold" />
 
           <div className="hidden flex-1 items-center gap-1 md:flex">
             {PRIMARY_NAV.map((item) => {
@@ -58,7 +54,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                     active
                       ? "border border-white/10 bg-white/10 text-white"
                       : "text-zinc-400 hover:bg-white/5 hover:text-white",
-                    item.premium && "text-fuchsia-200",
+                    item.premium && "text-[color:var(--color-brand-light)]",
                     guestLocked && !active && "opacity-70"
                   )}
                 >
@@ -98,7 +94,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
               {isGuest ? (
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3 py-2 text-sm font-medium text-violet-100 hover:bg-violet-500/25"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--color-accent)]/30 bg-[color:var(--color-accent)]/15 px-3 py-2 text-sm font-medium text-[color:var(--color-brand-light)] hover:bg-[color:var(--color-accent)]/25"
                 >
                   <LogIn className="h-4 w-4" />
                   <span className="hidden sm:inline">Iniciar sesión</span>

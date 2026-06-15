@@ -8,7 +8,6 @@ import { motion } from "framer-motion";
 import {
   Bell,
   Bolt,
-  Eye,
   Info,
   LayoutDashboard,
   Palette,
@@ -18,6 +17,8 @@ import {
   Terminal,
   Zap,
 } from "lucide-react";
+import { EyedBotMark } from "@/components/brand/EyedBotMark";
+import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
 
 const OverviewShowcase = dynamic(
   () => import("@/components/features/about/AboutShowcases").then((mod) => mod.OverviewShowcase),
@@ -99,7 +100,7 @@ function RotatingHighlight() {
 
   return (
     <div className="mt-4 h-6 overflow-hidden" aria-live="polite">
-      <p className="text-sm text-violet-200/90">{highlights[index]}</p>
+      <p className="text-sm text-[color:var(--color-brand-light)]/90">{highlights[index]}</p>
     </div>
   );
 }
@@ -110,24 +111,16 @@ export function LoginLanding() {
   const errorMessage = errorKey ? ERROR_MESSAGES[errorKey] || "Ocurrió un error al iniciar sesión." : null;
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#07060d] text-zinc-100">
+    <div className="relative min-h-screen overflow-x-hidden bg-[var(--color-bg)] text-zinc-100">
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="login-blob-a absolute -left-24 top-20 h-80 w-80 rounded-full bg-violet-600/25 blur-3xl" />
-        <div className="login-blob-b absolute right-0 top-1/3 h-96 w-96 rounded-full bg-fuchsia-500/15 blur-3xl" />
-        <div className="login-blob-c absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="login-blob-a absolute -left-24 top-20 h-80 w-80 rounded-full bg-[#a78bfa]/20 blur-3xl" />
+        <div className="login-blob-b absolute right-0 top-1/3 h-96 w-96 rounded-full bg-[#7c3aed]/15 blur-3xl" />
+        <div className="login-blob-c absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-[#c4b5fd]/10 blur-3xl" />
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-8 lg:px-8 lg:py-12">
         <header className="mb-10 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-violet-500/20 text-violet-100 shadow-[0_0_40px_rgba(139,92,246,0.35)]">
-              <Eye className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-semibold text-white">EyedBot</p>
-              <p className="text-xs text-zinc-500">Panel de administración</p>
-            </div>
-          </div>
+          <EyedBotLogo label="EyedBot" subtitle="Panel de administración" />
           <a
             href="https://discord.gg/eN6eQdGn87"
             target="_blank"
@@ -141,10 +134,12 @@ export function LoginLanding() {
         <div className="grid flex-1 items-start gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14">
           <div className="space-y-10">
             <section>
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-violet-300/80">Tu comunidad, bajo control</p>
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-[color:var(--color-brand-light)]/80">
+                Tu comunidad, bajo control
+              </p>
               <h1 className="mt-3 max-w-2xl text-4xl font-bold leading-tight text-white sm:text-5xl">
                 El bot de Discord con panel web para{" "}
-                <span className="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-[#c4b5fd] to-[#a78bfa] bg-clip-text text-transparent">
                   moderar, automatizar y crecer
                 </span>
               </h1>
@@ -157,16 +152,16 @@ export function LoginLanding() {
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
                   href="/about"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:border-violet-400/40 hover:bg-violet-500/10"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:border-[color:var(--color-accent)]/40 hover:bg-[color:var(--color-accent)]/10"
                 >
-                  <Info className="h-4 w-4 text-violet-300" />
+                  <Info className="h-4 w-4 text-[color:var(--color-brand-light)]" />
                   Conoce el proyecto
                 </Link>
                 <Link
                   href="/commands"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:border-violet-400/40 hover:bg-violet-500/10"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:border-[color:var(--color-accent)]/40 hover:bg-[color:var(--color-accent)]/10"
                 >
-                  <Terminal className="h-4 w-4 text-violet-300" />
+                  <Terminal className="h-4 w-4 text-[color:var(--color-brand-light)]" />
                   Ver comandos
                 </Link>
               </div>
@@ -191,7 +186,7 @@ export function LoginLanding() {
                     whileHover={{ y: -4, transition: { duration: 0.2 } }}
                     className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 backdrop-blur-sm"
                   >
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--color-accent)]/15 text-[color:var(--color-brand-light)]">
                       <Icon className="h-5 w-5" />
                     </div>
                     <h2 className="font-medium text-white">{feature.title}</h2>
@@ -210,7 +205,7 @@ export function LoginLanding() {
                 <ol className="space-y-3">
                   {STEPS.map((step, index) => (
                     <li key={step} className="flex gap-3 text-sm text-zinc-300">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-600/25 text-xs font-semibold text-violet-200">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-accent)]/25 text-xs font-semibold text-[color:var(--color-brand-light)]">
                         {index + 1}
                       </span>
                       {step}
@@ -230,7 +225,7 @@ export function LoginLanding() {
                 Comandos slash
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 px-3 py-1">
-                <Sparkles className="h-3.5 w-3.5 text-fuchsia-300" />
+                <Sparkles className="h-3.5 w-3.5 text-[color:var(--color-brand-light)]" />
                 EyedPlus+ premium
               </span>
             </div>
@@ -238,9 +233,7 @@ export function LoginLanding() {
 
           <aside className="lg:sticky lg:top-10">
             <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/40 to-fuchsia-600/30 text-violet-100">
-                <Eye className="h-8 w-8" />
-              </div>
+              <EyedBotMark className="eyedbot-mark-glow mx-auto mb-5 h-16 w-16 rounded-[22px]" />
               <h2 className="text-center text-2xl font-bold text-white">Entrar al panel</h2>
               <p className="mt-2 text-center text-sm text-zinc-400">
                 Usa tu cuenta de Discord. Solo verás servidores donde tengas permisos de administración.
