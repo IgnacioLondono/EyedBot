@@ -827,18 +827,25 @@ app.use(session({
     name: 'tulabot.session'
 }));
 
-const panelFaviconPath = path.join(__dirname, 'panel', 'public', 'eyedbot-icon.svg');
-const panelFaviconFallbackPath = path.join(__dirname, 'panel', 'app', 'favicon.ico');
+const panelFaviconIcoPath = path.join(__dirname, 'panel', 'app', 'favicon.ico');
+const panelFaviconPublicPath = path.join(__dirname, 'panel', 'public', 'favicon.ico');
+const panelFaviconSvgPath = path.join(__dirname, 'panel', 'public', 'eyedbot-icon.svg');
 app.get('/favicon.ico', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    if (fs.existsSync(panelFaviconPath)) {
-        res.type('image/svg+xml');
-        return res.sendFile(panelFaviconPath);
+    const icoPath = fs.existsSync(panelFaviconIcoPath)
+        ? panelFaviconIcoPath
+        : panelFaviconPublicPath;
+    if (fs.existsSync(icoPath)) {
+        res.type('image/x-icon');
+        return res.sendFile(icoPath);
     }
-    res.type('image/x-icon');
-    return res.sendFile(panelFaviconFallbackPath);
+    if (fs.existsSync(panelFaviconSvgPath)) {
+        res.type('image/svg+xml');
+        return res.sendFile(panelFaviconSvgPath);
+    }
+    res.status(404).end();
 });
 
 const uploadsRoot = path.join(__dirname, 'uploads');

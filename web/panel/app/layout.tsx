@@ -12,16 +12,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const ICON_VERSION = "3";
+
 export const metadata: Metadata = {
   title: "EyedBot Panel",
   description: "Panel de administración de EyedBot",
   icons: {
     icon: [
-      { url: "/eyedbot-icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
+      { url: `/favicon.ico?v=${ICON_VERSION}`, sizes: "48x48" },
+      { url: `/eyedbot-icon.svg?v=${ICON_VERSION}`, type: "image/svg+xml" },
+      { url: `/eyedbot-icon-32.png?v=${ICON_VERSION}`, type: "image/png", sizes: "32x32" },
     ],
-    apple: [{ url: "/eyedbot-icon.svg", type: "image/svg+xml" }],
-    shortcut: "/eyedbot-icon.svg",
+    apple: [{ url: `/eyedbot-icon.png?v=${ICON_VERSION}`, type: "image/png" }],
+    shortcut: `/favicon.ico?v=${ICON_VERSION}`,
   },
 };
 
