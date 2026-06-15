@@ -4731,13 +4731,16 @@ app.get('/api/guild/:guildId/free-games/preview', requireAuth, requirePremium, a
         const includeEpic = req.query.epic !== '0';
         const includeSteam = req.query.steam !== '0';
         const force = req.query.force === '1';
+        const minDiscount = Math.max(0, Math.min(100, Number.parseInt(req.query.minDiscount, 10) || 100));
 
-        const games = await freeGamesService.fetchAllFreeGames({ includeEpic, includeSteam, force });
+        const games = await freeGamesService.fetchAllFreeGames({ includeEpic, includeSteam, force, minDiscount });
+        const audit = freeGamesService.getLastFreeGamesAudit();
         res.json({
             success: true,
             count: games.length,
-            fetchedAt: new Date().toISOString(),
-            games
+            fetchedAt: audit?.fetchedAt || new Date().toISOString(),
+            games,
+            audit
         });
     } catch (error) {
         console.error('Error en free-games preview:', error);
@@ -4782,7 +4785,8 @@ app.post('/api/guild/:guildId/free-games/test', requireAuth, requirePremium, asy
         // Elegir un juego real si hay, si no armar uno demo
         const games = await freeGamesService.fetchAllFreeGames({
             includeEpic: config.sources.epic !== false,
-            includeSteam: config.sources.steam !== false
+            includeSteam: config.sources.steam !== false,
+            minDiscount: config.minDiscount
         });
         const demo = games[0] || {
             id: 'demo_0',

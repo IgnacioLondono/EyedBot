@@ -354,12 +354,13 @@ export const saveFreeGamesConfig = (guildId: string, body: Record<string, unknow
 
 export const previewFreeGames = (
   guildId: string,
-  params?: { epic?: boolean; steam?: boolean; force?: boolean }
+  params?: { epic?: boolean; steam?: boolean; force?: boolean; minDiscount?: number }
 ) => {
   const query = new URLSearchParams();
   if (params?.epic === false) query.set("epic", "0");
   if (params?.steam === false) query.set("steam", "0");
   if (params?.force) query.set("force", "1");
+  if (typeof params?.minDiscount === "number") query.set("minDiscount", String(params.minDiscount));
   const suffix = query.toString() ? `?${query}` : "";
   return apiFetch(`/api/guild/${g(guildId)}/free-games/preview${suffix}`);
 };

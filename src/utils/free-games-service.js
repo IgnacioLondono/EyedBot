@@ -9,6 +9,8 @@ const CHECK_MS = Math.max(5 * 60_000, Number.parseInt(process.env.FREE_GAMES_CHE
 const FETCH_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.FREE_GAMES_FETCH_TIMEOUT_MS || '15000', 10));
 
 const CACHE_MS = 10 * 60_000;
+const STEAM_STORE_UA = 'Mozilla/5.0 (compatible; EyedBot/1.0; +https://eyedcomun.me)';
+const STEAM_DETAILS_BATCH = Math.max(4, Number.parseInt(process.env.FREE_GAMES_STEAM_DETAILS_BATCH || '16', 10));
 
 /** Iconos de autor en embeds (deben ser PNG/JPG públicos; Discord no puede usar el CDN de Unreal). */
 const STORE_BRAND_ICON_URLS = {
@@ -18,7 +20,8 @@ const STORE_BRAND_ICON_URLS = {
 
 let intervalRef = null;
 let running = false;
-const listCache = { data: null, expiresAt: 0 };
+const listCache = { data: null, expiresAt: 0, minDiscount: 100 };
+let lastFetchAudit = null;
 
 // ============================================================
 // Utilidades
@@ -32,7 +35,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS)
             ...options,
             signal: controller.signal,
             headers: {
-                'User-Agent': 'EyedBot/1.0 (+https://eyedbot.local)',
+                'User-Agent': STEAM_STORE_UA,
                 'Accept': 'application/json, text/plain;q=0.8',
                 ...(options.headers || {})
             }
@@ -195,148 +198,294 @@ async function fetchEpicFreeGames() {
 }
 
 // ============================================================
-// Steam (solo juegos 100% off actualmente)
+// Steam (promociones 100% y listado oficial de gratis)
 // ============================================================
 
-async function fetchSteamFreeGames() {
-    // Usamos la API interna de Steam: featuredcategories entrega "specials"
-    // y hay que filtrar por discount_percent === 100 para juegos gratis
-    // temporalmente. Tambien probamos search para capturar mas.
-    const results = new Map();
-
-    // 1) Specials -> filtramos 100%
-    try {
-        const res = await fetchWithTimeout('https://store.steampowered.com/api/featuredcategories?cc=ES&l=spanish');
-        if (res.ok) {
-            const data = await res.json();
-            const specials = data?.specials?.items || [];
-            for (const item of specials) {
-                if (Number(item.discount_percent || 0) !== 100) continue;
-                if (item.type !== 0 && item.type !== undefined) continue; // type 0 = juego
-                const id = String(item.id || item.appid || '');
-                if (!id) continue;
-                results.set(id, normalizeSteamItem(item));
-            }
-        }
-    } catch {
-        // continue con busqueda fallback
-    }
-
-    // 2) Busqueda adicional: store.steampowered.com/search/?maxprice=free&specials=1
-    // (Aunque no JSON, la API store search devuelve JSON con flag snr:
-    // https://store.steampowered.com/search/results?query&start=0&count=40&maxprice=free&specials=1&json=1)
-    try {
-        const res = await fetchWithTimeout('https://store.steampowered.com/search/results/?query&start=0&count=50&specials=1&maxprice=free&json=1&cc=ES&l=spanish');
-        if (res.ok) {
-            const data = await res.json();
-            const items = Array.isArray(data?.items) ? data.items : [];
-            for (const item of items) {
-                const id = String(item.appid || '');
-                if (!id || results.has(id)) continue;
-                // item: { name, logo, appid, discount_percent, original_price, final_price }
-                if (Number(item.discount_percent || 0) !== 100) continue;
-                results.set(id, normalizeSteamItem({
-                    id,
-                    appid: id,
-                    name: item.name,
-                    header_image: item.logo,
-                    small_capsule_image: item.logo,
-                    discount_percent: item.discount_percent,
-                    original_price: item.original_price,
-                    final_price: item.final_price,
-                    currency: 'EUR'
-                }));
-            }
-        }
-    } catch {
-        // ok
-    }
-
-    const games = Array.from(results.values());
-
-    // Enriquecer opcionalmente el primer batch con appdetails (solo algunos, para
-    // no abusar). Best-effort.
-    await Promise.all(games.slice(0, 8).map(async (g) => {
-        try {
-            const res = await fetchWithTimeout(`https://store.steampowered.com/api/appdetails?appids=${g._appid}&cc=ES&l=spanish`, {}, 8000);
-            if (!res.ok) return;
-            const json = await res.json();
-            const payload = json?.[g._appid];
-            if (!payload?.success || !payload.data) return;
-            const d = payload.data;
-            g.description = String(d.short_description || g.description || '').slice(0, 500);
-            g.imageUrl = d.header_image || g.imageUrl;
-            g.thumbnailUrl = d.capsule_imagev5 || d.capsule_image || g.thumbnailUrl;
-            g.publisher = (d.publishers && d.publishers[0]) || g.publisher;
-            if (d.price_overview) {
-                const po = d.price_overview;
-                g.originalPriceMinor = safeNumber(po.initial, g.originalPriceMinor);
-                g.currency = po.currency || g.currency;
-                g.originalPrice = po.initial > 0 ? formatCurrency(po.initial, po.currency) : 'Gratis';
-                g.discountPercent = Number(po.discount_percent || 100);
-            }
-            g.tags = (d.genres || []).slice(0, 5).map((x) => x.description).filter(Boolean);
-        } catch {
-            // ignore
-        }
-    }));
-
-    return games;
+function extractSteamAppIdFromLogo(logo) {
+    const match = String(logo || '').match(/\/apps\/(\d+)\//);
+    return match ? match[1] : '';
 }
 
-function normalizeSteamItem(item) {
-    const id = String(item.id || item.appid || '');
-    const originalPriceMinor = safeNumber(item.original_price, 0);
+function extractSteamSearchAppIds(payload) {
+    const ids = new Map();
+    for (const item of payload?.items || []) {
+        const id = String(item.appid || item.id || extractSteamAppIdFromLogo(item.logo) || '').trim();
+        if (id) ids.set(id, String(item.name || '').trim());
+    }
+    const html = String(payload?.results_html || '');
+    for (const match of html.matchAll(/data-ds-appid="(\d+)"/g)) {
+        if (!ids.has(match[1])) ids.set(match[1], '');
+    }
+    return ids;
+}
+
+function isSteamGameType(data) {
+    return String(data?.type || '').toLowerCase() === 'game';
+}
+
+/**
+ * Clasifica si un juego de Steam debe listarse.
+ * - promo: descuento temporal con precio final 0
+ * - store_free: gratis permanente en el listado oficial de Steam
+ */
+function classifySteamListing(data, minDiscount = 100) {
+    if (!data || !isSteamGameType(data)) return null;
+    const po = data.price_overview;
+    if (po) {
+        const finalPrice = safeNumber(po.final, -1);
+        const discount = safeNumber(po.discount_percent, 0);
+        const initial = safeNumber(po.initial, 0);
+        if (finalPrice === 0 && discount >= minDiscount) return 'promo';
+        if (finalPrice === 0 && initial > 0) return 'promo';
+    }
+    if (data.is_free && !po) return 'store_free';
+    return null;
+}
+
+function normalizeSteamItem(item, listingKind = 'promo') {
+    const id = String(item.id || item.appid || item._appid || '');
+    const originalPriceMinor = safeNumber(item.original_price ?? item.originalPriceMinor, 0);
     const currency = item.currency || 'EUR';
     const image = item.header_image
         || item.large_capsule_image
         || item.small_capsule_image
         || (id ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg` : '');
 
-    return {
+    const description = listingKind === 'store_free' && !item.description
+        ? 'Disponible gratis en Steam.'
+        : String(item.description || '');
+
+    return sanitizePublicGame({
         _appid: id,
         id: `steam_${id}`,
         source: 'steam',
         sourceLabel: 'Steam',
-        title: String(item.name || 'Juego').slice(0, 256),
-        description: '',
+        title: String(item.name || item.title || 'Juego').slice(0, 256),
+        description: description.slice(0, 500),
         imageUrl: image,
-        thumbnailUrl: image,
+        thumbnailUrl: item.small_capsule_image || image,
         originalPriceMinor,
         currency,
         originalPrice: originalPriceMinor > 0 ? formatCurrency(originalPriceMinor, currency) : 'Gratis',
-        discountPercent: 100,
-        startsAt: '',
-        endsAt: '', // Steam no expone fecha de fin facilmente
+        discountPercent: safeNumber(item.discount_percent, 100),
+        startsAt: item.startsAt || '',
+        endsAt: item.endsAt || item.discount_expiration
+            ? new Date(safeNumber(item.discount_expiration, 0) * 1000).toISOString()
+            : '',
         isUpcoming: false,
         storeUrl: id ? `https://store.steampowered.com/app/${id}` : 'https://store.steampowered.com/search/?maxprice=free&specials=1',
-        tags: [],
-        publisher: ''
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        publisher: String(item.publisher || ''),
+        listingKind
+    });
+}
+
+function buildSteamGameFromDetails(appId, data, listingKind, seed = {}) {
+    const po = data.price_overview;
+    return normalizeSteamItem({
+        id: appId,
+        appid: appId,
+        header_image: data.header_image,
+        small_capsule_image: data.capsule_imagev5 || data.capsule_image,
+        description: data.short_description,
+        original_price: po?.initial,
+        discount_percent: po?.discount_percent ?? 100,
+        currency: po?.currency || 'EUR',
+        publisher: (data.publishers && data.publishers[0]) || '',
+        tags: (data.genres || []).slice(0, 5).map((genre) => genre.description).filter(Boolean),
+        name: data.name || seed.name,
+    }, listingKind);
+}
+
+async function fetchSteamAppDetails(appId) {
+    const res = await fetchWithTimeout(
+        `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appId)}&cc=ES&l=spanish`,
+        {},
+        8000
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const payload = json?.[appId];
+    return payload?.success ? payload.data : null;
+}
+
+async function collectSteamFeaturedGames(results, minDiscount, audit) {
+    try {
+        const res = await fetchWithTimeout('https://store.steampowered.com/api/featuredcategories?cc=ES&l=spanish');
+        if (!res.ok) {
+            audit.errors.push(`featuredcategories HTTP ${res.status}`);
+            return;
+        }
+        const data = await res.json();
+        for (const section of Object.values(data || {})) {
+            const items = section?.items;
+            if (!Array.isArray(items)) continue;
+            for (const item of items) {
+                audit.featuredScanned += 1;
+                if (item.type !== 0 && item.type !== undefined) continue;
+                const discount = safeNumber(item.discount_percent, 0);
+                const finalPrice = safeNumber(item.final_price, -1);
+                if (discount < minDiscount || finalPrice !== 0) continue;
+                const id = String(item.id || item.appid || '');
+                if (!id || results.has(id)) continue;
+                results.set(id, normalizeSteamItem(item, 'promo'));
+                audit.featuredMatched += 1;
+            }
+        }
+    } catch (err) {
+        audit.errors.push(`featuredcategories: ${err.message}`);
+    }
+}
+
+async function collectSteamSearchCandidates(minDiscount, audit) {
+    const candidateIds = new Map();
+    const searchUrls = [
+        'https://store.steampowered.com/search/results/?query&start=0&count=50&specials=1&maxprice=free&json=1&infinite=1&cc=ES&l=spanish',
+        'https://store.steampowered.com/search/results/?query&start=0&count=50&specials=1&json=1&infinite=1&cc=ES&l=spanish'
+    ];
+
+    for (const url of searchUrls) {
+        try {
+            const res = await fetchWithTimeout(url);
+            if (!res.ok) {
+                audit.errors.push(`search HTTP ${res.status}`);
+                continue;
+            }
+            const payload = await res.json();
+            for (const [id, name] of extractSteamSearchAppIds(payload)) {
+                if (!candidateIds.has(id)) candidateIds.set(id, name);
+            }
+        } catch (err) {
+            audit.errors.push(`search: ${err.message}`);
+        }
+    }
+
+    audit.searchCandidates = candidateIds.size;
+    return candidateIds;
+}
+
+async function verifySteamCandidates(candidateIds, results, minDiscount, audit) {
+    const pending = [...candidateIds.entries()]
+        .filter(([id]) => !results.has(id))
+        .slice(0, STEAM_DETAILS_BATCH);
+
+    await Promise.all(pending.map(async ([appId, seedName]) => {
+        audit.detailsChecked += 1;
+        try {
+            const data = await fetchSteamAppDetails(appId);
+            const listingKind = classifySteamListing(data, minDiscount);
+            if (!listingKind) return;
+            results.set(appId, buildSteamGameFromDetails(appId, data, listingKind, { name: seedName }));
+            audit.detailsMatched += 1;
+        } catch (err) {
+            audit.errors.push(`appdetails ${appId}: ${err.message}`);
+        }
+    }));
+}
+
+async function fetchSteamFreeGames(minDiscount = 100) {
+    const audit = {
+        featuredScanned: 0,
+        featuredMatched: 0,
+        searchCandidates: 0,
+        detailsChecked: 0,
+        detailsMatched: 0,
+        errors: []
     };
+    const results = new Map();
+
+    await collectSteamFeaturedGames(results, minDiscount, audit);
+    const candidateIds = await collectSteamSearchCandidates(minDiscount, audit);
+    await verifySteamCandidates(candidateIds, results, minDiscount, audit);
+
+    const games = [...results.values()];
+    audit.total = games.length;
+    return { games, audit };
+}
+
+function sanitizePublicGame(game) {
+    const copy = { ...game };
+    delete copy._appid;
+    delete copy.listingKind;
+    return copy;
+}
+
+function applyMinDiscountFilter(games, minDiscount = 100) {
+    return games.filter((game) => safeNumber(game.discountPercent, 0) >= minDiscount);
 }
 
 // ============================================================
 // Agregacion
 // ============================================================
 
-async function fetchAllFreeGames({ includeEpic = true, includeSteam = true, force = false } = {}) {
-    if (!force && listCache.data && listCache.expiresAt > Date.now()) {
-        return filterBySources(listCache.data, { includeEpic, includeSteam });
+async function fetchAllFreeGames({ includeEpic = true, includeSteam = true, force = false, minDiscount = 100 } = {}) {
+    const discountFloor = Math.max(0, Math.min(100, safeNumber(minDiscount, 100)));
+    const audit = {
+        fetchedAt: new Date().toISOString(),
+        minDiscount: discountFloor,
+        epic: { count: 0, error: null },
+        steam: {
+            count: 0,
+            featuredScanned: 0,
+            featuredMatched: 0,
+            searchCandidates: 0,
+            detailsChecked: 0,
+            detailsMatched: 0,
+            errors: [],
+            error: null
+        }
+    };
+
+    if (!force && listCache.data && listCache.expiresAt > Date.now() && listCache.minDiscount === discountFloor) {
+        lastFetchAudit = audit;
+        return filterBySources(applyMinDiscountFilter(listCache.data, discountFloor), { includeEpic, includeSteam });
     }
 
-    const [epic, steam] = await Promise.all([
-        includeEpic ? fetchEpicFreeGames().catch((e) => { console.warn('Epic fetch err:', e.message); return []; }) : Promise.resolve([]),
-        includeSteam ? fetchSteamFreeGames().catch((e) => { console.warn('Steam fetch err:', e.message); return []; }) : Promise.resolve([])
-    ]);
+    const epicPromise = includeEpic
+        ? fetchEpicFreeGames().catch((e) => {
+            audit.epic.error = e.message;
+            console.warn('Epic fetch err:', e.message);
+            return [];
+        })
+        : Promise.resolve([]);
 
-    // Para cache, guardamos la union de lo pedido
+    const steamPromise = includeSteam
+        ? fetchSteamFreeGames(discountFloor).catch((e) => {
+            audit.steam.error = e.message;
+            console.warn('Steam fetch err:', e.message);
+            return { games: [], audit: { errors: [e.message] } };
+        })
+        : Promise.resolve({ games: [], audit: {} });
+
+    const [epicRaw, steamResult] = await Promise.all([epicPromise, steamPromise]);
+    const epic = applyMinDiscountFilter(epicRaw, discountFloor).map(sanitizePublicGame);
+    const steam = applyMinDiscountFilter(steamResult.games || [], discountFloor).map(sanitizePublicGame);
+
+    audit.epic.count = epic.length;
+    audit.steam = {
+        ...audit.steam,
+        count: steam.length,
+        featuredScanned: steamResult.audit?.featuredScanned || 0,
+        featuredMatched: steamResult.audit?.featuredMatched || 0,
+        searchCandidates: steamResult.audit?.searchCandidates || 0,
+        detailsChecked: steamResult.audit?.detailsChecked || 0,
+        detailsMatched: steamResult.audit?.detailsMatched || 0,
+        errors: steamResult.audit?.errors || []
+    };
+
     const combined = [...epic, ...steam];
     if (includeEpic && includeSteam) {
         listCache.data = combined;
         listCache.expiresAt = Date.now() + CACHE_MS;
+        listCache.minDiscount = discountFloor;
     }
 
+    lastFetchAudit = audit;
     return combined;
+}
+
+function getLastFreeGamesAudit() {
+    return lastFetchAudit;
 }
 
 function filterBySources(list, { includeEpic, includeSteam }) {
@@ -447,7 +596,7 @@ async function refreshFreeGameEmbedsInChannel(channel, config, botUserId, option
 
     const includeEpic = config.sources?.epic !== false;
     const includeSteam = config.sources?.steam !== false;
-    const games = await fetchAllFreeGames({ includeEpic, includeSteam, force: true });
+    const games = await fetchAllFreeGames({ includeEpic, includeSteam, force: true, minDiscount: config.minDiscount });
     const gamesById = new Map(games.map((g) => [g.id, g]));
     const gamesByTitle = new Map(games.map((g) => [normalizeGameTitle(g.title), g]));
 
@@ -522,7 +671,8 @@ async function processGuildConfig(client, guildId, config) {
 
     const games = await fetchAllFreeGames({
         includeEpic: config.sources?.epic !== false,
-        includeSteam: config.sources?.steam !== false
+        includeSteam: config.sources?.steam !== false,
+        minDiscount: config.minDiscount
     }).catch(() => []);
 
     if (!games.length) return;
@@ -609,6 +759,9 @@ module.exports = {
     refreshFreeGameEmbedsInChannel,
     resolveEpicStoreSlug,
     buildEpicStoreUrl,
+    getLastFreeGamesAudit,
+    classifySteamListing,
+    extractSteamSearchAppIds,
     startFreeGamesScheduler,
     stopFreeGamesScheduler,
     runFreeGamesSweep

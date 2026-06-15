@@ -167,7 +167,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
     trackedEmbeds: 0,
   });
   const [games, setGames] = useState<FreeGameItem[]>([]);
-  const [previewMeta, setPreviewMeta] = useState({ count: 0, fetchedAt: "" });
+  const [previewMeta, setPreviewMeta] = useState({ count: 0, fetchedAt: "", audit: null as Record<string, unknown> | null });
   const [loading, setLoading] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -182,6 +182,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
         epic: form.sources.epic,
         steam: form.sources.steam,
         force,
+        minDiscount: form.minDiscount,
       });
       const root = asRecord(previewData);
       const parsed = parseGames(previewData);
@@ -189,6 +190,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
       setPreviewMeta({
         count: toNumberValue(root.count, parsed.length),
         fetchedAt: toStringValue(root.fetchedAt),
+        audit: asRecord(root.audit),
       });
     } catch (err) {
       toast({ title: "Error al cargar ofertas", description: getErrorMessage(err), tone: "danger" });
@@ -218,7 +220,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
 
   useEffect(() => {
     if (tab === "offers" || tab === "preview") void fetchOffers(false);
-  }, [tab, guildId, form.sources.epic, form.sources.steam]);
+  }, [tab, guildId, form.sources.epic, form.sources.steam, form.minDiscount]);
 
   function buildPayload() {
     return {
@@ -279,6 +281,9 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
   if (loading) return <Alert title="Cargando juegos gratis" description="Sincronizando configuración." />;
   if (error) return <Alert title="No se pudo cargar free games" description={error} variant="danger" />;
 
+  const epicCount = games.filter((game) => game.source === "epic").length;
+  const steamCount = games.filter((game) => game.source === "steam").length;
+  const steamAudit = asRecord(previewMeta.audit?.steam);
   const previewGame = games[0];
 
   return (
@@ -420,10 +425,19 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
             {tab === "offers" ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-zinc-400">
-                    {previewMeta.count} ofertas
-                    {previewMeta.fetchedAt ? ` · ${formatDate(previewMeta.fetchedAt)}` : ""}
-                  </p>
+                  <div className="text-sm text-zinc-400">
+                    <p>
+                      {previewMeta.count} ofertas · Epic {epicCount} · Steam {steamCount}
+                      {previewMeta.fetchedAt ? ` · ${formatDate(previewMeta.fetchedAt)}` : ""}
+                    </p>
+                    {form.sources.steam ? (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Steam: {toNumberValue(steamAudit.featuredMatched, 0)} destacados ·{" "}
+                        {toNumberValue(steamAudit.detailsMatched, 0)} verificados ·{" "}
+                        {toNumberValue(steamAudit.searchCandidates, 0)} candidatos
+                      </p>
+                    ) : null}
+                  </div>
                   <Button variant="secondary" size="sm" onClick={() => void fetchOffers(true)} disabled={loadingOffers}>
                     <RefreshCw className={`mr-2 h-4 w-4 ${loadingOffers ? "animate-spin" : ""}`} />
                     Recargar
