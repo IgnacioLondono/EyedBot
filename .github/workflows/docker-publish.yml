@@ -19,6 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare image name
+        id: prep
+        run: |
+          IMAGE="ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -36,8 +42,8 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ${{ steps.prep.outputs.image }}:latest
+            ${{ steps.prep.outputs.image }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -46,5 +52,5 @@ jobs:
       - name: Make package public (optional)
         if: github.repository_owner != ''
         run: |
-          echo "Imagen publicada: ghcr.io/${{ github.repository }}:latest"
+          echo "Imagen publicada: ${{ steps.prep.outputs.image }}:latest"
           echo "Para redeploy rápido en Portainer usa docker-compose.ghcr-host.yml"
