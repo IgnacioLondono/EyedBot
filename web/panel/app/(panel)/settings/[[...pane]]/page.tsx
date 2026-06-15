@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { SETTINGS_NAV } from "@/lib/navigation";
+import { filterSettingsNav } from "@/lib/web-config";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
@@ -21,7 +22,7 @@ const PANE_COPY: Record<string, { title: string; body: string }> = {
   },
   owner: {
     title: "Propietario",
-    body: "Usuarios del panel, EyedPlus+, logs, estadísticas y sistema (solo creador).",
+    body: "Usuarios, EyedPlus+, configuración web, bots, logs y sistema (solo creador).",
   },
   theme: {
     title: "Personalización",
@@ -51,10 +52,13 @@ export default function SettingsPage() {
     if (pane === "owner" && !isOwner) router.replace("/settings/account");
   }, [pane, isOwner, router]);
 
-  const visibleNav = SETTINGS_NAV.filter((item) => {
-    if (item.href.includes("/owner")) return isOwner;
-    return true;
-  });
+  const visibleNav = filterSettingsNav(
+    SETTINGS_NAV.filter((item) => {
+      if (item.href.includes("/owner")) return isOwner;
+      return true;
+    }),
+    bootstrap?.webConfig
+  );
 
   return (
     <>

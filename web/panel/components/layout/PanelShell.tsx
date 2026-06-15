@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ChevronDown, Link2, LogIn, LogOut, Plus } from "lucide-react";
 import { useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
+import { filterPrimaryNav } from "@/lib/web-config";
 import { EYEDBIO_URL } from "@/lib/eyedbio";
 import { EyedBioNavLink } from "@/components/layout/EyedBioNavLink";
 import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
@@ -25,6 +26,9 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   const isGuest = !user;
   const displayName = user?.global_name || user?.username || "Usuario";
   const homeHref = isGuest ? "/about" : "/dashboard";
+  const primaryNav = filterPrimaryNav(PRIMARY_NAV, bootstrap?.webConfig);
+  const maintenanceMessage = bootstrap?.webConfig?.maintenanceMessage;
+  const showMaintenanceNotice = Boolean(bootstrap?.isOwner && bootstrap?.webConfig?.maintenanceMode);
 
   return (
     <div className={cn("relative min-h-screen text-zinc-100", !hasActiveWallpaper && "bg-[var(--color-bg)]")}>
@@ -36,11 +40,16 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="sticky top-0 z-40 border-b border-white/10 bg-black/30 backdrop-blur-2xl">
+        {showMaintenanceNotice ? (
+          <div className="border-b border-amber-400/20 bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-100">
+            Modo mantenimiento activo para usuarios. {maintenanceMessage}
+          </div>
+        ) : null}
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 lg:px-6">
           <EyedBotLogo href={homeHref} label="EyedBot Panel" showText="desktop" className="font-semibold" />
 
           <div className="hidden flex-1 items-center gap-1 md:flex">
-            {PRIMARY_NAV.map((item) => {
+            {primaryNav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
               const guestLocked = isGuest && !isPublicPanelRoute(item.href);

@@ -85,6 +85,55 @@ export type PanelBootstrap = {
   premiumRequired?: boolean;
   botConnected: boolean;
   guildsSyncedAt: number;
+  webConfig?: WebPanelConfig;
+};
+
+export type WebPanelConfig = {
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+  premiumRequired: boolean;
+  billingEnabled: boolean;
+  pages: {
+    dashboard: boolean;
+    about: boolean;
+    commands: boolean;
+    premium: boolean;
+  };
+  modules: {
+    welcome: boolean;
+    verify: boolean;
+    tickets: boolean;
+    levels: boolean;
+    voice: boolean;
+    automation: boolean;
+    gacha: boolean;
+    moderation: boolean;
+    security: boolean;
+    notifications: boolean;
+    freeGames: boolean;
+    embed: boolean;
+    themeCustomization: boolean;
+  };
+};
+
+export type OwnerWebConfig = {
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+  allowNewLogins: boolean;
+  premiumRequired: boolean | null;
+  billingEnabled: boolean;
+  pages: WebPanelConfig["pages"];
+  modules: WebPanelConfig["modules"];
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+  effective?: {
+    premiumRequired: boolean;
+    billingEnabled: boolean;
+  };
+  env?: {
+    premiumRequired: boolean;
+    billingProvider: string;
+  };
 };
 
 export type BillingStatus = {
@@ -96,6 +145,30 @@ export type BillingStatus = {
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean;
   updatedAt?: string | null;
+  provider?: "webpay" | "mercadopago" | "none" | null;
+};
+
+export type BillingPlan = {
+  configured: boolean;
+  provider: "webpay" | "mercadopago" | "none";
+  monthlyAmount: number;
+  currency: string;
+  currencyLabel: string;
+  periodDays: number;
+  productName: string;
+  paymentLabel: string;
+};
+
+export type CheckoutSessionResponse = {
+  url?: string;
+  provider?: string;
+};
+
+export type BillingPortalResponse = {
+  url?: string;
+  ok?: boolean;
+  message?: string;
+  action?: string;
 };
 
 export type AboutOverview = {

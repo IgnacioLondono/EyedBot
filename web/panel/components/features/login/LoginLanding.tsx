@@ -75,6 +75,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   config_error: "Error de configuración del servidor. Contacta al administrador.",
   auth_failed: "No se pudo completar el inicio de sesión.",
   invalid_secret: "Credenciales OAuth inválidas en el servidor.",
+  maintenance: "El panel está en mantenimiento. Solo el propietario puede acceder.",
+  registration_closed: "Los nuevos accesos están cerrados temporalmente.",
 };
 
 const fadeUp = {

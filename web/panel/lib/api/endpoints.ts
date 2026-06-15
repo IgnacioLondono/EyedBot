@@ -1,10 +1,14 @@
 import { apiFetch, apiForm } from "@/lib/api/client";
 import type {
   AboutOverview,
+  BillingPlan,
+  BillingPortalResponse,
   BillingStatus,
+  CheckoutSessionResponse,
   CommandCatalogItem,
   DashboardSummary,
   GuildSummary,
+  OwnerWebConfig,
   PanelBootstrap,
   PanelUser,
 } from "@/lib/types";
@@ -41,15 +45,22 @@ export const getLogs = (params?: { level?: string; limit?: number }) => {
 
 export const getBillingStatus = () => apiFetch<BillingStatus>("/api/billing/status");
 
+export const getBillingPlan = () => apiFetch<BillingPlan>("/api/billing/plan");
+
 export const createCheckoutSession = () =>
-  apiFetch<{ url?: string }>("/api/billing/checkout-session", { method: "POST" });
+  apiFetch<CheckoutSessionResponse>("/api/billing/checkout-session", { method: "POST" });
 
 export const createBillingPortal = () =>
-  apiFetch<{ url?: string }>("/api/billing/portal", { method: "POST" });
+  apiFetch<BillingPortalResponse>("/api/billing/portal", { method: "POST" });
 
 // ─── Admin (owner) ──────────────────────────────────────────────────
 
 export const getLoginRegistry = () => apiFetch<unknown>("/api/admin/login-registry");
+
+export const getOwnerWebConfig = () => apiFetch<OwnerWebConfig>("/api/admin/web-config");
+
+export const updateOwnerWebConfig = (body: Record<string, unknown>) =>
+  apiFetch<OwnerWebConfig>("/api/admin/web-config", { method: "PUT", body });
 
 export const updateUserBilling = (userId: string, body: Record<string, unknown>) =>
   apiFetch(`/api/admin/user/${encodeURIComponent(userId)}/billing`, {

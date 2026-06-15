@@ -16,6 +16,8 @@ const os = require('os');
 const multer = require('multer');
 const db = require('../src/utils/database');
 const billingStore = require('../src/utils/billing-store');
+const webpayBilling = require('../src/utils/webpay-billing');
+const webPanelConfigStore = require('../src/utils/web-panel-config-store');
 const welcomeStore = require('../src/utils/welcome-config-store');
 const {
     canonicalWelcomeMediaUrl,
@@ -67,8 +69,7 @@ const NODE_ENV = String(process.env.NODE_ENV || 'development').trim().toLowerCas
 const IS_PRODUCTION = NODE_ENV === 'production';
 
 function isPremiumEnforcementEnabled() {
-    const raw = String(process.env.EYEDPLUS_REQUIRED || process.env.PREMIUM_REQUIRED || '').trim().toLowerCase();
-    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+    return webPanelConfigStore.getEffectivePremiumRequired();
 }
 const {
     handleTwitchEventSubHttpRequest,
@@ -363,6 +364,56 @@ const MP_MONTHLY_AMOUNT = Number.isFinite(MP_MONTHLY_AMOUNT_RAW) && MP_MONTHLY_A
     ? MP_MONTHLY_AMOUNT_RAW
     : 9.99;
 const MP_EXTERNAL_REFERENCE_PREFIX = envValue('MP_EXTERNAL_REFERENCE_PREFIX', 'eyedbot');
+const BILLING_PROVIDER = envValue('BILLING_PROVIDER', 'auto').toLowerCase();
+
+function resolveBillingProvider() {
+    if (BILLING_PROVIDER === 'webpay') {
+        return webpayBilling.isConfigured() ? 'webpay' : 'none';
+    }
+    if (BILLING_PROVIDER === 'mercadopago' || BILLING_PROVIDER === 'mercado_pago') {
+        return MP_ACCESS_TOKEN ? 'mercadopago' : 'none';
+    }
+    if (webpayBilling.isConfigured()) return 'webpay';
+    if (MP_ACCESS_TOKEN) return 'mercadopago';
+    return 'none';
+}
+
+function isWebPaySubscription(subscription) {
+    return String(subscription?.sourceEvent || '').includes('webpay');
+}
+
+function buildBillingPlanPayload() {
+    const provider = resolveBillingProvider();
+    if (provider === 'webpay') {
+        return {
+            configured: true,
+            provider: 'webpay',
+            ...webpayBilling.getPublicPlan()
+        };
+    }
+    if (provider === 'mercadopago') {
+        return {
+            configured: true,
+            provider: 'mercadopago',
+            monthlyAmount: MP_MONTHLY_AMOUNT,
+            currency: MP_CURRENCY_ID,
+            currencyLabel: MP_CURRENCY_ID,
+            periodDays: 30,
+            productName: MP_REASON,
+            paymentLabel: 'Mercado Pago'
+        };
+    }
+    return {
+        configured: false,
+        provider: 'none',
+        monthlyAmount: 0,
+        currency: '',
+        currencyLabel: '',
+        periodDays: 30,
+        productName: MP_REASON,
+        paymentLabel: ''
+    };
+}
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 8 * 1024 * 1024 }
@@ -1759,6 +1810,23 @@ app.get('/callback', async (req, res) => {
             return res.redirect('/login?error=auth_failed');
         }
 
+        const userId = String(user.id || '').trim();
+        if (webPanelConfigStore.isMaintenanceMode() && !isOwnerUser(user)) {
+            return res.redirect('/login?error=maintenance');
+        }
+
+        if (!webPanelConfigStore.isNewLoginAllowed() && !isOwnerUser(user)) {
+            try {
+                const analytics = await loadLoginAnalyticsSnapshot();
+                const existed = Boolean(analytics?.users?.[userId]);
+                if (!existed) {
+                    return res.redirect('/login?error=registration_closed');
+                }
+            } catch (loginCheckError) {
+                console.warn('⚠️ No se pudo validar registro de login:', loginCheckError?.message || loginCheckError);
+            }
+        }
+
         const previousGuilds = Array.isArray(req.session.guilds) ? req.session.guilds : [];
         let guilds = previousGuilds;
 
@@ -1788,7 +1856,6 @@ app.get('/callback', async (req, res) => {
             return res.redirect('/login?error=session_error');
         }
 
-        const userId = String(user.id || '').trim();
         if (userId && Array.isArray(guilds)) {
             const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(guilds));
             guildsApiResponseCache.set(userId, {
@@ -1846,6 +1913,18 @@ function requireAuth(req, res, next) {
         }
         return res.redirect('/login');
     }
+
+    if (webPanelConfigStore.isMaintenanceMode() && !isOwnerUser(req.session.user)) {
+        if (req.path.startsWith('/api/')) {
+            return res.status(503).json({
+                error: 'Panel en mantenimiento',
+                code: 'maintenance_mode',
+                message: webPanelConfigStore.getConfig().maintenanceMessage
+            });
+        }
+        return res.redirect('/login?error=maintenance');
+    }
+
     next();
 }
 
@@ -2026,11 +2105,15 @@ async function resolveBillingStatusForUser(user) {
             subscriptionId: '',
             currentPeriodEnd: null,
             cancelAtPeriodEnd: false,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            provider: resolveBillingProvider()
         };
     }
 
     const subscription = await billingStore.getUserSubscription(userId);
+    const paymentProvider = isWebPaySubscription(subscription)
+        ? 'webpay'
+        : (subscription?.subscriptionId ? 'mercadopago' : null);
     return {
         active: billingStore.isPremiumActive(subscription),
         status: subscription?.status || 'inactive',
@@ -2039,8 +2122,21 @@ async function resolveBillingStatusForUser(user) {
         subscriptionId: subscription?.subscriptionId || '',
         currentPeriodEnd: subscription?.currentPeriodEnd || null,
         cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd === true,
-        updatedAt: subscription?.updatedAt || null
+        updatedAt: subscription?.updatedAt || null,
+        provider: paymentProvider || resolveBillingProvider()
     };
+}
+
+function requireWebModuleEnabled(req, res, next) {
+    const moduleKey = webPanelConfigStore.resolveModuleFromRequestPath(req.originalUrl || req.url || '');
+    if (moduleKey && !webPanelConfigStore.isModuleEnabled(moduleKey)) {
+        return res.status(403).json({
+            error: 'Módulo desactivado por el administrador',
+            code: 'module_disabled',
+            module: moduleKey
+        });
+    }
+    return next();
 }
 
 // Rutas protegidas
@@ -2111,7 +2207,8 @@ app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
             hasPremium: hasPremiumGrant(req.session.user),
             premiumRequired: isPremiumEnforcementEnabled(),
             botConnected: Boolean(botClient?.user?.id),
-            guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0
+            guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0,
+            webConfig: webPanelConfigStore.getPublicConfig()
         });
     } catch (error) {
         console.error('❌ Error en /api/panel/bootstrap:', error);
@@ -2139,7 +2236,7 @@ app.get('/api/panel/dashboard-summary', requireAuth, async (req, res) => {
 });
 
 // Protección global para endpoints por servidor.
-app.use('/api/guild/:guildId', requireAuth, requireGuildManagementAccess);
+app.use('/api/guild/:guildId', requireAuth, requireGuildManagementAccess, requireWebModuleEnabled);
 
 app.get('/api/billing/status', requireAuth, async (req, res) => {
     const userId = String(req.session?.user?.id || '').trim();
@@ -2156,14 +2253,49 @@ app.get('/api/billing/status', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/billing/checkout-session', requireAuth, async (req, res) => {
-    if (!MP_ACCESS_TOKEN) {
-        return res.status(503).json({ error: 'Mercado Pago no configurado en el servidor' });
+app.get('/api/billing/plan', requireAuth, async (req, res) => {
+    try {
+        return res.json(buildBillingPlanPayload());
+    } catch (error) {
+        console.error('Error consultando plan de facturación:', error);
+        return res.status(500).json({ error: 'No se pudo obtener el plan' });
+    }
+});
+
+app.post('/api/billing/webpay/return', async (req, res) => {
+    const origin = resolveWebOrigin(req);
+    const premiumUrl = `${origin || ''}/premium`;
+    const token = String(req.body?.token_ws || req.query?.token_ws || '').trim();
+
+    if (!token) {
+        return res.redirect(`${premiumUrl}?billing=error&reason=missing_token`);
     }
 
+    try {
+        const result = await webpayBilling.commitCheckout(token);
+        if (result.ok) {
+            return res.redirect(`${premiumUrl}?billing=success`);
+        }
+        return res.redirect(`${premiumUrl}?billing=failed`);
+    } catch (error) {
+        console.error('Error confirmando pago WebPay:', error?.payload || error?.message || error);
+        return res.redirect(`${premiumUrl}?billing=error`);
+    }
+});
+
+app.post('/api/billing/checkout-session', requireAuth, async (req, res) => {
     const userId = String(req.session?.user?.id || '').trim();
     if (!userId) {
         return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
+    }
+
+    const provider = resolveBillingProvider();
+    if (provider === 'none') {
+        return res.status(503).json({ error: 'Pagos no configurados en el servidor' });
+    }
+
+    if (!webPanelConfigStore.isBillingEnabled()) {
+        return res.status(503).json({ error: 'Los pagos están desactivados temporalmente' });
     }
 
     try {
@@ -2172,7 +2304,17 @@ app.post('/api/billing/checkout-session', requireAuth, async (req, res) => {
             return res.status(500).json({ error: 'No se pudo resolver el origen público de la web' });
         }
 
-        const successBackUrl = String(MP_BACK_URL || `${origin}/?billing=success`).trim();
+        if (provider === 'webpay') {
+            const returnUrl = `${origin}/api/billing/webpay/return`;
+            const session = await webpayBilling.createCheckout({ userId, returnUrl });
+            return res.json({ url: session.url, provider: 'webpay' });
+        }
+
+        if (!MP_ACCESS_TOKEN) {
+            return res.status(503).json({ error: 'Mercado Pago no configurado en el servidor' });
+        }
+
+        const successBackUrl = String(MP_BACK_URL || `${origin}/premium?billing=success`).trim();
         const notificationUrl = `${origin}/api/billing/webhook`;
         const payload = {
             reason: MP_REASON,
@@ -2193,18 +2335,14 @@ app.post('/api/billing/checkout-session', requireAuth, async (req, res) => {
             return res.status(500).json({ error: 'Mercado Pago no devolvió URL de checkout' });
         }
 
-        return res.json({ url: session.init_point });
+        return res.json({ url: session.init_point, provider: 'mercadopago' });
     } catch (error) {
-        console.error('Error creando suscripción en Mercado Pago:', error?.response?.data || error?.message || error);
+        console.error('Error creando sesión de pago:', error?.response?.data || error?.payload || error?.message || error);
         return res.status(500).json({ error: 'No se pudo crear la sesión de pago' });
     }
 });
 
 app.post('/api/billing/portal', requireAuth, async (req, res) => {
-    if (!MP_ACCESS_TOKEN) {
-        return res.status(503).json({ error: 'Mercado Pago no configurado en el servidor' });
-    }
-
     const userId = String(req.session?.user?.id || '').trim();
     if (!userId) {
         return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
@@ -2213,6 +2351,23 @@ app.post('/api/billing/portal', requireAuth, async (req, res) => {
     try {
         const subscription = await billingStore.getUserSubscription(userId);
         const subscriptionId = String(subscription?.subscriptionId || '').trim();
+
+        if (isWebPaySubscription(subscription) || (resolveBillingProvider() === 'webpay' && !subscriptionId)) {
+            const result = await webpayBilling.cancelRenewal(userId);
+            if (!result.ok) {
+                return res.status(400).json({ error: result.message || 'No hay EyedPlus+ activo' });
+            }
+            return res.json({
+                ok: true,
+                action: 'cancel_renewal',
+                message: result.message
+            });
+        }
+
+        if (!MP_ACCESS_TOKEN) {
+            return res.status(503).json({ error: 'Mercado Pago no configurado en el servidor' });
+        }
+
         if (!subscriptionId) {
             return res.status(400).json({ error: 'No existe una suscripción activa para este usuario' });
         }
@@ -2228,7 +2383,7 @@ app.post('/api/billing/portal', requireAuth, async (req, res) => {
             message: 'Suscripción cancelada en Mercado Pago'
         });
     } catch (error) {
-        console.error('Error cancelando suscripción en Mercado Pago:', error?.response?.data || error?.message || error);
+        console.error('Error gestionando suscripción:', error?.response?.data || error?.message || error);
         return res.status(500).json({ error: 'No se pudo gestionar la suscripción' });
     }
 });
@@ -2248,6 +2403,38 @@ app.get('/api/about-overview', (req, res) => {
         ping,
         uptime: Number.isFinite(Number(botClient?.uptime)) ? Number(botClient.uptime) : null
     });
+});
+
+app.get('/api/admin/web-config', requireOwner, async (req, res) => {
+    try {
+        return res.json(webPanelConfigStore.getAdminConfig({
+            premiumRequired: webPanelConfigStore.envPremiumRequired(),
+            billingProvider: resolveBillingProvider()
+        }));
+    } catch (error) {
+        console.error('Error leyendo configuración web:', error);
+        return res.status(500).json({ error: 'No se pudo leer la configuración web' });
+    }
+});
+
+app.put('/api/admin/web-config', requireOwner, async (req, res) => {
+    try {
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const updatedBy = String(
+            req.session?.user?.global_name
+            || req.session?.user?.username
+            || req.session?.user?.id
+            || ''
+        ).trim();
+        webPanelConfigStore.updateConfig(body, updatedBy);
+        return res.json(webPanelConfigStore.getAdminConfig({
+            premiumRequired: webPanelConfigStore.envPremiumRequired(),
+            billingProvider: resolveBillingProvider()
+        }));
+    } catch (error) {
+        console.error('Error guardando configuración web:', error);
+        return res.status(500).json({ error: 'No se pudo guardar la configuración web' });
+    }
 });
 
 app.get('/api/admin/login-registry', requireOwner, async (req, res) => {

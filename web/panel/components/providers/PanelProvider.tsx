@@ -90,7 +90,9 @@ export function PanelProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PanelContextValue>(() => {
     const hasPremium = Boolean(billing?.active || bootstrap?.hasPremium || bootstrap?.isOwner);
-    const premiumRequired = Boolean(bootstrap?.premiumRequired);
+    const premiumRequired = Boolean(
+      bootstrap?.webConfig?.premiumRequired ?? bootstrap?.premiumRequired
+    );
     return {
       bootstrap,
       billing,

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Search } from "lucide-react";
 import { getGuildInfo } from "@/lib/api/endpoints";
 import { SERVER_PANES, serverPaneHref } from "@/lib/navigation";
+import { filterServerPanes } from "@/lib/web-config";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
@@ -48,18 +49,23 @@ export default function ServerPage() {
   const params = useParams<{ guildId: string; pane?: string[] }>();
   const guildId = params.guildId;
   const paneSlug = params.pane?.[0] || "overview";
-  const { premiumLocked } = usePanel();
+  const { premiumLocked, bootstrap } = usePanel();
+  const enabledPanes = useMemo(
+    () => filterServerPanes(SERVER_PANES, bootstrap?.webConfig),
+    [bootstrap?.webConfig]
+  );
+
+  const pane = enabledPanes.find((p) => p.slug === paneSlug) ?? enabledPanes[0] ?? SERVER_PANES[0];
+  const PaneComponent = PANE_COMPONENTS[pane.slug as ServerPaneSlug] ?? OverviewPane;
   const [guildName, setGuildName] = useState("Servidor");
   const [moduleQuery, setModuleQuery] = useState("");
 
-  const pane = SERVER_PANES.find((p) => p.slug === paneSlug) ?? SERVER_PANES[0];
-  const PaneComponent = PANE_COMPONENTS[pane.slug as ServerPaneSlug] ?? OverviewPane;
-
   const filteredPanes = useMemo(() => {
     const q = moduleQuery.trim().toLowerCase();
-    if (!q) return SERVER_PANES;
-    return SERVER_PANES.filter((item) => item.label.toLowerCase().includes(q));
-  }, [moduleQuery]);
+    const base = enabledPanes;
+    if (!q) return base;
+    return base.filter((item) => item.label.toLowerCase().includes(q));
+  }, [moduleQuery, enabledPanes]);
 
   useEffect(() => {
     void getGuildInfo(guildId)
