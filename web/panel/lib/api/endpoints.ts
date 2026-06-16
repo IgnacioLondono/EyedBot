@@ -382,6 +382,23 @@ export const testFreeGames = (guildId: string, body?: Record<string, unknown>) =
 export const refreshFreeGamesEmbeds = (guildId: string, body?: Record<string, unknown>) =>
   apiFetch(`/api/guild/${g(guildId)}/free-games/refresh-embeds`, { method: "POST", body });
 
+// ─── Crunchyroll ──────────────────────────────────────────────────
+
+export const getCrunchyrollConfig = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/crunchyroll/config`);
+
+export const saveCrunchyrollConfig = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/crunchyroll/config`, { method: "POST", body });
+
+export const searchCrunchyrollSeries = (guildId: string, q: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/crunchyroll/search?q=${encodeURIComponent(q)}`);
+
+export const previewCrunchyroll = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/crunchyroll/preview`);
+
+export const testCrunchyrollAlert = (guildId: string, body?: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/crunchyroll/test`, { method: "POST", body });
+
 // ─── Music ─────────────────────────────────────────────────────────
 
 export const getMusicState = (guildId: string) =>

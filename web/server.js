@@ -43,6 +43,8 @@ const {
 const { buildStreamAlertEmbed } = require('../src/utils/stream-alert-scheduler');
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
+const crunchyrollStore = require('../src/utils/crunchyroll-store');
+const crunchyrollService = require('../src/utils/crunchyroll-service');
 const channelSetupTemplates = require('../src/utils/channel-setup-templates');
 const { executeGuildNuke } = require('../src/utils/guild-nuke');
 const gachaStore = require('../src/utils/gacha-store');
@@ -5069,6 +5071,179 @@ app.post('/api/guild/:guildId/free-games/refresh-embeds', requireAuth, requirePr
     } catch (error) {
         console.error('Error actualizando embeds free-games:', error);
         res.status(500).json({ error: error.message || 'No se pudieron actualizar los embeds' });
+    }
+});
+
+// ============================================================
+// CRUNCHYROLL ALERTS
+// ============================================================
+
+app.get('/api/guild/:guildId/crunchyroll/config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await crunchyrollStore.getCrunchyrollConfig(guildId);
+        res.json(config || crunchyrollStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo crunchyroll config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de Crunchyroll' });
+    }
+});
+
+app.post('/api/guild/:guildId/crunchyroll/config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const current = await crunchyrollStore.getCrunchyrollConfig(guildId);
+        const body = req.body || {};
+        const prevBySeriesId = new Map((current.series || []).map((item) => [item.seriesId, item]));
+        const incomingSeries = Array.isArray(body.series) ? body.series : current.series || [];
+        const series = incomingSeries.map((item) => {
+            const prev = prevBySeriesId.get(String(item?.seriesId || '').trim());
+            return crunchyrollStore.defaultSeries({
+                ...item,
+                lastEpisodeId: item?.lastEpisodeId || prev?.lastEpisodeId || '',
+                lastEpisodeNumber: item?.lastEpisodeNumber || prev?.lastEpisodeNumber || 0,
+                lastPostedAt: item?.lastPostedAt || prev?.lastPostedAt || ''
+            });
+        });
+
+        const config = crunchyrollStore.normalizeConfig({
+            ...current,
+            enabled: body.enabled === true,
+            channelId: String(body.channelId || '').trim(),
+            mentionText: String(body.mentionText || '').slice(0, 300),
+            titleTemplate: String(body.titleTemplate || current.titleTemplate || '').slice(0, 200),
+            descriptionTemplate: String(body.descriptionTemplate || current.descriptionTemplate || '').slice(0, 1500),
+            color: String(body.color || current.color || 'f47521').replace('#', '').slice(0, 6),
+            footerText: String(body.footerText || current.footerText || 'EyedBot · Crunchyroll').slice(0, 200),
+            embedLargePreview: body.embedLargePreview !== false,
+            series,
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+
+        if (config.enabled && !config.channelId) {
+            return res.status(400).json({ error: 'Debes seleccionar un canal de notificaciones' });
+        }
+
+        const saved = await crunchyrollStore.setCrunchyrollConfig(guildId, config);
+        res.json({ success: true, config: saved });
+    } catch (error) {
+        console.error('Error guardando crunchyroll config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de Crunchyroll' });
+    }
+});
+
+app.get('/api/guild/:guildId/crunchyroll/search', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const q = String(req.query.q || '').trim();
+        if (!q) return res.status(400).json({ error: 'Escribe un nombre o URL de serie' });
+
+        const results = await crunchyrollService.searchSeries(q, 12);
+        res.json({ success: true, results });
+    } catch (error) {
+        console.error('Error buscando en Crunchyroll:', error);
+        res.status(500).json({ error: error.message || 'No se pudo buscar en Crunchyroll' });
+    }
+});
+
+app.get('/api/guild/:guildId/crunchyroll/preview', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await crunchyrollStore.getCrunchyrollConfig(guildId);
+        const upcoming = await crunchyrollService.fetchUpcomingEpisodes(12);
+        res.json({
+            success: true,
+            config,
+            upcoming,
+            fetchedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error en crunchyroll preview:', error);
+        res.status(500).json({ error: error.message || 'No se pudo cargar la vista previa de Crunchyroll' });
+    }
+});
+
+app.post('/api/guild/:guildId/crunchyroll/test', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const current = await crunchyrollStore.getCrunchyrollConfig(guildId);
+        const body = req.body || {};
+        const config = crunchyrollStore.normalizeConfig({
+            ...current,
+            enabled: true,
+            channelId: String(body.channelId || current.channelId || '').trim(),
+            mentionText: String(body.mentionText || current.mentionText || '').slice(0, 300),
+            titleTemplate: String(body.titleTemplate || current.titleTemplate || '').slice(0, 200),
+            descriptionTemplate: String(body.descriptionTemplate || current.descriptionTemplate || '').slice(0, 1500),
+            color: String(body.color || current.color || 'f47521').replace('#', '').slice(0, 6),
+            footerText: String(body.footerText || current.footerText || 'EyedBot · Crunchyroll').slice(0, 200),
+            embedLargePreview: body.embedLargePreview !== false,
+            series: Array.isArray(body.series) ? body.series : current.series || [],
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+
+        if (!config.channelId) {
+            return res.status(400).json({ error: 'Selecciona un canal antes de enviar la prueba' });
+        }
+
+        const tracked = (config.series || []).find((item) => item.enabled !== false && item.seriesId)
+            || (config.series || [])[0];
+        let series = tracked || {
+            seriesId: 'DEMO',
+            title: 'Solo Leveling',
+            url: 'https://www.crunchyroll.com',
+            imageUrl: ''
+        };
+        let episode = {
+            episodeId: 'demo_ep',
+            episodeNumber: 12,
+            title: 'Episodio de prueba',
+            seriesTitle: series.title,
+            url: series.url || 'https://www.crunchyroll.com',
+            imageUrl: series.imageUrl || '',
+            seasonNumber: 2
+        };
+
+        if (tracked?.seriesId) {
+            try {
+                const latest = await crunchyrollService.getLatestEpisodeForSeries(tracked.seriesId);
+                if (latest?.episodeId) {
+                    episode = latest;
+                    series = { ...tracked, title: latest.seriesTitle || tracked.title };
+                }
+            } catch {
+                // demo fallback
+            }
+        }
+
+        const posted = await crunchyrollService.postEpisodeAlert(botClient, guildId, config, series, episode);
+        if (!posted) {
+            return res.status(400).json({ error: 'No se pudo publicar en el canal seleccionado' });
+        }
+
+        res.json({ success: true, sample: { series, episode } });
+    } catch (error) {
+        console.error('Error enviando crunchyroll test:', error);
+        res.status(500).json({ error: error.message || 'Error al enviar prueba' });
     }
 });
 

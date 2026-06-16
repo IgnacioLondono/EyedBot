@@ -157,7 +157,7 @@ function resolveModuleFromRequestPath(url = '') {
     if (path.includes('/temp-voice') || path.includes('/voice')) return 'voice';
     if (path.includes('/stream-alert') || path.includes('/automation')) return 'automation';
     if (path.includes('/moderation') || path.includes('/unban') || path.includes('/bans')) return 'moderation';
-    if (path.includes('/notifications') || path.includes('/stream')) return 'notifications';
+    if (path.includes('/notifications') || path.includes('/stream') || path.includes('/crunchyroll')) return 'notifications';
     if (path.includes('/embed')) return 'embed';
     return null;
 }

@@ -28,6 +28,7 @@ import {
   Textarea,
 } from "@/components/features/shared";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
+import { CrunchyrollAlertsTab } from "@/components/features/server/panes/CrunchyrollAlertsTab";
 import { plainColorToHex } from "@/lib/embed-utils";
 import { asArray, asRecord, formatDate, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
@@ -186,6 +187,7 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
           items={[
             { id: "channel", label: "Canal" },
             { id: "stream", label: "Directos" },
+            { id: "crunchyroll", label: "Crunchyroll" },
             { id: "events", label: "Eventos" },
             { id: "digest", label: "Resumen" },
           ]}
@@ -264,6 +266,8 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
             <FormActions onSave={handleSave} onTest={handleTest} saving={saving} testing={testing} />
           </div>
         ) : null}
+
+        {tab === "crunchyroll" ? <CrunchyrollAlertsTab guildId={guildId} /> : null}
 
         {tab === "stream" || tab === "events" ? (
           <div className="space-y-5">

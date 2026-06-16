@@ -26,6 +26,7 @@ const db = require('./utils/database');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startStreamAlertScheduler, stopStreamAlertScheduler } = require('./utils/stream-alert-scheduler');
 const { startFreeGamesScheduler, stopFreeGamesScheduler } = require('./utils/free-games-service');
+const { startCrunchyrollScheduler, stopCrunchyrollScheduler } = require('./utils/crunchyroll-service');
 const { startBumpReminderScheduler, stopBumpReminderScheduler, handleDisboardBumpMessage } = require('./utils/bump-reminder-scheduler');
 require('dotenv').config();
 
@@ -348,6 +349,7 @@ client.once('clientReady', async () => {
     seedVoiceAnalyticsSessions(client);
     startStreamAlertScheduler(client);
     startFreeGamesScheduler(client);
+    startCrunchyrollScheduler(client);
     startBumpReminderScheduler(client);
 });
 
@@ -693,6 +695,7 @@ async function gracefulShutdown(signal) {
         await flushAllVoiceAnalyticsSessions();
         stopStreamAlertScheduler();
         stopFreeGamesScheduler();
+        stopCrunchyrollScheduler();
         stopBumpReminderScheduler();
         try {
             require('./utils/tts-voice-manager').disconnectAll('shutdown');
