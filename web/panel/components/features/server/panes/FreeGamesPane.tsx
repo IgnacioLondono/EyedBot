@@ -13,6 +13,7 @@ import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
@@ -108,8 +109,7 @@ function FreeGameEmbedPreview({ game, color }: { game: FreeGameItem; color: stri
   const hex = color.startsWith("#") ? color : `#${color.replace("#", "")}`;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#2f3136]">
-      <div className="h-1" style={{ backgroundColor: hex }} />
+    <DiscordEmbedShell color={hex}>
       <div className="p-4">
         <p className="text-xs text-[#949ba4]">{game.sourceLabel}</p>
         <p className="mt-1 text-base font-semibold text-white">🎮 {game.title}</p>
@@ -145,7 +145,7 @@ function FreeGameEmbedPreview({ game, color }: { game: FreeGameItem; color: stri
           </a>
         ) : null}
       </div>
-    </div>
+    </DiscordEmbedShell>
   );
 }
 

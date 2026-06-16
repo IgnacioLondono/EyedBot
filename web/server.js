@@ -941,6 +941,101 @@ function writeTemplateStore(data) {
     fs.writeFileSync(templatesFilePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
+function ensureEmbedTemplateUploadsDir(guildId) {
+    const safeGuildId = String(guildId || '').replace(/[^0-9]/g, '');
+    const uploadsDir = path.join(uploadsRoot, 'embed-templates', safeGuildId || 'shared');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    return { uploadsDir, safeGuildId: safeGuildId || 'shared' };
+}
+
+function persistEmbedTemplateAsset(req, guildId, file, kind = 'image') {
+    if (!file?.buffer) return '';
+    const { uploadsDir, safeGuildId } = ensureEmbedTemplateUploadsDir(guildId);
+    const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || kind);
+    const extension = extFromMimeOrName(file.mimetype, file.originalname);
+    const fileName = `${kind}_${Date.now()}_${baseName}${extension}`;
+    const outputPath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(outputPath, file.buffer);
+    const publicPath = `/uploads/embed-templates/${safeGuildId}/${fileName}`;
+    return buildPublicUploadUrl(req, publicPath);
+}
+
+function embedTemplateAssetUrl(value = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (raw.startsWith('/uploads/embed-templates/')) return raw;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.pathname.startsWith('/uploads/embed-templates/')) return parsed.pathname;
+    } catch {
+        // noop
+    }
+    return '';
+}
+
+function collectEmbedTemplateAssetUrls(embed = {}) {
+    const urls = new Set();
+    const imagePath = embedTemplateAssetUrl(embed.image);
+    const thumbPath = embedTemplateAssetUrl(embed.thumbnail);
+    if (imagePath) urls.add(imagePath);
+    if (thumbPath) urls.add(thumbPath);
+    const author = embed.author && typeof embed.author === 'object' ? embed.author : null;
+    const authorPath = embedTemplateAssetUrl(author?.iconURL || author?.iconUrl);
+    if (authorPath) urls.add(authorPath);
+    return Array.from(urls);
+}
+
+function deleteEmbedTemplateAssets(urls = []) {
+    for (const entry of urls) {
+        const pathname = embedTemplateAssetUrl(entry);
+        if (!pathname) continue;
+        const relative = pathname.replace(/^\/uploads\//, '');
+        const filePath = path.join(uploadsRoot, relative);
+        try {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } catch {
+            // noop
+        }
+    }
+}
+
+function deleteUploadDiskFile(publicPath = '') {
+    const normalized = String(publicPath || '').trim().split('?')[0];
+    if (!normalized.startsWith('/uploads/')) return false;
+    const filePath = path.join(uploadsRoot, normalized.replace(/^\/uploads\//, ''));
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            return true;
+        }
+    } catch {
+        // noop
+    }
+    return false;
+}
+
+function deleteWelcomeDiskImagesForSlot(guildId, slot) {
+    const uploadsDir = ensureWelcomeUploadsDir();
+    const safeGuildId = String(guildId || '').trim();
+    const safeSlot = greetingImageStore.normalizeSlot(slot);
+    const prefix = `${safeGuildId}_${safeSlot}_`;
+    let removed = 0;
+    try {
+        for (const fileName of fs.readdirSync(uploadsDir)) {
+            if (!fileName.startsWith(prefix)) continue;
+            try {
+                fs.unlinkSync(path.join(uploadsDir, fileName));
+                removed += 1;
+            } catch {
+                // noop
+            }
+        }
+    } catch {
+        // noop
+    }
+    return removed;
+}
+
 function ensureWelcomeUploadsDir() {
     const uploadsDir = path.join(uploadsRoot, 'welcome');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -5437,6 +5532,10 @@ app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFi
         }
 
         const uploadsDir = ensureVerifyUploadsDir();
+        const currentCfg = (await verifyStore.getVerifyConfig(guildId)) || {};
+        const previousUrl = String(currentCfg.imageUrl || currentCfg.image_url || '').trim();
+        deleteUploadDiskFile(previousUrl);
+
         const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `verify-${guildId}`);
         const extension = extFromMimeOrName(file.mimetype, file.originalname);
         const fileName = `${guildId}_${Date.now()}_${baseName}${extension}`;
@@ -5496,6 +5595,7 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
         }
 
         const slot = greetingImageStore.normalizeSlot(req.body?.slot || 'welcome');
+        deleteWelcomeDiskImagesForSlot(guildId, slot);
         const storedDb = await greetingImageStore.setImage(guildId, slot, file.buffer, file.mimetype);
 
         const uploadsDir = ensureWelcomeUploadsDir();
@@ -5564,6 +5664,7 @@ app.delete('/api/guild/:guildId/welcome-image', requireAuth, async (req, res) =>
         const setCfg = isGoodbye ? welcomeStore.setGoodbyeConfig : welcomeStore.setWelcomeConfig;
 
         await greetingImageStore.deleteImage(guildId, slot);
+        deleteWelcomeDiskImagesForSlot(guildId, slot);
 
         const currentCfg = (await getCfg(guildId)) || {};
         const nextCfg = {
@@ -5602,14 +5703,7 @@ app.delete('/api/guild/:guildId/verify-image', requireAuth, async (req, res) => 
             : '';
 
         if (uploadPath) {
-            const diskPath = path.join(uploadsRoot, uploadPath.replace(/^\/uploads\//, ''));
-            if (fs.existsSync(diskPath)) {
-                try {
-                    fs.unlinkSync(diskPath);
-                } catch {
-                    // ignorar si no se puede borrar del disco
-                }
-            }
+            deleteUploadDiskFile(uploadPath);
         }
 
         const nextCfg = {
@@ -6197,9 +6291,15 @@ app.get('/api/embed-templates/:guildId', requireAuth, (req, res) => {
     }
 });
 
-app.post('/api/embed-templates', requireAuth, (req, res) => {
+app.post('/api/embed-templates', requireAuth, upload.fields([
+    { name: 'imageFile', maxCount: 1 },
+    { name: 'thumbnailFile', maxCount: 1 }
+]), (req, res) => {
     try {
-        const { guildId, name, embed } = req.body || {};
+        const guildId = String(req.body?.guildId || '').trim();
+        const name = req.body?.name;
+        const embedRaw = req.body?.embed;
+        const embed = typeof embedRaw === 'string' ? JSON.parse(embedRaw) : embedRaw;
         if (!guildId || !name || !embed || typeof embed !== 'object') {
             return res.status(400).json({ error: 'Datos incompletos para guardar plantilla' });
         }
@@ -6210,11 +6310,26 @@ app.post('/api/embed-templates', requireAuth, (req, res) => {
         const cleanName = String(name).trim().slice(0, 80);
         if (!cleanName) return res.status(400).json({ error: 'Nombre de plantilla inválido' });
 
+        const imageUpload = req.files?.imageFile?.[0];
+        const thumbnailUpload = req.files?.thumbnailFile?.[0];
+        if (imageUpload?.buffer) {
+            if (!String(imageUpload.mimetype || '').startsWith('image/')) {
+                return res.status(400).json({ error: 'La imagen principal debe ser un archivo de imagen' });
+            }
+            embed.image = persistEmbedTemplateAsset(req, guildId, imageUpload, 'image');
+        }
+        if (thumbnailUpload?.buffer) {
+            if (!String(thumbnailUpload.mimetype || '').startsWith('image/')) {
+                return res.status(400).json({ error: 'La miniatura debe ser un archivo de imagen' });
+            }
+            embed.thumbnail = persistEmbedTemplateAsset(req, guildId, thumbnailUpload, 'thumb');
+        }
+
         const store = readTemplateStore();
         if (!Array.isArray(store.guilds[guildId])) store.guilds[guildId] = [];
 
-        // Reemplaza por nombre si ya existe para no duplicar spam.
         const existingIndex = store.guilds[guildId].findIndex((t) => String(t.name).toLowerCase() === cleanName.toLowerCase());
+        const previousEmbed = existingIndex >= 0 ? store.guilds[guildId][existingIndex].embed : null;
         const template = {
             id: existingIndex >= 0 ? store.guilds[guildId][existingIndex].id : `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             name: cleanName,
@@ -6228,6 +6343,13 @@ app.post('/api/embed-templates', requireAuth, (req, res) => {
             store.guilds[guildId][existingIndex] = template;
         } else {
             store.guilds[guildId].push(template);
+        }
+
+        if (previousEmbed) {
+            const previousAssets = collectEmbedTemplateAssetUrls(previousEmbed);
+            const nextAssets = collectEmbedTemplateAssetUrls(embed);
+            const orphaned = previousAssets.filter((asset) => !nextAssets.includes(asset));
+            deleteEmbedTemplateAssets(orphaned);
         }
 
         writeTemplateStore(store);
@@ -6246,9 +6368,11 @@ app.delete('/api/embed-templates/:guildId/:templateId', requireAuth, (req, res) 
 
         const store = readTemplateStore();
         const list = Array.isArray(store.guilds[guildId]) ? store.guilds[guildId] : [];
+        const removed = list.find((t) => t.id === templateId);
         const next = list.filter((t) => t.id !== templateId);
         store.guilds[guildId] = next;
         writeTemplateStore(store);
+        if (removed?.embed) deleteEmbedTemplateAssets(collectEmbedTemplateAssetUrls(removed.embed));
         res.json({ success: true });
     } catch (error) {
         console.error('Error eliminando plantilla de embed:', error);

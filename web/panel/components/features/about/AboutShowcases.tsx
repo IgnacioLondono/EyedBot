@@ -1,5 +1,6 @@
 "use client";
 
+import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
 import { SERVER_PANES } from "@/lib/navigation";
 
 function MockFrame({ title, children }: { title: string; children: React.ReactNode }) {
@@ -73,14 +74,13 @@ export function TicketsShowcase() {
   return (
     <MockFrame title="Tickets · Panel y gestión">
       <div className="grid gap-3 p-4 md:grid-cols-2">
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-[#2f3136]">
-          <div className="h-1 bg-violet-500" />
+        <DiscordEmbedShell color="#8b5cf6" className="rounded-xl">
           <div className="p-3">
             <p className="text-sm font-semibold text-white">Soporte</p>
             <p className="mt-1 text-xs text-[#dcddde]">Abre un ticket con el botón de abajo.</p>
             <span className="mt-3 inline-flex rounded-lg bg-[#5865f2] px-3 py-1.5 text-xs text-white">Solicitar ticket</span>
           </div>
-        </div>
+        </DiscordEmbedShell>
         <div className="space-y-2 rounded-xl border border-white/8 bg-black/30 p-3">
           <p className="text-xs font-medium text-white">Roles de staff</p>
           {["Moderador", "Soporte", "Admin"].map((role) => (
@@ -123,14 +123,13 @@ export function WelcomeShowcase() {
   return (
     <MockFrame title="Bienvenida · Embed en Discord">
       <div className="p-4">
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-[#2f3136]">
-          <div className="h-1 bg-emerald-400" />
+        <DiscordEmbedShell color="#34d399" className="rounded-xl">
           <div className="p-3">
             <p className="text-sm font-semibold text-white">¡Bienvenido a EyedComun!</p>
             <p className="mt-1 text-xs text-[#dcddde]">Hola @usuario, ya formas parte de la comunidad.</p>
             <p className="mt-2 text-[10px] text-[#949ba4]">EyedBot · 41 miembros</p>
           </div>
-        </div>
+        </DiscordEmbedShell>
         <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-zinc-500">
           <span className="rounded-lg border border-white/8 px-2 py-1">Canal: #bienvenida</span>
           <span className="rounded-lg border border-white/8 px-2 py-1">Color picker</span>
@@ -149,13 +148,12 @@ export function EmbedShowcase() {
           <div className="rounded-lg border border-white/8 bg-black/30 px-2 py-1.5 text-zinc-300">Autor · Campos · Footer</div>
           <div className="rounded-lg border border-white/8 bg-black/30 px-2 py-1.5 text-zinc-300">Imagen / miniatura</div>
         </div>
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-[#2f3136]">
-          <div className="h-1 bg-fuchsia-500" />
+        <DiscordEmbedShell color="#d946ef" className="rounded-xl">
           <div className="p-3">
             <p className="text-sm font-semibold text-white">Anuncio</p>
             <p className="mt-1 text-xs text-[#dcddde]">Contenido del embed con campos inline.</p>
           </div>
-        </div>
+        </DiscordEmbedShell>
       </div>
     </MockFrame>
   );

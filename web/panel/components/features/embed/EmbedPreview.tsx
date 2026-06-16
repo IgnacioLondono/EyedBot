@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { clsx } from "clsx";
 import type { EmbedFormState } from "@/lib/embed-utils";
 import { normalizeHexColor } from "@/lib/embed-utils";
 
@@ -24,6 +25,25 @@ function resolveMediaUrl(value?: string) {
   return trimmed || "";
 }
 
+export function DiscordEmbedShell({
+  color = "#a78bfa",
+  children,
+  className,
+}: {
+  color?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const accent = normalizeHexColor(color);
+
+  return (
+    <div className={clsx("flex overflow-hidden rounded-2xl border border-white/10 bg-[#2f3136]", className)}>
+      <div className="w-1 shrink-0 self-stretch" style={{ backgroundColor: accent }} aria-hidden />
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
 export function DiscordEmbedPreview({
   title,
   description,
@@ -44,8 +64,7 @@ export function DiscordEmbedPreview({
   const visibleFields = fields.filter((field) => field.name.trim() || field.value.trim());
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#2f3136]">
-      <div className="h-1" style={{ backgroundColor: accent }} />
+    <DiscordEmbedShell color={accent}>
       <div className="p-4">
         {authorName ? (
           <div className="mb-2 flex items-center gap-2 text-xs text-[#dcddde]">
@@ -100,7 +119,7 @@ export function DiscordEmbedPreview({
           </p>
         ) : null}
       </div>
-    </div>
+    </DiscordEmbedShell>
   );
 }
 

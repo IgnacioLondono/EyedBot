@@ -28,6 +28,7 @@ import {
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
+import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { asArray, asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
@@ -382,8 +383,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                   <Eye className="h-4 w-4" />
                   Vista previa del embed
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#2f3136]">
-                  <div className="h-1" style={{ backgroundColor: previewColor }} />
+                <DiscordEmbedShell color={previewColor}>
                   <div className="p-4">
                     <p className="font-semibold text-white">{config.title || "Soporte"}</p>
                     <p className="mt-2 whitespace-pre-wrap text-sm text-[#dcddde]">
@@ -396,7 +396,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                       </span>
                     </div>
                   </div>
-                </div>
+                </DiscordEmbedShell>
               </div>
               <Alert
                 title="Publicación"

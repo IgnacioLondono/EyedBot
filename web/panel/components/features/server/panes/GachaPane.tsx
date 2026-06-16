@@ -35,6 +35,7 @@ import {
   ChannelSelect,
 } from "@/components/features/shared";
 import { asArray, asRecord, extractLeaderboard, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
+import { GachaShopPanel } from "@/components/features/server/panes/GachaShopPanel";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 
 type GachaState = {
@@ -143,6 +144,11 @@ export function GachaPane({ guildId }: { guildId: string }) {
     }
   }
 
+  async function reloadShop() {
+    const shopData = asRecord(await getGachaShop(guildId));
+    setShop(asArray(shopData.items || shopData).map((entry) => asRecord(entry)));
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -231,6 +237,32 @@ export function GachaPane({ guildId }: { guildId: string }) {
                     onCheckedChange={(economyEnabled) => setForm((current) => ({ ...current, economyEnabled }))}
                   />
                 </div>
+                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div>
+                    <p className="font-medium text-white">Tienda activa</p>
+                    <p className="text-sm text-zinc-400">Permite comprar objetos con monedas del gacha.</p>
+                  </div>
+                  <Switch
+                    checked={form.shopEnabled}
+                    onCheckedChange={(shopEnabled) => setForm((current) => ({ ...current, shopEnabled }))}
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Monedas por XP">
+                    <Input
+                      type="number"
+                      value={form.coinsPerXp}
+                      onChange={(event) => setForm((current) => ({ ...current, coinsPerXp: Number(event.target.value) }))}
+                    />
+                  </Field>
+                  <Field label="Monedas por subir de nivel">
+                    <Input
+                      type="number"
+                      value={form.coinsPerLevelUp}
+                      onChange={(event) => setForm((current) => ({ ...current, coinsPerLevelUp: Number(event.target.value) }))}
+                    />
+                  </Field>
+                </div>
                 <FormActions onSave={handleSave} saving={saving} />
               </div>
             </div>
@@ -293,38 +325,12 @@ export function GachaPane({ guildId }: { guildId: string }) {
         ) : null}
 
         {tab === "shop" ? (
-          shop.length ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {shop.map((item, index) => {
-                const id = toStringValue(item.id, `shop-${index}`);
-                const hasDbImage = item.catalogDbImage === true;
-                return (
-                <div key={id} className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
-                  {hasDbImage ? (
-                    <img
-                      src={gachaCatalogImageUrl(guildId, id)}
-                      alt=""
-                      className="h-40 w-full object-cover"
-                    />
-                  ) : null}
-                  <div className="p-5">
-                  <p className="font-medium text-white">{toStringValue(item.name, "Item")}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-fuchsia-300">
-                    {toStringValue(item.rarity, "común")} · {toStringValue(item.series, "sin serie")}
-                  </p>
-                  <p className="mt-2 text-sm text-zinc-400">{toStringValue(item.description, "Sin descripción")}</p>
-                  <p className="mt-4 text-sm text-fuchsia-200">{toStringValue(item.price, "0")} monedas</p>
-                  </div>
-                </div>
-              );})}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<ShoppingBag className="h-6 w-6" />}
-              title="Tienda vacía"
-              description="No hay artículos cargados en la tienda del servidor."
-            />
-          )
+          <GachaShopPanel
+            guildId={guildId}
+            items={shop}
+            premiumLocked={premiumLocked}
+            onReload={reloadShop}
+          />
         ) : null}
 
         {tab === "market" ? (

@@ -338,8 +338,23 @@ export const getGachaShop = (guildId: string) =>
 export const getGachaMarket = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/gacha-market`);
 
-export const gachaCatalogImageUrl = (guildId: string, characterId: string) =>
-  `/api/guild/${g(guildId)}/gacha-catalog/${encodeURIComponent(characterId)}/image`;
+export const gachaCatalogImageUrl = (guildId: string, characterId: string, cacheBust = false) => {
+  const base = `/api/guild/${g(guildId)}/gacha-catalog/${encodeURIComponent(characterId)}/image`;
+  return cacheBust ? `${base}?t=${Date.now()}` : base;
+};
+
+export const saveGachaCatalogItem = (guildId: string, characterId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/gacha-catalog/${encodeURIComponent(characterId)}`, { method: "POST", body });
+
+export const deleteGachaCatalogItem = (guildId: string, characterId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/gacha-catalog/${encodeURIComponent(characterId)}`, { method: "DELETE" });
+
+export const uploadGachaCatalogImage = (guildId: string, characterId: string, file: File) => {
+  const form = new FormData();
+  form.append("characterId", characterId);
+  form.append("imageFile", file);
+  return apiForm(`/api/guild/${g(guildId)}/gacha-catalog-upload`, form);
+};
 
 export const getGachaInventory = (
   guildId: string,
@@ -414,8 +429,7 @@ export const sendEmbed = (form: FormData) => apiForm("/api/send-embed", form);
 export const getEmbedTemplates = (guildId: string) =>
   apiFetch(`/api/embed-templates/${g(guildId)}`);
 
-export const saveEmbedTemplate = (body: Record<string, unknown>) =>
-  apiFetch("/api/embed-templates", { method: "POST", body });
+export const saveEmbedTemplate = (form: FormData) => apiForm("/api/embed-templates", form);
 
 export const deleteEmbedTemplate = (guildId: string, templateId: string) =>
   apiFetch(`/api/embed-templates/${g(guildId)}/${encodeURIComponent(templateId)}`, {

@@ -103,6 +103,15 @@ export function embedToFormState(embed: Record<string, unknown>, base: EmbedForm
       ? `#${embed.color.toString(16).padStart(6, "0")}`
       : normalizeHexColor(String(embed.color || base.color), base.color);
 
+  const readMediaUrl = (value: unknown) => {
+    if (typeof value === "string") return value;
+    if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      return String(record.url || record.URL || "");
+    }
+    return "";
+  };
+
   return {
     ...base,
     title: String(embed.title || ""),
@@ -112,8 +121,8 @@ export function embedToFormState(embed: Record<string, unknown>, base: EmbedForm
     authorName: String(author.name || ""),
     authorIconUrl: String(author.iconURL || author.iconUrl || ""),
     authorUrl: String(author.url || ""),
-    imageUrl: String(embed.image || ""),
-    thumbnailUrl: String(embed.thumbnail || ""),
+    imageUrl: readMediaUrl(embed.image),
+    thumbnailUrl: readMediaUrl(embed.thumbnail),
     timestamp: embed.timestamp === true,
     fields: Array.isArray(embed.fields)
       ? embed.fields.map((entry) => {

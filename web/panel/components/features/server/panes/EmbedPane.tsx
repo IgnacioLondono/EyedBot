@@ -144,12 +144,25 @@ export function EmbedPane({ guildId }: { guildId: string }) {
 
     setSaving(true);
     try {
-      await saveEmbedTemplate({
-        guildId,
-        name,
-        embed: buildEmbedPayload(form),
-      });
-      toast({ title: "Template guardado", description: "La plantilla quedó disponible para reutilizar.", tone: "success" });
+      const payload = new FormData();
+      payload.append("guildId", guildId);
+      payload.append("name", name);
+      payload.append("embed", JSON.stringify(buildEmbedPayload(form)));
+      if (imageFile) payload.append("imageFile", imageFile);
+      if (thumbnailFile) payload.append("thumbnailFile", thumbnailFile);
+
+      const result = asRecord(await saveEmbedTemplate(payload));
+      const template = asRecord(result.template);
+      const embed = asRecord(template.embed);
+      setForm((current) =>
+        embedToFormState(embed, {
+          ...current,
+          templateName: toStringValue(template.name, name),
+        })
+      );
+      setImageFile(null);
+      setThumbnailFile(null);
+      toast({ title: "Template guardado", description: "La plantilla quedó disponible con sus imágenes.", tone: "success" });
       await reloadTemplates();
     } catch (err) {
       toast({ title: "No se pudo guardar template", description: getErrorMessage(err), tone: "danger" });

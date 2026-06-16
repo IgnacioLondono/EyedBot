@@ -17,6 +17,7 @@ import {
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
+import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
 import { asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
 
 type VoiceState = {
@@ -54,8 +55,7 @@ function VoicePanelPreview({ form }: { form: VoiceState }) {
   const limitLabel = form.userLimit > 0 ? `${form.userLimit} usuarios` : "Sin límite";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#2f3136]">
-      <div className="h-1 bg-violet-500" />
+    <DiscordEmbedShell color="#8b5cf6">
       <div className="p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#949ba4]">EyedBot</p>
         <p className="mt-1 text-base font-semibold text-white">Panel de Voz</p>
@@ -91,7 +91,7 @@ function VoicePanelPreview({ form }: { form: VoiceState }) {
           <p className="mt-4 text-xs text-[#949ba4]">Panel de botones desactivado en la configuración.</p>
         )}
       </div>
-    </div>
+    </DiscordEmbedShell>
   );
 }
 
