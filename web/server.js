@@ -5545,7 +5545,6 @@ app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFi
 
         const publicPath = `/uploads/verify/${fileName}`;
         const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
-        const currentCfg = (await verifyStore.getVerifyConfig(guildId)) || {};
         const nextCfg = {
             ...currentCfg,
             imageUrl: publicPath,
