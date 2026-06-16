@@ -17,8 +17,6 @@ import {
   Volume2,
 } from "lucide-react";
 import { getGuildInfo } from "@/lib/api/endpoints";
-import { serverPaneHref } from "@/lib/navigation";
-import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -233,9 +231,6 @@ export function OverviewPane({ guildId }: { guildId: string }) {
                   {toNumberValue(info.premiumSubscriptionCount)} boosts
                 </p>
               </div>
-              <Link href={serverPaneHref(guildId, "tickets")} className="rounded-2xl border border-white/10 px-4 py-2 text-sm text-violet-200 hover:bg-white/5">
-                Ir a tickets
-              </Link>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

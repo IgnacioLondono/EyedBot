@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { History, Inbox, MessageSquare, Send, Unlock } from "lucide-react";
 import {
   acceptTicket,
@@ -63,6 +63,10 @@ function mapTickets(value: unknown, idKeys: string[]): TicketRow[] {
   });
 }
 
+function reportIdFromRow(item: TicketRow) {
+  return toStringValue(item.raw.reportId) || item.id;
+}
+
 function parseTicketReport(payload: unknown): TicketReportDetail | null {
   const root = asRecord(payload);
   const report = asRecord(root.report ?? root);
@@ -100,6 +104,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const reportPanelRef = useRef<HTMLDivElement | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -190,6 +195,9 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
         throw new Error("El informe no tiene datos válidos");
       }
       setSelectedReport(report);
+      requestAnimationFrame(() => {
+        reportPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     } catch (err) {
       setSelectedReport(null);
       toast({ title: "No se pudo abrir informe", description: getErrorMessage(err), tone: "danger" });
@@ -351,49 +359,11 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
 
       {manageTab === "history" ? (
         <div className="space-y-4">
-          <Field label="Buscar en historial">
-            <Input value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Usuario, canal o motivo" />
-          </Field>
-          {filteredHistory.length ? (
-            <div className="space-y-3">
-              {filteredHistory.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-white">{item.title}</p>
-                      <p className="text-sm text-zinc-400">{item.owner}</p>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {formatDate(item.raw.createdAt || item.raw.closedAt)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={loadingReportId === item.id}
-                        onClick={() => void viewReport(item.id)}
-                      >
-                        <History className="mr-1 h-3.5 w-3.5" />
-                        {loadingReportId === item.id ? "Abriendo…" : "Ver informe"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        disabled={busyId === item.id}
-                        onClick={() => void runAction(item.id, () => deleteTicketReport(guildId, item.id), "Informe borrado")}
-                      >
-                        Borrar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="Historial vacío" description="No hay informes cerrados para mostrar." />
-          )}
           {selectedReport ? (
-            <div className="rounded-2xl border border-violet-400/25 bg-violet-500/5 p-4">
+            <div
+              ref={reportPanelRef}
+              className="rounded-2xl border border-[color:var(--color-accent)]/35 bg-[color:var(--color-btn-accent-bg)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+            >
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-white">Informe {selectedReport.reportId}</p>
@@ -412,7 +382,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                   </Button>
                   <a
                     href={`/api/guild/${encodeURIComponent(guildId)}/tickets/report/${encodeURIComponent(selectedReport.reportId)}/download`}
-                    className="inline-flex h-9 items-center rounded-2xl border border-white/12 bg-white/8 px-3 text-sm text-white hover:bg-white/12"
+                    className="inline-flex h-9 items-center rounded-2xl border border-[color:var(--color-btn-secondary-border)] bg-[color:var(--color-btn-secondary-bg)] px-3 text-sm text-[color:var(--color-btn-secondary-fg)] hover:brightness-110"
                   >
                     Descargar TXT
                   </a>
@@ -448,7 +418,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                   ))}
                 </div>
               ) : selectedReport.transcriptText ? (
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-white/8 bg-black/30 p-3 text-xs text-zinc-300">
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-white/8 bg-black/30 p-3 text-sm text-zinc-200">
                   {selectedReport.transcriptText}
                 </pre>
               ) : (
@@ -456,6 +426,48 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
               )}
             </div>
           ) : null}
+
+          <Field label="Buscar en historial">
+            <Input value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Usuario, canal o motivo" />
+          </Field>
+          {filteredHistory.length ? (
+            <div className="space-y-3">
+              {filteredHistory.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-white">{item.title}</p>
+                      <p className="text-sm text-zinc-400">{item.owner}</p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {formatDate(item.raw.createdAt || item.raw.closedAt)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="accent"
+                        disabled={loadingReportId === item.id}
+                        onClick={() => void viewReport(reportIdFromRow(item))}
+                      >
+                        <History className="mr-1 h-3.5 w-3.5" />
+                        {loadingReportId === item.id ? "Abriendo…" : "Ver informe"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === item.id}
+                        onClick={() => void runAction(item.id, () => deleteTicketReport(guildId, reportIdFromRow(item)), "Informe borrado")}
+                      >
+                        Borrar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Historial vacío" description="No hay informes cerrados para mostrar." />
+          )}
         </div>
       ) : null}
     </div>

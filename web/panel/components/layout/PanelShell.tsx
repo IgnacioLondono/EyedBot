@@ -92,7 +92,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                 href={bootstrap.inviteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-2xl bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-2))] px-3 py-2 text-sm font-medium text-white shadow-[0_10px_35px_var(--shadow-accent)]"
+                className="inline-flex items-center gap-1 rounded-2xl border border-[color:var(--color-accent)]/35 bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-2))] px-3 py-2 text-sm font-semibold text-[color:var(--color-btn-on-accent,#fff)] shadow-[0_10px_35px_var(--shadow-accent)] transition hover:brightness-110"
               >
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Añadir bot</span>

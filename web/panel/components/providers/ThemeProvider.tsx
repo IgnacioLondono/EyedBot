@@ -17,6 +17,7 @@ import {
   type ThemePresetId,
   applyPreset,
 } from "@/lib/theme-presets";
+import { isLightAccent } from "@/lib/theme-contrast";
 import {
   clearWallpaperFromIdb,
   saveWallpaperToIdb,
@@ -93,6 +94,31 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
     theme.wallpaperEnabled &&
     ((theme.wallpaperStorage === "inline" && theme.wallpaperUrl) ||
       (theme.wallpaperStorage === "indexeddb" && wallpaperUrl));
+
+  root.style.setProperty("--color-brand", theme.accentPrimary);
+  root.style.setProperty("--color-brand-light", theme.textSecondary);
+  root.style.setProperty("--color-brand-deep", theme.accentSecondary);
+
+  const accentIsLight = theme.autoContrast !== false && isLightAccent(theme.accentPrimary);
+  root.style.setProperty("--color-btn-on-accent", accentIsLight ? "#09090b" : "#ffffff");
+  root.style.setProperty(
+    "--color-btn-secondary-bg",
+    accentIsLight ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "rgba(255,255,255,0.08)"
+  );
+  root.style.setProperty(
+    "--color-btn-secondary-border",
+    accentIsLight ? "color-mix(in srgb, var(--color-accent) 42%, transparent)" : "rgba(255,255,255,0.14)"
+  );
+  root.style.setProperty("--color-btn-secondary-fg", theme.textPrimary);
+  root.style.setProperty(
+    "--color-btn-accent-bg",
+    accentIsLight ? "color-mix(in srgb, var(--color-accent) 22%, #09090b)" : "color-mix(in srgb, var(--color-accent) 24%, transparent)"
+  );
+  root.style.setProperty(
+    "--color-btn-accent-border",
+    accentIsLight ? "color-mix(in srgb, var(--color-accent) 55%, #52525b)" : "color-mix(in srgb, var(--color-accent) 45%, transparent)"
+  );
+  root.style.setProperty("--color-btn-accent-fg", theme.textPrimary);
 
   if (theme.wallpaperEnabled && theme.wallpaperStorage !== "none") {
     root.dataset.wallpaper = theme.wallpaperKind === "video" ? "video" : "image";
