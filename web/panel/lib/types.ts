@@ -87,6 +87,7 @@ export type PanelBootstrap = {
   premiumRequired?: boolean;
   botConnected: boolean;
   guildsSyncedAt: number;
+  welcomeCardStyleEnabled?: boolean;
   webConfig?: WebPanelConfig;
 };
 

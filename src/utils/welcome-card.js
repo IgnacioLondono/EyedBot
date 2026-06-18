@@ -54,7 +54,9 @@ const FONT_STACKS = {
     serif: { title: 'bold 44px Georgia, serif', name: 'bold 26px Georgia, serif', sub: 'italic 20px Georgia, serif', overlay: 'bold 17px Georgia, serif' },
     mono: { title: 'bold 40px Consolas, monospace', name: 'bold 24px Consolas, monospace', sub: 'italic 18px Consolas, monospace', overlay: 'bold 16px Consolas, monospace' },
     rounded: { title: 'bold 44px Verdana, sans-serif', name: 'bold 26px Verdana, sans-serif', sub: 'italic 20px Verdana, sans-serif', overlay: 'bold 17px Verdana, sans-serif' },
-    elegant: { title: 'bold 44px "Times New Roman", serif', name: 'bold 26px "Times New Roman", serif', sub: 'italic 20px "Times New Roman", serif', overlay: 'bold 17px "Times New Roman", serif' }
+    elegant: { title: 'bold 44px "Times New Roman", serif', name: 'bold 26px "Times New Roman", serif', sub: 'italic 20px "Times New Roman", serif', overlay: 'bold 17px "Times New Roman", serif' },
+    impact: { title: 'bold 48px Impact, "Arial Black", sans-serif', name: 'bold 28px Impact, "Arial Black", sans-serif', sub: 'italic 20px Impact, sans-serif', overlay: 'bold 17px Impact, sans-serif' },
+    trebuchet: { title: 'bold 44px "Trebuchet MS", sans-serif', name: 'bold 26px "Trebuchet MS", sans-serif', sub: 'italic 20px "Trebuchet MS", sans-serif', overlay: 'bold 17px "Trebuchet MS", sans-serif' }
 };
 
 function resolveFonts(fontKey) {

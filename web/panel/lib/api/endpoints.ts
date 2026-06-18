@@ -188,6 +188,21 @@ export const testWelcome = (guildId: string) =>
 export const previewWelcomeCard = (guildId: string, body: Record<string, unknown>) =>
   apiFetch(`/api/guild/${g(guildId)}/welcome-card-preview`, { method: "POST", body });
 
+export async function previewWelcomeCardBlob(guildId: string, body: Record<string, unknown>): Promise<Blob> {
+  const response = await fetch(`/api/guild/${g(guildId)}/welcome-card-preview`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", Accept: "image/png" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message = (payload as { error?: string } | null)?.error || `Error ${response.status} al generar vista previa`;
+    throw new Error(message);
+  }
+  return response.blob();
+}
+
 export const getGoodbyeConfig = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/goodbye-config`);
 

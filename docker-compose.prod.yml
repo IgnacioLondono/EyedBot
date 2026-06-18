@@ -45,6 +45,7 @@ services:
       - DB_RETRY_COOLDOWN_MS=15000
       - CONFIG_CACHE_TTL_MS=180000
       - SLOW_COMMAND_WARN_MS=1200
+      - WELCOME_CARD_STYLE_ENABLED=${WELCOME_CARD_STYLE_ENABLED:-true}
       - NODE_OPTIONS=--max-old-space-size=1024
     deploy:
       resources:

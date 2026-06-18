@@ -346,8 +346,8 @@ const PREMIUM_DISCORD_IDS = (() => {
         .map((value) => String(value || '').trim().replace(/^['"]+|['"]+$/g, ''))
         .filter(Boolean);
 })();
-/** Tarjeta PNG / imagen con fondo en bienvenidas — desactivado en panel y API hasta nuevo aviso. */
-const WELCOME_CARD_STYLE_ENABLED = false;
+/** Tarjeta PNG / imagen con fondo en bienvenidas — activar con WELCOME_CARD_STYLE_ENABLED=true en Portainer. */
+const WELCOME_CARD_STYLE_ENABLED = envValue('WELCOME_CARD_STYLE_ENABLED', 'true').toLowerCase() === 'true';
 const WEB_PUBLIC_ORIGIN = envValue('WEB_PUBLIC_ORIGIN') || envValue('PUBLIC_ORIGIN');
 const MP_ACCESS_TOKEN = envValue('MP_ACCESS_TOKEN');
 const MP_WEBHOOK_SECRET = envValue('MP_WEBHOOK_SECRET');
@@ -2318,6 +2318,7 @@ app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
             premiumRequired: isPremiumEnforcementEnabled(),
             botConnected: Boolean(botClient?.user?.id),
             guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0,
+            welcomeCardStyleEnabled: WELCOME_CARD_STYLE_ENABLED,
             webConfig: webPanelConfigStore.getPublicConfig()
         });
     } catch (error) {
@@ -3042,7 +3043,7 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
         base.cardNameTemplate = String(body.cardNameTemplate != null ? body.cardNameTemplate : '{username}').trim().slice(0, 120) || '{username}';
         base.cardOverlayText = String(body.cardOverlayText || '').slice(0, 200);
         base.cardOverlayColor = sanitizeHexColor6(body.cardOverlayColor, 'ffffff');
-        base.cardFontKey = ['system', 'serif', 'mono', 'rounded', 'elegant'].includes(String(body.cardFontKey || '').toLowerCase())
+        base.cardFontKey = ['system', 'serif', 'mono', 'rounded', 'elegant', 'impact', 'trebuchet'].includes(String(body.cardFontKey || '').toLowerCase())
             ? String(body.cardFontKey).toLowerCase()
             : 'system';
         base.cardLayout = mergeCardLayout(body.cardLayout);
@@ -5990,7 +5991,7 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
             subtitle,
             overlayText,
             overlayHex: sanitizeHexColor6(body.cardOverlayColor, 'ffffff'),
-            fontKey: ['system', 'serif', 'mono', 'rounded', 'elegant'].includes(String(body.cardFontKey || '').toLowerCase())
+            fontKey: ['system', 'serif', 'mono', 'rounded', 'elegant', 'impact', 'trebuchet'].includes(String(body.cardFontKey || '').toLowerCase())
                 ? String(body.cardFontKey).toLowerCase()
                 : 'system',
             plainUsername: plainUser,
