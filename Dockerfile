@@ -57,6 +57,7 @@ COPY --from=panel-build /panel/node_modules ./web/panel/node_modules
 COPY --from=panel-build /panel/package.json ./web/panel/package.json
 COPY --from=panel-build /panel/next.config.ts ./web/panel/next.config.ts
 COPY --from=panel-build /panel/public ./web/panel/public
+COPY --from=panel-build /panel/app ./web/panel/app
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \

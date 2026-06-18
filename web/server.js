@@ -27,7 +27,13 @@ const {
 } = require('../src/utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
 const greetingImageStore = require('../src/utils/greeting-image-store');
-const { renderWelcomeCardPng, mergeCardLayout } = require('../src/utils/welcome-card');
+let welcomeCardUtils = null;
+function getWelcomeCardUtils() {
+    if (!welcomeCardUtils) {
+        welcomeCardUtils = require('../src/utils/welcome-card');
+    }
+    return welcomeCardUtils;
+}
 const verifyStore = require('../src/utils/verify-config-store');
 const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
@@ -2983,7 +2989,7 @@ function buildDefaultGreetingConfig(mode, fallbackChannel = '') {
         cardOverlayText: '',
         cardOverlayColor: 'ffffff',
         cardFontKey: 'system',
-        cardLayout: mergeCardLayout(null)
+        cardLayout: getWelcomeCardUtils().mergeCardLayout(null)
     };
 }
 
@@ -3046,7 +3052,7 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
         base.cardFontKey = ['system', 'serif', 'mono', 'rounded', 'elegant', 'impact', 'trebuchet'].includes(String(body.cardFontKey || '').toLowerCase())
             ? String(body.cardFontKey).toLowerCase()
             : 'system';
-        base.cardLayout = mergeCardLayout(body.cardLayout);
+        base.cardLayout = getWelcomeCardUtils().mergeCardLayout(body.cardLayout);
     }
 
     return base;
@@ -5890,7 +5896,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
 
         if (WELCOME_CARD_STYLE_ENABLED && cfg?.welcomeStyle === 'card') {
             const bg = await resolveWelcomeCardBackground(cfg.imageUrl, guildId);
-            const buffer = await renderWelcomeCardPng({
+            const buffer = await getWelcomeCardUtils().renderWelcomeCardPng({
                 avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
                 backgroundUrl: bg.backgroundUrl || null,
                 backgroundFilePath: bg.backgroundFilePath || null,
@@ -5902,7 +5908,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
                 overlayHex: cfg.cardOverlayColor || 'ffffff',
                 fontKey: cfg.cardFontKey || 'system',
                 plainUsername: member.user.username,
-                cardLayout: mergeCardLayout(cfg.cardLayout),
+                cardLayout: getWelcomeCardUtils().mergeCardLayout(cfg.cardLayout),
                 accentHex: cfg.cardAccentColor || '4ade80',
                 titleHex: cfg.cardTitleColor || 'ffffff',
                 nameHex: cfg.cardNameColor || 'f8fafc',
@@ -5981,7 +5987,7 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
             ? String(body.previewOverlay)
             : applyWelcomeTemplate(String(body.cardOverlayText || ''), tplMember);
 
-        const buffer = await renderWelcomeCardPng({
+        const buffer = await getWelcomeCardUtils().renderWelcomeCardPng({
             avatarUrl,
             backgroundUrl: bg.backgroundUrl || null,
             backgroundFilePath: bg.backgroundFilePath || null,
@@ -5995,7 +6001,7 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
                 ? String(body.cardFontKey).toLowerCase()
                 : 'system',
             plainUsername: plainUser,
-            cardLayout: mergeCardLayout(body.cardLayout),
+            cardLayout: getWelcomeCardUtils().mergeCardLayout(body.cardLayout),
             accentHex: sanitizeHexColor6(body.cardAccentColor, '4ade80'),
             titleHex: sanitizeHexColor6(body.cardTitleColor, 'ffffff'),
             nameHex: sanitizeHexColor6(body.cardNameColor, 'f8fafc'),
@@ -7154,17 +7160,26 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
 });
 
 const BIND_HOST = String(process.env.WEB_BIND_HOST || '0.0.0.0').trim() || '0.0.0.0';
+const NEXT_PANEL_PREPARE_TIMEOUT_MS = Math.max(
+    15_000,
+    Number.parseInt(process.env.NEXT_PANEL_PREPARE_TIMEOUT_MS || '120000', 10) || 120_000
+);
 let server;
 
-async function startWebServer() {
-    try {
-        const { attachNextPanel } = require('./next-panel');
-        await attachNextPanel(app);
-    } catch (error) {
-        console.error('❌ No se pudo montar el panel Next.js:', error?.message || error);
-        console.warn('⚠️ Revisa que web/panel esté compilado (npm run build en web/panel).');
-    }
+function attachNextPanelWithTimeout(app) {
+    const { attachNextPanel } = require('./next-panel');
+    return Promise.race([
+        attachNextPanel(app),
+        new Promise((_, reject) => {
+            setTimeout(
+                () => reject(new Error(`Next.js prepare superó ${NEXT_PANEL_PREPARE_TIMEOUT_MS}ms`)),
+                NEXT_PANEL_PREPARE_TIMEOUT_MS
+            );
+        })
+    ]);
+}
 
+async function startWebServer() {
     server = app.listen(PORT, BIND_HOST, () => {
         const bindLabel = BIND_HOST === '0.0.0.0' ? 'todas las interfaces' : BIND_HOST;
         console.log(`🌐 Panel web iniciado en http://${bindLabel}:${PORT}`);
@@ -7192,6 +7207,14 @@ async function startWebServer() {
             console.error('❌ Error iniciando panel web:', error);
         }
     });
+
+    try {
+        await attachNextPanelWithTimeout(app);
+        console.log('✅ Panel Next.js montado correctamente');
+    } catch (error) {
+        console.error('❌ No se pudo montar el panel Next.js:', error?.message || error);
+        console.warn('⚠️ /health y /api siguen activos. Revisa el build del panel (web/panel).');
+    }
 }
 
 void startWebServer();

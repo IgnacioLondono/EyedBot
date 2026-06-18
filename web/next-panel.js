@@ -89,10 +89,10 @@ async function attachNextPanel(app) {
     });
 
     app.get('/', (req, res) => {
-        if (!req.session?.user) {
-            return res.redirect('/login');
+        if (req.session?.user) {
+            return res.redirect('/dashboard');
         }
-        return res.redirect('/dashboard');
+        return handlePanelRequest(handle, req, res);
     });
 
     app.get('/dashboard', (req, res) => {

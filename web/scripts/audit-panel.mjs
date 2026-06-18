@@ -13,6 +13,12 @@ const errors = [];
 const warnings = [];
 const ok = [];
 
+if (!fs.existsSync(publicDir)) {
+    console.log('\n=== AUDITORÍA PANEL EYEDBOT ===\n');
+    console.log('ℹ️  web/public no existe — panel Next.js activo; auditoría HTML legacy omitida.\n');
+    process.exit(0);
+}
+
 function err(msg) {
     errors.push(msg);
 }
