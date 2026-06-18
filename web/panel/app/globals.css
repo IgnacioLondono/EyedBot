@@ -42,6 +42,24 @@
   animation: login-blob-pulse 12s ease-in-out infinite;
 }
 
+@keyframes home-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.home-float {
+  animation: home-float 5s ease-in-out infinite;
+}
+
+.home-float-delay {
+  animation: home-float 5s ease-in-out 1.2s infinite;
+}
+
 :root {
   --background: #08070f;
   --foreground: #f4f4f5;

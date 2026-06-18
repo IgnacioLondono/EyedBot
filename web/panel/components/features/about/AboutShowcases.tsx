@@ -158,3 +158,49 @@ export function EmbedShowcase() {
     </MockFrame>
   );
 }
+
+export function LevelingShowcase() {
+  return (
+    <MockFrame title="Niveles · Leaderboard">
+      <div className="p-4">
+        <div className="flex items-end justify-center gap-2">
+          {[
+            { rank: 2, name: "Kiddis", xp: "12.4k", h: "h-16" },
+            { rank: 1, name: "Usuario", xp: "18.2k", h: "h-24" },
+            { rank: 3, name: "Miembro", xp: "9.1k", h: "h-12" },
+          ].map((row) => (
+            <div key={row.rank} className={`flex w-20 flex-col items-center rounded-t-xl border border-white/10 bg-violet-500/10 ${row.h} justify-end pb-2`}>
+              <span className="text-lg">{row.rank === 1 ? "👑" : row.rank}</span>
+              <p className="mt-1 truncate px-1 text-[10px] font-medium text-white">{row.name}</p>
+              <p className="text-[9px] text-violet-200">{row.xp}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-center text-[10px] text-zinc-500">XP por mensajes y voz · recompensas por rol</p>
+      </div>
+    </MockFrame>
+  );
+}
+
+export function AlertsShowcase() {
+  return (
+    <MockFrame title="Alertas · Directos y anime">
+      <div className="space-y-2 p-4">
+        <DiscordEmbedShell color="#9146ff" className="rounded-xl">
+          <div className="p-3">
+            <p className="text-xs font-semibold text-[#b9bbbe]">🔴 EN DIRECTO</p>
+            <p className="mt-1 text-sm font-semibold text-white">Creador está en Twitch</p>
+            <p className="mt-1 text-xs text-[#dcddde]">Únete a la transmisión ahora.</p>
+          </div>
+        </DiscordEmbedShell>
+        <DiscordEmbedShell color="#f47521" className="rounded-xl">
+          <div className="p-3">
+            <p className="text-xs font-semibold text-[#b9bbbe]">📺 Crunchyroll</p>
+            <p className="mt-1 text-sm font-semibold text-white">Nuevo episodio disponible</p>
+            <p className="mt-1 text-xs text-[#dcddde]">Tu serie seguida acaba de actualizarse.</p>
+          </div>
+        </DiscordEmbedShell>
+      </div>
+    </MockFrame>
+  );
+}
