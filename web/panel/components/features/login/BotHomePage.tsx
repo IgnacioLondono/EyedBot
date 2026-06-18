@@ -21,6 +21,7 @@ import {
 import { EyedBotMark } from "@/components/brand/EyedBotMark";
 import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
 import { getAboutOverview, getPanelBootstrap } from "@/lib/api/endpoints";
+import { SHOWCASE_ANIME_GIFS } from "@/lib/showcase-media";
 import type { AboutOverview } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -133,9 +134,14 @@ function DiscordRoleplayCard() {
           <span className="font-medium text-violet-300">@Kiddis</span> abrazó a{" "}
           <span className="font-medium text-violet-300">@amigo</span> 💕
         </p>
-        <div className="mt-3 flex h-24 items-center justify-center rounded-xl bg-gradient-to-br from-violet-900/50 to-fuchsia-900/30 text-xs text-zinc-500">
-          GIF de anime
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={SHOWCASE_ANIME_GIFS.hug}
+          alt="GIF de abrazo anime"
+          loading="lazy"
+          decoding="async"
+          className="mt-3 max-h-28 w-full rounded-xl object-cover"
+        />
         <p className="mt-2 text-xs text-fuchsia-300/90">Veces abrazado: 42</p>
       </div>
     </div>

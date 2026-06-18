@@ -1,7 +1,9 @@
 "use client";
 
-import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
+import { DiscordEmbedShell, DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
+import { SHOWCASE_ANIME_GIFS } from "@/lib/showcase-media";
 import { SERVER_PANES } from "@/lib/navigation";
+import { cn } from "@/lib/utils";
 
 function MockFrame({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -14,6 +16,33 @@ function MockFrame({ title, children }: { title: string; children: React.ReactNo
       </div>
       {children}
     </div>
+  );
+}
+
+function ShowcasePanel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("rounded-2xl border border-white/10 bg-[#1e1f24] p-4 shadow-xl", className)}>{children}</div>
+  );
+}
+
+function ShowcaseAnimeGif({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className={cn("w-full rounded-lg object-cover", className)}
+    />
   );
 }
 
@@ -141,21 +170,29 @@ export function WelcomeShowcase() {
 
 export function EmbedShowcase() {
   return (
-    <MockFrame title="Embeds · Constructor completo">
-      <div className="grid gap-3 p-4 md:grid-cols-2">
-        <div className="space-y-2 text-xs">
-          <div className="rounded-lg border border-white/8 bg-black/30 px-2 py-1.5 text-zinc-300">Título y descripción</div>
-          <div className="rounded-lg border border-white/8 bg-black/30 px-2 py-1.5 text-zinc-300">Autor · Campos · Footer</div>
-          <div className="rounded-lg border border-white/8 bg-black/30 px-2 py-1.5 text-zinc-300">Imagen / miniatura</div>
+    <ShowcasePanel>
+      <div className="grid gap-4 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:items-start">
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-zinc-400">Constructor en el panel</p>
+          {["Título y descripción", "Autor · Campos · Footer", "Imagen / miniatura"].map((label) => (
+            <div key={label} className="rounded-xl border border-white/8 bg-[#2b2d31] px-3 py-2 text-xs text-zinc-300">
+              {label}
+            </div>
+          ))}
         </div>
-        <DiscordEmbedShell color="#d946ef" className="rounded-xl">
-          <div className="p-3">
-            <p className="text-sm font-semibold text-white">Anuncio</p>
-            <p className="mt-1 text-xs text-[#dcddde]">Contenido del embed con campos inline.</p>
-          </div>
-        </DiscordEmbedShell>
+        <DiscordEmbedPreview
+          title="Anuncio del evento"
+          description="Contenido del embed con campos inline y banner personalizado."
+          color="#d946ef"
+          imageUrl={SHOWCASE_ANIME_GIFS.pat}
+          fields={[
+            { name: "Fecha", value: "Sábado 20:00", inline: true },
+            { name: "Canal", value: "#anuncios", inline: true },
+          ]}
+          footer="EyedBot · Constructor de embeds"
+        />
       </div>
-    </MockFrame>
+    </ShowcasePanel>
   );
 }
 
@@ -207,23 +244,23 @@ export function AlertsShowcase() {
 
 export function InteractionsShowcase() {
   return (
-    <MockFrame title="Interacciones · GIFs de anime">
-      <div className="p-4">
-        <DiscordEmbedShell color="#a78bfa" className="rounded-xl">
-          <div className="p-3">
-            <p className="text-sm font-semibold text-white">🤗 Abrazo</p>
-            <p className="mt-1 text-xs text-[#dcddde]">
-              <span className="font-medium text-violet-300">@Kiddis</span> abrazó a{" "}
-              <span className="font-medium text-violet-300">@amigo</span>
-            </p>
-            <div className="mt-3 flex h-32 items-center justify-center rounded-lg border border-white/5 bg-gradient-to-br from-violet-950/80 via-fuchsia-950/50 to-violet-900/40">
-              <span className="text-xs text-zinc-500">GIF de anime</span>
-            </div>
-            <p className="mt-2 text-[10px] text-fuchsia-300/90">Veces abrazado: 42</p>
-          </div>
-        </DiscordEmbedShell>
-        <p className="mt-3 text-center text-[10px] text-zinc-500">/hug · /pat · /kiss · /gif · botón de devolver</p>
-      </div>
-    </MockFrame>
+    <ShowcasePanel>
+      <DiscordEmbedShell color="#a78bfa" className="rounded-xl">
+        <div className="p-3">
+          <p className="text-sm font-semibold text-white">🤗 Abrazo</p>
+          <p className="mt-1 text-xs text-[#dcddde]">
+            <span className="font-medium text-violet-300">@Kiddis</span> abrazó a{" "}
+            <span className="font-medium text-violet-300">@amigo</span>
+          </p>
+          <ShowcaseAnimeGif
+            src={SHOWCASE_ANIME_GIFS.hug}
+            alt="GIF de abrazo anime"
+            className="mt-3 max-h-44"
+          />
+          <p className="mt-2 text-[10px] text-fuchsia-300/90">Veces abrazado: 42</p>
+        </div>
+      </DiscordEmbedShell>
+      <p className="mt-3 text-center text-[10px] text-zinc-500">/hug · /pat · /kiss · /gif · botón de devolver</p>
+    </ShowcasePanel>
   );
 }
