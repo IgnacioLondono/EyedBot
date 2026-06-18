@@ -4,7 +4,14 @@ const db = require('./database');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'leveling-store.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '120000', 10));
+/** Espejo JSON local; por defecto desactivado (MySQL es la fuente principal). */
+const FILE_MIRROR = String(process.env.LEVELING_FILE_MIRROR || 'false').trim().toLowerCase() === 'true';
+const FILE_WRITE_BLOCK_MS = Math.max(60_000, Number.parseInt(process.env.LEVELING_FILE_BLOCK_MS || '1800000', 10) || 1_800_000);
+const FILE_WRITE_WARN_MS = Math.max(60_000, Number.parseInt(process.env.LEVELING_FILE_WARN_MS || '300000', 10) || 300_000);
+
 const cache = new Map();
+let fileWriteBlockedUntil = 0;
+let lastFileWriteWarnAt = 0;
 
 function cacheGet(key) {
     const item = cache.get(key);
@@ -23,6 +30,18 @@ function cacheSet(key, value) {
     });
 }
 
+function isEnospcError(error) {
+    const code = String(error?.code || '').toUpperCase();
+    return code === 'ENOSPC' || Number(error?.errno) === -28;
+}
+
+function warnFileMirrorSkipped(reason) {
+    const now = Date.now();
+    if (now - lastFileWriteWarnAt < FILE_WRITE_WARN_MS) return;
+    lastFileWriteWarnAt = now;
+    console.warn(`⚠️ leveling-store.json: ${reason} (persistiendo solo en MySQL).`);
+}
+
 function ensureStore() {
     const dir = path.dirname(STORE_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -32,7 +51,16 @@ function ensureStore() {
 }
 
 function readStore() {
-    ensureStore();
+    try {
+        ensureStore();
+    } catch (error) {
+        if (isEnospcError(error)) {
+            warnFileMirrorSkipped('sin espacio para crear el archivo local');
+            return { guilds: {} };
+        }
+        throw error;
+    }
+
     try {
         const raw = fs.readFileSync(STORE_PATH, 'utf8');
         const parsed = JSON.parse(raw || '{}');
@@ -44,9 +72,23 @@ function readStore() {
     }
 }
 
-function writeStore(data) {
-    ensureStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
+function writeStoreSafe(data) {
+    if (!FILE_MIRROR) return false;
+    if (Date.now() < fileWriteBlockedUntil) return false;
+
+    try {
+        ensureStore();
+        fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
+        return true;
+    } catch (error) {
+        if (isEnospcError(error)) {
+            fileWriteBlockedUntil = Date.now() + FILE_WRITE_BLOCK_MS;
+            warnFileMirrorSkipped('disco lleno (ENOSPC)');
+            return false;
+        }
+        console.error('Error escribiendo leveling-store.json:', error?.message || error);
+        return false;
+    }
 }
 
 function ensureGuildBucket(store, guildId) {
@@ -60,6 +102,32 @@ function ensureGuildBucket(store, guildId) {
         store.guilds[guildId].users = {};
     }
     return store.guilds[guildId];
+}
+
+async function persistToDatabase(key, value) {
+    try {
+        if (typeof db.isAvailable === 'function' && !db.isAvailable()) return false;
+        await db.set(key, value);
+        return typeof db.isAvailable !== 'function' || db.isAvailable();
+    } catch {
+        return false;
+    }
+}
+
+function mirrorConfigToFile(guildId, config) {
+    if (!FILE_MIRROR) return;
+    const store = readStore();
+    const bucket = ensureGuildBucket(store, guildId);
+    bucket.config = config;
+    writeStoreSafe(store);
+}
+
+function mirrorUserToFile(guildId, userId, normalized) {
+    if (!FILE_MIRROR) return;
+    const store = readStore();
+    const bucket = ensureGuildBucket(store, guildId);
+    bucket.users[userId] = normalized;
+    writeStoreSafe(store);
 }
 
 const { DEFAULT_LEVEL_TIERS } = require('./level-tier-defaults');
@@ -121,17 +189,15 @@ async function getLevelingConfig(guildId) {
 }
 
 async function setLevelingConfig(guildId, config) {
-    try {
-        await db.set(`leveling_config_${guildId}`, config);
-    } catch {
-        // fallback still persists local
+    const dbOk = await persistToDatabase(`leveling_config_${guildId}`, config);
+    cacheSet(`leveling_cfg_${guildId}`, config);
+
+    if (!dbOk) {
+        mirrorConfigToFile(guildId, config);
+    } else if (FILE_MIRROR) {
+        mirrorConfigToFile(guildId, config);
     }
 
-    const store = readStore();
-    const bucket = ensureGuildBucket(store, guildId);
-    bucket.config = config;
-    writeStore(store);
-    cacheSet(`leveling_cfg_${guildId}`, config);
     return true;
 }
 
@@ -160,21 +226,18 @@ async function getUserState(guildId, userId) {
 
 async function setUserState(guildId, userId, userState) {
     const normalized = normalizeUserState(userState);
+    const dbOk = await persistToDatabase(`leveling_user_${guildId}_${userId}`, normalized);
+    cacheSet(`leveling_user_${guildId}_${userId}`, normalized);
 
-    try {
-        await db.set(`leveling_user_${guildId}_${userId}`, normalized);
-    } catch {
-        // fallback still persists local
+    if (!dbOk) {
+        mirrorUserToFile(guildId, userId, normalized);
+    } else if (FILE_MIRROR) {
+        mirrorUserToFile(guildId, userId, normalized);
     }
 
-    const store = readStore();
-    const bucket = ensureGuildBucket(store, guildId);
-    bucket.users[userId] = normalized;
-    writeStore(store);
-    cacheSet(`leveling_user_${guildId}_${userId}`, normalized);
     return normalized;
 }
- 
+
 async function incrementUserStats(guildId, userId, changes = {}) {
     const current = await getUserState(guildId, userId);
     const next = normalizeUserState({

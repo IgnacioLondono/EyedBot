@@ -399,6 +399,8 @@ const database = {
         }
     },
 
+    isAvailable: () => !shouldSkipDbCall(),
+
     // Cerrar conexiones (útil para shutdown graceful)
     close: async () => {
         if (pool) {
