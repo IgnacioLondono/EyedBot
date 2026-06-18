@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Crown,
   DoorOpen,
+  Heart,
   LayoutDashboard,
   Palette,
   Shield,
@@ -43,8 +44,12 @@ const AlertsShowcase = dynamic(
   () => import("@/components/features/about/AboutShowcases").then((m) => m.AlertsShowcase),
   { loading: () => <PreviewSkeleton />, ssr: false }
 );
-const ThemeShowcase = dynamic(
-  () => import("@/components/features/about/AboutShowcases").then((m) => m.ThemeShowcase),
+const EmbedShowcase = dynamic(
+  () => import("@/components/features/about/AboutShowcases").then((m) => m.EmbedShowcase),
+  { loading: () => <PreviewSkeleton />, ssr: false }
+);
+const InteractionsShowcase = dynamic(
+  () => import("@/components/features/about/AboutShowcases").then((m) => m.InteractionsShowcase),
   { loading: () => <PreviewSkeleton />, ssr: false }
 );
 
@@ -59,7 +64,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   registration_closed: "Los nuevos accesos están cerrados temporalmente.",
 };
 
+const ThemeShowcase = dynamic(
+  () => import("@/components/features/about/AboutShowcases").then((m) => m.ThemeShowcase),
+  { loading: () => <PreviewSkeleton />, ssr: false }
+);
+
 const MODULE_LINKS = [
+  { href: "#interacciones", label: "Interacciones" },
   { href: "#bienvenidas", label: "Bienvenidas" },
   { href: "#panel", label: "Panel web" },
   { href: "#tickets", label: "Tickets" },
@@ -102,6 +113,48 @@ function DiscordWelcomeCard() {
         </p>
         <p className="mt-3 text-xs text-[#949ba4]">Tarjetas con imagen · variables · fuentes personalizables</p>
       </div>
+    </div>
+  );
+}
+
+function DiscordRoleplayCard() {
+  return (
+    <div className="relative">
+      <div className="home-float absolute -left-2 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-pink-400/30 bg-pink-500/15 text-pink-200">
+        <Heart className="h-4 w-4" />
+      </div>
+      <div className="rounded-2xl border border-white/[0.08] bg-[#1e1f24] p-4 shadow-lg">
+        <div className="mb-3 flex items-center gap-2">
+          <EyedBotMark className="h-8 w-8 rounded-full" />
+          <span className="text-sm font-semibold text-white">EyedBot</span>
+          <DiscordAppBadge />
+        </div>
+        <p className="text-sm text-[#b5bac1]">
+          <span className="font-medium text-violet-300">@Kiddis</span> abrazó a{" "}
+          <span className="font-medium text-violet-300">@amigo</span> 💕
+        </p>
+        <div className="mt-3 flex h-24 items-center justify-center rounded-xl bg-gradient-to-br from-violet-900/50 to-fuchsia-900/30 text-xs text-zinc-500">
+          GIF de anime
+        </div>
+        <p className="mt-2 text-xs text-fuchsia-300/90">Veces abrazado: 42</p>
+      </div>
+    </div>
+  );
+}
+
+function DiscordEmbedMiniCard() {
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-[#1e1f24] p-4 shadow-lg">
+      <div className="mb-2 flex items-center gap-2">
+        <EyedBotMark className="h-8 w-8 rounded-full" />
+        <span className="text-sm font-semibold text-white">EyedBot</span>
+        <DiscordAppBadge />
+      </div>
+      <div className="rounded-lg border-l-4 border-violet-500 bg-[#2b2d31] p-3">
+        <p className="text-sm font-semibold text-white">Anuncio del servidor</p>
+        <p className="mt-1 text-xs text-[#b5bac1]">Embed con imagen, campos y color personalizado.</p>
+      </div>
+      <p className="mt-2 text-[10px] text-zinc-500">Constructor en el panel · plantillas guardadas</p>
     </div>
   );
 }
@@ -225,15 +278,6 @@ function HomeHeader({ loggedIn }: { loggedIn: boolean }) {
   );
 }
 
-function formatUptime(ms: number | null | undefined) {
-  if (!ms || !Number.isFinite(ms)) return "—";
-  const totalSec = Math.floor(ms / 1000);
-  const days = Math.floor(totalSec / 86400);
-  const hours = Math.floor((totalSec % 86400) / 3600);
-  if (days > 0) return `${days}d ${hours}h`;
-  return `${hours}h ${Math.floor((totalSec % 3600) / 60)}m`;
-}
-
 function LoginBlock({
   loggedIn,
   errorMessage,
@@ -312,9 +356,7 @@ export function BotHomePage() {
         <div className="relative mx-auto max-w-6xl px-4 py-16 lg:px-8 lg:py-24">
           <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
-              <p className="text-sm font-medium text-violet-300/90">
-                {botName} · {overview?.ping != null ? `${overview.ping} ms` : "en línea"}
-              </p>
+              <p className="text-sm font-medium text-violet-300/90">{botName} · bot y panel para Discord</p>
               <h1 className="mt-4 max-w-xl text-4xl font-bold leading-[1.1] tracking-tight text-white md:text-5xl lg:text-6xl">
                 Tu comunidad de Discord,{" "}
                 <span className="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
@@ -323,20 +365,22 @@ export function BotHomePage() {
               </h1>
               <p className="mt-5 max-w-lg text-lg leading-relaxed text-zinc-400">
                 {overview?.purpose ||
-                  "Moderación, bienvenidas con imagen, tickets, niveles, alertas de directos, gacha y un panel web para configurarlo todo."}
+                  "Interacciones con GIFs de anime, embeds personalizados, bienvenidas con imagen, tickets, niveles y alertas — todo desde el panel web."}
               </p>
-              <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-8 grid max-w-sm grid-cols-2 gap-3">
                 {[
                   { label: "Servidores", value: overview?.totalServers ?? "—" },
                   { label: "Comandos", value: overview?.totalCommands ?? "—" },
-                  { label: "Ping", value: overview?.ping != null ? `${overview.ping} ms` : "—" },
-                  { label: "Uptime", value: formatUptime(overview?.uptime) },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">{stat.label}</p>
                     <p className="mt-1 text-lg font-semibold text-white">{stat.value}</p>
                   </div>
                 ))}
+              </div>
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                <DiscordRoleplayCard />
+                <DiscordEmbedMiniCard />
               </div>
             </div>
             <LoginBlock loggedIn={loggedIn} errorMessage={errorMessage} />
@@ -346,8 +390,27 @@ export function BotHomePage() {
 
       <main>
         <FeatureSection
+          id="interacciones"
+          title="Interacciones y embeds"
+          paragraphs={[
+            "Comandos de diversión con GIFs de anime: abrazos, palmadas, besos y búsqueda libre con /gif.",
+            "Cada interacción lleva contador por usuario y botón para devolver la acción, como en los mejores bots de roleplay.",
+            "Además, crea y publica embeds desde el panel con imágenes, campos, colores y plantillas guardadas.",
+          ]}
+          ctaHref="/commands"
+          ctaLabel="Ver comandos de diversión"
+          preview={
+            <div className="grid gap-4">
+              <InteractionsShowcase />
+              <EmbedShowcase />
+            </div>
+          }
+        />
+
+        <FeatureSection
           id="bienvenidas"
           title="Bienvenidas"
+          reverse
           paragraphs={[
             "EyedBot personaliza mensajes de bienvenida y despedida con embeds o tarjetas con imagen generada al vuelo.",
             "Usa variables como {user}, {username} y {memberCount}, elige fuentes, colores y arrastra los elementos en el editor visual.",
@@ -361,7 +424,6 @@ export function BotHomePage() {
         <FeatureSection
           id="panel"
           title="Panel web"
-          reverse
           paragraphs={[
             "Configura cada módulo del servidor desde el navegador: verificación, anti-raid, voz temporal, embeds y más.",
             "Sin reiniciar el bot ni tocar archivos. Cambios en tiempo real con vistas previa de Discord.",
@@ -379,6 +441,7 @@ export function BotHomePage() {
         <FeatureSection
           id="tickets"
           title="Tickets"
+          reverse
           paragraphs={[
             "Sistema de soporte con panel publicable, roles de staff, categorías y gestión de tickets activos.",
             "Historial, informes y flujos para tu equipo de moderación.",
@@ -399,7 +462,6 @@ export function BotHomePage() {
         <FeatureSection
           id="niveles"
           title="Niveles y economía"
-          reverse
           paragraphs={[
             "XP por mensajes y tiempo en voz, con multiplicadores, recompensas por rol y leaderboard con podio.",
             "Integrado con la economía del gacha: monedas, tienda e inventario por servidor.",
@@ -420,6 +482,7 @@ export function BotHomePage() {
         <FeatureSection
           id="alertas"
           title="Alertas"
+          reverse
           paragraphs={[
             "Avisos cuando tus creadores empiezan directo en Twitch o YouTube, con WebSub y EventSub.",
             "Sigue series en Crunchyroll y recibe el capítulo nuevo en el canal que elijas.",
@@ -443,7 +506,6 @@ export function BotHomePage() {
         <FeatureSection
           id="eyedplus"
           title="EyedPlus+"
-          reverse
           paragraphs={[
             "Desbloquea personalización avanzada del panel: temas, fondo propio, blur y paleta completa.",
             "Módulos premium como gacha avanzado, plantillas de embeds y más opciones visuales.",
@@ -464,6 +526,7 @@ export function BotHomePage() {
         <FeatureSection
           id="seguridad"
           title="Seguridad"
+          reverse
           paragraphs={[
             "Verificación por reacción o botón, anti-spam, anti-raid y filtros configurables.",
             "Protege tu servidor sin sacrificar la experiencia de los miembros nuevos.",

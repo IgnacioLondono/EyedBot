@@ -204,3 +204,26 @@ export function AlertsShowcase() {
     </MockFrame>
   );
 }
+
+export function InteractionsShowcase() {
+  return (
+    <MockFrame title="Interacciones · GIFs de anime">
+      <div className="p-4">
+        <DiscordEmbedShell color="#a78bfa" className="rounded-xl">
+          <div className="p-3">
+            <p className="text-sm font-semibold text-white">🤗 Abrazo</p>
+            <p className="mt-1 text-xs text-[#dcddde]">
+              <span className="font-medium text-violet-300">@Kiddis</span> abrazó a{" "}
+              <span className="font-medium text-violet-300">@amigo</span>
+            </p>
+            <div className="mt-3 flex h-32 items-center justify-center rounded-lg border border-white/5 bg-gradient-to-br from-violet-950/80 via-fuchsia-950/50 to-violet-900/40">
+              <span className="text-xs text-zinc-500">GIF de anime</span>
+            </div>
+            <p className="mt-2 text-[10px] text-fuchsia-300/90">Veces abrazado: 42</p>
+          </div>
+        </DiscordEmbedShell>
+        <p className="mt-3 text-center text-[10px] text-zinc-500">/hug · /pat · /kiss · /gif · botón de devolver</p>
+      </div>
+    </MockFrame>
+  );
+}
