@@ -10,7 +10,6 @@ import {
   ChevronDown,
   Crown,
   DoorOpen,
-  Heart,
   LayoutDashboard,
   Palette,
   Shield,
@@ -21,7 +20,6 @@ import {
 import { EyedBotMark } from "@/components/brand/EyedBotMark";
 import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
 import { getAboutOverview, getPanelBootstrap } from "@/lib/api/endpoints";
-import { SHOWCASE_ANIME_GIFS } from "@/lib/showcase-media";
 import type { AboutOverview } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +70,7 @@ const ThemeShowcase = dynamic(
 
 const MODULE_LINKS = [
   { href: "#interacciones", label: "Interacciones" },
+  { href: "#embeds", label: "Embeds" },
   { href: "#bienvenidas", label: "Bienvenidas" },
   { href: "#panel", label: "Panel web" },
   { href: "#tickets", label: "Tickets" },
@@ -114,53 +113,6 @@ function DiscordWelcomeCard() {
         </p>
         <p className="mt-3 text-xs text-[#949ba4]">Tarjetas con imagen · variables · fuentes personalizables</p>
       </div>
-    </div>
-  );
-}
-
-function DiscordRoleplayCard() {
-  return (
-    <div className="relative">
-      <div className="home-float absolute -left-2 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-pink-400/30 bg-pink-500/15 text-pink-200">
-        <Heart className="h-4 w-4" />
-      </div>
-      <div className="rounded-2xl border border-white/[0.08] bg-[#1e1f24] p-4 shadow-lg">
-        <div className="mb-3 flex items-center gap-2">
-          <EyedBotMark className="h-8 w-8 rounded-full" />
-          <span className="text-sm font-semibold text-white">EyedBot</span>
-          <DiscordAppBadge />
-        </div>
-        <p className="text-sm text-[#b5bac1]">
-          <span className="font-medium text-violet-300">@Kiddis</span> abrazó a{" "}
-          <span className="font-medium text-violet-300">@amigo</span> 💕
-        </p>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={SHOWCASE_ANIME_GIFS.hug}
-          alt="GIF de abrazo anime"
-          loading="lazy"
-          decoding="async"
-          className="mt-3 max-h-28 w-full rounded-xl object-cover"
-        />
-        <p className="mt-2 text-xs text-fuchsia-300/90">Veces abrazado: 42</p>
-      </div>
-    </div>
-  );
-}
-
-function DiscordEmbedMiniCard() {
-  return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#1e1f24] p-4 shadow-lg">
-      <div className="mb-2 flex items-center gap-2">
-        <EyedBotMark className="h-8 w-8 rounded-full" />
-        <span className="text-sm font-semibold text-white">EyedBot</span>
-        <DiscordAppBadge />
-      </div>
-      <div className="rounded-lg border-l-4 border-violet-500 bg-[#2b2d31] p-3">
-        <p className="text-sm font-semibold text-white">Anuncio del servidor</p>
-        <p className="mt-1 text-xs text-[#b5bac1]">Embed con imagen, campos y color personalizado.</p>
-      </div>
-      <p className="mt-2 text-[10px] text-zinc-500">Constructor en el panel · plantillas guardadas</p>
     </div>
   );
 }
@@ -384,10 +336,6 @@ export function BotHomePage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                <DiscordRoleplayCard />
-                <DiscordEmbedMiniCard />
-              </div>
             </div>
             <LoginBlock loggedIn={loggedIn} errorMessage={errorMessage} />
           </div>
@@ -397,20 +345,14 @@ export function BotHomePage() {
       <main>
         <FeatureSection
           id="interacciones"
-          title="Interacciones y embeds"
+          title="Interacciones"
           paragraphs={[
             "Comandos de diversión con GIFs de anime: abrazos, palmadas, besos y búsqueda libre con /gif.",
             "Cada interacción lleva contador por usuario y botón para devolver la acción, como en los mejores bots de roleplay.",
-            "Además, crea y publica embeds desde el panel con imágenes, campos, colores y plantillas guardadas.",
           ]}
           ctaHref="/commands"
           ctaLabel="Ver comandos de diversión"
-          preview={
-            <div className="grid gap-4">
-              <InteractionsShowcase />
-              <EmbedShowcase />
-            </div>
-          }
+          preview={<InteractionsShowcase />}
         />
 
         <FeatureSection
@@ -431,7 +373,7 @@ export function BotHomePage() {
           id="panel"
           title="Panel web"
           paragraphs={[
-            "Configura cada módulo del servidor desde el navegador: verificación, anti-raid, voz temporal, embeds y más.",
+            "Configura cada módulo del servidor desde el navegador: verificación, anti-raid, voz temporal y más.",
             "Sin reiniciar el bot ni tocar archivos. Cambios en tiempo real con vistas previa de Discord.",
             "Diseñado para administradores que quieren control total sin complicaciones.",
           ]}
@@ -442,6 +384,20 @@ export function BotHomePage() {
               <OverviewShowcase />
             </div>
           }
+        />
+
+        <FeatureSection
+          id="embeds"
+          title="Embeds"
+          reverse
+          paragraphs={[
+            "Crea y publica embeds desde el panel con imágenes, campos, colores y plantillas guardadas.",
+            "Vista previa en tiempo real con el estilo exacto de Discord antes de enviar al canal.",
+            "Ideal para anuncios, reglas, eventos y mensajes destacados de tu servidor.",
+          ]}
+          ctaHref="#entrar"
+          ctaLabel="Configurar embeds"
+          preview={<EmbedShowcase />}
         />
 
         <FeatureSection

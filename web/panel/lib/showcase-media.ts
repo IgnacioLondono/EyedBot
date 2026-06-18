@@ -1,6 +1,38 @@
-/** GIFs públicos para previews de interacciones en la landing (Tenor CDN). */
+/** GIFs de la landing servidos por el backend (proxy de nekos.best). */
 export const SHOWCASE_ANIME_GIFS = {
-  hug: "https://media.tenor.com/XN0b3j_0M1EAAAAC/anime-hug.gif",
-  pat: "https://media.tenor.com/8y0cO0dCv2AAAAAC/anime-pat.gif",
-  kiss: "https://media.tenor.com/6yV8b4Cp6wAAAAAC/anime-kiss.gif",
+  hug: "/api/showcase/gif/hug",
+  pat: "/api/showcase/gif/pat",
+  kiss: "/api/showcase/gif/kiss",
 } as const;
+
+export type ShowcaseInteractionKey = keyof typeof SHOWCASE_ANIME_GIFS;
+
+export const SHOWCASE_INTERACTIONS = [
+  {
+    key: "hug" as const,
+    command: "/hug",
+    title: "🤗 Abrazo",
+    verb: "abrazó",
+    countLabel: "Veces abrazado",
+    count: 42,
+    gif: SHOWCASE_ANIME_GIFS.hug,
+  },
+  {
+    key: "pat" as const,
+    command: "/pat",
+    title: "👋 Caricia",
+    verb: "acarició",
+    countLabel: "Veces acariciado",
+    count: 18,
+    gif: SHOWCASE_ANIME_GIFS.pat,
+  },
+  {
+    key: "kiss" as const,
+    command: "/kiss",
+    title: "💋 Beso",
+    verb: "besó",
+    countLabel: "Veces besado",
+    count: 7,
+    gif: SHOWCASE_ANIME_GIFS.kiss,
+  },
+] as const;

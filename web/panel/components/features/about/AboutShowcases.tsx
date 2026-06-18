@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { DiscordEmbedShell, DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
-import { SHOWCASE_ANIME_GIFS } from "@/lib/showcase-media";
+import { SHOWCASE_ANIME_GIFS, SHOWCASE_INTERACTIONS } from "@/lib/showcase-media";
 import { SERVER_PANES } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -243,24 +244,58 @@ export function AlertsShowcase() {
 }
 
 export function InteractionsShowcase() {
+  const [index, setIndex] = useState(0);
+  const example = SHOWCASE_INTERACTIONS[index] ?? SHOWCASE_INTERACTIONS[0];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setIndex((current) => (current + 1) % SHOWCASE_INTERACTIONS.length);
+    }, 4500);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
     <ShowcasePanel>
-      <DiscordEmbedShell color="#a78bfa" className="rounded-xl">
-        <div className="p-3">
-          <p className="text-sm font-semibold text-white">🤗 Abrazo</p>
-          <p className="mt-1 text-xs text-[#dcddde]">
-            <span className="font-medium text-violet-300">@Kiddis</span> abrazó a{" "}
-            <span className="font-medium text-violet-300">@amigo</span>
-          </p>
-          <ShowcaseAnimeGif
-            src={SHOWCASE_ANIME_GIFS.hug}
-            alt="GIF de abrazo anime"
-            className="mt-3 max-h-44"
-          />
-          <p className="mt-2 text-[10px] text-fuchsia-300/90">Veces abrazado: 42</p>
-        </div>
-      </DiscordEmbedShell>
-      <p className="mt-3 text-center text-[10px] text-zinc-500">/hug · /pat · /kiss · /gif · botón de devolver</p>
+      <div className="mb-3 flex items-center justify-center gap-2">
+        {SHOWCASE_INTERACTIONS.map((item, itemIndex) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setIndex(itemIndex)}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[10px] font-medium transition",
+              itemIndex === index
+                ? "bg-violet-500/25 text-violet-200"
+                : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+            )}
+          >
+            {item.command}
+          </button>
+        ))}
+      </div>
+      <div
+        key={example.key}
+        className="animate-in fade-in duration-500"
+      >
+        <DiscordEmbedShell color="#a78bfa" className="rounded-xl">
+          <div className="p-3">
+            <p className="text-sm font-semibold text-white">{example.title}</p>
+            <p className="mt-1 text-xs text-[#dcddde]">
+              <span className="font-medium text-violet-300">@Kiddis</span> {example.verb} a{" "}
+              <span className="font-medium text-violet-300">@amigo</span>
+            </p>
+            <ShowcaseAnimeGif
+              src={example.gif}
+              alt={`GIF de ${example.command}`}
+              className="mt-3 max-h-44"
+            />
+            <p className="mt-2 text-[10px] text-fuchsia-300/90">
+              {example.countLabel}: {example.count}
+            </p>
+          </div>
+        </DiscordEmbedShell>
+      </div>
+      <p className="mt-3 text-center text-[10px] text-zinc-500">/gif · botón de devolver · contador por usuario</p>
     </ShowcasePanel>
   );
 }
