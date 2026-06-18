@@ -1106,10 +1106,19 @@ function isOwnerUser(user = null) {
     return OWNER_DISCORD_IDS.includes(userId);
 }
 
-function hasPremiumGrant(user = null) {
+function isOwnerModeEnabled(req) {
+    return req?.session?.ownerModeEnabled !== false;
+}
+
+function panelIsOwner(req) {
+    return isOwnerUser(req?.session?.user) && isOwnerModeEnabled(req);
+}
+
+function hasPremiumGrant(user = null, options = {}) {
     const userId = String(user?.id || '').trim();
     if (!userId) return false;
-    if (isOwnerUser(user)) return true;
+    const countOwner = options.countOwner !== false;
+    if (countOwner && isOwnerUser(user)) return true;
     return PREMIUM_DISCORD_IDS.includes(userId);
 }
 
@@ -2160,7 +2169,7 @@ async function requirePremium(req, res, next) {
         return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
     }
 
-    if (hasPremiumGrant(req.session?.user)) {
+    if (hasPremiumGrant(req.session?.user, { countOwner: isOwnerModeEnabled(req) })) {
         return next();
     }
 
@@ -2183,7 +2192,7 @@ async function requirePremium(req, res, next) {
     }
 }
 
-async function resolveBillingStatusForUser(user) {
+async function resolveBillingStatusForUser(user, options = {}) {
     const userId = String(user?.id || '').trim();
     if (!userId) {
         return {
@@ -2193,11 +2202,13 @@ async function resolveBillingStatusForUser(user) {
         };
     }
 
-    if (hasPremiumGrant(user)) {
+    const countOwner = options.countOwner !== false;
+    if (hasPremiumGrant(user, { countOwner })) {
+        const asOwner = countOwner && isOwnerUser(user);
         return {
             active: true,
-            status: isOwnerUser(user) ? 'owner' : 'granted',
-            grantType: isOwnerUser(user) ? 'owner' : 'allowlist',
+            status: asOwner ? 'owner' : 'granted',
+            grantType: asOwner ? 'owner' : 'allowlist',
             customerId: '',
             subscriptionId: '',
             currentPeriodEnd: null,
@@ -2300,8 +2311,10 @@ app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
             sessionGuilds: Array.isArray(req.session?.guilds) ? req.session.guilds : [],
             guilds,
             inviteUrl,
-            isOwner: isOwnerUser(req.session.user),
-            hasPremium: hasPremiumGrant(req.session.user),
+            ownerModeEnabled: isOwnerModeEnabled(req),
+            isRealOwner: isOwnerUser(req.session.user),
+            isOwner: panelIsOwner(req),
+            hasPremium: hasPremiumGrant(req.session.user, { countOwner: isOwnerModeEnabled(req) }),
             premiumRequired: isPremiumEnforcementEnabled(),
             botConnected: Boolean(botClient?.user?.id),
             guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0,
@@ -2342,12 +2355,38 @@ app.get('/api/billing/status', requireAuth, async (req, res) => {
     }
 
     try {
-        const billing = await resolveBillingStatusForUser(req.session.user);
+        const billing = await resolveBillingStatusForUser(req.session.user, {
+            countOwner: isOwnerModeEnabled(req)
+        });
         return res.json(billing);
     } catch (error) {
         console.error('Error consultando estado de facturación:', error);
         return res.status(500).json({ error: 'No se pudo obtener estado premium' });
     }
+});
+
+app.get('/api/owner/panel-mode', requireAuth, (req, res) => {
+    if (!isOwnerUser(req.session.user)) {
+        return res.status(403).json({ error: 'Solo el propietario puede consultar este ajuste' });
+    }
+    return res.json({
+        success: true,
+        ownerModeEnabled: isOwnerModeEnabled(req),
+        isOwner: panelIsOwner(req)
+    });
+});
+
+app.post('/api/owner/panel-mode', requireAuth, (req, res) => {
+    if (!isOwnerUser(req.session.user)) {
+        return res.status(403).json({ error: 'Solo el propietario puede cambiar este ajuste' });
+    }
+    const enabled = req.body?.enabled !== false;
+    req.session.ownerModeEnabled = enabled;
+    return res.json({
+        success: true,
+        ownerModeEnabled: enabled,
+        isOwner: enabled
+    });
 });
 
 app.get('/api/billing/plan', requireAuth, async (req, res) => {

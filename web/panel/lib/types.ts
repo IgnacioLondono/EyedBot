@@ -81,6 +81,8 @@ export type PanelBootstrap = {
   guilds: GuildSummary[];
   inviteUrl: string;
   isOwner: boolean;
+  isRealOwner?: boolean;
+  ownerModeEnabled?: boolean;
   hasPremium?: boolean;
   premiumRequired?: boolean;
   botConnected: boolean;

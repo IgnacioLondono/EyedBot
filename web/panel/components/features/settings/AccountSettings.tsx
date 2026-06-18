@@ -1,9 +1,16 @@
 "use client";
 
-import { ShieldCheck, User2 } from "lucide-react";
+import { User2 } from "lucide-react";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { Badge } from "@/components/ui/Badge";
 import { PaneGrid, SectionCard } from "@/components/features/shared";
+
+function premiumLabel(hasPremium: boolean, grantType?: string | null) {
+  if (!hasPremium) return "Plan base";
+  if (grantType === "subscription") return "EyedPlus+ activo";
+  if (grantType === "granted" || grantType === "allowlist") return "EyedPlus+ concedido";
+  return "EyedPlus+ activo";
+}
 
 export function AccountSettings() {
   const { bootstrap, billing, hasPremium } = usePanel();
@@ -24,39 +31,14 @@ export function AccountSettings() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Estado de acceso" description="Tu sesión y el plan activo dentro del panel.">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <span className="text-sm text-zinc-400">Premium</span>
-            {hasPremium ? (
-              <Badge variant="premium">
-                {billing?.grantType === "granted"
-                  ? "EyedPlus+ concedido"
-                  : billing?.grantType === "owner"
-                    ? "EyedPlus+ owner"
-                    : "EyedPlus+ activo"}
-              </Badge>
-            ) : (
-              <Badge variant="default">Plan base</Badge>
-            )}
-          </div>
-          <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <span className="text-sm text-zinc-400">Estado facturación</span>
-            <span className="text-sm text-white">{billing?.status || "Sin suscripción"}</span>
-          </div>
-          <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <span className="text-sm text-zinc-400">Permisos owner</span>
-            <Badge variant={bootstrap?.isOwner ? "success" : "default"}>
-              {bootstrap?.isOwner ? "Habilitado" : "No"}
-            </Badge>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.2),_rgba(0,0,0,0.1)_55%)] p-4 text-sm text-zinc-300">
-            <div className="mb-2 flex items-center gap-2 text-white">
-              <ShieldCheck className="h-4 w-4" />
-              Sesión segura
-            </div>
-            Tu sesión web usa el bootstrap del panel y conserva los permisos vinculados a tu cuenta de Discord.
-          </div>
+      <SectionCard title="Estado de acceso" description="Tu plan activo dentro del panel.">
+        <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+          <span className="text-sm text-zinc-400">Premium</span>
+          {hasPremium ? (
+            <Badge variant="premium">{premiumLabel(true, billing?.grantType)}</Badge>
+          ) : (
+            <Badge variant="default">Plan base</Badge>
+          )}
         </div>
       </SectionCard>
     </PaneGrid>

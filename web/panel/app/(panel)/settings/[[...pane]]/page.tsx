@@ -43,18 +43,18 @@ export default function SettingsPage() {
   const router = useRouter();
   const pane = params.pane?.[0] || "account";
   const { bootstrap, premiumLocked } = usePanel();
-  const isOwner = Boolean(bootstrap?.isOwner);
+  const isRealOwner = Boolean(bootstrap?.isRealOwner ?? bootstrap?.isOwner);
   const copy = PANE_COPY[pane] || PANE_COPY.account;
   const SettingsComponent = SETTINGS_COMPONENTS[pane as SettingsPaneSlug] || AccountSettings;
 
   useEffect(() => {
     if (pane === "web") router.replace("/settings/owner");
-    if (pane === "owner" && !isOwner) router.replace("/settings/account");
-  }, [pane, isOwner, router]);
+    if (pane === "owner" && !isRealOwner) router.replace("/settings/account");
+  }, [pane, isRealOwner, router]);
 
   const visibleNav = filterSettingsNav(
     SETTINGS_NAV.filter((item) => {
-      if (item.href.includes("/owner")) return isOwner;
+      if (item.href.includes("/owner")) return isRealOwner;
       return true;
     }),
     bootstrap?.webConfig
@@ -94,7 +94,7 @@ export default function SettingsPage() {
             actions={pane === "theme" && premiumLocked ? <Badge variant="premium">Premium</Badge> : null}
           />
           <div className="mt-5">
-            {pane === "owner" && !isOwner ? (
+            {pane === "owner" && !isRealOwner ? (
               <Alert title="Acceso restringido" description="El panel de propietario solo está disponible para el creador del bot." variant="danger" />
             ) : (
               <SettingsComponent />

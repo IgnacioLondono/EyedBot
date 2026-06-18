@@ -62,6 +62,15 @@ export const getOwnerWebConfig = () => apiFetch<OwnerWebConfig>("/api/admin/web-
 export const updateOwnerWebConfig = (body: Record<string, unknown>) =>
   apiFetch<OwnerWebConfig>("/api/admin/web-config", { method: "PUT", body });
 
+export const getOwnerPanelMode = () =>
+  apiFetch<{ ownerModeEnabled: boolean; isOwner: boolean }>("/api/owner/panel-mode");
+
+export const setOwnerPanelMode = (enabled: boolean) =>
+  apiFetch<{ ownerModeEnabled: boolean; isOwner: boolean }>("/api/owner/panel-mode", {
+    method: "POST",
+    body: { enabled },
+  });
+
 export const updateUserBilling = (userId: string, body: Record<string, unknown>) =>
   apiFetch(`/api/admin/user/${encodeURIComponent(userId)}/billing`, {
     method: "PUT",

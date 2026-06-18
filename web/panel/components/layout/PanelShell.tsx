@@ -28,7 +28,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   const homeHref = isGuest ? "/about" : "/dashboard";
   const primaryNav = filterPrimaryNav(PRIMARY_NAV, bootstrap?.webConfig);
   const maintenanceMessage = bootstrap?.webConfig?.maintenanceMessage;
-  const showMaintenanceNotice = Boolean(bootstrap?.isOwner && bootstrap?.webConfig?.maintenanceMode);
+  const showMaintenanceNotice = Boolean(bootstrap?.isRealOwner && bootstrap?.webConfig?.maintenanceMode);
 
   return (
     <div className={cn("relative min-h-screen text-zinc-100", !hasActiveWallpaper && "bg-[var(--color-bg)]")}>

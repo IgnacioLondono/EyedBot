@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { LoginLanding } from "@/components/features/login/LoginLanding";
+import { BotHomePage } from "@/components/features/login/BotHomePage";
 
 function LoginFallback() {
   return (
@@ -14,7 +14,7 @@ function LoginFallback() {
 export default function LoginPage() {
   return (
     <Suspense fallback={<LoginFallback />}>
-      <LoginLanding />
+      <BotHomePage />
     </Suspense>
   );
 }

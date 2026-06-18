@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  CreditCard,
-  Save,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
-import { getOwnerWebConfig, updateOwnerWebConfig } from "@/lib/api/endpoints";
+import { CreditCard, Save, Sparkles, Wrench } from "lucide-react";
+import { getOwnerPanelMode, getOwnerWebConfig, setOwnerPanelMode, updateOwnerWebConfig } from "@/lib/api/endpoints";
+import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -59,8 +55,11 @@ function ConfigRow({
 
 export function OwnerWebConfigTab() {
   const { toast } = useToast();
+  const { refresh } = usePanel();
   const [config, setConfig] = useState<OwnerWebConfig | null>(null);
   const [premiumMode, setPremiumMode] = useState<PremiumMode>("env");
+  const [ownerModeEnabled, setOwnerModeEnabled] = useState(true);
+  const [ownerModeSaving, setOwnerModeSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,9 +68,10 @@ export function OwnerWebConfigTab() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getOwnerWebConfig();
+      const [data, mode] = await Promise.all([getOwnerWebConfig(), getOwnerPanelMode().catch(() => null)]);
       setConfig(data);
       setPremiumMode(premiumModeFromConfig(data.premiumRequired));
+      if (mode) setOwnerModeEnabled(mode.ownerModeEnabled !== false);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -82,6 +82,26 @@ export function OwnerWebConfigTab() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function toggleOwnerMode(enabled: boolean) {
+    setOwnerModeSaving(true);
+    try {
+      const result = await setOwnerPanelMode(enabled);
+      setOwnerModeEnabled(result.ownerModeEnabled !== false);
+      await refresh(true);
+      toast({
+        title: enabled ? "Modo propietario activo" : "Modo propietario desactivado",
+        description: enabled
+          ? "Vuelves a ver la pestaña Propietario y los beneficios de owner."
+          : "El panel te tratará como un usuario normal. Puedes reactivarlo aquí.",
+        tone: "success",
+      });
+    } catch (err) {
+      toast({ title: "No se pudo cambiar el modo", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setOwnerModeSaving(false);
+    }
+  }
 
   async function save() {
     if (!config) return;
@@ -141,6 +161,19 @@ export function OwnerWebConfigTab() {
           Guardar cambios
         </Button>
       </div>
+
+      <SectionCard
+        title="Modo propietario"
+        description="Oculta temporalmente privilegios de owner en el panel (cuenta, premium y pestaña Propietario)."
+      >
+        <ConfigRow
+          title="Privilegios de propietario"
+          description="Desactívalo para probar el panel como un administrador normal sin perder acceso a esta sección."
+          checked={ownerModeEnabled}
+          onCheckedChange={(checked) => void toggleOwnerMode(checked)}
+          disabled={ownerModeSaving}
+        />
+      </SectionCard>
 
       <SectionCard
         title="Mantenimiento y acceso"
