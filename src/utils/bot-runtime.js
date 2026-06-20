@@ -21,6 +21,7 @@ const { handleTempVoiceButton, handleTempVoiceModal } = require('../events/temp-
 const { handleAFKAuthorReturn, handleAFKMentions } = require('../events/messageCreate');
 const guildActivityStore = require('./guild-activity-store');
 const { handleDisboardBumpMessage } = require('./bump-reminder-scheduler');
+const { handleGiveawayButton } = require('./giveaway-service');
 
 const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
 const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMMAND_WARN_MS || '1200', 10));
@@ -169,6 +170,7 @@ function attachInteractionHandler(client) {
             try {
                 if (await handleTempVoiceButton(interaction)) return;
                 if (await handleTicketButton(interaction)) return;
+                if (await handleGiveawayButton(interaction)) return;
                 if (interaction.customId.startsWith('fun_return_')) {
                     if (await handleReturnInteraction(interaction)) return;
                 }

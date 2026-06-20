@@ -25,6 +25,7 @@ const SERVER_MODULE_MAP: Record<string, keyof WebPanelConfig["modules"]> = {
   notifications: "notifications",
   "free-games": "freeGames",
   embed: "embed",
+  events: "events",
 };
 
 export function isWebPageEnabled(webConfig: WebPanelConfig | null | undefined, href: string) {
@@ -76,6 +77,7 @@ export const WEB_MODULE_LABELS: Record<keyof WebPanelConfig["modules"], string> 
   notifications: "Alertas",
   freeGames: "Juegos gratis",
   embed: "Embeds",
+  events: "Eventos y sorteos",
   themeCustomization: "Personalización del tema",
 };
 

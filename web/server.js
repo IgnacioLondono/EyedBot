@@ -37,6 +37,8 @@ function getWelcomeCardUtils() {
     return welcomeCardUtils;
 }
 const verifyStore = require('../src/utils/verify-config-store');
+const eventsGiveawaysStore = require('../src/utils/events-giveaways-store');
+const giveawayService = require('../src/utils/giveaway-service');
 const ticketStore = require('../src/utils/ticket-config-store');
 const levelingStore = require('../src/utils/leveling-store');
 const guildActivityStore = require('../src/utils/guild-activity-store');
@@ -3452,6 +3454,188 @@ app.post('/api/guild/:guildId/verify-embed-update', requireAuth, async (req, res
         const code = Number(error.statusCode);
         const status = code >= 400 && code < 600 ? code : 500;
         res.status(status).json({ error: error.message || 'Error al actualizar el embed de verificación' });
+    }
+});
+
+app.get('/api/guild/:guildId/events-giveaways-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const config = await eventsGiveawaysStore.getConfig(guildId);
+        res.json(config);
+    } catch (error) {
+        console.error('Error obteniendo events-giveaways config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de eventos y sorteos' });
+    }
+});
+
+app.post('/api/guild/:guildId/events-giveaways-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const body = req.body || {};
+        const config = await eventsGiveawaysStore.setConfig(guildId, {
+            enabled: body.enabled !== false,
+            defaultChannelId: String(body.defaultChannelId || '').trim(),
+            color: String(body.color || 'a78bfa').replace('#', '').slice(0, 6),
+            managerRoleIds: Array.isArray(body.managerRoleIds) ? body.managerRoleIds : [],
+            reminderMinutesBefore: body.reminderMinutesBefore
+        }, req.session.user?.id || 'panel');
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando events-giveaways config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de eventos y sorteos' });
+    }
+});
+
+app.get('/api/guild/:guildId/giveaways', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const status = String(req.query?.status || '').trim() || null;
+        const giveaways = await eventsGiveawaysStore.listGiveaways(guildId, status || undefined);
+        res.json({ giveaways });
+    } catch (error) {
+        console.error('Error listando sorteos:', error);
+        res.status(500).json({ error: 'Error al listar sorteos' });
+    }
+});
+
+app.post('/api/guild/:guildId/giveaways/create', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const body = req.body || {};
+        const cfg = await eventsGiveawaysStore.getConfig(guildId);
+        const giveaway = await giveawayService.createGiveaway(botClient, guild, {
+            title: String(body.title || 'Sorteo').slice(0, 256),
+            prize: String(body.prize || 'Premio').slice(0, 500),
+            description: String(body.description || '').slice(0, 2000),
+            durationMinutes: body.durationMinutes,
+            winnersCount: body.winnersCount,
+            channelId: String(body.channelId || cfg.defaultChannelId || '').trim(),
+            hostId: req.session.user?.id || 'panel',
+            requiredRoleId: String(body.requiredRoleId || '').trim(),
+            color: cfg.color
+        });
+
+        res.json({ success: true, giveaway });
+    } catch (error) {
+        console.error('Error creando sorteo:', error);
+        res.status(500).json({ error: error.message || 'Error al crear sorteo' });
+    }
+});
+
+app.post('/api/guild/:guildId/giveaways/:giveawayId/end', requireAuth, async (req, res) => {
+    try {
+        const { guildId, giveawayId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const giveaway = await giveawayService.endGiveaway(botClient, guildId, giveawayId, {
+            hostId: req.session.user?.id || 'panel'
+        });
+        res.json({ success: true, giveaway });
+    } catch (error) {
+        console.error('Error finalizando sorteo:', error);
+        res.status(500).json({ error: error.message || 'Error al finalizar sorteo' });
+    }
+});
+
+app.post('/api/guild/:guildId/giveaways/:giveawayId/reroll', requireAuth, async (req, res) => {
+    try {
+        const { guildId, giveawayId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const giveaway = await giveawayService.endGiveaway(botClient, guildId, giveawayId, {
+            reroll: true,
+            hostId: req.session.user?.id || 'panel'
+        });
+        res.json({ success: true, giveaway });
+    } catch (error) {
+        console.error('Error en reroll de sorteo:', error);
+        res.status(500).json({ error: error.message || 'Error al reroll del sorteo' });
+    }
+});
+
+app.get('/api/guild/:guildId/server-events', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const events = await eventsGiveawaysStore.listServerEvents(guildId);
+        res.json({ events });
+    } catch (error) {
+        console.error('Error listando eventos:', error);
+        res.status(500).json({ error: 'Error al listar eventos' });
+    }
+});
+
+app.post('/api/guild/:guildId/server-events/create', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const body = req.body || {};
+        const cfg = await eventsGiveawaysStore.getConfig(guildId);
+        const startAtRaw = String(body.startAt || '').trim();
+        const startMs = Date.parse(startAtRaw);
+        if (!startAtRaw || !Number.isFinite(startMs)) {
+            return res.status(400).json({ error: 'Fecha de inicio inválida' });
+        }
+
+        let eventRow = await eventsGiveawaysStore.saveServerEvent(guildId, {
+            title: String(body.title || 'Evento').slice(0, 256),
+            description: String(body.description || '').slice(0, 2000),
+            location: String(body.location || '').slice(0, 300),
+            channelId: String(body.channelId || cfg.defaultChannelId || '').trim(),
+            startAt: new Date(startMs).toISOString(),
+            hostId: req.session.user?.id || 'panel',
+            status: 'scheduled'
+        });
+
+        if (body.publish !== false) {
+            eventRow = await giveawayService.publishServerEvent(botClient, guild, eventRow);
+        }
+
+        res.json({ success: true, event: eventRow });
+    } catch (error) {
+        console.error('Error creando evento:', error);
+        res.status(500).json({ error: error.message || 'Error al crear evento' });
+    }
+});
+
+app.post('/api/guild/:guildId/server-events/:eventId/cancel', requireAuth, async (req, res) => {
+    try {
+        const { guildId, eventId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const eventRow = await eventsGiveawaysStore.getServerEvent(guildId, eventId);
+        if (!eventRow) return res.status(404).json({ error: 'Evento no encontrado' });
+        eventRow.status = 'cancelled';
+        await eventsGiveawaysStore.saveServerEvent(guildId, eventRow);
+        res.json({ success: true, event: eventRow });
+    } catch (error) {
+        console.error('Error cancelando evento:', error);
+        res.status(500).json({ error: error.message || 'Error al cancelar evento' });
     }
 });
 

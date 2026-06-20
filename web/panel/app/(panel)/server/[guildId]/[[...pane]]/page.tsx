@@ -25,6 +25,7 @@ import { NotificationsPane } from "@/components/features/server/panes/Notificati
 import { FreeGamesPane } from "@/components/features/server/panes/FreeGamesPane";
 import { SecurityPane } from "@/components/features/server/panes/SecurityPane";
 import { EmbedPane } from "@/components/features/server/panes/EmbedPane";
+import { EventsPane } from "@/components/features/server/panes/EventsPane";
 import { ModuleContent, ModuleSidebar } from "@/components/features/shared";
 
 const PANE_COMPONENTS = {
@@ -41,6 +42,7 @@ const PANE_COMPONENTS = {
   notifications: NotificationsPane,
   "free-games": FreeGamesPane,
   embed: EmbedPane,
+  events: EventsPane,
 } satisfies Record<string, ComponentType<{ guildId: string }>>;
 
 type ServerPaneSlug = keyof typeof PANE_COMPONENTS;

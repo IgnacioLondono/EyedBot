@@ -243,6 +243,37 @@ export const deleteWelcomeImage = (guildId: string, slot: string) =>
 export const deleteVerifyImage = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/verify-image`, { method: "DELETE" });
 
+// ─── Eventos y sorteos ──────────────────────────────────────────────
+
+export const getEventsGiveawaysConfig = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/events-giveaways-config`);
+
+export const saveEventsGiveawaysConfig = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/events-giveaways-config`, { method: "POST", body });
+
+export const listGiveaways = (guildId: string, status?: string) => {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch<{ giveaways: Record<string, unknown>[] }>(`/api/guild/${g(guildId)}/giveaways${query}`);
+};
+
+export const createGiveaway = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/giveaways/create`, { method: "POST", body });
+
+export const endGiveaway = (guildId: string, giveawayId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/giveaways/${encodeURIComponent(giveawayId)}/end`, { method: "POST" });
+
+export const rerollGiveaway = (guildId: string, giveawayId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/giveaways/${encodeURIComponent(giveawayId)}/reroll`, { method: "POST" });
+
+export const listServerEvents = (guildId: string) =>
+  apiFetch<{ events: Record<string, unknown>[] }>(`/api/guild/${g(guildId)}/server-events`);
+
+export const createServerEvent = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/server-events/create`, { method: "POST", body });
+
+export const cancelServerEvent = (guildId: string, eventId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/server-events/${encodeURIComponent(eventId)}/cancel`, { method: "POST" });
+
 // ─── Tickets ────────────────────────────────────────────────────────
 
 export const getTicketConfig = (guildId: string) =>

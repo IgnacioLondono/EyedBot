@@ -9,6 +9,7 @@ import {
   Info,
   LayoutDashboard,
   LayoutGrid,
+  CalendarDays,
   Mic,
   Shield,
   Sparkles,
@@ -62,6 +63,7 @@ export const SERVER_PANES: ServerPane[] = [
   { id: "notifications", slug: "notifications", label: "Alertas", icon: Bell },
   { id: "free-games", slug: "free-games", label: "Juegos gratis", icon: Gift, premium: true },
   { id: "embed", slug: "embed", label: "Embeds", icon: FileBadge2 },
+  { id: "events", slug: "events", label: "Eventos y sorteos", icon: CalendarDays },
 ];
 
 export function serverPaneHref(guildId: string, slug = "overview") {

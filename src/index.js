@@ -28,6 +28,7 @@ const { startStreamAlertScheduler, stopStreamAlertScheduler } = require('./utils
 const { startFreeGamesScheduler, stopFreeGamesScheduler } = require('./utils/free-games-service');
 const { startCrunchyrollScheduler, stopCrunchyrollScheduler } = require('./utils/crunchyroll-service');
 const { startBumpReminderScheduler, stopBumpReminderScheduler, handleDisboardBumpMessage } = require('./utils/bump-reminder-scheduler');
+const { startEventsGiveawaysScheduler, stopEventsGiveawaysScheduler, handleGiveawayButton } = require('./utils/giveaway-service');
 require('dotenv').config();
 
 let webPanel = null;
@@ -351,6 +352,7 @@ client.once('clientReady', async () => {
     startFreeGamesScheduler(client);
     startCrunchyrollScheduler(client);
     startBumpReminderScheduler(client);
+    startEventsGiveawaysScheduler(client);
 });
 
 client.on('guildCreate', (guild) => {
@@ -471,6 +473,9 @@ client.on('interactionCreate', async interaction => {
 
             const ticketHandled = await handleTicketButton(interaction);
             if (ticketHandled) return;
+
+            const giveawayHandled = await handleGiveawayButton(interaction);
+            if (giveawayHandled) return;
 
             if (interaction.customId.startsWith('fun_return_')) {
                 const handled = await handleReturnInteraction(interaction);

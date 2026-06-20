@@ -115,6 +115,7 @@ export type WebPanelConfig = {
     notifications: boolean;
     freeGames: boolean;
     embed: boolean;
+    events: boolean;
     themeCustomization: boolean;
   };
 };
