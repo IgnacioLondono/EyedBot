@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { clsx } from "clsx";
 import type { EmbedFormState } from "@/lib/embed-utils";
 import { normalizeHexColor } from "@/lib/embed-utils";
+import { resolvePanelMediaUrl } from "@/lib/panel-media";
 
 export type DiscordEmbedPreviewProps = {
   title?: string;
@@ -21,8 +22,7 @@ export type DiscordEmbedPreviewProps = {
 };
 
 function resolveMediaUrl(value?: string) {
-  const trimmed = String(value || "").trim();
-  return trimmed || "";
+  return resolvePanelMediaUrl(value);
 }
 
 export function DiscordEmbedShell({

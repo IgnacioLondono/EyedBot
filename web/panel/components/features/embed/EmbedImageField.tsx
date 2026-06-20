@@ -4,17 +4,10 @@ import { useRef } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/features/shared";
+import { resolvePanelMediaUrl } from "@/lib/panel-media";
 
 export function resolveEmbedImageSrc(value?: string, filePreview?: string) {
-  if (filePreview) return filePreview;
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (/^(https?:|blob:|data:)/i.test(raw)) return raw;
-  if (raw.startsWith("/")) {
-    const joiner = raw.includes("?") ? "&" : "?";
-    return `${raw}${joiner}t=${Date.now()}`;
-  }
-  return raw;
+  return resolvePanelMediaUrl(value, filePreview);
 }
 
 export function EmbedImageField({

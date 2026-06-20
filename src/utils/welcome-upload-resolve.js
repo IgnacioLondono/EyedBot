@@ -27,6 +27,54 @@ function getWelcomePublicOrigin() {
     return String(process.env.WEB_PUBLIC_ORIGIN || process.env.PUBLIC_ORIGIN || '').trim().replace(/\/+$/, '');
 }
 
+function isLocalNetworkHostname(hostname = '') {
+    const h = String(hostname || '').toLowerCase();
+    if (!h) return false;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '::1') return true;
+    if (h.endsWith('.local') || h.endsWith('.localhost')) return true;
+    if (/^10\./.test(h)) return true;
+    if (/^192\.168\./.test(h)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true;
+    if (/^169\.254\./.test(h)) return true;
+    return false;
+}
+
+/**
+ * URL segura para el panel: rutas relativas /uploads o /api, o HTTPS públicas.
+ * Convierte URLs absolutas de red local (192.168.x, localhost…) a pathname relativo.
+ */
+function canonicalPanelMediaUrl(raw) {
+    const rawStr = String(raw || '').trim();
+    if (!rawStr || /^(blob:|data:)/i.test(rawStr)) return '';
+
+    if (greetingImageStore.parseGreetingImageApiUrl(rawStr)) {
+        return rawStr.split('?')[0].slice(0, 1000);
+    }
+
+    const uploadPath = extractUploadPath(rawStr);
+    if (uploadPath) return uploadPath.slice(0, 1000);
+
+    if (/^https?:\/\//i.test(rawStr)) {
+        try {
+            const parsed = new URL(rawStr);
+            if (isLocalNetworkHostname(parsed.hostname)) {
+                const localUpload = extractUploadPath(parsed.href);
+                if (localUpload) return localUpload.slice(0, 1000);
+                const apiPath = String(parsed.pathname || '').split('?')[0];
+                if (apiPath.startsWith('/api/')) return apiPath.slice(0, 1000);
+                return '';
+            }
+            return rawStr.slice(0, 1000);
+        } catch {
+            return '';
+        }
+    }
+
+    if (rawStr.startsWith('/')) return rawStr.split('?')[0].slice(0, 1000);
+
+    return '';
+}
+
 /**
  * Para persistir en JSON/MySQL: ruta API de imagen en BD, `/uploads/...`, o https externas.
  */
@@ -211,7 +259,9 @@ async function resolveWelcomeCardBackground(imageUrl, guildId) {
 module.exports = {
     extractUploadPath,
     getWelcomePublicOrigin,
+    isLocalNetworkHostname,
     canonicalWelcomeMediaUrl,
+    canonicalPanelMediaUrl,
     resolveWelcomeUploadFile,
     resolveWelcomeMediaForDiscord,
     applyWelcomeMediaToEmbed,

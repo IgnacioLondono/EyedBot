@@ -21,6 +21,8 @@ const webPanelConfigStore = require('../src/utils/web-panel-config-store');
 const welcomeStore = require('../src/utils/welcome-config-store');
 const {
     canonicalWelcomeMediaUrl,
+    canonicalPanelMediaUrl,
+    extractUploadPath,
     resolveWelcomeUploadFile: resolveLocalUploadFile,
     resolveWelcomeCardBackground,
     applyWelcomeMediaToEmbed
@@ -3289,6 +3291,14 @@ async function refreshTicketPanelMessage(guildId, updatedByUserId) {
     return { messageId: message.id, channelId: channel.id, config: updatedCfg };
 }
 
+function sanitizeVerifyConfigForPanel(cfg = {}) {
+    const next = { ...cfg };
+    const imageUrl = canonicalPanelMediaUrl(cfg.imageUrl || cfg.image_url || '');
+    next.imageUrl = imageUrl;
+    next.image_url = imageUrl;
+    return next;
+}
+
 app.get('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -3313,7 +3323,13 @@ app.get('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
             });
         }
 
-        return res.json(cfg);
+        const sanitized = sanitizeVerifyConfigForPanel(cfg);
+        const previousImage = String(cfg.imageUrl || cfg.image_url || '').trim();
+        if (sanitized.imageUrl !== previousImage) {
+            await verifyStore.setVerifyConfig(guildId, { ...cfg, ...sanitized }).catch(() => null);
+        }
+
+        return res.json(sanitized);
     } catch (error) {
         console.error('Error obteniendo verify config:', error);
         res.status(500).json({ error: 'Error al obtener configuración de verificación' });
@@ -3337,7 +3353,7 @@ app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
             message: String(body.message || '¡Reacciona a este mensaje para ver los demás canales!').slice(0, 2000),
             color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
             footer: String(body.footer || '').slice(0, 300),
-            imageUrl: String(body.imageUrl || '').slice(0, 1000),
+            imageUrl: canonicalPanelMediaUrl(body.imageUrl || body.image_url || ''),
             removeRoleOnUnreact: body.removeRoleOnUnreact === true,
             messageId: String(body.messageId || '').trim(),
             updatedAt: new Date().toISOString(),
@@ -3345,7 +3361,7 @@ app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
         };
 
         await verifyStore.setVerifyConfig(guildId, config);
-        res.json({ success: true, config });
+        res.json({ success: true, config: sanitizeVerifyConfigForPanel(config) });
     } catch (error) {
         console.error('Error guardando verify config:', error);
         res.status(500).json({ error: 'Error al guardar configuración de verificación' });
@@ -5619,7 +5635,6 @@ app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFi
         fs.writeFileSync(outputPath, file.buffer);
 
         const publicPath = `/uploads/verify/${fileName}`;
-        const publicUrl = `${req.protocol}://${req.get('host')}${publicPath}`;
         const nextCfg = {
             ...currentCfg,
             imageUrl: publicPath,
@@ -5629,7 +5644,12 @@ app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFi
         };
         await verifyStore.setVerifyConfig(guildId, nextCfg);
 
-        res.json({ success: true, url: publicUrl, path: publicPath, config: nextCfg });
+        res.json({
+            success: true,
+            url: buildPublicUploadUrl(req, publicPath),
+            path: publicPath,
+            config: sanitizeVerifyConfigForPanel(nextCfg)
+        });
     } catch (error) {
         console.error('Error subiendo imagen de verify:', error);
         res.status(500).json({ error: 'Error al subir imagen de verify' });
@@ -5772,9 +5792,7 @@ app.delete('/api/guild/:guildId/verify-image', requireAuth, async (req, res) => 
 
         const currentCfg = (await verifyStore.getVerifyConfig(guildId)) || {};
         const previousUrl = String(currentCfg.imageUrl || currentCfg.image_url || '').trim();
-        const uploadPath = previousUrl.startsWith('/uploads/')
-            ? previousUrl.split('?')[0]
-            : '';
+        const uploadPath = extractUploadPath(previousUrl) || (previousUrl.startsWith('/uploads/') ? previousUrl.split('?')[0] : '');
 
         if (uploadPath) {
             deleteUploadDiskFile(uploadPath);
@@ -5789,7 +5807,7 @@ app.delete('/api/guild/:guildId/verify-image', requireAuth, async (req, res) => 
         };
         await verifyStore.setVerifyConfig(guildId, nextCfg);
 
-        res.json({ success: true, config: nextCfg });
+        res.json({ success: true, config: sanitizeVerifyConfigForPanel(nextCfg) });
     } catch (error) {
         console.error('Error eliminando imagen de verify:', error);
         res.status(500).json({ error: 'Error al eliminar imagen de verificación' });
