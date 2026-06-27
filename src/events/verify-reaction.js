@@ -1,31 +1,12 @@
-const verifyStore = require('../utils/verify-config-store');
-
-function normalizeEmojiIdentifier(emoji) {
-    if (!emoji) return '';
-    if (emoji.id) return String(emoji.id);
-    return String(emoji.name || '');
-}
-
-async function resolveVerifyConfig(guild) {
-    if (!guild?.id) return null;
-    const cfg = await verifyStore.getVerifyConfig(guild.id);
-    if (!cfg || cfg.enabled === false) return null;
-    if (!cfg.channelId || !cfg.messageId || !cfg.roleId) return null;
-    return cfg;
-}
-
-async function ensureMember(guild, userId) {
-    if (!guild || !userId) return null;
-    return guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
-}
-
-function hasRequiredPermissions(guild, role) {
-    const me = guild?.members?.me;
-    if (!me || !role) return false;
-    if (!me.permissions.has('ManageRoles')) return false;
-    if (me.roles.highest.position <= role.position) return false;
-    return true;
-}
+const {
+    normalizeEmojiIdentifier,
+    resolveVerifyConfig,
+    ensureMember,
+    completeVerification,
+    revokeVerification,
+    usesReactionVerification,
+    eligibilityMessage
+} = require('../utils/verify-service');
 
 async function handleReactionAdd(reaction, user) {
     if (!reaction || !user || user.bot) return;
@@ -40,7 +21,7 @@ async function handleReactionAdd(reaction, user) {
     if (!guild) return;
 
     const cfg = await resolveVerifyConfig(guild);
-    if (!cfg) return;
+    if (!cfg || !usesReactionVerification(cfg)) return;
 
     if (String(message.channelId) !== String(cfg.channelId) || String(message.id) !== String(cfg.messageId)) return;
 
@@ -48,24 +29,20 @@ async function handleReactionAdd(reaction, user) {
     const reactionEmoji = normalizeEmojiIdentifier(reaction.emoji);
     if (reactionEmoji !== expectedEmoji) return;
 
-    const verifiedRole = guild.roles.cache.get(cfg.roleId) || await guild.roles.fetch(cfg.roleId).catch(() => null);
-    if (!verifiedRole) return;
-    if (!hasRequiredPermissions(guild, verifiedRole)) return;
-
-    const newMemberRoleId = String(cfg.newMemberRoleId || '').trim();
-    let newMemberRole = null;
-    if (newMemberRoleId && newMemberRoleId !== verifiedRole.id) {
-        newMemberRole = guild.roles.cache.get(newMemberRoleId) || await guild.roles.fetch(newMemberRoleId).catch(() => null);
-        if (newMemberRole && !hasRequiredPermissions(guild, newMemberRole)) return;
-    }
-
     const member = await ensureMember(guild, user.id);
-    if (!member || member.roles.cache.has(verifiedRole.id)) return;
+    if (!member) return;
 
-    const addedVerifiedRole = await member.roles.add(verifiedRole, 'Verificación por reacción').then(() => true).catch(() => false);
-    if (!addedVerifiedRole || !newMemberRole || !member.roles.cache.has(newMemberRole.id)) return;
-
-    await member.roles.remove(newMemberRole, 'Quitar rol inicial tras verificación').catch(() => null);
+    const result = await completeVerification(member, cfg, 'Verificación por reacción');
+    if (!result.ok && result.reason !== 'already_verified') {
+        await reaction.users.remove(user.id).catch(() => null);
+        const channel = message.channel;
+        if (channel?.isTextBased?.()) {
+            await channel.send({
+                content: `<@${user.id}> ${eligibilityMessage(cfg, result)}`,
+                allowedMentions: { users: [user.id], parse: [] }
+            }).catch(() => null);
+        }
+    }
 }
 
 async function handleReactionRemove(reaction, user) {
@@ -81,7 +58,7 @@ async function handleReactionRemove(reaction, user) {
     if (!guild) return;
 
     const cfg = await resolveVerifyConfig(guild);
-    if (!cfg || cfg.removeRoleOnUnreact !== true) return;
+    if (!cfg || cfg.removeRoleOnUnreact !== true || !usesReactionVerification(cfg)) return;
 
     if (String(message.channelId) !== String(cfg.channelId) || String(message.id) !== String(cfg.messageId)) return;
 
@@ -89,14 +66,10 @@ async function handleReactionRemove(reaction, user) {
     const reactionEmoji = normalizeEmojiIdentifier(reaction.emoji);
     if (reactionEmoji !== expectedEmoji) return;
 
-    const role = guild.roles.cache.get(cfg.roleId) || await guild.roles.fetch(cfg.roleId).catch(() => null);
-    if (!role) return;
-    if (!hasRequiredPermissions(guild, role)) return;
-
     const member = await ensureMember(guild, user.id);
-    if (!member || !member.roles.cache.has(role.id)) return;
+    if (!member) return;
 
-    await member.roles.remove(role, 'Desverificación por quitar reacción').catch(() => null);
+    await revokeVerification(member, cfg, 'Desverificación por quitar reacción');
 }
 
 module.exports = {

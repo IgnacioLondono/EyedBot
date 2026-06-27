@@ -8,6 +8,7 @@ const guildMemberAddEvent = require('./events/guildMemberAdd');
 const guildMemberRemoveEvent = require('./events/guildMemberRemove');
 const antiRaidGuard = require('./events/anti-raid-guard');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
+const { handleVerifyButton } = require('./utils/verify-service');
 const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = require('./events/ticket-interaction');
 const {
     handleMessageCreate,
@@ -476,6 +477,9 @@ client.on('interactionCreate', async interaction => {
 
             const giveawayHandled = await handleGiveawayButton(interaction);
             if (giveawayHandled) return;
+
+            const verifyHandled = await handleVerifyButton(interaction);
+            if (verifyHandled) return;
 
             if (interaction.customId.startsWith('fun_return_')) {
                 const handled = await handleReturnInteraction(interaction);

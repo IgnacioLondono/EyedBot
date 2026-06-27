@@ -224,6 +224,9 @@ export const publishVerify = (guildId: string, body?: Record<string, unknown>) =
 export const updateVerifyEmbed = (guildId: string, body: Record<string, unknown>) =>
   apiFetch(`/api/guild/${g(guildId)}/verify-embed-update`, { method: "POST", body });
 
+export const syncVerifyPermissions = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/verify-sync-permissions`, { method: "POST", body });
+
 export const uploadVerifyImage = (guildId: string, file: File) => {
   const form = new FormData();
   form.append("imageFile", file);

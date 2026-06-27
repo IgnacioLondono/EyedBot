@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, ShieldCheck } from "lucide-react";
 import {
   deleteVerifyImage,
   getVerifyConfig,
   publishVerify,
   saveVerifyConfig,
+  syncVerifyPermissions,
   updateVerifyEmbed,
   uploadVerifyImage,
 } from "@/lib/api/endpoints";
@@ -17,12 +18,14 @@ import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import {
   ChannelSelect,
   ColorInput,
   Field,
   FormActions,
   Input,
+  MultiChannelSelect,
   PaneGrid,
   RoleSelect,
   SectionCard,
@@ -32,6 +35,8 @@ import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { plainColorToHex } from "@/lib/embed-utils";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
+
+type VerifyMode = "reaction" | "button" | "both";
 
 type VerifyState = {
   enabled: boolean;
@@ -45,10 +50,24 @@ type VerifyState = {
   footer: string;
   imageUrl: string;
   removeRoleOnUnreact: boolean;
+  reassignRoleOnUnreact: boolean;
+  verificationMode: VerifyMode;
+  restrictedChannelIds: string[];
+  minAccountAgeDays: number;
+  requireNewMemberRole: boolean;
+  logChannelId: string;
+  buttonLabel: string;
 };
+
+function normalizeVerifyMode(value: unknown): VerifyMode {
+  const mode = toStringValue(value, "both").toLowerCase();
+  if (mode === "reaction" || mode === "button" || mode === "both") return mode;
+  return "both";
+}
 
 function normalizeVerify(value: unknown): VerifyState {
   const data = asRecord(value);
+  const restrictedRaw = data.restrictedChannelIds || data.restricted_channel_ids;
   return {
     enabled: toBooleanValue(data.enabled),
     channelId: toStringValue(data.channelId || data.channel_id),
@@ -61,11 +80,45 @@ function normalizeVerify(value: unknown): VerifyState {
     footer: toStringValue(data.footer),
     imageUrl: toStringValue(data.imageUrl || data.image_url),
     removeRoleOnUnreact: toBooleanValue(data.removeRoleOnUnreact),
+    reassignRoleOnUnreact: data.reassignRoleOnUnreact === false ? false : true,
+    verificationMode: normalizeVerifyMode(data.verificationMode || data.verification_mode),
+    restrictedChannelIds: Array.isArray(restrictedRaw)
+      ? restrictedRaw.map((id) => toStringValue(id)).filter(Boolean)
+      : [],
+    minAccountAgeDays: Math.max(0, Number.parseInt(toStringValue(data.minAccountAgeDays || data.min_account_age_days, "0"), 10) || 0),
+    requireNewMemberRole: toBooleanValue(data.requireNewMemberRole || data.require_new_member_role),
+    logChannelId: toStringValue(data.logChannelId || data.log_channel_id),
+    buttonLabel: toStringValue(data.buttonLabel || data.button_label, "Verificarme"),
+  };
+}
+
+function toVerifyPayload(form: VerifyState) {
+  return {
+    enabled: form.enabled,
+    channelId: form.channelId,
+    roleId: form.roleId,
+    newMemberRoleId: form.newMemberRoleId,
+    emoji: form.emoji,
+    title: form.title,
+    message: form.description,
+    color: form.color,
+    footer: form.footer,
+    imageUrl: form.imageUrl,
+    removeRoleOnUnreact: form.removeRoleOnUnreact,
+    reassignRoleOnUnreact: form.reassignRoleOnUnreact,
+    verificationMode: form.verificationMode,
+    restrictedChannelIds: form.restrictedChannelIds,
+    minAccountAgeDays: form.minAccountAgeDays,
+    requireNewMemberRole: form.requireNewMemberRole,
+    logChannelId: form.logChannelId,
+    buttonLabel: form.buttonLabel,
   };
 }
 
 const VERIFY_TABS = [
   { id: "config", label: "Configuración" },
+  { id: "acceso", label: "Acceso" },
+  { id: "seguridad", label: "Seguridad" },
   { id: "embed", label: "Embed" },
   { id: "media", label: "Imagen" },
 ];
@@ -87,10 +140,18 @@ export function VerifyPane({ guildId }: { guildId: string }) {
     footer: "",
     imageUrl: "",
     removeRoleOnUnreact: false,
+    reassignRoleOnUnreact: true,
+    verificationMode: "both",
+    restrictedChannelIds: [],
+    minAccountAgeDays: 0,
+    requireNewMemberRole: false,
+    logChannelId: "",
+    buttonLabel: "Verificarme",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [syncingPermissions, setSyncingPermissions] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingImage, setDeletingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +166,7 @@ export function VerifyPane({ guildId }: { guildId: string }) {
   async function handleSave() {
     setSaving(true);
     try {
-      await saveVerifyConfig(guildId, form);
+      await saveVerifyConfig(guildId, toVerifyPayload(form));
       toast({ title: "Verificación guardada", description: "El flujo de acceso quedó actualizado.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
@@ -117,7 +178,8 @@ export function VerifyPane({ guildId }: { guildId: string }) {
   async function handlePublish() {
     setPublishing(true);
     try {
-      await publishVerify(guildId, form);
+      await saveVerifyConfig(guildId, toVerifyPayload(form));
+      await publishVerify(guildId, toVerifyPayload(form));
       toast({ title: "Mensaje publicado", description: "La publicación de verificación fue enviada.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo publicar", description: getErrorMessage(err), tone: "danger" });
@@ -129,7 +191,8 @@ export function VerifyPane({ guildId }: { guildId: string }) {
   async function handleUpdateEmbed() {
     setPublishing(true);
     try {
-      await updateVerifyEmbed(guildId, form);
+      await saveVerifyConfig(guildId, toVerifyPayload(form));
+      await updateVerifyEmbed(guildId, toVerifyPayload(form));
       toast({ title: "Embed actualizado", description: "El mensaje publicado fue editado.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo actualizar", description: getErrorMessage(err), tone: "danger" });
@@ -138,12 +201,40 @@ export function VerifyPane({ guildId }: { guildId: string }) {
     }
   }
 
+  async function handleSyncPermissions() {
+    setSyncingPermissions(true);
+    try {
+      await saveVerifyConfig(guildId, toVerifyPayload(form));
+      const result = asRecord(await syncVerifyPermissions(guildId, { restrictedChannelIds: form.restrictedChannelIds }));
+      const synced = Number(result.synced || 0);
+      const errors = Array.isArray(result.errors) ? result.errors : [];
+      const config = asRecord(result.config);
+      if (Object.keys(config).length) {
+        setForm(normalizeVerify(config));
+      }
+      toast({
+        title: "Permisos sincronizados",
+        description:
+          errors.length > 0
+            ? `Se actualizaron ${synced} canales. ${errors.length} canal(es) fallaron.`
+            : `Se actualizaron ${synced} canal(es) para el rol sin verificar.`,
+        tone: errors.length > 0 ? "warning" : "success",
+      });
+    } catch (err) {
+      toast({ title: "No se pudo sincronizar", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setSyncingPermissions(false);
+    }
+  }
+
   if (loading) return <Alert title="Cargando verificación" description="Consultando el estado del módulo." />;
   if (error) return <Alert title="No se pudo cargar verificación" description={error} variant="danger" />;
 
+  const selectableChannels = channels.filter((channel) => channel.botCanAccess !== false);
+
   return (
     <PaneGrid>
-      <SectionCard title="Panel de verificación" description="Configura el mensaje y la entrega del rol de acceso.">
+      <SectionCard title="Panel de verificación" description="Configura el mensaje, los roles y el acceso inicial al servidor.">
         <Tabs items={VERIFY_TABS} value={tab} onValueChange={setTab} className="mb-5" />
 
         {tab === "config" ? (
@@ -161,7 +252,7 @@ export function VerifyPane({ guildId }: { guildId: string }) {
             <Field label="Rol al verificar">
               <RoleSelect value={form.roleId} onChange={(roleId) => setForm((current) => ({ ...current, roleId }))} options={roles} />
             </Field>
-            <Field label="Rol inicial de nuevo miembro" description="Opcional. Se quita al verificar.">
+            <Field label="Rol inicial de nuevo miembro" description="Se asigna al entrar y limita qué canales puede ver hasta verificarse.">
               <RoleSelect
                 value={form.newMemberRoleId}
                 onChange={(newMemberRoleId) => setForm((current) => ({ ...current, newMemberRoleId }))}
@@ -169,17 +260,112 @@ export function VerifyPane({ guildId }: { guildId: string }) {
                 placeholder="Sin rol inicial"
               />
             </Field>
-            <Field label="Emoji de reacción">
-              <Input value={form.emoji} onChange={(event) => setForm((current) => ({ ...current, emoji: event.target.value }))} placeholder="✅" />
+            <Field label="Modo de verificación" description="El botón es más seguro: no depende de reacciones y evita bots de reacción.">
+              <Select
+                value={form.verificationMode}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    verificationMode: normalizeVerifyMode(event.target.value),
+                  }))
+                }
+              >
+                <option value="button">Solo botón</option>
+                <option value="reaction">Solo reacción</option>
+                <option value="both">Botón y reacción</option>
+              </Select>
+            </Field>
+            {form.verificationMode !== "button" ? (
+              <Field label="Emoji de reacción">
+                <Input value={form.emoji} onChange={(event) => setForm((current) => ({ ...current, emoji: event.target.value }))} placeholder="✅" />
+              </Field>
+            ) : null}
+            {form.verificationMode !== "reaction" ? (
+              <Field label="Texto del botón">
+                <Input
+                  value={form.buttonLabel}
+                  onChange={(event) => setForm((current) => ({ ...current, buttonLabel: event.target.value }))}
+                  placeholder="Verificarme"
+                />
+              </Field>
+            ) : null}
+          </div>
+        ) : null}
+
+        {tab === "acceso" ? (
+          <div className="space-y-5">
+            <Alert
+              title="Configura permisos en Discord"
+              description="Para que el rol sin verificar solo vea ciertos canales, niega «Ver canal» a @everyone en el resto del servidor (o categorías) y usa «Sincronizar permisos» para permitir acceso solo en los canales seleccionados."
+            />
+            <Field
+              label="Canales visibles sin verificar"
+              description="Incluye reglas, verificación y bienvenida. El canal de verificación se añade automáticamente."
+            >
+              <MultiChannelSelect
+                value={form.restrictedChannelIds}
+                onChange={(restrictedChannelIds) => setForm((current) => ({ ...current, restrictedChannelIds }))}
+                options={selectableChannels}
+              />
+            </Field>
+            <Button variant="secondary" onClick={() => void handleSyncPermissions()} disabled={syncingPermissions || !form.newMemberRoleId}>
+              {syncingPermissions ? "Sincronizando..." : "Sincronizar permisos del rol sin verificar"}
+            </Button>
+          </div>
+        ) : null}
+
+        {tab === "seguridad" ? (
+          <div className="space-y-5">
+            <Field label="Antigüedad mínima de cuenta (días)" description="0 desactiva esta comprobación. Recomendado: 3-7 días contra cuentas nuevas.">
+              <Input
+                type="number"
+                min={0}
+                max={365}
+                value={String(form.minAccountAgeDays)}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    minAccountAgeDays: Math.max(0, Math.min(365, Number.parseInt(event.target.value || "0", 10) || 0)),
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Canal de registros" description="Opcional. El bot enviará un aviso cuando alguien se verifique o pierda acceso.">
+              <ChannelSelect
+                value={form.logChannelId}
+                onChange={(logChannelId) => setForm((current) => ({ ...current, logChannelId }))}
+                options={channels}
+                placeholder="Sin canal de logs"
+              />
             </Field>
             <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
               <div>
+                <p className="font-medium text-white">Exigir rol sin verificar</p>
+                <p className="text-sm text-zinc-400">Solo pueden verificarse miembros que tengan el rol inicial asignado.</p>
+              </div>
+              <Switch
+                checked={form.requireNewMemberRole}
+                onCheckedChange={(requireNewMemberRole) => setForm((current) => ({ ...current, requireNewMemberRole }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
                 <p className="font-medium text-white">Quitar rol al quitar reacción</p>
-                <p className="text-sm text-zinc-400">Revoca el acceso si el usuario elimina la reacción.</p>
+                <p className="text-sm text-zinc-400">Revoca el acceso si el usuario elimina la reacción (solo modo reacción).</p>
               </div>
               <Switch
                 checked={form.removeRoleOnUnreact}
                 onCheckedChange={(removeRoleOnUnreact) => setForm((current) => ({ ...current, removeRoleOnUnreact }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
+                <p className="font-medium text-white">Restaurar rol sin verificar al desverificar</p>
+                <p className="text-sm text-zinc-400">Vuelve a asignar el rol inicial si pierden la verificación.</p>
+              </div>
+              <Switch
+                checked={form.reassignRoleOnUnreact}
+                onCheckedChange={(reassignRoleOnUnreact) => setForm((current) => ({ ...current, reassignRoleOnUnreact }))}
               />
             </div>
           </div>
@@ -264,6 +450,14 @@ export function VerifyPane({ guildId }: { guildId: string }) {
             <p className="text-sm text-zinc-400">
               Canal: {channels.find((channel) => channel.id === form.channelId)?.name || "Sin canal"} · Rol:{" "}
               {roles.find((role) => role.id === form.roleId)?.name || "Sin rol"}
+            </p>
+          </div>
+          <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+            <p className="text-sm text-zinc-300">
+              Modo: {form.verificationMode === "both" ? "Botón y reacción" : form.verificationMode === "button" ? "Solo botón" : "Solo reacción"}
+              {form.minAccountAgeDays > 0 ? ` · Cuenta mínima: ${form.minAccountAgeDays} días` : ""}
+              {form.restrictedChannelIds.length > 0 ? ` · ${form.restrictedChannelIds.length} canal(es) sin verificar` : ""}
             </p>
           </div>
           <DiscordEmbedPreview

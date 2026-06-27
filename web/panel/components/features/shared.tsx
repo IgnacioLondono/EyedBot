@@ -293,6 +293,61 @@ export function MultiRoleSelect({
   );
 }
 
+export function MultiChannelSelect({
+  value,
+  onChange,
+  options,
+  emptyLabel = "No hay canales disponibles.",
+}: {
+  value: string[];
+  onChange: (value: string[]) => void;
+  options: Array<{ id: string; name: string; isPrivate?: boolean; type?: number }>;
+  emptyLabel?: string;
+}) {
+  if (!options.length) {
+    return <p className="text-sm text-zinc-500">{emptyLabel}</p>;
+  }
+
+  function toggle(channelId: string) {
+    if (value.includes(channelId)) {
+      onChange(value.filter((id) => id !== channelId));
+      return;
+    }
+    onChange([...value, channelId]);
+  }
+
+  return (
+    <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-white/8 bg-black/20 p-2">
+      {options.map((channel) => {
+        const checked = value.includes(channel.id);
+        const privateLabel = channel.isPrivate ? " · Privado" : "";
+        return (
+          <label
+            key={channel.id}
+            className={cn(
+              "flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm transition",
+              checked ? "bg-violet-500/15 text-white" : "text-zinc-300 hover:bg-white/5"
+            )}
+          >
+            <input
+              type="checkbox"
+              name={`channel-${channel.id}`}
+              id={`channel-${channel.id}`}
+              checked={checked}
+              onChange={() => toggle(channel.id)}
+              className="accent-violet-500"
+            />
+            <span className="truncate">
+              #{channel.name}
+              {privateLabel}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ColorInput({
   value,
   onChange,

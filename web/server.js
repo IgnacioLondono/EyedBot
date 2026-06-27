@@ -37,6 +37,11 @@ function getWelcomeCardUtils() {
     return welcomeCardUtils;
 }
 const verifyStore = require('../src/utils/verify-config-store');
+const {
+    buildVerifyComponents,
+    usesReactionVerification,
+    syncRestrictedRolePermissions
+} = require('../src/utils/verify-service');
 const eventsGiveawaysStore = require('../src/utils/events-giveaways-store');
 const giveawayService = require('../src/utils/giveaway-service');
 const ticketStore = require('../src/utils/ticket-config-store');
@@ -3188,6 +3193,12 @@ async function buildVerifyEmbedFromConfig(cfg, guild) {
     return { embed, files };
 }
 
+async function buildVerifyPanelPayload(guildId, cfg, guild) {
+    const { embed, files } = await buildVerifyEmbedFromConfig(cfg, guild);
+    const components = buildVerifyComponents(guildId, cfg);
+    return { embed, files, components };
+}
+
 function buildTicketPanelPayload(guildId, cfg, guild) {
     const embed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
@@ -3285,13 +3296,16 @@ async function refreshVerifyPanelMessage(guildId, updatedByUserId) {
         throw e;
     }
 
-    const { embed, files } = await buildVerifyEmbedFromConfig(cfg, guild);
+    const { embed, files, components } = await buildVerifyPanelPayload(guildId, cfg, guild);
     await message.edit({
         embeds: [embed],
-        files: files.length ? files : []
+        files: files.length ? files : [],
+        components: components.length ? components : []
     });
 
-    await syncVerifyPanelReaction(message, cfg);
+    if (usesReactionVerification(cfg)) {
+        await syncVerifyPanelReaction(message, cfg);
+    }
 
     const emojiData = normalizeVerifyEmojiInput(cfg.emoji || '✅');
     const updatedCfg = {
@@ -3396,7 +3410,14 @@ app.get('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
                 footer: '',
                 imageUrl: '',
                 removeRoleOnUnreact: false,
-                messageId: ''
+                reassignRoleOnUnreact: true,
+                messageId: '',
+                verificationMode: 'both',
+                restrictedChannelIds: [],
+                minAccountAgeDays: 0,
+                requireNewMemberRole: false,
+                logChannelId: '',
+                buttonLabel: 'Verificarme'
             });
         }
 
@@ -3420,19 +3441,50 @@ app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
         const body = req.body || {};
+        const existing = (await verifyStore.getVerifyConfig(guildId)) || {};
+        const verificationModeRaw = String(body.verificationMode || existing.verificationMode || 'both').toLowerCase();
+        const verificationMode = ['reaction', 'button', 'both'].includes(verificationModeRaw)
+            ? verificationModeRaw
+            : 'both';
+        const restrictedChannelIds = Array.isArray(body.restrictedChannelIds)
+            ? body.restrictedChannelIds.map((id) => String(id || '').trim()).filter(Boolean)
+            : Array.isArray(existing.restrictedChannelIds)
+                ? existing.restrictedChannelIds
+                : [];
+        const minAccountAgeDays = Math.max(
+            0,
+            Math.min(
+                365,
+                Number.parseInt(String(body.minAccountAgeDays ?? existing.minAccountAgeDays ?? 0), 10) || 0
+            )
+        );
+
         const config = {
+            ...existing,
             enabled: body.enabled === true,
-            channelId: String(body.channelId || '').trim(),
-            roleId: String(body.roleId || '').trim(),
-            newMemberRoleId: String(body.newMemberRoleId || '').trim(),
-            emoji: String(body.emoji || '✅').trim().slice(0, 80),
-            title: String(body.title || 'Verify').slice(0, 256),
-            message: String(body.message || '¡Reacciona a este mensaje para ver los demás canales!').slice(0, 2000),
-            color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
-            footer: String(body.footer || '').slice(0, 300),
-            imageUrl: canonicalPanelMediaUrl(body.imageUrl || body.image_url || ''),
+            channelId: String(body.channelId || existing.channelId || '').trim(),
+            roleId: String(body.roleId || existing.roleId || '').trim(),
+            newMemberRoleId: String(body.newMemberRoleId || existing.newMemberRoleId || '').trim(),
+            emoji: String(body.emoji || existing.emoji || '✅').trim().slice(0, 80),
+            title: String(body.title || existing.title || 'Verify').slice(0, 256),
+            message: String(
+                body.message
+                || body.description
+                || existing.message
+                || '¡Reacciona a este mensaje para ver los demás canales!'
+            ).slice(0, 2000),
+            color: String(body.color || existing.color || '7c4dff').replace('#', '').slice(0, 6),
+            footer: String(body.footer ?? existing.footer ?? '').slice(0, 300),
+            imageUrl: canonicalPanelMediaUrl(body.imageUrl || body.image_url || existing.imageUrl || ''),
             removeRoleOnUnreact: body.removeRoleOnUnreact === true,
-            messageId: String(body.messageId || '').trim(),
+            reassignRoleOnUnreact: body.reassignRoleOnUnreact !== false,
+            messageId: String(body.messageId || existing.messageId || '').trim(),
+            verificationMode,
+            restrictedChannelIds,
+            minAccountAgeDays,
+            requireNewMemberRole: body.requireNewMemberRole === true,
+            logChannelId: String(body.logChannelId || existing.logChannelId || '').trim(),
+            buttonLabel: String(body.buttonLabel || existing.buttonLabel || 'Verificarme').slice(0, 80),
             updatedAt: new Date().toISOString(),
             updatedBy: req.session.user?.id || 'unknown'
         };
@@ -3442,6 +3494,55 @@ app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error guardando verify config:', error);
         res.status(500).json({ error: 'Error al guardar configuración de verificación' });
+    }
+});
+
+app.post('/api/guild/:guildId/verify-sync-permissions', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await verifyStore.getVerifyConfig(guildId);
+        if (!cfg?.newMemberRoleId) {
+            return res.status(400).json({ error: 'Configura el rol inicial de nuevo miembro antes de sincronizar permisos.' });
+        }
+
+        const body = req.body || {};
+        if (Array.isArray(body.restrictedChannelIds)) {
+            cfg.restrictedChannelIds = body.restrictedChannelIds
+                .map((id) => String(id || '').trim())
+                .filter(Boolean);
+        }
+
+        const result = await syncRestrictedRolePermissions(guild, cfg);
+        if (!result.ok) {
+            return res.status(400).json({ error: result.error || 'No se pudieron sincronizar permisos.' });
+        }
+
+        const updatedCfg = {
+            ...cfg,
+            restrictedChannelIds: result.channelIds,
+            permissionsSyncedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+        await verifyStore.setVerifyConfig(guildId, updatedCfg);
+
+        res.json({
+            success: true,
+            synced: result.synced,
+            errors: result.errors,
+            channelIds: result.channelIds,
+            config: sanitizeVerifyConfigForPanel(updatedCfg)
+        });
+    } catch (error) {
+        console.error('Error sincronizando permisos de verificación:', error);
+        res.status(500).json({ error: 'Error al sincronizar permisos del rol sin verificar' });
     }
 });
 
@@ -3489,12 +3590,18 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
             return res.status(403).json({ error: 'El bot no puede administrar el rol inicial de nuevo miembro (revisa jerarquía y permiso Gestionar roles)' });
         }
 
-        const { embed, files } = await buildVerifyEmbedFromConfig(cfg, guild);
+        const { embed, files, components } = await buildVerifyPanelPayload(guildId, cfg, guild);
 
-        const posted = await channel.send({ embeds: [embed], files });
+        const posted = await channel.send({
+            embeds: [embed],
+            files,
+            components: components.length ? components : []
+        });
 
         const emojiData = normalizeVerifyEmojiInput(cfg.emoji || '✅');
-        await posted.react(emojiData.reactValue).catch(() => null);
+        if (usesReactionVerification(cfg)) {
+            await posted.react(emojiData.reactValue).catch(() => null);
+        }
 
         const updatedCfg = {
             ...cfg,
