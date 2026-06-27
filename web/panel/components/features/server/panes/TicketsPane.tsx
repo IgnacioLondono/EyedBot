@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, FlaskConical, Layers } from "lucide-react";
+import { Eye, FlaskConical, Layers, LayoutTemplate } from "lucide-react";
 import {
   getTicketConfig,
   publishTickets,
@@ -30,10 +30,12 @@ import {
 } from "@/components/features/shared";
 import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
 import { usePanel } from "@/components/providers/PanelProvider";
+import { applyTicketPreset, TICKET_PRESETS } from "@/lib/ticket-presets";
 import { asArray, asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
 const TICKET_TABS = [
   { id: "panel", label: "Panel" },
+  { id: "templates", label: "Plantillas" },
   { id: "roles", label: "Roles" },
   { id: "preview", label: "Preview" },
   { id: "categories", label: "Categorías" },
@@ -192,6 +194,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   const [publishing, setPublishing] = useState(false);
   const [updatingEmbed, setUpdatingEmbed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -363,6 +366,57 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             )
           ) : null}
 
+          {tab === "templates" ? (
+            <div className="space-y-5">
+              <Alert
+                title="Plantillas de tickets"
+                description="Elige un tema listo para usar. Se aplican título, mensaje, color, categorías y opciones de labs. Los canales y roles no se modifican."
+              />
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {TICKET_PRESETS.map((preset) => {
+                  const active = selectedTemplateId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplateId(preset.id);
+                        setConfig((current) => applyTicketPreset(preset, current));
+                        toast({
+                          title: "Plantilla aplicada",
+                          description: `"${preset.name}" rellenó el panel y las categorías. Guarda y publica cuando estés listo.`,
+                          tone: "success",
+                        });
+                      }}
+                      className={`rounded-2xl border p-4 text-left transition hover:border-violet-500/40 ${
+                        active ? "border-violet-400/60 bg-violet-500/10" : "border-white/10 bg-black/20"
+                      }`}
+                    >
+                      <div className="mb-3 flex items-center gap-2">
+                        <span
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: `#${preset.color.replace("#", "")}` }}
+                          aria-hidden
+                        />
+                        <p className="font-medium text-white">{preset.name}</p>
+                      </div>
+                      <p className="text-sm text-zinc-400">{preset.description}</p>
+                      <p className="mt-3 text-xs text-zinc-500">
+                        {preset.ticketCategories.length} categorías · {preset.commonProblems.length} casos
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <FormActions onSave={handleSaveConfig} saving={saving} />
+                <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing}>
+                  {publishing ? "Publicando..." : "Publicar panel"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {tab === "roles" ? (
             <div className="space-y-5">
               <Field label="Roles de staff" description="Selecciona los roles que pueden gestionar tickets.">
@@ -485,10 +539,19 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           {tab === "manage" ? <TicketsManagePanel guildId={guildId} /> : null}
 
           {tab === "guide" ? (
-            <Alert
-              title="Flujo recomendado"
-              description="1) Configura panel, roles y categorías. 2) Revisa preview y publica. 3) Ajusta labs si necesitas DMs o historial. 4) Gestiona pendientes y activos."
-            />
+            <div className="space-y-4">
+              <Alert
+                title="Flujo recomendado"
+                description="1) Elige una plantilla o configura el panel manualmente. 2) Asigna roles de staff. 3) Revisa preview y publica. 4) Ajusta labs si necesitas DMs o historial. 5) Gestiona pendientes y activos."
+              />
+              <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
+                <div className="mb-2 flex items-center gap-2 font-medium text-zinc-200">
+                  <LayoutTemplate className="h-4 w-4" />
+                  Plantillas disponibles
+                </div>
+                {TICKET_PRESETS.map((preset) => preset.name).join(" · ")}
+              </div>
+            </div>
           ) : null}
         </div>
       </SectionCard>

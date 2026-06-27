@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Calendar, Gift, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Calendar, Eye, Gift, LayoutTemplate, RefreshCw, Sparkles } from "lucide-react";
 import {
   cancelServerEvent,
   createGiveaway,
@@ -17,6 +17,7 @@ import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
@@ -31,6 +32,16 @@ import {
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
+import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
+import { plainColorToHex } from "@/lib/embed-utils";
+import {
+  applyGiveawayPreset,
+  formatGiveawayDuration,
+  GIVEAWAY_DURATION_PRESETS,
+  GIVEAWAY_PRESETS,
+  giveawayStatusLabel,
+  giveawayStatusVariant,
+} from "@/lib/giveaway-presets";
 import { asArray, asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
 type ModuleConfig = {
@@ -64,8 +75,9 @@ type EventRow = {
 
 const TABS = [
   { id: "giveaways", label: "Sorteos" },
+  { id: "templates", label: "Plantillas" },
   { id: "events", label: "Eventos" },
-  { id: "config", label: "Configuración" },
+  { id: "config", label: "Configuraci?n" },
 ];
 
 function normalizeConfig(value: unknown): ModuleConfig {
@@ -106,6 +118,23 @@ function normalizeEvent(value: unknown): EventRow {
   };
 }
 
+function buildGiveawayPreviewDescription(form: {
+  prize: string;
+  description: string;
+  winnersCount: number;
+  durationMinutes: number;
+}) {
+  const lines = [
+    form.description.trim(),
+    "",
+    `?? **Premio:** ${form.prize || "?"}`,
+    `?? **Ganadores:** ${form.winnersCount}`,
+    `?? **Participantes:** 0`,
+    `? **Termina:** en ${formatGiveawayDuration(form.durationMinutes)}`,
+  ].filter((line, index) => line !== "" || index === 1);
+  return lines.join("\n");
+}
+
 export function EventsPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
@@ -124,6 +153,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 
   const [giveawayForm, setGiveawayForm] = useState({
     title: "Sorteo",
@@ -142,6 +172,13 @@ export function EventsPane({ guildId }: { guildId: string }) {
     startAt: "",
     channelId: "",
   });
+
+  const activeGiveaways = useMemo(
+    () => giveaways.filter((row) => row.status === "active"),
+    [giveaways]
+  );
+
+  const previewColor = plainColorToHex(config.color);
 
   async function reloadLists() {
     const [giveawayPayload, eventsPayload] = await Promise.all([
@@ -175,7 +212,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
     try {
       const result = asRecord(await saveEventsGiveawaysConfig(guildId, config));
       setConfig(normalizeConfig(result.config ?? config));
-      toast({ title: "Configuración guardada", description: "Eventos y sorteos actualizados.", tone: "success" });
+      toast({ title: "Configuraci?n guardada", description: "Eventos y sorteos actualizados.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -188,7 +225,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
     try {
       await createGiveaway(guildId, giveawayForm);
       await reloadLists();
-      toast({ title: "Sorteo creado", description: "Se publicó en Discord con botón de participación.", tone: "success" });
+      toast({ title: "Sorteo creado", description: "Se public? en Discord con bot?n de participaci?n.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo crear", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -201,7 +238,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
     try {
       await createServerEvent(guildId, { ...eventForm, publish: true });
       await reloadLists();
-      toast({ title: "Evento publicado", description: "El anuncio quedó en el canal seleccionado.", tone: "success" });
+      toast({ title: "Evento publicado", description: "El anuncio qued? en el canal seleccionado.", tone: "success" });
       setEventForm((current) => ({ ...current, title: "", description: "", location: "", startAt: "" }));
     } catch (err) {
       toast({ title: "No se pudo publicar", description: getErrorMessage(err), tone: "danger" });
@@ -210,35 +247,62 @@ export function EventsPane({ guildId }: { guildId: string }) {
     }
   }
 
-  if (loading) return <Alert title="Cargando eventos y sorteos" description="Consultando el módulo." />;
+  if (loading) return <Alert title="Cargando eventos y sorteos" description="Consultando el m?dulo." />;
   if (error) return <Alert title="No se pudo cargar" description={error} variant="danger" />;
 
   return (
     <div className="space-y-6">
       <SectionCard
         title="Eventos y sorteos"
-        description="Crea sorteos con botón de participación y anuncia eventos con recordatorios automáticos."
+        description="Crea sorteos con bot?n de participaci?n, usa plantillas r?pidas y anuncia eventos con recordatorios autom?ticos."
       >
         <Tabs items={TABS} value={tab} onValueChange={setTab} className="mb-5" />
 
         {tab === "giveaways" ? (
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="space-y-4 rounded-2xl border border-white/8 bg-black/20 p-4">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Gift className="h-4 w-4 text-violet-300" />
-                Nuevo sorteo
-              </h3>
-              <Field label="Título">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Gift className="h-4 w-4 text-violet-300" />
+                  Nuevo sorteo
+                </h3>
+                <Button size="sm" variant="ghost" onClick={() => setTab("templates")}>
+                  <LayoutTemplate className="mr-2 h-4 w-4" />
+                  Ver plantillas
+                </Button>
+              </div>
+
+              <Field label="T?tulo">
                 <Input value={giveawayForm.title} onChange={(e) => setGiveawayForm((c) => ({ ...c, title: e.target.value }))} />
               </Field>
               <Field label="Premio">
                 <Input value={giveawayForm.prize} onChange={(e) => setGiveawayForm((c) => ({ ...c, prize: e.target.value }))} />
               </Field>
-              <Field label="Descripción">
+              <Field label="Descripci?n">
                 <Textarea value={giveawayForm.description} onChange={(e) => setGiveawayForm((c) => ({ ...c, description: e.target.value }))} />
               </Field>
+
+              <Field label="Duraci?n r?pida">
+                <div className="flex flex-wrap gap-2">
+                  {GIVEAWAY_DURATION_PRESETS.map((preset) => (
+                    <button
+                      key={preset.minutes}
+                      type="button"
+                      onClick={() => setGiveawayForm((c) => ({ ...c, durationMinutes: preset.minutes }))}
+                      className={`rounded-xl border px-3 py-1.5 text-xs transition ${
+                        giveawayForm.durationMinutes === preset.minutes
+                          ? "border-violet-400/60 bg-violet-500/15 text-violet-100"
+                          : "border-white/10 bg-black/20 text-zinc-400 hover:border-white/20"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Duración (min)">
+                <Field label="Duraci?n (min)">
                   <Input
                     type="number"
                     min={5}
@@ -256,6 +320,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                   />
                 </Field>
               </div>
+
               <Field label="Canal">
                 <ChannelSelect
                   value={giveawayForm.channelId}
@@ -276,67 +341,138 @@ export function EventsPane({ guildId }: { guildId: string }) {
               </Button>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">Sorteos recientes</h3>
-                <Button size="sm" variant="ghost" onClick={() => void reloadLists()}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Actualizar
-                </Button>
+            <div className="space-y-5">
+              <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+                <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400">
+                  <Eye className="h-4 w-4" />
+                  Vista previa en Discord
+                </div>
+                <DiscordEmbedPreview
+                  title={`?? ${giveawayForm.title || "Sorteo"}`}
+                  description={buildGiveawayPreviewDescription(giveawayForm)}
+                  color={previewColor}
+                  footer="EyedBot ? Sorteos"
+                />
+                <div className="mt-4">
+                  <span className="inline-flex rounded-lg bg-[#3ba55d] px-4 py-2 text-sm font-medium text-white">
+                    ?? Participar
+                  </span>
+                </div>
               </div>
-              {giveaways.length === 0 ? (
-                <p className="text-sm text-zinc-500">Aún no hay sorteos en este servidor.</p>
-              ) : (
-                giveaways.slice(0, 12).map((row) => (
-                  <div key={row.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-white">{row.title}</p>
-                        <p className="text-sm text-zinc-400">{row.prize}</p>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {row.status} · {row.entries.length} participantes · ID {row.id.slice(0, 8)}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {row.status === "active" ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busyId === row.id}
-                            onClick={() => {
-                              setBusyId(row.id);
-                              void endGiveaway(guildId, row.id)
-                                .then(() => reloadLists())
-                                .then(() => toast({ title: "Sorteo finalizado", tone: "success" }))
-                                .catch((err) => toast({ title: "Error", description: getErrorMessage(err), tone: "danger" }))
-                                .finally(() => setBusyId(null));
-                            }}
-                          >
-                            Terminar
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busyId === row.id}
-                            onClick={() => {
-                              setBusyId(row.id);
-                              void rerollGiveaway(guildId, row.id)
-                                .then(() => reloadLists())
-                                .then(() => toast({ title: "Reroll hecho", tone: "success" }))
-                                .catch((err) => toast({ title: "Error", description: getErrorMessage(err), tone: "danger" }))
-                                .finally(() => setBusyId(null));
-                            }}
-                          >
-                            Reroll
-                          </Button>
-                        )}
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">Sorteos recientes</h3>
+                    <p className="text-xs text-zinc-500">{activeGiveaways.length} activos ? {giveaways.length} total</p>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => void reloadLists()}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Actualizar
+                  </Button>
+                </div>
+                {giveaways.length === 0 ? (
+                  <p className="text-sm text-zinc-500">A?n no hay sorteos en este servidor.</p>
+                ) : (
+                  giveaways.slice(0, 12).map((row) => (
+                    <div key={row.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-white">{row.title}</p>
+                            <Badge variant={giveawayStatusVariant(row.status)}>{giveawayStatusLabel(row.status)}</Badge>
+                          </div>
+                          <p className="text-sm text-zinc-400">{row.prize}</p>
+                          <p className="mt-1 text-xs text-zinc-500">
+                            {row.entries.length} participantes
+                            {row.endsAt ? ` ? termina ${new Date(row.endsAt).toLocaleString("es-ES")}` : ""}
+                            {` ? ID ${row.id.slice(0, 8)}`}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {row.status === "active" ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={busyId === row.id}
+                              onClick={() => {
+                                setBusyId(row.id);
+                                void endGiveaway(guildId, row.id)
+                                  .then(() => reloadLists())
+                                  .then(() => toast({ title: "Sorteo finalizado", tone: "success" }))
+                                  .catch((err) => toast({ title: "Error", description: getErrorMessage(err), tone: "danger" }))
+                                  .finally(() => setBusyId(null));
+                              }}
+                            >
+                              Terminar
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busyId === row.id}
+                              onClick={() => {
+                                setBusyId(row.id);
+                                void rerollGiveaway(guildId, row.id)
+                                  .then(() => reloadLists())
+                                  .then(() => toast({ title: "Reroll hecho", tone: "success" }))
+                                  .catch((err) => toast({ title: "Error", description: getErrorMessage(err), tone: "danger" }))
+                                  .finally(() => setBusyId(null));
+                              }}
+                            >
+                              Reroll
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
+          </div>
+        ) : null}
+
+        {tab === "templates" ? (
+          <div className="space-y-5">
+            <Alert
+              title="Plantillas de sorteos"
+              description="Selecciona un preset para rellenar el formulario de sorteos. Luego ajusta canal, rol requerido y publica desde la pesta?a Sorteos."
+            />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {GIVEAWAY_PRESETS.map((preset) => {
+                const active = selectedPresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPresetId(preset.id);
+                      setGiveawayForm((current) => applyGiveawayPreset(preset, current));
+                      toast({
+                        title: "Plantilla cargada",
+                        description: `"${preset.name}" rellen? el formulario. Ve a Sorteos para publicar.`,
+                        tone: "success",
+                      });
+                    }}
+                    className={`rounded-2xl border p-4 text-left transition hover:border-violet-500/40 ${
+                      active ? "border-violet-400/60 bg-violet-500/10" : "border-white/10 bg-black/20"
+                    }`}
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-violet-300" />
+                      <p className="font-medium text-white">{preset.name}</p>
+                    </div>
+                    <p className="text-sm text-zinc-400">{preset.description}</p>
+                    <p className="mt-3 text-xs text-zinc-500">
+                      {preset.prize} ? {formatGiveawayDuration(preset.durationMinutes)} ? {preset.winnersCount} ganador
+                      {preset.winnersCount === 1 ? "" : "es"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+            <Button onClick={() => setTab("giveaways")}>Ir a crear sorteo</Button>
           </div>
         ) : null}
 
@@ -347,10 +483,10 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 <Calendar className="h-4 w-4 text-violet-300" />
                 Nuevo evento
               </h3>
-              <Field label="Título">
+              <Field label="T?tulo">
                 <Input value={eventForm.title} onChange={(e) => setEventForm((c) => ({ ...c, title: e.target.value }))} />
               </Field>
-              <Field label="Descripción">
+              <Field label="Descripci?n">
                 <Textarea value={eventForm.description} onChange={(e) => setEventForm((c) => ({ ...c, description: e.target.value }))} />
               </Field>
               <Field label="Lugar / enlace">
@@ -383,9 +519,9 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 events.slice(0, 12).map((row) => (
                   <div key={row.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
                     <p className="font-medium text-white">{row.title}</p>
-                    <p className="text-sm text-zinc-400">{row.description || "Sin descripción"}</p>
+                    <p className="text-sm text-zinc-400">{row.description || "Sin descripci?n"}</p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      {row.status} · {row.startAt ? new Date(row.startAt).toLocaleString("es-ES") : "—"} · ID {row.id.slice(0, 8)}
+                      {row.status} ? {row.startAt ? new Date(row.startAt).toLocaleString("es-ES") : "?"} ? ID {row.id.slice(0, 8)}
                     </p>
                     {row.status !== "cancelled" && row.status !== "completed" ? (
                       <Button
@@ -416,7 +552,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
           <div className="space-y-5">
             <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
               <div>
-                <p className="font-medium text-white">Módulo activo</p>
+                <p className="font-medium text-white">M?dulo activo</p>
                 <p className="text-sm text-zinc-400">Permite sorteos y eventos en este servidor.</p>
               </div>
               <Switch checked={config.enabled} onCheckedChange={(enabled) => setConfig((c) => ({ ...c, enabled }))} />
@@ -440,7 +576,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 onChange={(e) => setConfig((c) => ({ ...c, reminderMinutesBefore: Number(e.target.value) || 60 }))}
               />
             </Field>
-            <Field label="Roles gestores" description="Opcional. Quién puede usar /sorteo y /evento además del staff.">
+            <Field label="Roles gestores" description="Opcional. Qui?n puede usar /sorteo y /evento adem?s del staff.">
               <MultiRoleSelect
                 value={config.managerRoleIds}
                 onChange={(managerRoleIds) => setConfig((c) => ({ ...c, managerRoleIds }))}
