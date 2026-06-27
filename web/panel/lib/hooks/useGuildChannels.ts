@@ -8,6 +8,9 @@ export type GuildChannelOption = {
   id: string;
   name: string;
   type: string;
+  parentId?: string | null;
+  isPrivate?: boolean;
+  botCanAccess?: boolean;
 };
 
 export function useGuildChannels(guildId: string) {
@@ -27,6 +30,9 @@ export function useGuildChannels(guildId: string) {
             id: toStringValue(item.id),
             name: toStringValue(item.name, "Canal"),
             type: toStringValue(item.type, "unknown"),
+            parentId: toStringValue(item.parentId) || null,
+            isPrivate: item.isPrivate === true,
+            botCanAccess: item.botCanAccess !== false,
           };
         });
         setChannels(mapped.filter((item) => item.id));

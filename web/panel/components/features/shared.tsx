@@ -151,16 +151,22 @@ function channelMatchesFilter(channel: { type?: string }, filter: ChannelFilter)
   if (filter === "all") return true;
   if (filter === "voice") return type === "2" || type === "13";
   if (filter === "category") return type === "4";
-  if (filter === "text") return type === "0" || type === "5";
+  if (filter === "text") return type === "0" || type === "5" || type === "15";
   return true;
 }
 
-function channelOptionLabel(channel: { name: string; type?: string }) {
+function channelOptionLabel(channel: { name: string; type?: string; isPrivate?: boolean; botCanAccess?: boolean }) {
   const type = String(channel.type || "");
-  if (type === "2" || type === "13") return `🔊 ${channel.name}`;
-  if (type === "4") return `📁 ${channel.name}`;
-  if (type === "5") return `📢 ${channel.name}`;
-  return `#${channel.name}`;
+  const tags: string[] = [];
+  if (channel.isPrivate) tags.push("Privado");
+  if (channel.isPrivate && channel.botCanAccess === false) tags.push("Bot sin acceso");
+  const prefix = tags.length ? `[${tags.join(" · ")}] ` : "";
+
+  if (type === "2" || type === "13") return `${prefix}Voz · ${channel.name}`;
+  if (type === "4") return `${prefix}Categoría · ${channel.name}`;
+  if (type === "5") return `${prefix}Anuncios · ${channel.name}`;
+  if (type === "15") return `${prefix}Foro · ${channel.name}`;
+  return `${prefix}Texto · ${channel.name}`;
 }
 
 export function ChannelSelect({
@@ -172,7 +178,7 @@ export function ChannelSelect({
 }: {
   value: string;
   onChange: (value: string) => void;
-  options: Array<{ id: string; name: string; type?: string }>;
+  options: Array<{ id: string; name: string; type?: string; isPrivate?: boolean; botCanAccess?: boolean }>;
   placeholder?: string;
   filter?: ChannelFilter;
 }) {

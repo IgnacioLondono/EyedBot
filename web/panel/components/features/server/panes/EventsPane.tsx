@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Eye, Gift, LayoutTemplate, RefreshCw, Sparkles } from "lucide-react";
+import { Calendar, Eye, Gift, LayoutTemplate, MousePointerClick, RefreshCw, Sparkles } from "lucide-react";
 import {
   cancelServerEvent,
   createGiveaway,
@@ -77,7 +77,7 @@ const TABS = [
   { id: "giveaways", label: "Sorteos" },
   { id: "templates", label: "Plantillas" },
   { id: "events", label: "Eventos" },
-  { id: "config", label: "Configuraci?n" },
+  { id: "config", label: "Configuración" },
 ];
 
 function normalizeConfig(value: unknown): ModuleConfig {
@@ -127,10 +127,10 @@ function buildGiveawayPreviewDescription(form: {
   const lines = [
     form.description.trim(),
     "",
-    `?? **Premio:** ${form.prize || "?"}`,
-    `?? **Ganadores:** ${form.winnersCount}`,
-    `?? **Participantes:** 0`,
-    `? **Termina:** en ${formatGiveawayDuration(form.durationMinutes)}`,
+    `**Premio:** ${form.prize || "—"}`,
+    `**Ganadores:** ${form.winnersCount}`,
+    `**Participantes:** 0`,
+    `**Termina:** en ${formatGiveawayDuration(form.durationMinutes)}`,
   ].filter((line, index) => line !== "" || index === 1);
   return lines.join("\n");
 }
@@ -212,7 +212,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
     try {
       const result = asRecord(await saveEventsGiveawaysConfig(guildId, config));
       setConfig(normalizeConfig(result.config ?? config));
-      toast({ title: "Configuraci?n guardada", description: "Eventos y sorteos actualizados.", tone: "success" });
+      toast({ title: "Configuración guardada", description: "Eventos y sorteos actualizados.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -225,7 +225,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
     try {
       await createGiveaway(guildId, giveawayForm);
       await reloadLists();
-      toast({ title: "Sorteo creado", description: "Se public? en Discord con bot?n de participaci?n.", tone: "success" });
+      toast({ title: "Sorteo creado", description: "Se publicó en Discord con botón de participación.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo crear", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -238,7 +238,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
     try {
       await createServerEvent(guildId, { ...eventForm, publish: true });
       await reloadLists();
-      toast({ title: "Evento publicado", description: "El anuncio qued? en el canal seleccionado.", tone: "success" });
+      toast({ title: "Evento publicado", description: "El anuncio quedó en el canal seleccionado.", tone: "success" });
       setEventForm((current) => ({ ...current, title: "", description: "", location: "", startAt: "" }));
     } catch (err) {
       toast({ title: "No se pudo publicar", description: getErrorMessage(err), tone: "danger" });
@@ -247,14 +247,14 @@ export function EventsPane({ guildId }: { guildId: string }) {
     }
   }
 
-  if (loading) return <Alert title="Cargando eventos y sorteos" description="Consultando el m?dulo." />;
+  if (loading) return <Alert title="Cargando eventos y sorteos" description="Consultando el módulo." />;
   if (error) return <Alert title="No se pudo cargar" description={error} variant="danger" />;
 
   return (
     <div className="space-y-6">
       <SectionCard
         title="Eventos y sorteos"
-        description="Crea sorteos con bot?n de participaci?n, usa plantillas r?pidas y anuncia eventos con recordatorios autom?ticos."
+        description="Crea sorteos con botón de participación, usa plantillas rápidas y anuncia eventos con recordatorios automáticos."
       >
         <Tabs items={TABS} value={tab} onValueChange={setTab} className="mb-5" />
 
@@ -272,17 +272,17 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 </Button>
               </div>
 
-              <Field label="T?tulo">
+              <Field label="Título">
                 <Input value={giveawayForm.title} onChange={(e) => setGiveawayForm((c) => ({ ...c, title: e.target.value }))} />
               </Field>
               <Field label="Premio">
                 <Input value={giveawayForm.prize} onChange={(e) => setGiveawayForm((c) => ({ ...c, prize: e.target.value }))} />
               </Field>
-              <Field label="Descripci?n">
+              <Field label="Descripción">
                 <Textarea value={giveawayForm.description} onChange={(e) => setGiveawayForm((c) => ({ ...c, description: e.target.value }))} />
               </Field>
 
-              <Field label="Duraci?n r?pida">
+              <Field label="Duración rápida">
                 <div className="flex flex-wrap gap-2">
                   {GIVEAWAY_DURATION_PRESETS.map((preset) => (
                     <button
@@ -302,7 +302,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
               </Field>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Duraci?n (min)">
+                <Field label="Duración (min)">
                   <Input
                     type="number"
                     min={5}
@@ -348,14 +348,15 @@ export function EventsPane({ guildId }: { guildId: string }) {
                   Vista previa en Discord
                 </div>
                 <DiscordEmbedPreview
-                  title={`?? ${giveawayForm.title || "Sorteo"}`}
+                  title={giveawayForm.title || "Sorteo"}
                   description={buildGiveawayPreviewDescription(giveawayForm)}
                   color={previewColor}
-                  footer="EyedBot ? Sorteos"
+                  footer="EyedBot · Sorteos"
                 />
                 <div className="mt-4">
-                  <span className="inline-flex rounded-lg bg-[#3ba55d] px-4 py-2 text-sm font-medium text-white">
-                    ?? Participar
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-[#3ba55d] px-4 py-2 text-sm font-medium text-white">
+                    <MousePointerClick className="h-4 w-4" aria-hidden />
+                    Participar
                   </span>
                 </div>
               </div>
@@ -364,7 +365,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-white">Sorteos recientes</h3>
-                    <p className="text-xs text-zinc-500">{activeGiveaways.length} activos ? {giveaways.length} total</p>
+                    <p className="text-xs text-zinc-500">{activeGiveaways.length} activos · {giveaways.length} total</p>
                   </div>
                   <Button size="sm" variant="ghost" onClick={() => void reloadLists()}>
                     <RefreshCw className="mr-2 h-4 w-4" />
@@ -372,7 +373,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                   </Button>
                 </div>
                 {giveaways.length === 0 ? (
-                  <p className="text-sm text-zinc-500">A?n no hay sorteos en este servidor.</p>
+                  <p className="text-sm text-zinc-500">Aún no hay sorteos en este servidor.</p>
                 ) : (
                   giveaways.slice(0, 12).map((row) => (
                     <div key={row.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
@@ -385,8 +386,8 @@ export function EventsPane({ guildId }: { guildId: string }) {
                           <p className="text-sm text-zinc-400">{row.prize}</p>
                           <p className="mt-1 text-xs text-zinc-500">
                             {row.entries.length} participantes
-                            {row.endsAt ? ` ? termina ${new Date(row.endsAt).toLocaleString("es-ES")}` : ""}
-                            {` ? ID ${row.id.slice(0, 8)}`}
+                            {row.endsAt ? ` · termina ${new Date(row.endsAt).toLocaleString("es-ES")}` : ""}
+                            {` · ID ${row.id.slice(0, 8)}`}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -437,7 +438,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
           <div className="space-y-5">
             <Alert
               title="Plantillas de sorteos"
-              description="Selecciona un preset para rellenar el formulario de sorteos. Luego ajusta canal, rol requerido y publica desde la pesta?a Sorteos."
+              description="Selecciona un preset para rellenar el formulario de sorteos. Luego ajusta canal, rol requerido y publica desde la pestaña Sorteos."
             />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {GIVEAWAY_PRESETS.map((preset) => {
@@ -451,7 +452,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                       setGiveawayForm((current) => applyGiveawayPreset(preset, current));
                       toast({
                         title: "Plantilla cargada",
-                        description: `"${preset.name}" rellen? el formulario. Ve a Sorteos para publicar.`,
+                        description: `"${preset.name}" rellenó el formulario. Ve a Sorteos para publicar.`,
                         tone: "success",
                       });
                     }}
@@ -465,7 +466,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                     </div>
                     <p className="text-sm text-zinc-400">{preset.description}</p>
                     <p className="mt-3 text-xs text-zinc-500">
-                      {preset.prize} ? {formatGiveawayDuration(preset.durationMinutes)} ? {preset.winnersCount} ganador
+                      {preset.prize} · {formatGiveawayDuration(preset.durationMinutes)} · {preset.winnersCount} ganador
                       {preset.winnersCount === 1 ? "" : "es"}
                     </p>
                   </button>
@@ -483,10 +484,10 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 <Calendar className="h-4 w-4 text-violet-300" />
                 Nuevo evento
               </h3>
-              <Field label="T?tulo">
+              <Field label="Título">
                 <Input value={eventForm.title} onChange={(e) => setEventForm((c) => ({ ...c, title: e.target.value }))} />
               </Field>
-              <Field label="Descripci?n">
+              <Field label="Descripción">
                 <Textarea value={eventForm.description} onChange={(e) => setEventForm((c) => ({ ...c, description: e.target.value }))} />
               </Field>
               <Field label="Lugar / enlace">
@@ -519,9 +520,9 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 events.slice(0, 12).map((row) => (
                   <div key={row.id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
                     <p className="font-medium text-white">{row.title}</p>
-                    <p className="text-sm text-zinc-400">{row.description || "Sin descripci?n"}</p>
+                    <p className="text-sm text-zinc-400">{row.description || "Sin descripción"}</p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      {row.status} ? {row.startAt ? new Date(row.startAt).toLocaleString("es-ES") : "?"} ? ID {row.id.slice(0, 8)}
+                      {row.status} · {row.startAt ? new Date(row.startAt).toLocaleString("es-ES") : "?"} · ID {row.id.slice(0, 8)}
                     </p>
                     {row.status !== "cancelled" && row.status !== "completed" ? (
                       <Button
@@ -552,7 +553,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
           <div className="space-y-5">
             <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
               <div>
-                <p className="font-medium text-white">M?dulo activo</p>
+                <p className="font-medium text-white">Módulo activo</p>
                 <p className="text-sm text-zinc-400">Permite sorteos y eventos en este servidor.</p>
               </div>
               <Switch checked={config.enabled} onCheckedChange={(enabled) => setConfig((c) => ({ ...c, enabled }))} />
@@ -576,7 +577,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 onChange={(e) => setConfig((c) => ({ ...c, reminderMinutesBefore: Number(e.target.value) || 60 }))}
               />
             </Field>
-            <Field label="Roles gestores" description="Opcional. Qui?n puede usar /sorteo y /evento adem?s del staff.">
+            <Field label="Roles gestores" description="Opcional. Quién puede usar /sorteo y /evento además del staff.">
               <MultiRoleSelect
                 value={config.managerRoleIds}
                 onChange={(managerRoleIds) => setConfig((c) => ({ ...c, managerRoleIds }))}

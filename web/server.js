@@ -58,7 +58,15 @@ const crunchyrollService = require('../src/utils/crunchyroll-service');
 const channelSetupTemplates = require('../src/utils/channel-setup-templates');
 const { executeGuildNuke } = require('../src/utils/guild-nuke');
 const gachaStore = require('../src/utils/gacha-store');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const {
+    ActionRowBuilder,
+    AttachmentBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ChannelType,
+    EmbedBuilder,
+    PermissionFlagsBits
+} = require('discord.js');
 const {
     ticketButtonCustomIdForGuild,
     acceptPendingFromWeb,
@@ -1708,6 +1716,79 @@ function summarizeChannelType(channel) {
     return `Tipo ${type}`;
 }
 
+const SELECTABLE_GUILD_CHANNEL_TYPES = new Set([
+    ChannelType.GuildText,
+    ChannelType.GuildVoice,
+    ChannelType.GuildCategory,
+    ChannelType.GuildAnnouncement,
+    ChannelType.GuildStageVoice,
+    ChannelType.GuildForum
+]);
+
+function channelIsPrivateForEveryone(channel, guild) {
+    const everyoneRole = guild?.roles?.everyone;
+    if (!everyoneRole) return false;
+    const everyonePerms = channel.permissionsFor?.(everyoneRole);
+    if (!everyonePerms) return false;
+    return !everyonePerms.has(PermissionFlagsBits.ViewChannel);
+}
+
+function memberCanViewChannel(channel, member) {
+    if (!member || !channel) return false;
+    const perms = channel.permissionsFor?.(member);
+    return perms?.has(PermissionFlagsBits.ViewChannel) === true;
+}
+
+function botCanViewChannel(channel, guild) {
+    const me = guild?.members?.me;
+    if (!me || !channel) return false;
+    const perms = channel.permissionsFor?.(me);
+    return perms?.has(PermissionFlagsBits.ViewChannel) === true;
+}
+
+function mapSelectableGuildChannel(channel, guild, member = null) {
+    return {
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        typeName: summarizeChannelType(channel).toLowerCase(),
+        parentId: channel.parentId || null,
+        position: Number(channel.rawPosition ?? channel.position ?? 0),
+        isPrivate: channelIsPrivateForEveryone(channel, guild),
+        userCanView: member ? memberCanViewChannel(channel, member) : true,
+        botCanAccess: botCanViewChannel(channel, guild)
+    };
+}
+
+function sortSelectableGuildChannels(a, b) {
+    const parentA = String(a.parentId || '');
+    const parentB = String(b.parentId || '');
+    if (parentA !== parentB) return parentA.localeCompare(parentB, 'es');
+    if (a.position !== b.position) return a.position - b.position;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+}
+
+async function listSelectableGuildChannels(guild, sessionUserId = '') {
+    try {
+        await guild.channels.fetch();
+    } catch {
+        /* noop */
+    }
+
+    const member = sessionUserId
+        ? (guild.members.cache.get(String(sessionUserId))
+            || await guild.members.fetch(String(sessionUserId)).catch(() => null))
+        : null;
+
+    const rows = guild.channels.cache
+        .filter((channel) => SELECTABLE_GUILD_CHANNEL_TYPES.has(channel.type))
+        .filter((channel) => (member ? memberCanViewChannel(channel, member) : true))
+        .map((channel) => mapSelectableGuildChannel(channel, guild, member))
+        .sort(sortSelectableGuildChannels);
+
+    return rows;
+}
+
 function sanitizeChannelSnapshot(channel) {
     const connectedUsers = channel.members
         ? channel.members
@@ -2942,14 +3023,8 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'No tienes acceso a este servidor' });
         }
 
-        const channels = guild.channels.cache
-            .filter((channel) => channel.type === 0 || channel.type === 2 || channel.type === 4 || channel.type === 5)
-            .map((channel) => ({
-                id: channel.id,
-                name: channel.name,
-                type: channel.type,
-                typeName: summarizeChannelType(channel).toLowerCase()
-            }));
+        const sessionUserId = String(req.session?.user?.id || '').trim();
+        const channels = await listSelectableGuildChannels(guild, sessionUserId);
 
         res.json(channels);
     } catch (error) {
