@@ -301,7 +301,7 @@ export function MultiChannelSelect({
 }: {
   value: string[];
   onChange: (value: string[]) => void;
-  options: Array<{ id: string; name: string; isPrivate?: boolean; type?: number }>;
+  options: Array<{ id: string; name: string; isPrivate?: boolean; type?: string; botCanAccess?: boolean }>;
   emptyLabel?: string;
 }) {
   if (!options.length) {
