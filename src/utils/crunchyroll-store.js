@@ -70,6 +70,8 @@ function defaultConfig() {
         color: 'f47521',
         footerText: 'EyedBot · Crunchyroll',
         embedLargePreview: true,
+        notifyAllAnime: true,
+        seenEpisodeIds: [],
         series: [],
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
@@ -91,6 +93,10 @@ function normalizeConfig(raw = {}) {
         color: String(raw.color || base.color).replace('#', '').slice(0, 6) || base.color,
         footerText: String(raw.footerText || base.footerText).slice(0, 200),
         embedLargePreview: raw.embedLargePreview !== false,
+        notifyAllAnime: raw.notifyAllAnime !== false,
+        seenEpisodeIds: Array.isArray(raw.seenEpisodeIds)
+            ? raw.seenEpisodeIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 1000)
+            : [],
         series,
         updatedAt: raw.updatedAt || new Date().toISOString(),
         updatedBy: String(raw.updatedBy || 'system')

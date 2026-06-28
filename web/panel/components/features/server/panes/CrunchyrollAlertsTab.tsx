@@ -50,6 +50,7 @@ type CrunchyrollState = {
   color: string;
   footerText: string;
   embedLargePreview: boolean;
+  notifyAllAnime: boolean;
   series: CrunchyrollSeries[];
 };
 
@@ -79,6 +80,7 @@ const defaultForm: CrunchyrollState = {
   color: "f47521",
   footerText: "EyedBot · Crunchyroll",
   embedLargePreview: true,
+  notifyAllAnime: true,
   series: [],
 };
 
@@ -108,6 +110,7 @@ function normalizeForm(value: unknown): CrunchyrollState {
     color: toStringValue(data.color, defaultForm.color).replace("#", ""),
     footerText: toStringValue(data.footerText, defaultForm.footerText),
     embedLargePreview: toBooleanValue(data.embedLargePreview, true),
+    notifyAllAnime: data.notifyAllAnime !== false,
     series: asArray(data.series).map(normalizeSeries),
   };
 }
@@ -259,7 +262,7 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
       <div className="flex items-center gap-3 rounded-2xl border border-orange-400/20 bg-orange-500/10 px-4 py-3">
         <Tv className="h-5 w-5 text-orange-200" />
         <p className="text-sm text-orange-100">
-          Avisa en Discord cuando salga un episodio nuevo de las series que sigas en Crunchyroll.
+          Publica en Discord cuando Crunchyroll añada episodios nuevos. Con <strong>Todos los estrenos</strong> no hace falta elegir series una por una.
         </p>
       </div>
 
@@ -269,6 +272,19 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
           <p className="text-sm text-zinc-400">Revisa episodios nuevos cada ~20 minutos.</p>
         </div>
         <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((c) => ({ ...c, enabled: checked }))} />
+      </div>
+
+      <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+        <div>
+          <p className="font-medium text-white">Todos los estrenos</p>
+          <p className="text-sm text-zinc-400">
+            Avisa por cada capítulo nuevo en el feed de Crunchyroll (cualquier anime). La primera revisión solo sincroniza; los avisos empiezan en el siguiente ciclo (~20 min).
+          </p>
+        </div>
+        <Switch
+          checked={form.notifyAllAnime}
+          onCheckedChange={(checked) => setForm((c) => ({ ...c, notifyAllAnime: checked }))}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -328,7 +344,10 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
         />
       </div>
 
-      <SectionCard title="Seguir series" description="Busca por nombre o pega la URL de Crunchyroll.">
+      <SectionCard
+        title="Seguir series (opcional)"
+        description="Añade títulos concretos si quieres seguimiento extra además del feed global."
+      >
         <div className="mb-4 flex gap-2">
           <Input
             value={query}
@@ -388,7 +407,14 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
             ))}
           </div>
         ) : (
-          <EmptyState title="Sin series" description="Busca y añade anime para recibir avisos de capítulos nuevos." />
+          <EmptyState
+            title={form.notifyAllAnime ? "Feed global activo" : "Sin series"}
+            description={
+              form.notifyAllAnime
+                ? "Recibirás avisos de cualquier estreno nuevo. Aquí puedes añadir series específicas si quieres."
+                : "Activa «Todos los estrenos» o busca y añade anime para recibir avisos."
+            }
+          />
         )}
       </SectionCard>
 

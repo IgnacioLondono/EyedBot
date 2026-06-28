@@ -8,6 +8,8 @@ const CR_LOCALE = String(process.env.CRUNCHYROLL_LOCALE || 'es-ES').trim() || 'e
 const CR_USER_AGENT = String(process.env.CRUNCHYROLL_USER_AGENT || 'EyedBot/1.0 (+https://eyedcomun.me)').trim();
 const CHECK_MS = Math.max(5 * 60_000, Number.parseInt(process.env.CRUNCHYROLL_CHECK_MS || `${20 * 60_000}`, 10));
 const FETCH_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.CRUNCHYROLL_FETCH_TIMEOUT_MS || '20000', 10));
+const NOTIFY_ALL_LIMIT = Math.max(10, Math.min(50, Number.parseInt(process.env.CRUNCHYROLL_NOTIFY_ALL_LIMIT || '30', 10)));
+const NOTIFY_ALL_MAX_POSTS = Math.max(1, Math.min(10, Number.parseInt(process.env.CRUNCHYROLL_NOTIFY_ALL_MAX_POSTS || '3', 10)));
 
 let intervalRef = null;
 let running = false;
@@ -138,6 +140,10 @@ function mapEpisodeItem(episode = {}, series = {}, season = {}) {
         String(episode.episode_number ?? episode.episode ?? episode.sequence_number ?? '0'),
         10
     ) || 0;
+    const seriesId = String(series.seriesId || series.id || episode.series_id || '').trim();
+    const seriesTitle = String(
+        series.title || series.name || episode.series_title || episode.parent_title || ''
+    ).trim();
 
     return {
         episodeId,
@@ -147,8 +153,8 @@ function mapEpisodeItem(episode = {}, series = {}, season = {}) {
         imageUrl: pickImage(episode.images) || pickImage(series.images),
         seasonNumber: Number.parseInt(String(season.season_number ?? season.number ?? '0'), 10) || 0,
         seasonTitle: String(season.title || season.name || '').trim(),
-        seriesId: String(series.seriesId || series.id || '').trim(),
-        seriesTitle: String(series.title || series.name || '').trim(),
+        seriesId,
+        seriesTitle,
         url: episodeUrl(episodeId),
         publishedAt: episode.episode_air_date || episode.premium_available_date || episode.free_available_date || null
     };
@@ -219,6 +225,21 @@ async function getLatestEpisodeForSeries(seriesId) {
     }, episodes[0]);
 
     return mapEpisodeItem(latestEpisode, series, latestSeason);
+}
+
+async function fetchNewlyAddedEpisodes(limit = NOTIFY_ALL_LIMIT) {
+    const n = Math.max(1, Math.min(50, limit));
+    const payload = await crFetch(
+        `/content/v2/discover/browse?type=episode&sort_by=newly_added&n=${n}&locale=${encodeURIComponent(CR_LOCALE)}`
+    );
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    return rows
+        .map((row) => {
+            const seriesMeta = row?.series_metadata || row?.series || {};
+            const seasonMeta = row?.season_metadata || row?.season || {};
+            return mapEpisodeItem(row, { ...seriesMeta, seriesId: seriesMeta.id }, seasonMeta);
+        })
+        .filter((item) => item.episodeId);
 }
 
 async function fetchUpcomingEpisodes(limit = 12) {
@@ -308,14 +329,13 @@ async function postEpisodeAlert(client, guildId, config, series, episode) {
     return true;
 }
 
-async function processGuildConfig(client, guildId, config) {
-    if (!config?.enabled || !config.channelId) return null;
-
+async function processTrackedSeries(client, guildId, config) {
     const activeSeries = (config.series || []).filter((item) => item.enabled !== false && item.seriesId);
-    if (!activeSeries.length) return null;
+    if (!activeSeries.length) return { config, updated: false };
 
     let updated = false;
     const nextSeries = [];
+    const seenThisSweep = new Set(Array.isArray(config.seenEpisodeIds) ? config.seenEpisodeIds : []);
 
     for (const tracked of activeSeries) {
         const copy = { ...tracked };
@@ -340,16 +360,18 @@ async function processGuildConfig(client, guildId, config) {
                 continue;
             }
 
-            if (copy.lastEpisodeId === episode.episodeId) {
+            if (copy.lastEpisodeId === episode.episodeId || seenThisSweep.has(episode.episodeId)) {
                 nextSeries.push(copy);
                 continue;
             }
 
-            const posted = await postEpisodeAlert(client, guildId, config, copy, episode);
+            const series = { ...copy, title: episode.seriesTitle || copy.title };
+            const posted = await postEpisodeAlert(client, guildId, config, series, episode);
             if (posted) {
                 copy.lastEpisodeId = episode.episodeId;
                 copy.lastEpisodeNumber = episode.episodeNumber;
                 copy.lastPostedAt = new Date().toISOString();
+                seenThisSweep.add(episode.episodeId);
                 updated = true;
             }
         } catch (error) {
@@ -359,11 +381,89 @@ async function processGuildConfig(client, guildId, config) {
         nextSeries.push(copy);
     }
 
-    if (!updated) return null;
+    return {
+        config: { ...config, series: nextSeries, seenEpisodeIds: Array.from(seenThisSweep).slice(-1000) },
+        updated
+    };
+}
+
+async function processAllAnimeFeed(client, guildId, config) {
+    const episodes = await fetchNewlyAddedEpisodes(NOTIFY_ALL_LIMIT);
+    if (!episodes.length) return { config, updated: false };
+
+    const seen = new Set(Array.isArray(config.seenEpisodeIds) ? config.seenEpisodeIds : []);
+    let updated = false;
+    let posts = 0;
+
+    if (!seen.size) {
+        for (const episode of episodes) {
+            if (episode.episodeId) seen.add(episode.episodeId);
+        }
+        updated = true;
+        console.log(`📺 Crunchyroll ${guildId}: feed inicial (${seen.size} episodios marcados sin avisar)`);
+        return { config: { ...config, seenEpisodeIds: Array.from(seen).slice(-1000) }, updated };
+    }
+
+    const freshEpisodes = episodes.filter((ep) => ep.episodeId && !seen.has(ep.episodeId));
+
+    for (const episode of freshEpisodes.reverse()) {
+        if (posts >= NOTIFY_ALL_MAX_POSTS) break;
+
+        const series = {
+            seriesId: episode.seriesId,
+            title: episode.seriesTitle || episode.title || 'Anime',
+            url: episode.seriesId ? seriesUrl(episode.seriesId, episode.seriesTitle) : episode.url,
+            imageUrl: episode.imageUrl
+        };
+
+        try {
+            const posted = await postEpisodeAlert(client, guildId, config, series, episode);
+            if (posted) {
+                seen.add(episode.episodeId);
+                posts += 1;
+                updated = true;
+                console.log(`📺 Crunchyroll ${guildId}: aviso ${series.title} ep.${episode.episodeNumber}`);
+            }
+        } catch (error) {
+            console.warn(`Crunchyroll all-anime ${guildId}/${episode.episodeId}:`, error?.message || error);
+        }
+    }
+
+    return {
+        config: { ...config, seenEpisodeIds: Array.from(seen).slice(-1000) },
+        updated
+    };
+}
+
+async function processGuildConfig(client, guildId, config) {
+    if (!config?.enabled || !config.channelId) return null;
+
+    const activeSeries = (config.series || []).filter((item) => item.enabled !== false && item.seriesId);
+    if (config.notifyAllAnime === false && !activeSeries.length) return null;
+
+    let working = { ...config };
+    let anyUpdated = false;
+
+    if (config.notifyAllAnime !== false) {
+        try {
+            const allResult = await processAllAnimeFeed(client, guildId, working);
+            working = allResult.config;
+            if (allResult.updated) anyUpdated = true;
+        } catch (error) {
+            console.warn(`Crunchyroll feed ${guildId}:`, error?.message || error);
+        }
+    }
+
+    if (activeSeries.length) {
+        const trackedResult = await processTrackedSeries(client, guildId, working);
+        working = trackedResult.config;
+        if (trackedResult.updated) anyUpdated = true;
+    }
+
+    if (!anyUpdated) return null;
 
     const saved = await crunchyrollStore.setCrunchyrollConfig(guildId, {
-        ...config,
-        series: nextSeries,
+        ...working,
         updatedAt: new Date().toISOString()
     });
     return saved;
@@ -403,6 +503,7 @@ module.exports = {
     getSeriesDetail,
     getLatestEpisodeForSeries,
     fetchUpcomingEpisodes,
+    fetchNewlyAddedEpisodes,
     buildCrunchyrollEmbed,
     postEpisodeAlert,
     processGuildConfig,

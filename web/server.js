@@ -5863,12 +5863,21 @@ app.post('/api/guild/:guildId/crunchyroll/config', requireAuth, async (req, res)
             color: String(body.color || current.color || 'f47521').replace('#', '').slice(0, 6),
             footerText: String(body.footerText || current.footerText || 'EyedBot · Crunchyroll').slice(0, 200),
             embedLargePreview: body.embedLargePreview !== false,
+            notifyAllAnime: body.notifyAllAnime !== false,
+            seenEpisodeIds: Array.isArray(current?.seenEpisodeIds) ? current.seenEpisodeIds : [],
             series,
             updatedBy: req.session.user?.id || 'unknown'
         });
 
         if (config.enabled && !config.channelId) {
             return res.status(400).json({ error: 'Debes seleccionar un canal de notificaciones' });
+        }
+
+        const activeSeries = (config.series || []).filter((item) => item.enabled !== false && item.seriesId);
+        if (config.enabled && config.notifyAllAnime === false && !activeSeries.length) {
+            return res.status(400).json({
+                error: 'Activa "Todos los estrenos" o añade al menos una serie a seguir'
+            });
         }
 
         const saved = await crunchyrollStore.setCrunchyrollConfig(guildId, config);
