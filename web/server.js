@@ -4039,7 +4039,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
         const defaultTicketCategories = [
             { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
             { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft Server', description: 'Ayuda con el servidor, soporte tecnico y consultas generales' },
+            { value: 'eyedbio', label: 'Eyed.bio', description: 'Soporte de perfil link-in-bio, widgets y cuenta' },
             { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
         ];
 
@@ -4051,12 +4051,12 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
             { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
         ];
 
-        const defaultMinecraftServers = [
-            { value: 'no-aplica', label: 'No aplica', description: 'Mi solicitud no es sobre Minecraft' },
-            { value: 'survival', label: 'Survival', description: 'Soporte del servidor Survival' },
-            { value: 'skyblock', label: 'Skyblock', description: 'Soporte del servidor Skyblock' },
-            { value: 'practice', label: 'Practice/PvP', description: 'Soporte de modos PvP o Practice' },
-            { value: 'lobby', label: 'Lobby/Network', description: 'Problemas de conexion o lobby' }
+        const defaultSupportAreas = [
+            { value: 'no-aplica', label: 'No aplica', description: 'Mi consulta no es sobre Eyed.bio' },
+            { value: 'perfil-gratis', label: 'Plan gratuito', description: 'Funciones del plan base' },
+            { value: 'perfil-pro', label: 'Plan Pro', description: 'Suscripción o funciones premium' },
+            { value: 'discord-presence', label: 'Presencia Discord', description: 'Widget en el perfil público' },
+            { value: 'custom-domain', label: 'Dominio personalizado', description: 'DNS o dominio propio' }
         ];
 
         const cfg = await ticketStore.getTicketConfig(guildId);
@@ -4077,7 +4077,8 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
                 messageId: '',
                 ticketCategories: defaultTicketCategories,
                 commonProblems: defaultCommonProblems,
-                minecraftServers: defaultMinecraftServers,
+                supportAreas: defaultSupportAreas,
+                minecraftServers: defaultSupportAreas,
                 caseRoleMap: {}
             });
         }
@@ -4089,7 +4090,18 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
             sendDmPendingStatus: cfg.sendDmPendingStatus === true,
             ticketCategories: Array.isArray(cfg.ticketCategories) && cfg.ticketCategories.length ? cfg.ticketCategories : defaultTicketCategories,
             commonProblems: Array.isArray(cfg.commonProblems) && cfg.commonProblems.length ? cfg.commonProblems : defaultCommonProblems,
-            minecraftServers: Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultMinecraftServers,
+            supportAreas: (() => {
+                const fromCfg = Array.isArray(cfg.supportAreas) && cfg.supportAreas.length
+                    ? cfg.supportAreas
+                    : (Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultSupportAreas);
+                return fromCfg;
+            })(),
+            minecraftServers: (() => {
+                const fromCfg = Array.isArray(cfg.supportAreas) && cfg.supportAreas.length
+                    ? cfg.supportAreas
+                    : (Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultSupportAreas);
+                return fromCfg;
+            })(),
             caseRoleMap: cfg.caseRoleMap && typeof cfg.caseRoleMap === 'object' ? cfg.caseRoleMap : {}
         });
     } catch (error) {
@@ -4110,7 +4122,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
         const defaultTicketCategories = [
             { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
             { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'solicitud-ingreso-minecraft', label: 'Minecraft Server', description: 'Ayuda con el servidor, soporte tecnico y consultas generales' },
+            { value: 'eyedbio', label: 'Eyed.bio', description: 'Soporte de perfil link-in-bio, widgets y cuenta' },
             { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
         ];
 
@@ -4122,12 +4134,12 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
         ];
 
-        const defaultMinecraftServers = [
-            { value: 'no-aplica', label: 'No aplica', description: 'Mi solicitud no es sobre Minecraft' },
-            { value: 'survival', label: 'Survival', description: 'Soporte del servidor Survival' },
-            { value: 'skyblock', label: 'Skyblock', description: 'Soporte del servidor Skyblock' },
-            { value: 'practice', label: 'Practice/PvP', description: 'Soporte de modos PvP o Practice' },
-            { value: 'lobby', label: 'Lobby/Network', description: 'Problemas de conexion o lobby' }
+        const defaultSupportAreas = [
+            { value: 'no-aplica', label: 'No aplica', description: 'Mi consulta no es sobre Eyed.bio' },
+            { value: 'perfil-gratis', label: 'Plan gratuito', description: 'Funciones del plan base' },
+            { value: 'perfil-pro', label: 'Plan Pro', description: 'Suscripción o funciones premium' },
+            { value: 'discord-presence', label: 'Presencia Discord', description: 'Widget en el perfil público' },
+            { value: 'custom-domain', label: 'Dominio personalizado', description: 'DNS o dominio propio' }
         ];
 
         const toOptionValue = (text, fallback) => {
@@ -4186,10 +4198,10 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             'issue'
         );
 
-        const minecraftServers = normalizeTicketOptions(
-            body.minecraftServers,
-            currentCfg?.minecraftServers || defaultMinecraftServers,
-            'mc'
+        const supportAreas = normalizeTicketOptions(
+            body.supportAreas ?? body.minecraftServers,
+            currentCfg?.supportAreas || currentCfg?.minecraftServers || defaultSupportAreas,
+            'area'
         );
 
         const normalizeRoleMap = (raw) => {
@@ -4212,8 +4224,8 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
 
         const caseRoleMap = normalizeRoleMap(body.caseRoleMap || currentCfg?.caseRoleMap || {});
 
-        if (!minecraftServers.some((item) => item.value === 'no-aplica')) {
-            minecraftServers.unshift(defaultMinecraftServers[0]);
+        if (!supportAreas.some((item) => item.value === 'no-aplica')) {
+            supportAreas.unshift(defaultSupportAreas[0]);
         }
 
         const incomingMessageId = String(body.messageId || '').trim();
@@ -4240,7 +4252,8 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             buttonLabel: String(body.buttonLabel || 'Solicitar ticket').slice(0, 80),
             ticketCategories,
             commonProblems,
-            minecraftServers,
+            supportAreas,
+            minecraftServers: supportAreas,
             caseRoleMap,
             messageId: preservedMessageId,
             updatedAt: new Date().toISOString(),

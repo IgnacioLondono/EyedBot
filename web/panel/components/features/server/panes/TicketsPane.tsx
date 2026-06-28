@@ -61,7 +61,9 @@ type TicketConfigState = {
   adminRoleIds: string[];
   ticketCategories: TicketOption[];
   commonProblems: TicketOption[];
-  minecraftServers: TicketOption[];
+  supportAreas: TicketOption[];
+  /** @deprecated Usar supportAreas */
+  minecraftServers?: TicketOption[];
   caseRoleMap: Record<string, string[]>;
 };
 
@@ -186,7 +188,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
     adminRoleIds: [],
     ticketCategories: [],
     commonProblems: [],
-    minecraftServers: [],
+    supportAreas: [],
     caseRoleMap: {},
   });
   const [loading, setLoading] = useState(true);
@@ -218,7 +220,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           adminRoleIds: normalizeRoleIds(cfg.adminRoleIds),
           ticketCategories: normalizeOptions(cfg.ticketCategories),
           commonProblems: normalizeOptions(cfg.commonProblems),
-          minecraftServers: normalizeOptions(cfg.minecraftServers),
+          supportAreas: normalizeOptions(cfg.supportAreas ?? cfg.minecraftServers),
           caseRoleMap: normalizeCaseRoleMap(cfg.caseRoleMap),
         });
       })
@@ -472,9 +474,9 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                 onChange={(commonProblems) => setConfig((c) => ({ ...c, commonProblems }))}
               />
               <OptionEditor
-                title="Servidores Minecraft"
-                options={config.minecraftServers}
-                onChange={(minecraftServers) => setConfig((c) => ({ ...c, minecraftServers }))}
+                title="Áreas Eyed.bio"
+                options={config.supportAreas}
+                onChange={(supportAreas) => setConfig((c) => ({ ...c, supportAreas }))}
               />
               <FormActions onSave={handleSaveConfig} saving={saving} />
             </div>

@@ -32,7 +32,7 @@ const PENDING_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_CATEGORIES = [
     { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
     { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-    { value: 'solicitud-ingreso-minecraft', label: 'Minecraft Server', description: 'Ayuda con el servidor, soporte tecnico y consultas generales' },
+    { value: 'eyedbio', label: 'Eyed.bio', description: 'Soporte de perfil link-in-bio, widgets y cuenta' },
     { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
 ];
 
@@ -57,16 +57,22 @@ const DEFAULT_COMMON_ISSUES_BY_CATEGORY = {
         { value: 'apelacion', label: 'Sancion o apelacion', description: 'Revisar mute, kick o ban' },
         { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
     ],
+    eyedbio: [
+        { value: 'perfil', label: 'Mi perfil', description: 'Enlaces, tema o diseño del perfil' },
+        { value: 'discord-widget', label: 'Widget Discord', description: 'Presencia o actividad en el perfil' },
+        { value: 'vincular-discord', label: 'Vincular Discord', description: 'Conectar cuenta con EyedBot' },
+        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
+    ],
     'solicitud-ingreso-minecraft': [
-        { value: 'postulacion', label: 'Solicitud de ingreso', description: 'Aplicar para entrar al servidor' },
-        { value: 'whitelist', label: 'Whitelist', description: 'Agregar o corregir acceso de whitelist' },
-        { value: 'cuenta', label: 'Cuenta/Nick de Minecraft', description: 'Problemas con nick o cuenta' },
+        { value: 'perfil', label: 'Mi perfil', description: 'Enlaces, tema o diseño del perfil' },
+        { value: 'discord-widget', label: 'Widget Discord', description: 'Presencia o actividad en el perfil' },
+        { value: 'vincular-discord', label: 'Vincular Discord', description: 'Conectar cuenta con EyedBot' },
         { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
     ],
     sugerencias: [
         { value: 'mejora-comunidad', label: 'Mejora de comunidad', description: 'Ideas para eventos y convivencia' },
         { value: 'mejora-bot', label: 'Mejora del bot', description: 'Nuevos comandos o ajustes' },
-        { value: 'mejora-minecraft', label: 'Mejora de Minecraft', description: 'Ideas para el servidor Minecraft' },
+        { value: 'mejora-eyedbio', label: 'Mejora de Eyed.bio', description: 'Ideas para la plataforma link-in-bio' },
         { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
     ]
 };
@@ -490,35 +496,43 @@ function normalizeConfiguredOptions(raw, defaults, prefix) {
     return built.length ? built : defaults;
 }
 
+function normalizeLegacyCategory(item = {}) {
+    const rawLabel = String(item?.label || '').trim();
+    const rawValue = String(item?.value || '').trim();
+
+    if (
+        rawValue === 'minecraft'
+        || rawValue === 'solicitud-ingreso-minecraft'
+        || /minecraft/i.test(rawLabel)
+    ) {
+        return {
+            value: 'eyedbio',
+            label: 'Eyed.bio',
+            description: 'Soporte de perfil link-in-bio, widgets y cuenta'
+        };
+    }
+
+    return {
+        value: rawValue,
+        label: rawLabel,
+        description: String(item?.description || '').trim()
+    };
+}
+
 function sanitizeCategories(categories = []) {
     const normalized = [];
     const used = new Set();
 
     categories.forEach((item) => {
-        const rawLabel = String(item?.label || '').trim();
-        const rawValue = String(item?.value || '').trim();
+        const mapped = normalizeLegacyCategory(item);
+        const { value, label, description } = mapped;
 
-        if (rawValue === 'compras-y-rangos' || /compras\s*y\s*rangos/i.test(rawLabel)) return;
-
-        const isMinecraft = rawValue === 'minecraft' || rawValue === 'solicitud-ingreso-minecraft' || /minecraft/i.test(rawLabel);
-        const value = isMinecraft ? 'solicitud-ingreso-minecraft' : rawValue;
-        const label = isMinecraft ? 'Minecraft Server' : rawLabel;
-        const description = isMinecraft
-            ? 'Ayuda con el servidor, soporte tecnico y consultas generales'
-            : String(item?.description || '').trim();
+        if (value === 'compras-y-rangos' || /compras\s*y\s*rangos/i.test(label)) return;
 
         if (!value || !label || used.has(value)) return;
         used.add(value);
         normalized.push({ value, label, description: description.slice(0, 100) });
     });
-
-    if (!normalized.some((item) => item.value === 'solicitud-ingreso-minecraft')) {
-        normalized.push({
-            value: 'solicitud-ingreso-minecraft',
-            label: 'Minecraft Server',
-            description: 'Ayuda con el servidor, soporte tecnico y consultas generales'
-        });
-    }
 
     return normalized.length ? normalized.slice(0, 25) : DEFAULT_CATEGORIES;
 }
@@ -848,32 +862,32 @@ async function updateTicketPresetSelector(interaction, guildId, updater) {
 async function showTicketReasonModal(interaction, guildId, preset = {}) {
     const modalCustomId = `${MODAL_PREFIX}${guildId}_${Date.now()}`;
 
-    if (String(preset.mode || '') === 'minecraft-application') {
+    if (String(preset.mode || '') === 'eyedbio-link') {
         const modal = new ModalBuilder()
             .setCustomId(modalCustomId)
-            .setTitle('Ingreso a Minecraft');
+            .setTitle('Vincular Eyed.bio');
 
-        const whyInput = new TextInputBuilder()
-            .setCustomId('ticket_mc_why_input_v2')
-            .setLabel('Por que quieres ingresar?')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true)
-            .setMinLength(5)
-            .setMaxLength(500)
-            .setPlaceholder('Cuentanos por que quieres entrar al servidor premium.');
-
-        const nickInput = new TextInputBuilder()
-            .setCustomId('ticket_mc_nick_input_v2')
-            .setLabel('Nick de Minecraft')
+        const profileInput = new TextInputBuilder()
+            .setCustomId('ticket_eyedbio_profile_input')
+            .setLabel('URL o usuario de tu perfil')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
-            .setMinLength(2)
-            .setMaxLength(32)
-            .setPlaceholder('Ej: Steve123');
+            .setMinLength(3)
+            .setMaxLength(120)
+            .setPlaceholder('Ej: https://eyedbio.eyedcomun.me/tuusuario');
+
+        const discordIdInput = new TextInputBuilder()
+            .setCustomId('ticket_eyedbio_discord_id_input')
+            .setLabel('Discord User ID')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMinLength(17)
+            .setMaxLength(20)
+            .setPlaceholder('Modo desarrollador → copiar ID de usuario');
 
         modal.addComponents(
-            new ActionRowBuilder().addComponents(whyInput),
-            new ActionRowBuilder().addComponents(nickInput)
+            new ActionRowBuilder().addComponents(profileInput),
+            new ActionRowBuilder().addComponents(discordIdInput)
         );
         await interaction.showModal(modal);
         return;
@@ -1074,8 +1088,13 @@ function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue
     return /no aparece en esta lista/i.test(String(commonIssueLabel || ''));
 }
 
-function shouldOpenMinecraftApplication(commonIssueValue) {
-    return String(commonIssueValue || '') === 'postulacion';
+function isEyedBioCategory(categoryValue) {
+    const value = String(categoryValue || '');
+    return value === 'eyedbio' || value === 'solicitud-ingreso-minecraft';
+}
+
+function shouldOpenEyedBioLinkModal(commonIssueValue) {
+    return String(commonIssueValue || '') === 'vincular-discord';
 }
 
 async function closeTicket(interaction) {
@@ -1245,10 +1264,10 @@ async function handleTicketButton(interaction) {
         const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
         const commonIssueLabel = optionLabelByValue(categoryIssues, draft.commonIssue);
 
-        if (String(draft.category) === 'solicitud-ingreso-minecraft') {
-            if (shouldOpenMinecraftApplication(draft.commonIssue)) {
+        if (isEyedBioCategory(draft.category)) {
+            if (shouldOpenEyedBioLinkModal(draft.commonIssue)) {
                 await showTicketReasonModal(interaction, guildId, {
-                    mode: 'minecraft-application'
+                    mode: 'eyedbio-link'
                 });
                 return true;
             }
@@ -1296,8 +1315,8 @@ async function handleTicketButton(interaction) {
         const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
         const commonIssueLabel = optionLabelByValue(categoryIssues, draft.commonIssue);
 
-        if (String(draft.category) === 'solicitud-ingreso-minecraft' && shouldOpenMinecraftApplication(draft.commonIssue)) {
-            await showTicketReasonModal(interaction, guildId, { mode: 'minecraft-application' });
+        if (isEyedBioCategory(draft.category) && shouldOpenEyedBioLinkModal(draft.commonIssue)) {
+            await showTicketReasonModal(interaction, guildId, { mode: 'eyedbio-link' });
             return true;
         }
 
@@ -1430,8 +1449,8 @@ async function handleTicketModal(interaction) {
     const modalPayload = interaction.customId.slice(MODAL_PREFIX.length);
     const guildId = modalPayload.split('_')[0];
     const reason = safeGetField(interaction, 'ticket_reason_input', 'Sin motivo');
-    const mcWhy = safeGetField(interaction, 'ticket_mc_why_input_v2', '');
-    const mcNick = safeGetField(interaction, 'ticket_mc_nick_input_v2', '');
+    const eyedBioProfile = safeGetField(interaction, 'ticket_eyedbio_profile_input', '');
+    const eyedBioDiscordId = safeGetField(interaction, 'ticket_eyedbio_discord_id_input', '');
 
     let category = 'Soporte general';
     let commonIssue = 'Mi caso no aparece en esta lista';
@@ -1446,10 +1465,11 @@ async function handleTicketModal(interaction) {
         commonIssue = optionLabelByValue(categoryIssues, selectedDraft.commonIssue);
     }
 
-    const finalReason = mcWhy
-        ? [`Motivo ingreso: ${mcWhy}`, `Nick Minecraft: ${mcNick || 'No especificado'}`]
-            .filter(Boolean)
-            .join('\n')
+    const finalReason = eyedBioProfile
+        ? [
+            `Perfil Eyed.bio: ${eyedBioProfile}`,
+            `Discord User ID: ${eyedBioDiscordId || 'No especificado'}`
+        ].filter(Boolean).join('\n')
         : reason;
 
     await submitPendingTicketRequest(interaction, guildId, {
@@ -1457,7 +1477,7 @@ async function handleTicketModal(interaction) {
         commonIssue,
         categoryValue: selectedDraft?.category,
         commonIssueValue: selectedDraft?.commonIssue,
-        noMatchIssue: mcWhy || reason,
+        noMatchIssue: eyedBioProfile || reason,
         reason: finalReason
     });
     return true;
