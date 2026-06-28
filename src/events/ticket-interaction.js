@@ -12,6 +12,11 @@ const {
     StringSelectMenuBuilder
 } = require('discord.js');
 const ticketStore = require('../utils/ticket-config-store');
+const {
+    DEFAULT_TICKET_CATEGORIES,
+    DEFAULT_COMMON_PROBLEMS,
+    DEFAULT_COMMON_ISSUES_BY_CATEGORY
+} = require('../utils/ticket-defaults');
 const db = require('../utils/database');
 
 const OPEN_PREFIX = 'ticket_open_';
@@ -29,53 +34,9 @@ const PANEL_CANCEL_PREFIX = 'ticket_panel_cancel_';
 const DRAFT_TTL_MS = 15 * 60 * 1000;
 const PENDING_TTL_MS = 30 * 60 * 1000;
 
-const DEFAULT_CATEGORIES = [
-    { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
-    { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-    { value: 'eyedbio', label: 'Eyed.bio', description: 'Soporte de perfil link-in-bio, widgets y cuenta' },
-    { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
-];
+const DEFAULT_CATEGORIES = DEFAULT_TICKET_CATEGORIES;
 
-const DEFAULT_COMMON_ISSUES = [
-    { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
-    { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
-    { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
-    { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
-    { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-];
-
-const DEFAULT_COMMON_ISSUES_BY_CATEGORY = {
-    'soporte-general': [
-        { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
-        { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
-        { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
-        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-    ],
-    reportes: [
-        { value: 'usuario', label: 'Reportar usuario', description: 'Reporte por conducta o incumplimiento' },
-        { value: 'bug', label: 'Reportar bug', description: 'Fallos tecnicos detectados' },
-        { value: 'apelacion', label: 'Sancion o apelacion', description: 'Revisar mute, kick o ban' },
-        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-    ],
-    eyedbio: [
-        { value: 'perfil', label: 'Mi perfil', description: 'Enlaces, tema o diseño del perfil' },
-        { value: 'discord-widget', label: 'Widget Discord', description: 'Presencia o actividad en el perfil' },
-        { value: 'vincular-discord', label: 'Vincular Discord', description: 'Conectar cuenta con EyedBot' },
-        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-    ],
-    'solicitud-ingreso-minecraft': [
-        { value: 'perfil', label: 'Mi perfil', description: 'Enlaces, tema o diseño del perfil' },
-        { value: 'discord-widget', label: 'Widget Discord', description: 'Presencia o actividad en el perfil' },
-        { value: 'vincular-discord', label: 'Vincular Discord', description: 'Conectar cuenta con EyedBot' },
-        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-    ],
-    sugerencias: [
-        { value: 'mejora-comunidad', label: 'Mejora de comunidad', description: 'Ideas para eventos y convivencia' },
-        { value: 'mejora-bot', label: 'Mejora del bot', description: 'Nuevos comandos o ajustes' },
-        { value: 'mejora-eyedbio', label: 'Mejora de Eyed.bio', description: 'Ideas para la plataforma link-in-bio' },
-        { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-    ]
-};
+const DEFAULT_COMMON_ISSUES = DEFAULT_COMMON_PROBLEMS;
 
 const ticketDrafts = new Map();
 const pendingRequestsMemory = new Map();
@@ -1090,7 +1051,16 @@ function shouldOpenDetailModal(commonIssueValue, commonIssueLabel, categoryValue
 
 function isEyedBioCategory(categoryValue) {
     const value = String(categoryValue || '');
-    return value === 'eyedbio' || value === 'solicitud-ingreso-minecraft';
+    return [
+        'eyedbio',
+        'solicitud-ingreso-minecraft',
+        'perfil',
+        'tema',
+        'discord-widget',
+        'cuenta',
+        'dominio',
+        'plan-pro'
+    ].includes(value);
 }
 
 function shouldOpenEyedBioLinkModal(commonIssueValue) {

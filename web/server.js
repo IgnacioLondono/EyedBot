@@ -45,6 +45,11 @@ const {
 const eventsGiveawaysStore = require('../src/utils/events-giveaways-store');
 const giveawayService = require('../src/utils/giveaway-service');
 const ticketStore = require('../src/utils/ticket-config-store');
+const {
+    DEFAULT_TICKET_CATEGORIES,
+    DEFAULT_COMMON_PROBLEMS,
+    DEFAULT_SUPPORT_AREAS
+} = require('../src/utils/ticket-defaults');
 const levelingStore = require('../src/utils/leveling-store');
 const guildActivityStore = require('../src/utils/guild-activity-store');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
@@ -4036,28 +4041,9 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const defaultTicketCategories = [
-            { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
-            { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'eyedbio', label: 'Eyed.bio', description: 'Soporte de perfil link-in-bio, widgets y cuenta' },
-            { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
-        ];
-
-        const defaultCommonProblems = [
-            { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
-            { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
-            { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
-            { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
-            { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-        ];
-
-        const defaultSupportAreas = [
-            { value: 'no-aplica', label: 'No aplica', description: 'Mi consulta no es sobre Eyed.bio' },
-            { value: 'perfil-gratis', label: 'Plan gratuito', description: 'Funciones del plan base' },
-            { value: 'perfil-pro', label: 'Plan Pro', description: 'Suscripción o funciones premium' },
-            { value: 'discord-presence', label: 'Presencia Discord', description: 'Widget en el perfil público' },
-            { value: 'custom-domain', label: 'Dominio personalizado', description: 'DNS o dominio propio' }
-        ];
+        const defaultTicketCategories = DEFAULT_TICKET_CATEGORIES;
+        const defaultCommonProblems = DEFAULT_COMMON_PROBLEMS;
+        const defaultSupportAreas = DEFAULT_SUPPORT_AREAS;
 
         const cfg = await ticketStore.getTicketConfig(guildId);
         if (!cfg) {
@@ -4119,28 +4105,9 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
         const body = req.body || {};
         const currentCfg = await ticketStore.getTicketConfig(guildId);
 
-        const defaultTicketCategories = [
-            { value: 'soporte-general', label: 'Soporte general', description: 'Dudas o ayuda general del servidor' },
-            { value: 'reportes', label: 'Reportes', description: 'Reportar usuarios, bugs o conductas' },
-            { value: 'eyedbio', label: 'Eyed.bio', description: 'Soporte de perfil link-in-bio, widgets y cuenta' },
-            { value: 'sugerencias', label: 'Sugerencias', description: 'Ideas para mejorar la comunidad' }
-        ];
-
-        const defaultCommonProblems = [
-            { value: 'permisos', label: 'Problemas de permisos', description: 'No puedo ver o usar un canal/comando' },
-            { value: 'sanciones', label: 'Sancion o apelacion', description: 'Mute, kick, ban o apelacion' },
-            { value: 'errores-del-bot', label: 'Error del bot', description: 'Comandos que fallan o no responden' },
-            { value: 'roles-y-canales', label: 'Roles y canales', description: 'Roles incorrectos o accesos faltantes' },
-            { value: 'otro', label: 'Mi caso no aparece en esta lista', description: 'Abrir formulario para explicar tu caso' }
-        ];
-
-        const defaultSupportAreas = [
-            { value: 'no-aplica', label: 'No aplica', description: 'Mi consulta no es sobre Eyed.bio' },
-            { value: 'perfil-gratis', label: 'Plan gratuito', description: 'Funciones del plan base' },
-            { value: 'perfil-pro', label: 'Plan Pro', description: 'Suscripción o funciones premium' },
-            { value: 'discord-presence', label: 'Presencia Discord', description: 'Widget en el perfil público' },
-            { value: 'custom-domain', label: 'Dominio personalizado', description: 'DNS o dominio propio' }
-        ];
+        const defaultTicketCategories = DEFAULT_TICKET_CATEGORIES;
+        const defaultCommonProblems = DEFAULT_COMMON_PROBLEMS;
+        const defaultSupportAreas = DEFAULT_SUPPORT_AREAS;
 
         const toOptionValue = (text, fallback) => {
             const safe = String(text || '')

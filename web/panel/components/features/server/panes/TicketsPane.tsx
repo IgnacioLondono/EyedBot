@@ -372,7 +372,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             <div className="space-y-5">
               <Alert
                 title="Plantillas de tickets"
-                description="Elige un tema listo para usar. Se aplican título, mensaje, color, categorías y opciones de labs. Los canales y roles no se modifican."
+                description="Elige un tema listo para usar. Se aplican título, mensaje, color, categorías, áreas Eyed.bio y opciones de labs. Los canales y roles no se modifican."
               />
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {TICKET_PRESETS.map((preset) => {
@@ -405,6 +405,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                       <p className="text-sm text-zinc-400">{preset.description}</p>
                       <p className="mt-3 text-xs text-zinc-500">
                         {preset.ticketCategories.length} categorías · {preset.commonProblems.length} casos
+                        {preset.supportAreas?.length ? ` · ${preset.supportAreas.length} áreas Eyed.bio` : ""}
                       </p>
                     </button>
                   );
