@@ -87,6 +87,7 @@ const {
     sendWebMessageToTicket
 } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, sanitizeXpMultiplier, getProgress } = require('../src/utils/leveling-math');
+const presenceStore = require('../src/utils/presence-store');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -248,6 +249,84 @@ app.get('/health', async (req, res) => {
         dbOk,
         sessionCacheSize: sessionL1Cache.size
     });
+});
+
+const DISCORD_SNOWFLAKE_RE = /^\d{17,20}$/;
+
+function requireEyedBotApiKey(req, res, next) {
+    const key = String(process.env.EYEDBOT_API_KEY || '').trim();
+    if (!key) {
+        return res.status(503).json({ success: false, error: 'Presence API not configured' });
+    }
+    const auth = String(req.headers.authorization || '').trim();
+    if (auth !== `Bearer ${key}`) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    return next();
+}
+
+async function resolveLivePresence(discordUserId) {
+    const cached = presenceStore.getPresence(discordUserId);
+    if (cached) return cached;
+
+    if (!botClient) return null;
+
+    for (const guild of botClient.guilds.cache.values()) {
+        if (!presenceStore.isGuildTracked(guild.id)) continue;
+
+        const cachedMember = guild.members.cache.get(discordUserId);
+        if (cachedMember) {
+            const payload = presenceStore.serializeFromMember(cachedMember);
+            if (payload) {
+                presenceStore.setPresence(discordUserId, payload);
+                return payload;
+            }
+        }
+    }
+
+    for (const guild of botClient.guilds.cache.values()) {
+        if (!presenceStore.isGuildTracked(guild.id)) continue;
+
+        try {
+            const member = await guild.members.fetch(discordUserId);
+            if (!member) continue;
+            const payload = presenceStore.serializeFromMember(member);
+            if (payload) {
+                presenceStore.setPresence(discordUserId, payload);
+                return payload;
+            }
+        } catch {
+            // Member not in this guild
+        }
+    }
+
+    return null;
+}
+
+app.get('/api/presence/:discordUserId', requireEyedBotApiKey, async (req, res) => {
+    const discordUserId = String(req.params.discordUserId || '').trim();
+    if (!DISCORD_SNOWFLAKE_RE.test(discordUserId)) {
+        return res.status(400).json({ success: false, error: 'Invalid Discord user ID' });
+    }
+
+    if (!botClient?.user?.id) {
+        return res.status(503).json({ success: false, error: 'Bot not connected' });
+    }
+
+    try {
+        const data = await resolveLivePresence(discordUserId);
+        if (!data) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found in tracked guilds or no presence cached'
+            });
+        }
+
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('Error en GET /api/presence:', error?.message || error);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
 });
 
 function resolveWebOrigin(req) {

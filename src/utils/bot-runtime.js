@@ -430,7 +430,8 @@ function createEyedBotClient() {
             GatewayIntentBits.GuildMessages,
             GatewayIntentBits.GuildMessageReactions,
             GatewayIntentBits.MessageContent,
-            GatewayIntentBits.GuildVoiceStates
+            GatewayIntentBits.GuildVoiceStates,
+            GatewayIntentBits.GuildPresences
         ],
         partials: [Partials.Message, Partials.Channel, Partials.Reaction]
     });

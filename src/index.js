@@ -30,6 +30,8 @@ const { startFreeGamesScheduler, stopFreeGamesScheduler } = require('./utils/fre
 const { startCrunchyrollScheduler, stopCrunchyrollScheduler } = require('./utils/crunchyroll-service');
 const { startBumpReminderScheduler, stopBumpReminderScheduler, handleDisboardBumpMessage } = require('./utils/bump-reminder-scheduler');
 const { startEventsGiveawaysScheduler, stopEventsGiveawaysScheduler, handleGiveawayButton } = require('./utils/giveaway-service');
+const presenceStore = require('./utils/presence-store');
+const { attachPresenceTracking, seedPresencesFromClient } = require('./events/presence-tracker');
 require('dotenv').config();
 
 let webPanel = null;
@@ -100,10 +102,14 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildVoiceStates
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildPresences
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
+
+attachPresenceTracking(client);
+presenceStore.startPresenceCacheCleanup();
 
 if ((process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false') {
     try {
@@ -354,6 +360,7 @@ client.once('clientReady', async () => {
     startCrunchyrollScheduler(client);
     startBumpReminderScheduler(client);
     startEventsGiveawaysScheduler(client);
+    seedPresencesFromClient(client);
 });
 
 client.on('guildCreate', (guild) => {
@@ -706,6 +713,7 @@ async function gracefulShutdown(signal) {
         stopFreeGamesScheduler();
         stopCrunchyrollScheduler();
         stopBumpReminderScheduler();
+        presenceStore.stopPresenceCacheCleanup();
         try {
             require('./utils/tts-voice-manager').disconnectAll('shutdown');
         } catch {
