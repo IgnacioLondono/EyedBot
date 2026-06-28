@@ -271,32 +271,30 @@ async function resolveLivePresence(discordUserId) {
 
     if (!botClient) return null;
 
-    for (const guild of botClient.guilds.cache.values()) {
-        if (!presenceStore.isGuildTracked(guild.id)) continue;
+    const filter = presenceStore.getPresenceGuildFilter();
+    const guildIds = filter
+        ? Array.from(filter)
+        : Array.from(botClient.guilds.cache.keys());
 
-        const cachedMember = guild.members.cache.get(discordUserId);
-        if (cachedMember) {
-            const payload = presenceStore.serializeFromMember(cachedMember);
-            if (payload) {
-                presenceStore.setPresence(discordUserId, payload);
-                return payload;
-            }
+    for (const guildId of guildIds) {
+        let guild = botClient.guilds.cache.get(String(guildId));
+        if (!guild) {
+            guild = await botClient.guilds.fetch(String(guildId)).catch(() => null);
         }
-    }
-
-    for (const guild of botClient.guilds.cache.values()) {
-        if (!presenceStore.isGuildTracked(guild.id)) continue;
+        if (!guild) continue;
 
         try {
-            const member = await guild.members.fetch(discordUserId);
-            if (!member) continue;
+            let member = guild.members.cache.get(discordUserId);
+            if (!member) {
+                member = await guild.members.fetch({ user: discordUserId, force: true });
+            }
             const payload = presenceStore.serializeFromMember(member);
             if (payload) {
                 presenceStore.setPresence(discordUserId, payload);
                 return payload;
             }
         } catch {
-            // Member not in this guild
+            // Usuario no está en este guild
         }
     }
 

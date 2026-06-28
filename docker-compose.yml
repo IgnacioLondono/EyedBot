@@ -80,6 +80,7 @@ services:
       - TENOR_API_KEY=${TENOR_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - EYEDBOT_API_KEY=${EYEDBOT_API_KEY:-}
+      - PRESENCE_GUILD_IDS=${PRESENCE_GUILD_IDS:-}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

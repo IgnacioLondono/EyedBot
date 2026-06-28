@@ -63,6 +63,7 @@ services:
       - TENOR_API_KEY=${TENOR_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - EYEDBOT_API_KEY=${EYEDBOT_API_KEY:-}
+      - PRESENCE_GUILD_IDS=${PRESENCE_GUILD_IDS:-}
       - NODE_OPTIONS=--max-old-space-size=1024
     volumes:
       - ./data:/app/data
