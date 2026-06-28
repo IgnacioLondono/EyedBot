@@ -79,6 +79,7 @@ services:
       - DB_NAME=${DB_NAME:-tulabot}
       - TENOR_API_KEY=${TENOR_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - EYEDBOT_API_KEY=${EYEDBOT_API_KEY:-}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

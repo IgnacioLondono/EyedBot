@@ -87,6 +87,7 @@ services:
       - ALLOW_INSECURE_LOCAL_ORIGIN=${ALLOW_INSECURE_LOCAL_ORIGIN:-false}
       - TENOR_API_KEY=${TENOR_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - EYEDBOT_API_KEY=${EYEDBOT_API_KEY:-}
       - NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=768 --dns-result-order=ipv4first}
     volumes:
       - ./data:/app/data
