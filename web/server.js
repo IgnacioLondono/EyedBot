@@ -609,6 +609,13 @@ function timeoutAfter(ms, label = 'timeout') {
 
 const OAUTH_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.OAUTH_REQUEST_TIMEOUT_MS || '10000', 10) || 10000;
 const OAUTH_STATE_TTL_MS = Number.parseInt(process.env.OAUTH_STATE_TTL_MS || '600000', 10) || 600000;
+const EYEDBIO_LINK_RETURN_PREFIX = String(
+    process.env.EYEDBIO_LINK_RETURN_PREFIX || 'https://eyedbio.eyedcomun.me/'
+).trim();
+const EYEDBIO_LINK_SESSION_TTL_MS = Math.max(
+    60_000,
+    Number.parseInt(process.env.EYEDBIO_LINK_SESSION_TTL_MS || '600000', 10) || 600_000
+);
 const oauthStateFallbackStore = new Map();
 
 function pruneOauthStateFallbackStore(now = Date.now()) {
@@ -636,6 +643,35 @@ function consumeOauthStateFallback(state) {
     if (!entry) return null;
     if (Number(entry.expiresAt || 0) <= Date.now()) return null;
     return entry;
+}
+
+function signEyedBioLink(discordUserId, state) {
+    const key = String(process.env.EYEDBOT_API_KEY || '').trim();
+    if (!key) return null;
+    return crypto
+        .createHmac('sha256', key)
+        .update(`${discordUserId}.${state}`)
+        .digest('hex');
+}
+
+function isValidEyedBioReturnUrl(returnUrl) {
+    const value = String(returnUrl || '').trim();
+    if (!value.startsWith(EYEDBIO_LINK_RETURN_PREFIX)) return false;
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function getActiveEyedBioLink(session = {}) {
+    const link = session.eyedbioLink;
+    if (!link?.returnUrl || !link?.state) return null;
+    const issuedAt = Number(link.issuedAt || 0);
+    if (!issuedAt || Date.now() - issuedAt > EYEDBIO_LINK_SESSION_TTL_MS) return null;
+    if (!isValidEyedBioReturnUrl(link.returnUrl)) return null;
+    return link;
 }
 
 function saveSession(req) {
@@ -927,11 +963,12 @@ app.use(cors({
     credentials: true
 }));
 app.use('/auth/discord', authRateLimiter);
+app.use('/api/link/eyedbio', authRateLimiter);
 app.use('/callback', authRateLimiter);
 app.use('/api/', apiRateLimiter);
 app.use((req, res, next) => {
     const path = String(req.path || '');
-    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/callback', '/api/user', '/api/guilds', '/api/panel/bootstrap'];
+    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/api/link/eyedbio', '/callback', '/api/user', '/api/guilds', '/api/panel/bootstrap'];
     if (neverCachePrefixes.some((prefix) => path.startsWith(prefix))) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
@@ -1979,6 +2016,56 @@ function setBotClient(client) {
 }
 
 // Rutas de autenticación
+app.get('/api/link/eyedbio', (req, res) => {
+    if (!CLIENT_ID) {
+        return res.status(500).json({ success: false, error: 'OAuth not configured' });
+    }
+
+    const returnUrl = String(req.query.returnUrl || '').trim();
+    const state = String(req.query.state || '').trim();
+
+    if (!returnUrl || !state) {
+        return res.status(400).json({ success: false, error: 'returnUrl and state are required' });
+    }
+
+    if (!isValidEyedBioReturnUrl(returnUrl)) {
+        return res.status(400).json({ success: false, error: 'Invalid returnUrl' });
+    }
+
+    if (!String(process.env.EYEDBOT_API_KEY || '').trim()) {
+        return res.status(503).json({ success: false, error: 'EYEDBOT_API_KEY not configured' });
+    }
+
+    try {
+        req.session.oauthState = state;
+        req.session.oauthStateIssuedAt = Date.now();
+        req.session.oauthFlow = 'eyedbio';
+        req.session.eyedbioLink = {
+            returnUrl,
+            state,
+            issuedAt: Date.now()
+        };
+        rememberOauthState(state, req.sessionID);
+
+        saveSession(req)
+            .then(() => {
+                const url = oauth.generateAuthUrl({
+                    scope: ['identify'],
+                    state
+                });
+                console.log('🔗 Eyed.bio link: redirigiendo a Discord OAuth...');
+                res.redirect(url);
+            })
+            .catch((sessionError) => {
+                console.error('❌ Error guardando sesión Eyed.bio link:', sessionError);
+                res.status(500).json({ success: false, error: 'session_error' });
+            });
+    } catch (error) {
+        console.error('❌ Error iniciando link Eyed.bio:', error);
+        res.status(500).json({ success: false, error: 'link_start_failed' });
+    }
+});
+
 app.get('/auth/discord', (req, res) => {
     if (!CLIENT_ID) {
         return res.status(500).send(`
@@ -1999,6 +2086,8 @@ app.get('/auth/discord', (req, res) => {
         const state = crypto.randomBytes(24).toString('hex');
         req.session.oauthState = state;
         req.session.oauthStateIssuedAt = Date.now();
+        delete req.session.oauthFlow;
+        delete req.session.eyedbioLink;
         rememberOauthState(state, req.sessionID);
 
         saveSession(req)
@@ -2069,10 +2158,14 @@ app.get('/callback', async (req, res) => {
         console.log(`   Redirect URI: ${redirectUri}`);
         console.log(`   Client ID: ${CLIENT_ID ? '✅ Configurado' : '❌ Faltante'}`);
         console.log(`   Client Secret: ${CLIENT_SECRET ? '✅ Configurado' : '❌ Faltante'}`);
-        
+
+        const pendingEyedBioLink = getActiveEyedBioLink(req.session);
+        const isEyedBioOAuth = req.session.oauthFlow === 'eyedbio' || Boolean(pendingEyedBioLink);
+        const oauthScope = isEyedBioOAuth ? 'identify' : 'identify guilds';
+
         const tokenData = await withOauthTimeout(oauth.tokenRequest({
             code,
-            scope: 'identify guilds',
+            scope: oauthScope,
             grantType: 'authorization_code'
         }), 'oauth.tokenRequest timeout');
 
@@ -2087,6 +2180,45 @@ app.get('/callback', async (req, res) => {
         if (!user || !user.id) {
             console.error('❌ No se pudo obtener información del usuario');
             return res.redirect('/login?error=auth_failed');
+        }
+
+        const eyedBioLink = getActiveEyedBioLink(req.session);
+        if (req.session.oauthFlow === 'eyedbio' && !eyedBioLink) {
+            delete req.session.oauthFlow;
+            delete req.session.eyedbioLink;
+            delete req.session.oauthState;
+            delete req.session.oauthStateIssuedAt;
+            return res.redirect('/login?error=link_expired');
+        }
+
+        if (eyedBioLink) {
+            const discordUserId = String(user.id);
+            const linkState = String(eyedBioLink.state);
+            const sig = signEyedBioLink(discordUserId, linkState);
+
+            delete req.session.eyedbioLink;
+            delete req.session.oauthFlow;
+            delete req.session.oauthState;
+            delete req.session.oauthStateIssuedAt;
+
+            if (!sig) {
+                return res.redirect('/login?error=config_error');
+            }
+
+            try {
+                await saveSession(req);
+            } catch (err) {
+                console.error('❌ Error guardando sesión tras link Eyed.bio:', err);
+                return res.redirect('/login?error=session_error');
+            }
+
+            const url = new URL(eyedBioLink.returnUrl);
+            url.searchParams.set('state', linkState);
+            url.searchParams.set('discordUserId', discordUserId);
+            url.searchParams.set('sig', sig);
+
+            console.log(`✅ Eyed.bio link completado para usuario ${discordUserId}`);
+            return res.redirect(url.toString());
         }
 
         const userId = String(user.id || '').trim();
