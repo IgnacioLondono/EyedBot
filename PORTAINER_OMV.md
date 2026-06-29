@@ -41,7 +41,8 @@ En la seccion **Environment variables** agrega al menos:
 - `DISCORD_TOKEN`
 - `CLIENT_ID`
 - `GUILD_ID`
-- `EYEDBOT_API_KEY` (API de presencia para Eyed.bio; genera con `openssl rand -base64 32`)
+- `EYEDBOT_API_KEY` (API de presencia + firma OAuth Eyed.bio; genera con `openssl rand -base64 32`)
+- `REDIRECT_URI=https://eyedbot.eyedcomun.me/callback` (OAuth Discord, obligatorio para link Eyed.bio)
 
 Opcionales recomendadas:
 

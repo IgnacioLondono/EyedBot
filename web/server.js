@@ -430,8 +430,8 @@ function envValue(name, fallback = '') {
     return String(raw).trim();
 }
 
-const CLIENT_ID = envValue('CLIENT_ID');
-const CLIENT_SECRET = envValue('CLIENT_SECRET');
+const CLIENT_ID = envValue('CLIENT_ID') || envValue('DISCORD_CLIENT_ID');
+const CLIENT_SECRET = envValue('CLIENT_SECRET') || envValue('DISCORD_CLIENT_SECRET');
 const OWNER_DISCORD_IDS = (() => {
     const raw = [
         envValue('WEB_OWNER_DISCORD_ID'),
