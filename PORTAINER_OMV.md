@@ -135,22 +135,16 @@ Si el repo es privado, crea un PAT con `read:packages` y en Portainer **Registri
    Debe responder JSON con la versión.
 5. Si el contenedor se reinicia en bucle: sube memoria (`_JAVA_OPTIONS=-Xmx768m`) o revisa espacio en disco.
 
-### YouTube falla (`Must find action functions from script` / `Unknown file format`)
+### YouTube / Lavalink: `Permission denied` en `./plugins`
 
-Eso significa que el **plugin de YouTube no está cargado** (Lavalink intenta HTTP o el source viejo).
+El volumen `./data/lavalink-plugins` en OMV suele ser **solo lectura** para el usuario `lavalink` del contenedor.
 
-1. El stack debe **construir** la imagen `eyedbot-lavalink:4` (`docker/lavalink/Dockerfile` embebe `application.yml`).
-2. Tras redeploy, en logs de arranque busca `youtube-plugin` / `dev.lavalink.youtube`.
-3. Borra plugins viejos una vez: `./data/lavalink-plugins/*` (host) o volumen `lavalink-plugins` (bridge).
-4. Verifica dentro del contenedor:
-   ```bash
-   docker exec eyedbot-lavalink head -20 /opt/Lavalink/application.yml
-   docker exec eyedbot-lavalink ls -la /opt/Lavalink/plugins
-   ```
-5. Prueba carga:
-   ```bash
-   curl -H "Authorization: TU_PASSWORD" "http://127.0.0.1:2333/v4/loadtracks?identifier=ytsearch:test"
-   ```
+**Solución (desde commit reciente):** el plugin `youtube-plugin-1.18.1.jar` va **dentro de la imagen** `eyedbot-lavalink:4`. No montes carpeta en `/opt/Lavalink/plugins`.
+
+1. Pull and redeploy con **rebuild** del servicio `lavalink`.
+2. Elimina del compose cualquier volumen `lavalink-plugins` o `./data/lavalink-plugins`.
+3. En logs debe aparecer carga del plugin **sin** error `Permission denied`.
+4. Prueba: `curl -H "Authorization: TU_PASSWORD" "http://127.0.0.1:2333/v4/loadtracks?identifier=ytsearch:test"`
 
 ## 8. Tuning del host (OMV/Debian)
 

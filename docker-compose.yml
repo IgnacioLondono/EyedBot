@@ -50,8 +50,6 @@ services:
       - _JAVA_OPTIONS=-Xmx512m
     ports:
       - "127.0.0.1:2333:2333"
-    volumes:
-      - lavalink-plugins:/opt/Lavalink/plugins
     healthcheck:
       # $$ → $ dentro del contenedor; usa LAVALINK_PASSWORD del servicio lavalink
       test: ["CMD-SHELL", "curl -sf -H \"Authorization: $$LAVALINK_SERVER_PASSWORD\" http://127.0.0.1:2333/version -o /dev/null || exit 1"]
@@ -117,6 +115,3 @@ services:
 networks:
   eyedbot-net:
     driver: bridge
-
-volumes:
-  lavalink-plugins:
