@@ -3,6 +3,7 @@ const { useQueue } = require('../../utils/music-queue-manager');
 const config = require('../../config');
 const { safeDeferReply, safeEditReply } = require('../../utils/interactions');
 const { getMusicSystem } = require('./_common');
+const { inferSearchEngineForUrl } = require('../../utils/music-track-utils');
 const {
     savePlaylist,
     getPlaylist,
@@ -148,12 +149,9 @@ async function runLoad(interaction) {
         const played = await interaction.client.player.play(voiceChannel, track.url, {
             requestedBy: interaction.user,
             nodeOptions,
-            searchEngine: 'youtube'
+            searchEngine: inferSearchEngineForUrl(track.url)
         }).catch(() => null);
         if (played?.track) {
-            if (track.title) played.track.title = track.title;
-            if (track.artist) played.track.author = track.artist;
-            if (track.thumbnail) played.track.thumbnail = track.thumbnail;
             added++;
         } else {
             failed++;

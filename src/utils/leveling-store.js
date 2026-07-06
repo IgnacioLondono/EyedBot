@@ -263,17 +263,24 @@ function listGuildUsers(guildId) {
 function mergeLevelingRows(a, b) {
     const ax = Number.parseInt(a.xp || 0, 10) || 0;
     const bx = Number.parseInt(b.xp || 0, 10) || 0;
+    const aMsgs = Number.parseInt(a.messageCount || 0, 10) || 0;
+    const bMsgs = Number.parseInt(b.messageCount || 0, 10) || 0;
+    const aVoice = Number.parseInt(a.voiceMinutes || 0, 10) || 0;
+    const bVoice = Number.parseInt(b.voiceMinutes || 0, 10) || 0;
+    const aTime = Date.parse(a.updatedAt || '') || 0;
+    const bTime = Date.parse(b.updatedAt || '') || 0;
+    const pickNewer = bTime > aTime ? b : a;
+    const pickOlder = bTime > aTime ? a : b;
+
     return normalizeUserState({
         xp: Math.max(ax, bx),
-        messageCount: Math.max(
-            Number.parseInt(a.messageCount || 0, 10) || 0,
-            Number.parseInt(b.messageCount || 0, 10) || 0
+        level: Math.max(
+            Number.parseInt(a.level || 0, 10) || 0,
+            Number.parseInt(b.level || 0, 10) || 0
         ),
-        voiceMinutes: Math.max(
-            Number.parseInt(a.voiceMinutes || 0, 10) || 0,
-            Number.parseInt(b.voiceMinutes || 0, 10) || 0
-        ),
-        updatedAt: a.updatedAt || b.updatedAt
+        messageCount: Math.max(aMsgs, bMsgs),
+        voiceMinutes: Math.max(aVoice, bVoice),
+        updatedAt: pickNewer.updatedAt || pickOlder.updatedAt
     });
 }
 

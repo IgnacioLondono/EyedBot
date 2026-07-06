@@ -470,6 +470,52 @@ async function resolveAppleUrl(url) {
     return null;
 }
 
+async function resolveSoundCloudUrl(url) {
+    const cleaned = normalizeUrlForProvider(url);
+    const lower = cleaned.toLowerCase();
+    const isPlaylist = lower.includes('/sets/') || lower.includes('/playlists/');
+
+    const { data } = await axios.get('https://soundcloud.com/oembed', {
+        timeout: 8000,
+        params: { format: 'json', url: cleaned }
+    }).catch(() => ({ data: null }));
+
+    if (isPlaylist) {
+        return {
+            provider: 'soundcloud',
+            type: 'playlist',
+            title: data?.title || 'SoundCloud Playlist',
+            author: data?.author_name || null,
+            thumbnail: data?.thumbnail_url || null,
+            url: cleaned,
+            lavalinkNative: true,
+            tracks: []
+        };
+    }
+
+    const rawTitle = (data?.title || '').toString().trim();
+    const rawArtist = (data?.author_name || '').toString().trim();
+
+    return {
+        provider: 'soundcloud',
+        type: 'track',
+        title: rawTitle || 'SoundCloud',
+        author: rawArtist || null,
+        thumbnail: data?.thumbnail_url || null,
+        url: cleaned,
+        tracks: [{
+            title: rawTitle || 'SoundCloud',
+            artist: rawArtist || 'Desconocido',
+            durationMs: 0,
+            album: null,
+            thumbnail: data?.thumbnail_url || null,
+            isrc: null,
+            sourceUrl: cleaned,
+            provider: 'soundcloud'
+        }]
+    };
+}
+
 function parseYoutubeUrl(url) {
     try {
         const u = new URL(url);
@@ -559,6 +605,7 @@ async function resolveProviderUrl(url) {
         if (provider === 'spotify') return await resolveSpotifyUrl(cleaned);
         if (provider === 'apple') return await resolveAppleUrl(cleaned);
         if (provider === 'youtube') return await resolveYoutubeUrl(cleaned);
+        if (provider === 'soundcloud') return await resolveSoundCloudUrl(cleaned);
     } catch (error) {
         return {
             provider,
@@ -579,6 +626,7 @@ module.exports = {
     resolveSpotifyUrl,
     resolveAppleUrl,
     resolveYoutubeUrl,
+    resolveSoundCloudUrl,
     resolveProviderUrl,
     formatDurationMs
 };

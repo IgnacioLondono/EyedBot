@@ -49,9 +49,34 @@ function buildResolveIdentifier(query, searchEngine = 'youtube') {
     return `ytsearch:${q}`;
 }
 
+function inferSearchEngineForUrl(url) {
+    const lower = String(url || '').toLowerCase();
+    if (lower.includes('soundcloud.com')) return 'soundcloud';
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
+    if (lower.includes('spotify.com')) return 'spotify';
+    return 'youtube';
+}
+
+/**
+ * Guarda metadatos del enlace original sin sobrescribir lo que realmente suena.
+ * @param {object} track
+ * @param {{ title?: string, artist?: string, provider?: string, sourceUrl?: string, thumbnail?: string }} meta
+ */
+function attachRequestedMetadata(track, meta = {}) {
+    if (!track || !meta) return track;
+    if (meta.title) track.requestedTitle = meta.title;
+    if (meta.artist) track.requestedArtist = meta.artist;
+    if (meta.provider) track.requestedProvider = meta.provider;
+    if (meta.sourceUrl) track.requestedSourceUrl = meta.sourceUrl;
+    if (meta.thumbnail) track.requestedThumbnail = meta.thumbnail;
+    return track;
+}
+
 module.exports = {
     formatMs,
     isHttpUrl,
     trackFromLavalink,
-    buildResolveIdentifier
+    buildResolveIdentifier,
+    inferSearchEngineForUrl,
+    attachRequestedMetadata
 };

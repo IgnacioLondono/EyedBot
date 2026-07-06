@@ -6122,7 +6122,7 @@ app.get('/api/guild/:guildId/leveling-leaderboard', requireAuth, async (req, res
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const config = await levelingStore.getLevelingConfig(guildId);
-        const users = await levelingStore.listGuildUsers(guildId);
+        const users = await levelingStore.listGuildUsersMerged(guildId);
 
         const sortedUsers = users
             .sort((a, b) => (b.xp || 0) - (a.xp || 0))
@@ -7217,7 +7217,7 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
         const owner = await resolveGuildOwnerProfile(guild);
 
         const guildAgeDays = Math.max(1, Math.ceil((Date.now() - guild.createdTimestamp) / 86400000));
-        const trackedUsers = await levelingStore.listGuildUsers(guildId);
+        const trackedUsers = await levelingStore.listGuildUsersMerged(guildId);
         const activeTrackedUsers = trackedUsers.filter((entry) => Number.parseInt(entry.messageCount || 0, 10) > 0 || Number.parseInt(entry.voiceMinutes || 0, 10) > 0);
 
         const totalTrackedMessages = activeTrackedUsers.reduce((sum, entry) => sum + (Number.parseInt(entry.messageCount || 0, 10) || 0), 0);

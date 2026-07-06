@@ -279,6 +279,20 @@ class MusicSystem {
                 { name: '🔊 Volumen', value: `${queue?.node?.volume ?? config.musicDefaultVolume}%`, inline: true }
             );
 
+        if (track?.requestedTitle && track.requestedTitle !== track?.title) {
+            const providerLabel = track.requestedProvider
+                ? ({ spotify: 'Spotify', apple: 'Apple Music', soundcloud: 'SoundCloud', youtube: 'YouTube' }[track.requestedProvider] || track.requestedProvider)
+                : 'enlace original';
+            const requestedLine = track.requestedSourceUrl
+                ? `[${track.requestedTitle}](${track.requestedSourceUrl})`
+                : track.requestedTitle;
+            embed.addFields({
+                name: `🎯 Pediste (${providerLabel})`,
+                value: `${requestedLine}${track.requestedArtist ? ` — *${track.requestedArtist}*` : ''}`.substring(0, 1024),
+                inline: false
+            });
+        }
+
         if (artwork) embed.setThumbnail(artwork);
         if (url) embed.setURL(url);
         return embed;
@@ -578,8 +592,6 @@ class MusicSystem {
             return;
         }
 
-        if (selected.title) exactTrack.title = selected.title;
-        if (selected.author) exactTrack.author = selected.author;
         if (selected.thumbnail) exactTrack.thumbnail = selected.thumbnail;
         if (selected.duration) exactTrack.duration = selected.duration;
 
@@ -602,9 +614,12 @@ class MusicSystem {
         }).catch(() => {});
     }
 
-    async resolveStrictTrack(url, requestedBy) {
+    async resolveStrictTrack(url, requestedBy, searchEngine = 'youtube') {
         if (!url) return null;
-        const engines = ['youtube', 'auto'];
+        const engines = searchEngine === 'youtube'
+            ? ['youtube', 'auto']
+            : [searchEngine, 'auto'];
+
         const targetId = this._extractYouTubeId(url);
 
         for (const engine of engines) {
@@ -623,6 +638,7 @@ class MusicSystem {
                 return !!(targetId && tId && tId === targetId);
             });
             if (exact) return exact;
+            if (searchEngine === 'soundcloud' && result.tracks[0]) return result.tracks[0];
         }
 
         return null;

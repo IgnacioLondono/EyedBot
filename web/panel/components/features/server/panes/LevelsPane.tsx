@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import { getLevelingConfig, getLevelingLeaderboard, saveLevelingConfig } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
@@ -92,8 +92,21 @@ export function LevelsPane({ guildId }: { guildId: string }) {
   const [form, setForm] = useState<LevelingState>(() => normalizeConfig({}));
   const [leaderboard, setLeaderboard] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
+  const [boardLoading, setBoardLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadLeaderboard() {
+    setBoardLoading(true);
+    try {
+      const boardData = await getLevelingLeaderboard(guildId);
+      setLeaderboard(extractLeaderboard(boardData).map((entry) => asRecord(entry)));
+    } catch (err) {
+      toast({ title: "No se pudo actualizar", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setBoardLoading(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -114,6 +127,11 @@ export function LevelsPane({ guildId }: { guildId: string }) {
       active = false;
     };
   }, [guildId]);
+
+  useEffect(() => {
+    if (tab !== "leaderboard") return;
+    void loadLeaderboard();
+  }, [guildId, tab]);
 
   const milestones = useMemo(() => buildLevelMilestones(form.difficulty), [form.difficulty]);
   const curvePreview = useMemo(
@@ -414,6 +432,12 @@ export function LevelsPane({ guildId }: { guildId: string }) {
 
       {tab === "leaderboard" ? (
         <SectionCard title="Leaderboard" description="Datos en vivo desde la base de datos de niveles.">
+          <div className="mb-4 flex justify-end">
+            <Button variant="secondary" size="sm" onClick={() => void loadLeaderboard()} disabled={boardLoading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${boardLoading ? "animate-spin" : ""}`} />
+              Actualizar
+            </Button>
+          </div>
           {leaderboard.length ? (
             <div className="space-y-3">
               <LeaderboardPodium entries={leaderboard as LeaderboardEntry[]} mode="leveling" />
