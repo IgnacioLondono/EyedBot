@@ -8,8 +8,25 @@ const READY_TIMEOUT_MS = Math.max(
 );
 const HTTP_WARMUP_MS = Math.max(
     5000,
-    Number.parseInt(process.env.LAVALINK_HTTP_WARMUP_MS || '90000', 10) || 90000
+    Number.parseInt(process.env.LAVALINK_HTTP_WARMUP_MS || '180000', 10) || 180000
 );
+
+function lavalinkConnectionHint() {
+    const host = config.lavalinkHost || '127.0.0.1';
+    const port = config.lavalinkPort || 2333;
+    const hasPassword = Boolean(String(config.lavalinkPassword || '').trim());
+    const lines = [
+        `Destino: ${host}:${port}`,
+        `LAVALINK_PASSWORD en bot: ${hasPassword ? 'definida' : 'vacía (usa default youshallnotpass)'}`,
+        'Comprueba en Portainer:',
+        '  1) Contenedor eyedbot-lavalink en Running (requiere COMPOSE_PROFILES=music en el stack)',
+        '  2) MUSIC_ENABLED=true y LAVALINK_ENABLED=true',
+        '  3) Host mode → LAVALINK_HOST=127.0.0.1 (no "lavalink")',
+        '  4) Misma LAVALINK_PASSWORD en bot y lavalink',
+        '  5) Primer arranque: el plugin YouTube puede tardar 2–3 min (revisa logs de eyedbot-lavalink)'
+    ];
+    return lines.join('\n   ');
+}
 
 /** @type {Shoukaku | null} */
 let shoukaku = null;
@@ -61,6 +78,7 @@ function waitForLavalinkHttp(timeoutMs = HTTP_WARMUP_MS) {
     const port = config.lavalinkPort || 2333;
     const password = config.lavalinkPassword || 'youshallnotpass';
     const started = Date.now();
+    let authWarned = false;
 
     return new Promise((resolve) => {
         const attempt = () => {
@@ -83,6 +101,10 @@ function waitForLavalinkHttp(timeoutMs = HTTP_WARMUP_MS) {
                     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                         resolve(true);
                         return;
+                    }
+                    if (res.statusCode === 401 && !authWarned) {
+                        authWarned = true;
+                        console.warn('⚠️ Lavalink rechazó la contraseña (401). LAVALINK_PASSWORD del bot debe coincidir con LAVALINK_SERVER_PASSWORD de Lavalink.');
                     }
                     setTimeout(attempt, 2000);
                 }
@@ -196,6 +218,7 @@ async function bootstrapMusicConnection(client) {
     const httpUp = await waitForLavalinkHttp(HTTP_WARMUP_MS);
     if (!httpUp) {
         console.warn('⚠️ Lavalink HTTP no respondió a tiempo (¿contenedor eyedbot-lavalink caído o plugin descargando?).');
+        console.warn(`   ${lavalinkConnectionHint()}`);
         logNodeSnapshot('sin HTTP');
     } else {
         console.log('🎵 Lavalink HTTP activo; conectando Shoukaku...');
@@ -207,6 +230,7 @@ async function bootstrapMusicConnection(client) {
     if (node) return node;
 
     logNodeSnapshot('timeout Shoukaku');
+    console.warn(`   ${lavalinkConnectionHint()}`);
     return null;
 }
 

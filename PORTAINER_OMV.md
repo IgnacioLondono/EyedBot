@@ -48,9 +48,12 @@ Opcionales recomendadas:
 
 - `TENOR_API_KEY`
 - `GEMINI_API_KEY`
-- `LAVALINK_HOST=lavalink`
+- `COMPOSE_PROFILES=music` (**obligatorio** si quieres música; sin esto no se levanta `eyedbot-lavalink`)
+- `MUSIC_ENABLED=true`
+- `LAVALINK_ENABLED=true`
+- `LAVALINK_HOST=lavalink` (bridge) o `LAVALINK_HOST=127.0.0.1` (**host mode**)
 - `LAVALINK_PORT=2333`
-- `LAVALINK_PASSWORD` (si cambias la default)
+- `LAVALINK_PASSWORD=youshallnotpass` (misma clave en **bot** y **lavalink**; Lavalink 4 también usa `LAVALINK_SERVER_PASSWORD`, el compose la sincroniza)
 
 Audio recomendado (perfil limpio/estable):
 
@@ -115,6 +118,22 @@ Si el repo es privado, crea un PAT con `read:packages` y en Portainer **Registri
 - Si no conecta Discord: revisa `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`
 - Si musica falla por stream: revisa red/salida a YouTube y prueba bajar filtros con `/filters reset`
 - Si Stack no levanta: revisa logs de `eyedbot` y `eyedbot-lavalink`
+
+### Lavalink no conecta (`sin nodos en Shoukaku` / `HTTP no respondió`)
+
+1. En Portainer → **Containers**: debe existir **`eyedbot-lavalink`** en estado **running**.
+   - Si no existe: añade `COMPOSE_PROFILES=music` en las variables del stack y redeploy.
+2. Variables del stack:
+   - `MUSIC_ENABLED=true`
+   - `LAVALINK_ENABLED=true`
+   - `LAVALINK_HOST=127.0.0.1` si usas `docker-compose.host.yml` (host mode)
+   - `LAVALINK_PASSWORD` **igual** en bot y lavalink
+3. Logs de `eyedbot-lavalink`: busca `Started LavalinkServer` o errores de descarga del plugin YouTube.
+   - El **primer arranque** puede tardar 2–3 minutos descargando el plugin.
+4. Prueba manual (en el NAS):  
+   `curl -H "Authorization: TU_PASSWORD" http://127.0.0.1:2333/version`  
+   Debe responder JSON con la versión.
+5. Si el contenedor se reinicia en bucle: sube memoria (`_JAVA_OPTIONS=-Xmx768m`) o revisa espacio en disco.
 
 ## 8. Tuning del host (OMV/Debian)
 

@@ -32,6 +32,6 @@ module.exports = {
     lavalinkEnabled: (process.env.LAVALINK_ENABLED || 'false').toLowerCase() === 'true',
     lavalinkHost: process.env.LAVALINK_HOST || 'lavalink',
     lavalinkPort: Number.parseInt(process.env.LAVALINK_PORT || '2333', 10),
-    lavalinkPassword: process.env.LAVALINK_PASSWORD || ''
+    lavalinkPassword: process.env.LAVALINK_PASSWORD || process.env.LAVALINK_SERVER_PASSWORD || 'youshallnotpass',
 };
 

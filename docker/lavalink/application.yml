@@ -8,8 +8,8 @@ lavalink:
       repository: "https://maven.lavalink.dev/releases"
       snapshot: false
   server:
-    # Misma variable que LAVALINK_PASSWORD en Docker (bot + servicio lavalink)
-    password: "${LAVALINK_PASSWORD}"
+    # Sobrescribible con LAVALINK_SERVER_PASSWORD en Docker (variable oficial Lavalink 4).
+    password: "youshallnotpass"
     sources:
       # Obligatorio: desactiva YouTube integrado (deprecado) y usa el plugin de abajo
       youtube: false

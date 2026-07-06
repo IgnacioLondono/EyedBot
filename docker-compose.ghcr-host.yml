@@ -9,11 +9,13 @@ services:
     profiles: ["music"]
     restart: always
     environment:
-      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
       - SERVER_PORT=2333
       - _JAVA_OPTIONS=-Xmx512m
     volumes:
       - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+      - ./data/lavalink-plugins:/opt/Lavalink/plugins
     network_mode: host
     cpus: "0.75"
     mem_limit: 768m
@@ -51,7 +53,8 @@ services:
       - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
       - LAVALINK_HOST=${LAVALINK_HOST:-127.0.0.1}
       - LAVALINK_PORT=${LAVALINK_PORT:-2333}
-      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - LAVALINK_HTTP_WARMUP_MS=${LAVALINK_HTTP_WARMUP_MS:-180000}
       - CONFIG_CACHE_TTL_MS=${CONFIG_CACHE_TTL_MS:-180000}
       - SLOW_COMMAND_WARN_MS=${SLOW_COMMAND_WARN_MS:-1200}
       - WELCOME_CARD_STYLE_ENABLED=${WELCOME_CARD_STYLE_ENABLED:-true}

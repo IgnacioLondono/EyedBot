@@ -28,16 +28,18 @@ services:
     container_name: eyedbot-lavalink
     restart: unless-stopped
     environment:
-      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
       - SERVER_PORT=2333
       - _JAVA_OPTIONS=-Xmx512m
     ports:
       - "127.0.0.1:2333:2333"
     volumes:
       - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+      - lavalink-plugins:/opt/Lavalink/plugins
     healthcheck:
       # $$ → $ dentro del contenedor; usa LAVALINK_PASSWORD del servicio lavalink
-      test: ["CMD-SHELL", "curl -sf -H \"Authorization: $$LAVALINK_PASSWORD\" http://127.0.0.1:2333/version -o /dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -sf -H \"Authorization: $$LAVALINK_SERVER_PASSWORD\" http://127.0.0.1:2333/version -o /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -69,6 +71,10 @@ services:
       - WEB_ALLOWED_ORIGINS=${WEB_ALLOWED_ORIGINS:-}
       - MUSIC_ENABLED=${MUSIC_ENABLED:-false}
       - LAVALINK_ENABLED=${LAVALINK_ENABLED:-false}
+      - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
+      - LAVALINK_PORT=${LAVALINK_PORT:-2333}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - LAVALINK_HTTP_WARMUP_MS=${LAVALINK_HTTP_WARMUP_MS:-180000}
       - CONFIG_CACHE_TTL_MS=${CONFIG_CACHE_TTL_MS:-120000}
       - SLOW_COMMAND_WARN_MS=${SLOW_COMMAND_WARN_MS:-900}
       - WELCOME_CARD_STYLE_ENABLED=${WELCOME_CARD_STYLE_ENABLED:-true}
@@ -96,3 +102,6 @@ services:
 networks:
   eyedbot-net:
     driver: bridge
+
+volumes:
+  lavalink-plugins:
