@@ -700,6 +700,10 @@ async function main() {
         return false;
     });
 
+    if (MUSIC_ENABLED && config.lavalinkEnabled) {
+        require('./utils/lavalink-shoukaku').initShoukaku(client);
+    }
+
     await client.login(TOKEN);
 }
 

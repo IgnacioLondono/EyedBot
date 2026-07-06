@@ -43,7 +43,7 @@ function nodeStateLabel(state) {
 
 function logNodeSnapshot(context) {
     if (!shoukaku?.nodes?.size) {
-        console.warn(`⚠️ Lavalink (${context}): sin nodos en Shoukaku. ¿El contenedor lavalink está arriba?`);
+        console.warn(`⚠️ Lavalink (${context}): sin nodos en Shoukaku (¿initShoukaku antes de login?).`);
         return;
     }
     for (const [name, node] of shoukaku.nodes) {
@@ -122,22 +122,52 @@ function waitForLavalinkHttp(timeoutMs = HTTP_WARMUP_MS) {
     });
 }
 
+function buildNodeConfig() {
+    const host = config.lavalinkHost || '127.0.0.1';
+    const port = config.lavalinkPort || 2333;
+    return {
+        name: 'main',
+        url: `${host}:${port}`,
+        auth: config.lavalinkPassword || 'youshallnotpass'
+    };
+}
+
+function attachShoukakuEventHandlers(instance) {
+    instance.on('ready', (name) => {
+        console.log(`🎵 Lavalink nodo "${name}" listo (Shoukaku)`);
+        if (readyCallback) readyCallback(true);
+    });
+
+    instance.on('error', (name, error) => {
+        console.warn(`⚠️ Lavalink [${name}]:`, error?.message || error);
+    });
+
+    instance.on('close', (name, code, reason) => {
+        console.warn(`⚠️ Lavalink [${name}] cerrado (${code}): ${reason || ''}`);
+    });
+
+    instance.on('disconnect', (name, count) => {
+        console.warn(`⚠️ Lavalink [${name}] desconectado (intentos: ${count})`);
+    });
+
+    instance.on('debug', (name, message) => {
+        if (String(process.env.LAVALINK_DEBUG || '').toLowerCase() === 'true') {
+            console.log(`🎵 Lavalink debug [${name}]:`, message);
+        }
+    });
+}
+
 /**
+ * Debe llamarse antes de client.login() para que el conector DiscordJS registre clientReady.
+ * Si el cliente ya está listo, añade el nodo manualmente (clientReady no se repetirá).
  * @param {import('discord.js').Client} client
  */
 function initShoukaku(client) {
     if (shoukaku) return shoukaku;
 
-    const host = config.lavalinkHost || '127.0.0.1';
-    const port = config.lavalinkPort || 2333;
+    const nodeConfig = buildNodeConfig();
 
-    shoukaku = new Shoukaku(new Connectors.DiscordJS(client), [
-        {
-            name: 'main',
-            url: `${host}:${port}`,
-            auth: config.lavalinkPassword || 'youshallnotpass'
-        }
-    ], {
+    shoukaku = new Shoukaku(new Connectors.DiscordJS(client), [nodeConfig], {
         moveOnDisconnect: false,
         resume: false,
         reconnectTries: 12,
@@ -145,22 +175,12 @@ function initShoukaku(client) {
         restTimeout: 30000
     });
 
-    shoukaku.on('ready', (name) => {
-        console.log(`🎵 Lavalink nodo "${name}" listo (Shoukaku)`);
-        if (readyCallback) readyCallback(true);
-    });
+    attachShoukakuEventHandlers(shoukaku);
 
-    shoukaku.on('error', (name, error) => {
-        console.warn(`⚠️ Lavalink [${name}]:`, error?.message || error);
-    });
-
-    shoukaku.on('close', (name, code, reason) => {
-        console.warn(`⚠️ Lavalink [${name}] cerrado (${code}): ${reason || ''}`);
-    });
-
-    shoukaku.on('disconnect', (name, count) => {
-        console.warn(`⚠️ Lavalink [${name}] desconectado (intentos: ${count})`);
-    });
+    if (typeof client.isReady === 'function' && client.isReady() && shoukaku.nodes.size === 0) {
+        console.log('🎵 Shoukaku: cliente ya listo; conectando nodo Lavalink manualmente...');
+        shoukaku.addNode(nodeConfig);
+    }
 
     return shoukaku;
 }

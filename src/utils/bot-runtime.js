@@ -454,6 +454,10 @@ function bootstrapAuxiliaryClient(client, token, options = {}) {
         }
     }
 
+    if (MUSIC_ENABLED && config.lavalinkEnabled) {
+        require('./lavalink-shoukaku').initShoukaku(client);
+    }
+
     client.once('clientReady', async () => {
         console.log(`🤖 Bot auxiliar conectado como ${client.user.tag}${options.label ? ` (${options.label})` : ''}`);
         if (MUSIC_ENABLED && config.lavalinkEnabled) {
