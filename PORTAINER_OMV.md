@@ -135,19 +135,22 @@ Si el repo es privado, crea un PAT con `read:packages` y en Portainer **Registri
    Debe responder JSON con la versión.
 5. Si el contenedor se reinicia en bucle: sube memoria (`_JAVA_OPTIONS=-Xmx768m`) o revisa espacio en disco.
 
-### YouTube falla (`Must find action functions from script` / `FriendlyException`)
+### YouTube falla (`Must find action functions from script` / `Unknown file format`)
 
-Eso significa que Lavalink está usando el **YouTube integrado (roto)** en lugar del **plugin**.
+Eso significa que el **plugin de YouTube no está cargado** (Lavalink intenta HTTP o el source viejo).
 
-1. Tras redeploy, en logs de `eyedbot-lavalink` al arrancar debe aparecer la descarga/carga de `youtube-plugin` (versión **1.18.1**).
-2. **No** debe salir el aviso *"default Youtube source is now deprecated"*. Si sale, el `application.yml` no está montado o es viejo.
-3. Borra plugins antiguos y reinicia Lavalink (una vez):
-   - Bridge: `docker volume rm eyedbot_lavalink-plugins` (o el nombre de tu stack) y redeploy
-   - Host: borra `./data/lavalink-plugins/*` en el repo del stack y redeploy
-4. Variables recomendadas en el servicio lavalink:
-   - `LAVALINK_SERVER_SOURCES_YOUTUBE=false`
-   - `PLUGINS_YOUTUBE_ENABLED=true`
-5. Prueba: `curl -H "Authorization: TU_PASSWORD" "http://127.0.0.1:2333/v4/loadtracks?identifier=ytsearch:test"` — debe devolver JSON con tracks, no error de `base.js`.
+1. El stack debe **construir** la imagen `eyedbot-lavalink:4` (`docker/lavalink/Dockerfile` embebe `application.yml`).
+2. Tras redeploy, en logs de arranque busca `youtube-plugin` / `dev.lavalink.youtube`.
+3. Borra plugins viejos una vez: `./data/lavalink-plugins/*` (host) o volumen `lavalink-plugins` (bridge).
+4. Verifica dentro del contenedor:
+   ```bash
+   docker exec eyedbot-lavalink head -20 /opt/Lavalink/application.yml
+   docker exec eyedbot-lavalink ls -la /opt/Lavalink/plugins
+   ```
+5. Prueba carga:
+   ```bash
+   curl -H "Authorization: TU_PASSWORD" "http://127.0.0.1:2333/v4/loadtracks?identifier=ytsearch:test"
+   ```
 
 ## 8. Tuning del host (OMV/Debian)
 
