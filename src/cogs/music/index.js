@@ -163,13 +163,23 @@ class MusicSystem {
             || t.includes('clip');
     }
 
+    _formatPlaybackError(error) {
+        const raw = (error?.message || 'Error desconocido').toString();
+        const clientMatch = raw.match(/Client \[[^\]]+\] failed:\s*([^\n]+)/i);
+        if (clientMatch) return clientMatch[1].trim().substring(0, 500);
+        const first = raw.split('\n').map((line) => line.trim()).find((line) => line && !line.startsWith('at '));
+        return (first || raw).substring(0, 500);
+    }
+
     _isRecoverablePlaybackError(error) {
         const msg = (error?.message || '').toString().toLowerCase();
         return msg.includes('could not extract stream')
             || msg.includes('extract stream')
             || msg.includes('video unavailable')
             || msg.includes('playability')
-            || msg.includes('age-restricted');
+            || msg.includes('age-restricted')
+            || msg.includes('requires login')
+            || msg.includes('client [');
     }
 
     _recoveryKey(guildId, track) {
@@ -437,7 +447,7 @@ class MusicSystem {
             embeds: [new EmbedBuilder()
                 .setColor('#FFA500')
                 .setTitle('❌ Error de reproduccion')
-                .setDescription(`${track?.title ? `**${track.title}**\n` : ''}\`\`\`${(error?.message || 'Error desconocido').toString().substring(0, 1500)}\`\`\``)]
+                .setDescription(`${track?.title ? `**${track.title}**\n` : ''}${this._formatPlaybackError(error)}`)]
         }).catch(() => {});
     }
 

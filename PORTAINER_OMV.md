@@ -146,6 +146,14 @@ El volumen `./data/lavalink-plugins` en OMV suele ser **solo lectura** para el u
 3. En logs debe aparecer carga del plugin **sin** error `Permission denied`.
 4. Prueba: `curl -H "Authorization: TU_PASSWORD" "http://127.0.0.1:2333/v4/loadtracks?identifier=ytsearch:test"`
 
+### YouTube: `requires login` o audio con mala calidad
+
+1. **Rebuild** de `eyedbot-lavalink:4` (la config de clientes va en `docker/lavalink/application.yml`).
+2. Clientes recomendados: `ANDROID_VR`, `TVHTML5_SIMPLY`, `MWEB`, `WEBEMBEDDED`, `MUSIC` (solo búsqueda).
+3. **No uses** `ANDROID_MUSIC` ni `IOS` en playback: el primero pide login; el segundo no devuelve Opus y suena transcodificado.
+4. No definas `PLUGINS_YOUTUBE_CLIENTS_*` en el stack si quieres usar la config del `application.yml` embebido.
+5. Si muchos videos fallan, considera OAuth del plugin (cuenta quemable) en `application.yml` → `plugins.youtube.oauth`.
+
 ## 8. Tuning del host (OMV/Debian)
 
 Si buscas menor latencia y menos caidas, aplica tuning en el host antes de hacer deploy.

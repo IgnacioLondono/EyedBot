@@ -33,8 +33,8 @@ lavalink:
       pluginFilters: true
     youtubePlaylistLoadLimit: 20
     playerUpdateInterval: 2
-    bufferDurationMs: 600
-    frameBufferDurationMs: 8000
+    bufferDurationMs: 800
+    frameBufferDurationMs: 10000
     opusEncodingQuality: 10
     resamplingQuality: HIGH
     trackStuckThresholdMs: 15000
@@ -47,14 +47,23 @@ plugins:
     allowSearch: true
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
-    # Sin WEB al inicio (evita errores de cipher/base.js). MUSIC solo para búsquedas.
+    # Orden: clientes con Opus nativo primero; sin IOS (transcodifica y suena mal).
+    # Sin ANDROID_MUSIC (suele fallar con "requires login").
     clients:
-      - MUSIC
-      - TVHTML5_SIMPLY
       - ANDROID_VR
-      - ANDROID_MUSIC
-      - IOS
+      - TVHTML5_SIMPLY
+      - MWEB
       - WEBEMBEDDED
+      - MUSIC
+    clientOptions:
+      MUSIC:
+        playback: false
+        videoLoading: false
+        playlistLoading: false
+        searching: true
+      WEBEMBEDDED:
+        playlistLoading: false
+        searching: false
 
 metrics:
   prometheus:

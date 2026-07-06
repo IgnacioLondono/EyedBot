@@ -15,7 +15,7 @@ module.exports = {
     musicDefaultVolume: Number.parseInt(process.env.MUSIC_DEFAULT_VOLUME || '55', 10),
     musicMaxVolume: Number.parseInt(process.env.MUSIC_MAX_VOLUME || '80', 10),
     musicSkipFfmpeg: (process.env.MUSIC_SKIP_FFMPEG || 'false').toLowerCase() === 'true',
-    musicCleanProfileEnabled: (process.env.MUSIC_CLEAN_PROFILE_ENABLED || 'true').toLowerCase() === 'true',
+    musicCleanProfileEnabled: (process.env.MUSIC_CLEAN_PROFILE_ENABLED || 'false').toLowerCase() === 'true',
     musicCleanFilters: (process.env.MUSIC_CLEAN_FILTERS || 'normalizer2,softlimiter')
         .split(',')
         .map((f) => f.trim())
