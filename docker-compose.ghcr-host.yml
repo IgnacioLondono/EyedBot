@@ -11,6 +11,8 @@ services:
     environment:
       - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
       - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - LAVALINK_SERVER_SOURCES_YOUTUBE=false
+      - PLUGINS_YOUTUBE_ENABLED=true
       - SERVER_PORT=2333
       - _JAVA_OPTIONS=-Xmx512m
     volumes:

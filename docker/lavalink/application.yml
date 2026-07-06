@@ -3,15 +3,15 @@ server:
   address: 0.0.0.0
 
 lavalink:
+  # Lavalink 4: sin "repository" (Maven releases por defecto).
   plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.13.5"
-      repository: "https://maven.lavalink.dev/releases"
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.1"
       snapshot: false
   server:
     # Sobrescribible con LAVALINK_SERVER_PASSWORD en Docker (variable oficial Lavalink 4).
     password: "youshallnotpass"
     sources:
-      # Obligatorio: desactiva YouTube integrado (deprecado) y usa el plugin de abajo
+      # Obligatorio: el YouTube integrado de Lavaplayer está roto; solo usar el plugin.
       youtube: false
       bandcamp: true
       soundcloud: true
@@ -47,10 +47,13 @@ plugins:
     allowSearch: true
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
+    # Sin WEB al inicio (evita errores de cipher/base.js). MUSIC solo para búsquedas.
     clients:
       - MUSIC
+      - TVHTML5_SIMPLY
       - ANDROID_VR
-      - WEB
+      - ANDROID_MUSIC
+      - IOS
       - WEBEMBEDDED
 
 metrics:
@@ -66,3 +69,4 @@ logging:
   level:
     root: INFO
     lavalink: INFO
+    dev.lavalink.youtube: INFO
