@@ -438,8 +438,15 @@ function createEyedBotClient() {
 }
 
 function bootstrapAuxiliaryClient(client, token, options = {}) {
-    const commandPayloads = loadBotCommands(client);
+    const commandsEnabled = options.commandsEnabled !== false;
+    // Con comandos desactivados no se cargan/registran slash (evita "copiar" los comandos del bot principal).
+    const commandPayloads = commandsEnabled ? loadBotCommands(client) : [];
+    if (!commandsEnabled) {
+        const { Collection } = require('discord.js');
+        client.commands = new Collection();
+    }
     client.__eyedSlashPayloads = commandPayloads;
+    client.__eyedCommandsEnabled = commandsEnabled;
     client.__eyedBotToken = token;
     client.__eyedAuxiliary = true;
 

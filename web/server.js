@@ -61,6 +61,8 @@ const {
     cacheBustPreviewUrl
 } = require('../src/utils/twitch-stream-api');
 const { buildStreamAlertEmbed } = require('../src/utils/stream-alert-scheduler');
+const weeklySummaryStore = require('../src/utils/weekly-summary-store');
+const weeklySummaryService = require('../src/utils/weekly-summary-service');
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
 const crunchyrollStore = require('../src/utils/crunchyroll-store');
@@ -5294,6 +5296,69 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
     } catch (error) {
         console.error('Error enviando stream alert test:', error);
         res.status(500).json({ error: 'Error al enviar prueba de stream alert' });
+    }
+});
+
+app.get('/api/guild/:guildId/weekly-summary-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await weeklySummaryStore.getConfig(guildId);
+        res.json(config || weeklySummaryStore.defaultConfig());
+    } catch (error) {
+        console.error('Error obteniendo weekly summary config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración del resumen semanal' });
+    }
+});
+
+app.post('/api/guild/:guildId/weekly-summary-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const body = req.body || {};
+        if (body.enabled && !body.channelId) {
+            return res.status(400).json({ error: 'Debes seleccionar un canal para el resumen' });
+        }
+
+        const patch = {
+            updatedBy: req.session.user?.id || 'panel'
+        };
+        for (const key of ['enabled', 'channelId', 'dayOfWeek', 'hour', 'minute', 'timezone', 'compare', 'mentionRoleId']) {
+            if (Object.prototype.hasOwnProperty.call(body, key)) patch[key] = body[key];
+        }
+
+        const config = await weeklySummaryStore.setConfig(guildId, patch);
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error guardando weekly summary config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración del resumen semanal' });
+    }
+});
+
+app.post('/api/guild/:guildId/weekly-summary-send', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const result = await weeklySummaryService.sendWeeklySummary(botClient, guildId, { rotate: false });
+        if (!result.ok) {
+            const reasons = {
+                no_channel: 'No hay canal configurado.',
+                channel_invalid: 'El canal configurado no es válido o el bot no tiene acceso.',
+                guild_unavailable: 'El servidor no está disponible.'
+            };
+            return res.status(400).json({ error: reasons[result.reason] || 'No se pudo publicar el resumen.' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error enviando weekly summary:', error);
+        res.status(500).json({ error: 'Error al enviar el resumen semanal' });
     }
 });
 

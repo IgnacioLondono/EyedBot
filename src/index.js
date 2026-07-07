@@ -30,6 +30,7 @@ const { startFreeGamesScheduler, stopFreeGamesScheduler } = require('./utils/fre
 const { startCrunchyrollScheduler, stopCrunchyrollScheduler } = require('./utils/crunchyroll-service');
 const { startBumpReminderScheduler, stopBumpReminderScheduler, handleDisboardBumpMessage } = require('./utils/bump-reminder-scheduler');
 const { startEventsGiveawaysScheduler, stopEventsGiveawaysScheduler, handleGiveawayButton } = require('./utils/giveaway-service');
+const { startWeeklySummaryScheduler, stopWeeklySummaryScheduler } = require('./utils/weekly-summary-service');
 const presenceStore = require('./utils/presence-store');
 const { attachPresenceTracking, seedPresencesFromClient } = require('./events/presence-tracker');
 require('dotenv').config();
@@ -360,6 +361,7 @@ client.once('clientReady', async () => {
     startCrunchyrollScheduler(client);
     startBumpReminderScheduler(client);
     startEventsGiveawaysScheduler(client);
+    startWeeklySummaryScheduler(client);
     seedPresencesFromClient(client);
 });
 
@@ -717,6 +719,7 @@ async function gracefulShutdown(signal) {
         stopFreeGamesScheduler();
         stopCrunchyrollScheduler();
         stopBumpReminderScheduler();
+        stopWeeklySummaryScheduler();
         presenceStore.stopPresenceCacheCleanup();
         try {
             require('./utils/tts-voice-manager').disconnectAll('shutdown');

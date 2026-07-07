@@ -89,6 +89,7 @@ export type OwnerBotSummary = {
   avatarUrl: string | null;
   guildCount: number;
   ping: number | null;
+  commandsEnabled: boolean;
   tokenHint: string;
   inviteUrl: string;
   lastError: string | null;
@@ -369,6 +370,15 @@ export const saveStreamAlertConfig = (guildId: string, body: Record<string, unkn
 
 export const testStreamAlert = (guildId: string, body: Record<string, unknown>) =>
   apiFetch(`/api/guild/${g(guildId)}/stream-alert-test`, { method: "POST", body });
+
+export const getWeeklySummaryConfig = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/weekly-summary-config`);
+
+export const saveWeeklySummaryConfig = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/weekly-summary-config`, { method: "POST", body });
+
+export const sendWeeklySummaryNow = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/weekly-summary-send`, { method: "POST" });
 
 export const getChannelSetup = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/channel-setup`);

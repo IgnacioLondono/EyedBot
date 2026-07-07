@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   Bolt,
+  BarChart3,
   DoorOpen,
   FileBadge2,
   Gamepad2,
@@ -64,6 +65,7 @@ export const SERVER_PANES: ServerPane[] = [
   { id: "free-games", slug: "free-games", label: "Juegos gratis", icon: Gift, premium: true },
   { id: "embed", slug: "embed", label: "Embeds", icon: FileBadge2 },
   { id: "events", slug: "events", label: "Eventos y sorteos", icon: CalendarDays },
+  { id: "weekly-summary", slug: "weekly-summary", label: "Resumen semanal", icon: BarChart3 },
 ];
 
 export function serverPaneHref(guildId: string, slug = "overview") {

@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Send,
   Server,
+  Terminal,
   Trash2,
   UserPlus,
   Upload,
@@ -49,6 +50,7 @@ type OwnerBot = {
   avatarUrl: string | null;
   guildCount: number;
   ping: number | null;
+  commandsEnabled: boolean;
   tokenHint: string;
   inviteUrl: string;
   lastError: string | null;
@@ -82,6 +84,7 @@ function parseBot(raw: unknown): OwnerBot {
     avatarUrl: toStringValue(row.avatarUrl) || discordAvatarUrl(appId, avatar),
     guildCount: Number(row.guildCount) || 0,
     ping: row.ping == null ? null : Number(row.ping),
+    commandsEnabled: row.commandsEnabled !== false,
     tokenHint: toStringValue(row.tokenHint),
     inviteUrl: toStringValue(row.inviteUrl) || botAdminInviteUrl(appId),
     lastError: toStringValue(row.lastError) || null,
@@ -326,6 +329,27 @@ export function OwnerBotsTab() {
     }
   }
 
+  async function handleToggleCommands(id: string, commandsEnabled: boolean) {
+    setBusy(`commands-${id}`);
+    try {
+      const data = asRecord(await updateOwnerBot(id, { commandsEnabled }));
+      const bot = parseBot(data.bot);
+      setBots((prev) => prev.map((item) => (item.id === id ? bot : item)));
+      toast({
+        title: commandsEnabled ? "Comandos activados" : "Comandos desactivados",
+        description: commandsEnabled
+          ? "El bot volverá a registrar sus comandos."
+          : "Se quitaron los comandos de este bot para que no dupliquen a EyedBot.",
+        tone: "success",
+      });
+    } catch (err) {
+      toast({ title: "Error", description: getErrorMessage(err), tone: "danger" });
+      await loadBots();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleSaveProfile() {
     if (!selectedId) return;
     setBusy("profile");
@@ -529,6 +553,16 @@ export function OwnerBotsTab() {
                 >
                   <Power className="mr-1 h-3.5 w-3.5" />
                   {selected.enabled ? "Detener" : "Iniciar"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy === `commands-${selected.id}`}
+                  onClick={() => void handleToggleCommands(selected.id, !selected.commandsEnabled)}
+                  title="Evita que este bot duplique los comandos de EyedBot"
+                >
+                  <Terminal className="mr-1 h-3.5 w-3.5" />
+                  {selected.commandsEnabled ? "Desactivar comandos" : "Activar comandos"}
                 </Button>
                 <Button
                   size="sm"

@@ -81,6 +81,7 @@ function sanitizePublicRecord(record) {
         avatarUrl: user?.displayAvatarURL?.({ size: 128 }) || record.avatarUrl || null,
         guildCount: client?.guilds?.cache?.size ?? record.guildCount ?? 0,
         ping: client?.ws?.ping ?? null,
+        commandsEnabled: record.commandsEnabled !== false,
         tokenHint: maskToken(record.token),
         inviteUrl: buildBotInviteUrl(client?.user?.id || record.applicationId),
         createdAt: record.createdAt,
@@ -127,7 +128,10 @@ async function startBotRuntime(record) {
         console.error(`❌ Bot auxiliar ${record.label}:`, rt.lastError);
     });
 
-    bootstrapAuxiliaryClient(client, record.token, { label: record.label });
+    bootstrapAuxiliaryClient(client, record.token, {
+        label: record.label,
+        commandsEnabled: record.commandsEnabled !== false
+    });
 
     client.once('clientReady', () => {
         rt.status = 'online';
@@ -202,6 +206,7 @@ async function createBot({ label, token }) {
         label: cleanLabel,
         token: cleanToken,
         enabled: true,
+        commandsEnabled: true,
         username: user.username,
         discriminator: user.discriminator,
         applicationId: user.id,
@@ -269,6 +274,25 @@ async function updateBot(id, patch = {}) {
                 record.updatedAt = new Date().toISOString();
                 writeStore(store);
                 throw asBotError(error);
+            }
+        }
+    }
+
+    if (patch.commandsEnabled != null) {
+        const nextCommandsEnabled = patch.commandsEnabled === true;
+        if (nextCommandsEnabled !== (record.commandsEnabled !== false)) {
+            record.commandsEnabled = nextCommandsEnabled;
+            // Reiniciar para (re)registrar o limpiar los slash commands del bot.
+            if (record.enabled !== false && runtime.has(id)) {
+                try {
+                    await startBotRuntime(record);
+                    record.lastError = null;
+                } catch (error) {
+                    record.lastError = formatBotLoginError(error?.message || error);
+                    record.updatedAt = new Date().toISOString();
+                    writeStore(store);
+                    throw asBotError(error);
+                }
             }
         }
     }
@@ -462,8 +486,8 @@ async function sendBotChatMessage(id, { guildId, channelId, content, ownerTag })
         throw Object.assign(new Error('El bot no puede escribir en este canal'), { statusCode: 403 });
     }
 
-    const prefix = ownerTag ? `**[${ownerTag}]** ` : '';
-    const sent = await channel.send(`${prefix}${text}`);
+    // El mensaje sale como el bot, sin exponer quién lo envió desde el panel.
+    const sent = await channel.send(text);
     return {
         id: sent.id,
         content: sent.content,
