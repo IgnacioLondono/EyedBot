@@ -1,9 +1,10 @@
-const { EmbedBuilder, MessageFlags } = require('discord.js');
+const { EmbedBuilder, MessageFlags, AttachmentBuilder } = require('discord.js');
 const config = require('../../config');
 const levelingStore = require('../../utils/leveling-store');
 const { getLevelFromXp, getProgress, sanitizeDifficulty } = require('../../utils/leveling-math');
 const { parseRoleRewards, getRoleRewardTiersForLevel } = require('../../utils/leveling-rewards');
 const { getEyedTiersForGuild, formatLevelRange } = require('../../utils/eyed-tier-catalog');
+const { renderNivelCardPng, renderTopCardPng } = require('../../utils/leveling-card');
 
 function progressBar(percent, width = 14) {
     const p = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -62,6 +63,8 @@ async function resolveLeaderboardDisplayName(guild, client, userId) {
  * Progreso de nivel (tuyo u otro usuario). Respuesta solo visible para quien ejecuta (ephemeral).
  */
 async function runNivelSelf(interaction) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
     const guild = interaction.guild;
     const target = interaction.options.getUser('usuario') || interaction.user;
     const isSelf = target.id === interaction.user.id;
@@ -153,7 +156,29 @@ async function runNivelSelf(interaction) {
         }
     }
 
-    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    try {
+        const progressLabel =
+            prog.nextNeed > 0
+                ? `${prog.intoLevel.toLocaleString('es-ES')} / ${prog.nextNeed.toLocaleString('es-ES')} XP → Nv ${level + 1}`
+                : '';
+
+        const cardBuffer = await renderNivelCardPng({
+            avatarUrl: target.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true }),
+            displayName: target.globalName || target.username,
+            level,
+            xp,
+            rank: rankText,
+            percent: prog.percent,
+            progressLabel
+        });
+        const attachment = new AttachmentBuilder(cardBuffer, { name: 'nivel.png' });
+        embed.setImage('attachment://nivel.png');
+
+        return interaction.editReply({ embeds: [embed], files: [attachment] });
+    } catch (error) {
+        console.error('nivel card:', error);
+        return interaction.editReply({ embeds: [embed] });
+    }
 }
 
 /** Lista roles de nivel configurados en el servidor (`roleRewards`); si no hay, muestra referencia Eyed. */
@@ -256,6 +281,30 @@ async function runTop(interaction) {
             })
         );
 
+        const cardEntries = await Promise.all(
+            slice.map(async (row, i) => {
+                const xp = Math.max(0, Number.parseInt(row.xp || 0, 10) || 0);
+                const prog = getProgress(xp, difficulty);
+                const user = await client.users.fetch(row.userId).catch(() => null);
+                let suffix = '';
+                if (orden === 'mensajes') {
+                    suffix = `${(Number(row.messageCount) || 0).toLocaleString('es-ES')} msgs`;
+                } else if (orden === 'voz') {
+                    suffix = `${(Number(row.voiceMinutes) || 0).toLocaleString('es-ES')} min`;
+                } else {
+                    suffix = `${xp.toLocaleString('es-ES')} XP`;
+                }
+                return {
+                    rank: i + 1,
+                    avatarUrl: user?.displayAvatarURL({ extension: 'png', size: 128, forceStatic: true }),
+                    displayName: await resolveLeaderboardDisplayName(guild, client, row.userId),
+                    level: prog.level,
+                    percent: prog.percent,
+                    suffix
+                };
+            })
+        );
+
         const embed = new EmbedBuilder()
             .setColor(config.embedColor)
             .setTitle(`🏆 Ranking por ${ordenLabel}`)
@@ -268,7 +317,18 @@ async function runTop(interaction) {
             })
             .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        try {
+            const cardBuffer = await renderTopCardPng({
+                title: `Ranking por ${ordenLabel}`,
+                entries: cardEntries
+            });
+            const attachment = new AttachmentBuilder(cardBuffer, { name: 'top.png' });
+            embed.setImage('attachment://top.png');
+            return interaction.editReply({ embeds: [embed], files: [attachment] });
+        } catch (cardError) {
+            console.error('top card:', cardError);
+            return interaction.editReply({ embeds: [embed] });
+        }
     } catch (error) {
         console.error('top niveles:', error);
         return interaction.editReply({
