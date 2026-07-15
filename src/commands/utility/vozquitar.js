@@ -89,7 +89,9 @@ module.exports = {
                     Connect: false,
                     Speak: false,
                     Stream: false,
-                    UseVAD: false
+                    UseVAD: false,
+                    SendMessages: false,
+                    AttachFiles: false
                 });
             });
 

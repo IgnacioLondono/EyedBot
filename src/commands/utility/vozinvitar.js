@@ -84,7 +84,11 @@ module.exports = {
                 Connect: true,
                 Speak: true,
                 Stream: true,
-                UseVAD: true
+                UseVAD: true,
+                SendMessages: true,
+                AttachFiles: true,
+                EmbedLinks: true,
+                ReadMessageHistory: true
             });
 
             return interaction.reply({
@@ -92,7 +96,9 @@ module.exports = {
                     new EmbedBuilder()
                         .setColor(config.embedColor)
                         .setTitle('Usuario invitado')
-                        .setDescription(`Ahora **${targetMember.user.tag}** puede entrar a tu canal privado.`)
+                        .setDescription(
+                            `Ahora **${targetMember.user.tag}** puede entrar a tu canal privado y enviar mensajes/archivos.`
+                        )
                 ],
                 flags: 64
             });

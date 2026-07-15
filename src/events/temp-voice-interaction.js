@@ -197,14 +197,34 @@ async function handleTempVoiceButton(interaction) {
 
             if (isLocked) {
                 await channel.permissionOverwrites.edit(everyoneRoleId, {
-                    Connect: null
+                    Connect: null,
+                    SendMessages: true,
+                    AttachFiles: true,
+                    EmbedLinks: true,
+                    ReadMessageHistory: true
                 }).catch(() => null);
                 await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado', {
                     isLocked: false
                 });
             } else {
                 await channel.permissionOverwrites.edit(everyoneRoleId, {
-                    Connect: false
+                    Connect: false,
+                    SendMessages: false,
+                    AttachFiles: false
+                }).catch(() => null);
+                await channel.permissionOverwrites.edit(interaction.user.id, {
+                    ViewChannel: true,
+                    Connect: true,
+                    Speak: true,
+                    Stream: true,
+                    UseVAD: true,
+                    SendMessages: true,
+                    AttachFiles: true,
+                    EmbedLinks: true,
+                    ReadMessageHistory: true,
+                    MoveMembers: true,
+                    MuteMembers: true,
+                    DeafenMembers: true
                 }).catch(() => null);
                 await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal bloqueado', {
                     isLocked: true

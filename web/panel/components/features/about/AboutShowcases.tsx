@@ -254,9 +254,17 @@ export function InteractionsShowcase() {
     return () => window.clearInterval(timer);
   }, []);
 
+  // Precarga los GIFs para que el cambio de pestaña no colapse el layout al cargar.
+  useEffect(() => {
+    for (const item of SHOWCASE_INTERACTIONS) {
+      const img = new window.Image();
+      img.src = item.gif;
+    }
+  }, []);
+
   return (
-    <ShowcasePanel>
-      <div className="mb-3 flex items-center justify-center gap-2">
+    <ShowcasePanel className="flex h-full min-h-[360px] flex-col">
+      <div className="mb-3 flex shrink-0 items-center justify-center gap-2">
         {SHOWCASE_INTERACTIONS.map((item, itemIndex) => (
           <button
             key={item.key}
@@ -273,29 +281,36 @@ export function InteractionsShowcase() {
           </button>
         ))}
       </div>
-      <div
-        key={example.key}
-        className="animate-in fade-in duration-500"
-      >
-        <DiscordEmbedShell color="#a78bfa" className="rounded-xl">
-          <div className="p-3">
+      <div className="min-h-0 flex-1">
+        <DiscordEmbedShell color="#a78bfa" className="h-full rounded-xl">
+          <div className="flex h-full flex-col p-3">
             <p className="text-sm font-semibold text-white">{example.title}</p>
             <p className="mt-1 text-xs text-[#dcddde]">
               <span className="font-medium text-violet-300">@Kiddis</span> {example.verb} a{" "}
               <span className="font-medium text-violet-300">@amigo</span>
             </p>
-            <ShowcaseAnimeGif
-              src={example.gif}
-              alt={`GIF de ${example.command}`}
-              className="mt-3 max-h-44"
-            />
+            <div className="relative mt-3 h-44 w-full shrink-0 overflow-hidden rounded-lg bg-black/40">
+              {SHOWCASE_INTERACTIONS.map((item, itemIndex) => (
+                <ShowcaseAnimeGif
+                  key={item.key}
+                  src={item.gif}
+                  alt={`GIF de ${item.command}`}
+                  className={cn(
+                    "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
+                    itemIndex === index ? "opacity-100" : "pointer-events-none opacity-0"
+                  )}
+                />
+              ))}
+            </div>
             <p className="mt-2 text-[10px] text-fuchsia-300/90">
               {example.countLabel}: {example.count}
             </p>
           </div>
         </DiscordEmbedShell>
       </div>
-      <p className="mt-3 text-center text-[10px] text-zinc-500">/gif · botón de devolver · contador por usuario</p>
+      <p className="mt-3 shrink-0 text-center text-[10px] text-zinc-500">
+        /gif · botón de devolver · contador por usuario
+      </p>
     </ShowcasePanel>
   );
 }

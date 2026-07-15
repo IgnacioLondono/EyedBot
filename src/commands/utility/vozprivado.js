@@ -54,7 +54,9 @@ module.exports = {
             if (activate) {
                 await channel.permissionOverwrites.edit(guildId, {
                     ViewChannel: true,
-                    Connect: false
+                    Connect: false,
+                    SendMessages: false,
+                    AttachFiles: false
                 });
 
                 await channel.permissionOverwrites.edit(interaction.user.id, {
@@ -63,6 +65,10 @@ module.exports = {
                     Speak: true,
                     Stream: true,
                     UseVAD: true,
+                    SendMessages: true,
+                    AttachFiles: true,
+                    EmbedLinks: true,
+                    ReadMessageHistory: true,
                     MoveMembers: true,
                     MuteMembers: true,
                     DeafenMembers: true,
@@ -74,17 +80,23 @@ module.exports = {
                         new EmbedBuilder()
                             .setColor(config.embedColor)
                             .setTitle('🔒 Canal privado activado')
-                            .setDescription('Tu canal temporal ahora es privado. Usa `/vozinvitar` para permitir usuarios.')
+                            .setDescription(
+                                'Tu canal temporal ahora es privado. Usa `/vozinvitar` para dar acceso (voz + chat/archivos).'
+                            )
                     ],
                     flags: 64
                 });
             }
 
-            await channel.permissionOverwrites.delete(guildId).catch(async () => {
-                await channel.permissionOverwrites.edit(guildId, {
-                    ViewChannel: null,
-                    Connect: null
-                });
+            await channel.permissionOverwrites.edit(guildId, {
+                ViewChannel: true,
+                Connect: null,
+                SendMessages: true,
+                AttachFiles: true,
+                EmbedLinks: true,
+                ReadMessageHistory: true
+            }).catch(async () => {
+                await channel.permissionOverwrites.delete(guildId).catch(() => null);
             });
 
             return interaction.reply({

@@ -138,7 +138,7 @@ function FeatureSection({
     <section id={id} className="scroll-mt-24 border-t border-white/[0.06] py-16 md:py-24">
       <div
         className={cn(
-          "mx-auto grid max-w-6xl items-center gap-10 px-4 lg:grid-cols-2 lg:gap-16 lg:px-8",
+          "mx-auto grid max-w-6xl items-start gap-10 px-4 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-8",
           reverse && "lg:[&>div:first-child]:order-2 lg:[&>div:last-child]:order-1"
         )}
       >
@@ -156,7 +156,7 @@ function FeatureSection({
             {ctaLabel}
           </Link>
         </div>
-        <div className="relative">{preview}</div>
+        <div className="relative min-w-0 self-stretch">{preview}</div>
       </div>
     </section>
   );

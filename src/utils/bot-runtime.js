@@ -12,9 +12,7 @@ const { handleVerifyButton } = require('./verify-service');
 const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = require('../events/ticket-interaction');
 const {
     handleMessageCreate,
-    handleAnalyticsVoiceStateUpdate,
-    seedVoiceAnalyticsSessions,
-    startVoiceXpLoop
+    handleAnalyticsVoiceStateUpdate
 } = require('../events/leveling-tracker');
 const { handleCountingMessage } = require('../events/counting-game');
 const { handleVoiceStateUpdate } = require('../events/temp-voice');
@@ -158,6 +156,58 @@ async function registerSlashCommandsForClient(client, token, commandPayloads, op
     return false;
 }
 
+async function executeChatInputCommand(interaction, client) {
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
+
+    if (MODERATION_COMMAND_NAMES.has(interaction.commandName) && !canUseModerationCommands(interaction)) {
+        await safeReply(interaction, {
+            content: '❌ Solo moderadores o administradores pueden usar este comando.',
+            flags: 64
+        }).catch(() => {});
+        return;
+    }
+
+    const startedAt = Date.now();
+    let acknowledgedInTime = false;
+    const slowCommandTimer = setTimeout(() => {
+        acknowledgedInTime = interaction.replied || interaction.deferred;
+    }, SLOW_COMMAND_WARN_MS);
+
+    try {
+        await command.execute(interaction);
+        const elapsedMs = Date.now() - startedAt;
+        if (elapsedMs >= SLOW_COMMAND_WARN_MS && !acknowledgedInTime) {
+            console.warn(`⚠️ Comando lento: /${interaction.commandName} tardó ${elapsedMs}ms en ${interaction.guildId || 'DM'}`);
+        }
+    } catch (error) {
+        if (isUnknownInteractionError(error)) return;
+        console.error(error);
+        await safeReply(interaction, { content: '❌ Error al ejecutar el comando.', flags: 64 }).catch(() => {});
+    } finally {
+        clearTimeout(slowCommandTimer);
+    }
+}
+
+/** Bots del portal: solo slash commands (si están habilitados), sin botones ni automatizaciones. */
+function attachAuxiliaryInteractionHandler(client) {
+    client.on('interactionCreate', async (interaction) => {
+        if (interaction.isAutocomplete()) {
+            const command = client.commands.get(interaction.commandName);
+            if (!command?.autocomplete) return;
+            try {
+                await command.autocomplete(interaction);
+            } catch (error) {
+                console.error('Error en autocomplete:', error);
+            }
+            return;
+        }
+
+        if (!interaction.isChatInputCommand()) return;
+        await executeChatInputCommand(interaction, client);
+    });
+}
+
 function attachInteractionHandler(client) {
     client.on('interactionCreate', async (interaction) => {
         let musicSystem = interaction.client.musicSystem;
@@ -289,42 +339,30 @@ function attachInteractionHandler(client) {
         }
 
         if (!interaction.isChatInputCommand()) return;
-
-        const command = client.commands.get(interaction.commandName);
-        if (!command) return;
-
-        if (MODERATION_COMMAND_NAMES.has(interaction.commandName) && !canUseModerationCommands(interaction)) {
-            await safeReply(interaction, {
-                content: '❌ Solo moderadores o administradores pueden usar este comando.',
-                flags: 64
-            }).catch(() => {});
-            return;
-        }
-
-        const startedAt = Date.now();
-        let acknowledgedInTime = false;
-        const slowCommandTimer = setTimeout(() => {
-            acknowledgedInTime = interaction.replied || interaction.deferred;
-        }, SLOW_COMMAND_WARN_MS);
-
-        try {
-            await command.execute(interaction);
-            const elapsedMs = Date.now() - startedAt;
-            if (elapsedMs >= SLOW_COMMAND_WARN_MS && !acknowledgedInTime) {
-                console.warn(`⚠️ Comando lento: /${interaction.commandName} tardó ${elapsedMs}ms en ${interaction.guildId || 'DM'}`);
-            }
-        } catch (error) {
-            if (isUnknownInteractionError(error)) return;
-            console.error(error);
-            await safeReply(interaction, { content: '❌ Error al ejecutar el comando.', flags: 64 }).catch(() => {});
-        } finally {
-            clearTimeout(slowCommandTimer);
-        }
+        await executeChatInputCommand(interaction, client);
     });
 }
 
 function attachGuildEventHandlers(client, options = {}) {
     const auxiliary = options.auxiliary === true;
+
+    if (auxiliary) {
+        client.on('guildCreate', (guild) => {
+            const payloads = client.__eyedSlashPayloads;
+            const token = client.__eyedBotToken;
+            if (!payloads?.length || !token) return;
+            setTimeout(() => {
+                registerSlashCommandsForClient(client, token, payloads, {
+                    guildIds: [guild.id],
+                    cleanupGlobal: false,
+                    retries: 3
+                }).catch((error) => {
+                    console.error('❌ Error sincronizando slash en nuevo servidor (auxiliar):', error?.message || error);
+                });
+            }, 10000);
+        });
+        return;
+    }
 
     client.on('messageCreate', async (message) => {
         try {
@@ -402,23 +440,6 @@ function attachGuildEventHandlers(client, options = {}) {
             console.error('Error en messageReactionRemove:', error);
         }
     });
-
-    if (!auxiliary) return;
-
-    client.on('guildCreate', (guild) => {
-        const payloads = client.__eyedSlashPayloads;
-        const token = client.__eyedBotToken;
-        if (!payloads?.length || !token) return;
-        setTimeout(() => {
-            registerSlashCommandsForClient(client, token, payloads, {
-                guildIds: [guild.id],
-                cleanupGlobal: false,
-                retries: 3
-            }).catch((error) => {
-                console.error('❌ Error sincronizando slash en nuevo servidor (auxiliar):', error?.message || error);
-            });
-        }, 10000);
-    });
 }
 
 function createEyedBotClient() {
@@ -450,7 +471,7 @@ function bootstrapAuxiliaryClient(client, token, options = {}) {
     client.__eyedBotToken = token;
     client.__eyedAuxiliary = true;
 
-    attachInteractionHandler(client);
+    attachAuxiliaryInteractionHandler(client);
     attachGuildEventHandlers(client, { auxiliary: true });
 
     if ((process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false') {
@@ -484,10 +505,6 @@ function bootstrapAuxiliaryClient(client, token, options = {}) {
         await registerSlashCommandsForClient(client, token, commandPayloads).catch((error) => {
             console.error('❌ Error registrando slash auxiliar:', error?.message || error);
         });
-        if (!options.skipVoiceLoop) {
-            startVoiceXpLoop(client);
-            seedVoiceAnalyticsSessions(client);
-        }
     });
 }
 
@@ -499,6 +516,8 @@ module.exports = {
     loadBotCommands,
     registerSlashCommandsForClient,
     attachInteractionHandler,
+    attachAuxiliaryInteractionHandler,
+    executeChatInputCommand,
     attachGuildEventHandlers,
     createEyedBotClient,
     bootstrapAuxiliaryClient

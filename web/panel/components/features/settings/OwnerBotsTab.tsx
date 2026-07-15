@@ -408,7 +408,7 @@ export function OwnerBotsTab() {
     <div className="space-y-5">
       <SectionCard
         title="Crear bot auxiliar"
-        description="Registra otro bot de Discord con las mismas funciones (comandos, tickets, niveles, etc.). El token solo lo ve el propietario."
+        description="Bot de identidad propia para chatear desde el panel. EyedBot sigue manejando voz temporal, bienvenidas, niveles y el resto de automatizaciones. Activa los comandos solo si este bot va en servidores sin EyedBot."
       >
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Nombre interno">

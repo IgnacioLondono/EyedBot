@@ -354,7 +354,16 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
         const existing = guild.channels.cache.get(existingChannelId) || await guild.channels.fetch(existingChannelId).catch(() => null);
         if (existing && existing.type === ChannelType.GuildVoice) {
             await existing.permissionOverwrites.edit(member.id, {
-                ManageChannels: false
+                ManageChannels: false,
+                ViewChannel: true,
+                Connect: true,
+                Speak: true,
+                Stream: true,
+                UseVAD: true,
+                SendMessages: true,
+                AttachFiles: true,
+                EmbedLinks: true,
+                ReadMessageHistory: true
             }).catch(() => null);
             await ensureManagementEmbedIfMissing(existing, member, config);
             return { channel: existing, created: false };
@@ -375,17 +384,29 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
     const parentId = parent?.type === ChannelType.GuildCategory ? parent.id : creatorChannel.parentId || null;
     const userLimit = Math.max(0, Math.min(99, Number.parseInt(config.userLimit || 0, 10) || 0));
     const botMember = await resolveBotMember(guild);
+    const chatAllow = [
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.AttachFiles,
+        PermissionsBitField.Flags.EmbedLinks,
+        PermissionsBitField.Flags.ReadMessageHistory
+    ];
     const overwrites = [
+        {
+            id: guild.roles.everyone.id,
+            allow: [...chatAllow]
+        },
         {
             id: member.id,
             allow: [
+                PermissionsBitField.Flags.ViewChannel,
                 PermissionsBitField.Flags.Connect,
                 PermissionsBitField.Flags.Speak,
                 PermissionsBitField.Flags.Stream,
                 PermissionsBitField.Flags.UseVAD,
                 PermissionsBitField.Flags.MoveMembers,
                 PermissionsBitField.Flags.MuteMembers,
-                PermissionsBitField.Flags.DeafenMembers
+                PermissionsBitField.Flags.DeafenMembers,
+                ...chatAllow
             ]
         }
     ];
@@ -397,6 +418,7 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
                 PermissionsBitField.Flags.ViewChannel,
                 PermissionsBitField.Flags.Connect,
                 PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.AttachFiles,
                 PermissionsBitField.Flags.ReadMessageHistory,
                 PermissionsBitField.Flags.EmbedLinks,
                 PermissionsBitField.Flags.ManageMessages,
