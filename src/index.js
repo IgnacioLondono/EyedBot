@@ -58,6 +58,11 @@ const FORCED_SLASH_GUILD_IDS = String(process.env.FORCED_SLASH_GUILD_IDS || '')
     .split(/[,;\s]+/)
     .map((id) => id.trim())
     .filter(Boolean);
+/** Detalle por comando/guild. Por defecto solo resúmenes (avisos y errores siguen igual). */
+const LOG_VERBOSE = (process.env.LOG_VERBOSE || 'false').toLowerCase() === 'true';
+function verboseLog(...args) {
+    if (LOG_VERBOSE) console.log(...args);
+}
 const DISABLED_SLASH_COMMANDS = new Set([
     'voznombre',
     'vozprivado'
@@ -168,13 +173,13 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
     for (const appId of appIds) {
         for (let attempt = 1; attempt <= retries; attempt++) {
             try {
-                console.log(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${retries})...`);
+                verboseLog(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${retries})...`);
 
                 let okCount = 0;
                 const failedGuilds = [];
                 for (const guildId of resolvedTargetGuildIds) {
                     const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
-                    console.log(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
+                    verboseLog(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
 
                     const registerOneGuild = rest.put(
                         Routes.applicationGuildCommands(appId, guildId),
@@ -193,7 +198,7 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                             await registerOneGuild;
                         }
                         okCount += 1;
-                        console.log(`✅ Slash registrados en guild ${guildName} (${guildId}).`);
+                        verboseLog(`✅ Slash registrados en guild ${guildName} (${guildId}).`);
                     } catch (guildError) {
                         failedGuilds.push(guildId);
                         console.warn(`⚠️ No se pudieron registrar slash en guild ${guildName} (${guildId}):`, guildError?.message || guildError);
@@ -255,6 +260,10 @@ client.commands = new Collection();
 const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 
+let commandsLoadedCount = 0;
+let commandsSkippedCount = 0;
+const skippedCommandNames = [];
+
 // Función recursiva para cargar comandos
 function loadCommands(dir) {
     if (!fs.existsSync(dir)) return;
@@ -271,12 +280,15 @@ function loadCommands(dir) {
             const command = require(filePath);
             if ('data' in command && 'execute' in command) {
                 if (DISABLED_SLASH_COMMANDS.has(command.data.name)) {
-                    console.log(`⏭️ Comando desactivado (omitido): ${command.data.name}`);
+                    commandsSkippedCount += 1;
+                    skippedCommandNames.push(command.data.name);
+                    verboseLog(`⏭️ Comando desactivado (omitido): ${command.data.name}`);
                     continue;
                 }
                 client.commands.set(command.data.name, command);
                 commands.push(command.data.toJSON());
-                console.log(`✅ Comando cargado: ${command.data.name}`);
+                commandsLoadedCount += 1;
+                verboseLog(`✅ Comando cargado: ${command.data.name}`);
             }
         }
     }
@@ -293,18 +305,28 @@ if (MUSIC_ENABLED && config.lavalinkEnabled) {
                 const command = require(path.join(musicDir, file));
                 if ('data' in command && 'execute' in command) {
                     if (DISABLED_SLASH_COMMANDS.has(command.data.name)) {
-                        console.log(`⏭️ Comando música desactivado (omitido): ${command.data.name}`);
+                        commandsSkippedCount += 1;
+                        skippedCommandNames.push(command.data.name);
+                        verboseLog(`⏭️ Comando música desactivado (omitido): ${command.data.name}`);
                         continue;
                     }
                     client.commands.set(command.data.name, command);
                     commands.push(command.data.toJSON());
-                    console.log(`🎵 Comando música cargado: ${command.data.name}`);
+                    commandsLoadedCount += 1;
+                    verboseLog(`🎵 Comando música cargado: ${command.data.name}`);
                 }
             } catch (error) {
                 console.error(`❌ Error cargando comando música ${file}:`, error?.message || error);
             }
         }
     }
+}
+
+{
+    const skipBit = commandsSkippedCount
+        ? ` (${commandsSkippedCount} omitidos: ${skippedCommandNames.join(', ')})`
+        : '';
+    console.log(`✅ ${commandsLoadedCount} comandos cargados${skipBit}.`);
 }
 
 client.once('clientReady', async () => {
