@@ -131,7 +131,8 @@ const FOOTER_TEXT_MAX = 2048;
 function setInteractionFooter(embed, requesterTag, source = null, sourceLabel = '🎬 Anime:') {
     const base = `Solicitado por ${requesterTag}`;
     const v = source != null ? String(source).trim() : '';
-    let text = v ? `${base}\n${sourceLabel} ${v}` : base;
+    // Una sola línea: Discord suele truncar/ignorar saltos en footers.
+    let text = v ? `${base} · ${sourceLabel} ${v}` : base;
     if (text.length > FOOTER_TEXT_MAX) {
         text = `${text.slice(0, FOOTER_TEXT_MAX - 3)}...`;
     }
@@ -363,10 +364,23 @@ function shuffleItems(items) {
     return [...items].sort(() => Math.random() - 0.5);
 }
 
-async function resolveGif(cacheKey, providers) {
+async function resolveGif(cacheKey, providers, options = {}) {
     if (gifInflight.has(cacheKey)) {
         return gifInflight.get(cacheKey);
     }
+
+    const preferSource = options.preferSource === true;
+
+    const pickResult = (results) => {
+        if (!results.length) return null;
+        if (preferSource) {
+            const withSource = results.filter((result) => String(result?.source || '').trim());
+            if (withSource.length) {
+                return withSource[Math.floor(Math.random() * withSource.length)];
+            }
+        }
+        return results[Math.floor(Math.random() * results.length)] || null;
+    };
 
     const request = (async () => {
         let fallback = null;
@@ -383,13 +397,11 @@ async function resolveGif(cacheKey, providers) {
             if (!results.length) continue;
 
             if (!fallback) {
-                fallback = results[Math.floor(Math.random() * results.length)] || null;
+                fallback = pickResult(results);
             }
 
             const freshResults = results.filter((result) => !isRecentGif(cacheKey, result.url));
-            const selected = freshResults.length
-                ? freshResults[Math.floor(Math.random() * freshResults.length)]
-                : null;
+            const selected = freshResults.length ? pickResult(freshResults) : null;
 
             if (selected?.url) {
                 rememberGif(cacheKey, selected);
@@ -413,14 +425,35 @@ async function resolveGif(cacheKey, providers) {
 }
 
 async function fetchInteractionGif(action) {
-    const providers = [
+    const cacheKey = `action:${action}`;
+
+    // Preferir nekos.best: trae anime_name para el footer en /hug, /pat, devoluciones, etc.
+    for (let tryN = 0; tryN < 2; tryN += 1) {
+        try {
+            const fromNekos = await fetchFromNekosBest(action);
+            if (!fromNekos?.url) break;
+            const hasAnime = Boolean(String(fromNekos.source || '').trim());
+            if (hasAnime && !isRecentGif(cacheKey, fromNekos.url)) {
+                rememberGif(cacheKey, fromNekos);
+                return fromNekos;
+            }
+            if (hasAnime && tryN === 1) {
+                rememberGif(cacheKey, fromNekos);
+                return fromNekos;
+            }
+            if (hasAnime) continue;
+            break;
+        } catch {
+            break;
+        }
+    }
+
+    return resolveGif(cacheKey, [
         () => fetchFromNekosBest(action),
         () => fetchFromOtakuGifs(action),
         () => fetchFromWaifuPics(action),
         () => fetchFromTenor(action)
-    ];
-
-    return resolveGif(`action:${action}`, providers);
+    ], { preferSource: true });
 }
 
 async function fetchSearchGif(query) {
