@@ -2837,28 +2837,61 @@ app.post('/api/billing/portal', requireAuth, async (req, res) => {
     }
 });
 
-const SHOWCASE_GIF_SOURCES = {
-    hug: 'https://nekos.best/api/v2/hug/2363175c-4cda-414e-8929-a87f53fc1cc1.gif',
-    pat: 'https://nekos.best/api/v2/pat/74adca0b-35d1-4362-9c1a-0e3c826a07b6.gif',
-    kiss: 'https://nekos.best/api/v2/kiss/2aed535e-27ba-47ba-9c48-d080a2066574.gif'
+const SHOWCASE_GIF_ACTIONS = new Set(['hug', 'pat', 'kiss']);
+const SHOWCASE_GIF_UA =
+    process.env.GIF_USER_AGENT
+    || 'EyedBot (https://github.com/IgnacioLondono/EyedBot)';
+const SHOWCASE_GIF_FALLBACKS = {
+    hug: 'https://cdn.otakugifs.xyz/gifs/hug/acbFO8l7Hi.gif',
+    pat: 'https://cdn.otakugifs.xyz/gifs/pat/5c90b301ee64c14a.gif',
+    kiss: 'https://cdn.otakugifs.xyz/gifs/kiss/e344703a274d59e6.gif'
 };
-const SHOWCASE_GIF_UA = 'EyedBot/1.0 (https://eyedbot.eyedcomun.me)';
+
+async function resolveShowcaseGifUrl(action) {
+    try {
+        const meta = await axios.get(`https://nekos.best/api/v2/${action}`, {
+            timeout: 10000,
+            headers: { 'User-Agent': SHOWCASE_GIF_UA, Accept: 'application/json' }
+        });
+        const url = meta?.data?.results?.[0]?.url;
+        if (url) return url;
+    } catch {
+        /* continuar con fallbacks */
+    }
+
+    try {
+        const otaku = await axios.get('https://api.otakugifs.xyz/gif', {
+            timeout: 10000,
+            params: { reaction: action },
+            headers: { 'User-Agent': SHOWCASE_GIF_UA, Accept: 'application/json' }
+        });
+        if (otaku?.data?.url) return otaku.data.url;
+    } catch {
+        /* continuar */
+    }
+
+    return SHOWCASE_GIF_FALLBACKS[action] || null;
+}
 
 app.get('/api/showcase/gif/:action', async (req, res) => {
     const action = String(req.params.action || '').toLowerCase();
-    const sourceUrl = SHOWCASE_GIF_SOURCES[action];
-    if (!sourceUrl) {
+    if (!SHOWCASE_GIF_ACTIONS.has(action)) {
         return res.status(404).send('Not found');
     }
 
     try {
+        const sourceUrl = await resolveShowcaseGifUrl(action);
+        if (!sourceUrl) {
+            return res.status(502).send('GIF unavailable');
+        }
+
         const gifRes = await axios.get(sourceUrl, {
             timeout: 15000,
             responseType: 'arraybuffer',
-            headers: { 'User-Agent': SHOWCASE_GIF_UA }
+            headers: { 'User-Agent': SHOWCASE_GIF_UA, Accept: 'image/gif,image/*,*/*' }
         });
-        res.setHeader('Content-Type', 'image/gif');
-        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        res.setHeader('Content-Type', gifRes.headers['content-type'] || 'image/gif');
+        res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
         return res.send(Buffer.from(gifRes.data));
     } catch (error) {
         console.error(`❌ Error en /api/showcase/gif/${action}:`, error?.message || error);

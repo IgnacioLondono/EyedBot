@@ -1,4 +1,4 @@
-/** GIFs de la landing servidos por el backend (proxy de nekos.best). */
+/** GIFs de la landing vía proxy del backend (nekos.best / otakugifs). */
 export const SHOWCASE_ANIME_GIFS = {
   hug: "/api/showcase/gif/hug",
   pat: "/api/showcase/gif/pat",

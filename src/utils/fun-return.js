@@ -8,6 +8,18 @@ const DATA_DIR = path.join(__dirname, '../../data');
 const MENTIONS_FILE = path.join(DATA_DIR, 'fun-mentions.json');
 const TRANSLATION_CACHE_TTL_MS = Math.max(60_000, Number.parseInt(process.env.FUN_TRANSLATION_CACHE_TTL_MS || '900000', 10));
 const GIF_RECENT_LIMIT = Math.max(3, Number.parseInt(process.env.FUN_GIF_RECENT_LIMIT || '5', 10));
+/** nekos.best exige APP_NAME (CONTACT); axios por defecto es bloqueado. */
+const GIF_USER_AGENT =
+    process.env.GIF_USER_AGENT
+    || 'EyedBot (https://github.com/IgnacioLondono/EyedBot)';
+
+const gifHttp = axios.create({
+    timeout: 9000,
+    headers: {
+        'User-Agent': GIF_USER_AGENT,
+        Accept: 'application/json, image/*, */*'
+    }
+});
 
 let mentionsCache = null;
 let writeQueue = Promise.resolve();
@@ -228,17 +240,25 @@ async function translateText(text, langpair = 'en|es', options = {}) {
 }
 
 async function fetchFromWaifuPics(action) {
-    const response = await axios.get(`https://api.waifu.pics/sfw/${action}`, { timeout: 8000 });
+    const response = await gifHttp.get(`https://api.waifu.pics/sfw/${action}`);
     const url = response?.data?.url || null;
     return url ? { url, source: null } : null;
 }
 
 async function fetchFromNekosBest(action) {
-    const response = await axios.get(`https://nekos.best/api/v2/${action}`, { timeout: 8000 });
+    const response = await gifHttp.get(`https://nekos.best/api/v2/${action}`);
     const row = response?.data?.results?.[0];
     const url = row?.url || null;
     const source = row?.anime_name?.trim() || null;
     return url ? { url, source } : null;
+}
+
+async function fetchFromOtakuGifs(action) {
+    const response = await gifHttp.get('https://api.otakugifs.xyz/gif', {
+        params: { reaction: action }
+    });
+    const url = response?.data?.url || null;
+    return url ? { url, source: null } : null;
 }
 
 async function fetchFromTenor(action) {
@@ -246,8 +266,7 @@ async function fetchFromTenor(action) {
     const meta = getActionMeta(action);
     if (!meta) return null;
 
-    const response = await axios.get('https://tenor.googleapis.com/v2/search', {
-        timeout: 8000,
+    const response = await gifHttp.get('https://tenor.googleapis.com/v2/search', {
         params: {
             key: config.tenorApiKey,
             q: meta.tenorQuery,
@@ -271,8 +290,7 @@ async function fetchFromTenor(action) {
 async function fetchGifFromSearchTenor(query) {
     if (!config.tenorApiKey) return null;
 
-    const response = await axios.get('https://tenor.googleapis.com/v2/search', {
-        timeout: 9000,
+    const response = await gifHttp.get('https://tenor.googleapis.com/v2/search', {
         params: {
             key: config.tenorApiKey,
             q: query,
@@ -294,8 +312,7 @@ async function fetchGifFromSearchTenor(query) {
 }
 
 async function fetchGifFromGiphy(query) {
-    const response = await axios.get('https://api.giphy.com/v1/gifs/search', {
-        timeout: 9000,
+    const response = await gifHttp.get('https://api.giphy.com/v1/gifs/search', {
         params: {
             api_key: 'dc6zaTOxFJmzC',
             q: query,
@@ -317,9 +334,9 @@ async function fetchGifFromGiphy(query) {
 }
 
 async function fetchGifFromNekosFallback(query) {
-    const response = await axios.get(`https://nekos.life/api/v2/img/${query.toLowerCase().includes('anime') ? 'smug' : 'cuddle'}`, {
-        timeout: 9000
-    });
+    const response = await gifHttp.get(
+        `https://nekos.life/api/v2/img/${query.toLowerCase().includes('anime') ? 'smug' : 'cuddle'}`
+    );
 
     const url = response?.data?.url || null;
     return url ? { url, source: null } : null;
@@ -398,6 +415,7 @@ async function resolveGif(cacheKey, providers) {
 async function fetchInteractionGif(action) {
     const providers = [
         () => fetchFromNekosBest(action),
+        () => fetchFromOtakuGifs(action),
         () => fetchFromWaifuPics(action),
         () => fetchFromTenor(action)
     ];
