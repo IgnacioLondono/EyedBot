@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
 const config = require('../../config');
 const { setInteractionFooter, translateText } = require('../../utils/fun-return');
+const { fetchRandomAnime } = require('../../utils/anime-api');
 
 const GENRES = [
     { name: 'Accion', value: 'accion', id: 1 },
@@ -25,45 +25,32 @@ const SEASONS = [
     { name: 'Otono', value: 'fall' }
 ];
 
-function cleanSynopsis(text) {
-    if (!text) return 'Sin resumen disponible.';
-    return text
-        .replace(/\[Written by MAL Rewrite\]/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function truncate(text, max = 700) {
+function truncate(text, max = 380) {
     if (!text) return '';
     return text.length > max ? `${text.slice(0, max - 3)}...` : text;
 }
 
-function pickRandom(items) {
-    if (!Array.isArray(items) || !items.length) return null;
-    return items[Math.floor(Math.random() * items.length)];
-}
-
 function seasonLabel(value) {
-    const match = SEASONS.find((s) => s.value === value);
-    return match ? match.name : 'No especificada';
+    if (!value) return 'No especificada';
+    const key = String(value).toLowerCase();
+    const match = SEASONS.find((s) => s.value === key || s.value.toUpperCase() === String(value).toUpperCase());
+    if (match) return match.name;
+    const map = { WINTER: 'Invierno', SPRING: 'Primavera', SUMMER: 'Verano', FALL: 'Otono' };
+    return map[String(value).toUpperCase()] || 'No especificada';
 }
 
-function malStatusEs(status) {
-    const s = String(status || '').trim();
+function statusEs(status) {
     const map = {
+        FINISHED: 'Finalizado',
+        RELEASING: 'En emision',
+        NOT_YET_RELEASED: 'Proximamente',
+        CANCELLED: 'Cancelado',
+        HIATUS: 'En pausa',
         'Finished Airing': 'Finalizado',
         'Currently Airing': 'En emision',
         'Not yet aired': 'Proximamente'
     };
-    return map[s] || s || 'No definido';
-}
-
-function formatVoteCount(n) {
-    const num = Number(n);
-    if (!Number.isFinite(num) || num <= 0) return null;
-    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-    if (num >= 10_000) return `${Math.round(num / 1000)}k`;
-    return String(num);
+    return map[status] || status || 'No definido';
 }
 
 module.exports = {
@@ -100,7 +87,6 @@ module.exports = {
         const categoria = interaction.options.getString('categoria');
         const anio = interaction.options.getInteger('anio');
         const temporada = interaction.options.getString('temporada');
-
         const genreMatch = GENRES.find((g) => g.value === categoria) || null;
 
         if (temporada && !anio) {
@@ -113,36 +99,14 @@ module.exports = {
         }
 
         try {
-            let animes = [];
+            const anime = await fetchRandomAnime({
+                genreValue: categoria || null,
+                genreId: genreMatch?.id || null,
+                year: anio || null,
+                season: temporada || null
+            });
 
-            if (temporada && anio) {
-                const { data } = await axios.get(`https://api.jikan.moe/v4/seasons/${anio}/${temporada}`, {
-                    timeout: 12000,
-                    params: { sfw: true, limit: 25 }
-                });
-                animes = data?.data || [];
-            } else {
-                const { data } = await axios.get('https://api.jikan.moe/v4/anime', {
-                    timeout: 12000,
-                    params: {
-                        sfw: true,
-                        limit: 25,
-                        min_score: 6,
-                        order_by: 'score',
-                        sort: 'desc',
-                        genres: genreMatch?.id || undefined,
-                        start_date: anio ? `${anio}-01-01` : undefined,
-                        end_date: anio ? `${anio}-12-31` : undefined
-                    }
-                });
-                animes = data?.data || [];
-            }
-
-            if (genreMatch && animes.length) {
-                animes = animes.filter((a) => (a.genres || []).some((g) => g.mal_id === genreMatch.id));
-            }
-
-            if (!animes.length) {
+            if (!anime) {
                 return interaction.editReply({
                     embeds: [new EmbedBuilder()
                         .setColor('#FFA500')
@@ -151,53 +115,15 @@ module.exports = {
                 });
             }
 
-            const anime = pickRandom(animes);
-            const synopsisRaw = cleanSynopsis(anime?.synopsis);
-            const synopsisEs = truncate(await translateText(synopsisRaw), 380);
-
-            const title = anime?.title_spanish || anime?.title || anime?.title_english || 'Anime recomendado';
-
-            let coverUrl =
-                anime?.images?.jpg?.maximum_image_url ||
-                anime?.images?.webp?.maximum_image_url ||
-                anime?.images?.jpg?.large_image_url ||
-                anime?.images?.webp?.large_image_url ||
-                null;
-
-            if (anime?.mal_id && !anime?.images?.jpg?.maximum_image_url && !anime?.images?.webp?.maximum_image_url) {
-                try {
-                    const { data } = await axios.get(`https://api.jikan.moe/v4/anime/${anime.mal_id}`, { timeout: 12000 });
-                    const img = data?.data?.images;
-                    coverUrl =
-                        img?.jpg?.maximum_image_url ||
-                        img?.webp?.maximum_image_url ||
-                        img?.jpg?.large_image_url ||
-                        img?.webp?.large_image_url ||
-                        coverUrl;
-                } catch {
-                    // se queda coverUrl del listado
-                }
-            }
-
-            const genres = (anime?.genres || []).map((g) => g.name).slice(0, 6).join(', ') || 'No especificado';
-            const studios = (anime?.studios || []).map((s) => s.name).slice(0, 3).join(', ') || 'No especificado';
-            const year = anime?.year || anime?.aired?.prop?.from?.year || 'No definido';
-            const season = seasonLabel(anime?.season);
-            const votes = formatVoteCount(anime?.scored_by);
-            const scoreLine =
-                anime?.score != null
-                    ? `**${anime.score}**/10${votes ? ` · ${votes} votos` : ''}`
-                    : 'Sin nota';
-            const rankLine = anime?.rank != null ? `#${anime.rank} global` : 'Sin ranking';
-            const duration = anime?.duration && anime.duration !== 'Unknown' ? anime.duration : null;
-            const rating = anime?.rating || null;
-            const synopsisBlock = synopsisEs || 'Sin resumen disponible.';
+            const synopsisEs = truncate(await translateText(anime.synopsis).catch(() => anime.synopsis), 380);
+            const genres = (anime.genres || []).slice(0, 6).join(', ') || 'No especificado';
+            const studios = (anime.studios || []).slice(0, 3).join(', ') || 'No especificado';
+            const scoreLine = anime.score != null ? `**${anime.score}**/10` : 'Sin nota';
 
             const metaLines = [
-                `**${year}** · ${season} · **${anime?.episodes ?? '—'}** eps · Nota ${scoreLine} · ${malStatusEs(anime?.status)}`,
+                `**${anime.year}** · ${seasonLabel(anime.season)} · **${anime.episodes}** eps · Nota ${scoreLine} · ${statusEs(anime.status)}`,
                 `**Generos:** ${genres}`,
-                `**Estudio:** ${studios}`,
-                `Ranking ${rankLine}${duration ? ` · ${duration}` : ''}${rating ? ` · ${rating}` : ''}`
+                `**Estudio:** ${studios}${anime.duration ? ` · ${anime.duration}` : ''}`
             ].join('\n');
 
             const requester = interaction.user;
@@ -207,13 +133,11 @@ module.exports = {
                     name: requester.displayName || requester.username,
                     iconURL: requester.displayAvatarURL({ extension: 'png', size: 128 })
                 })
-                .setTitle(`🎌 ${title}`)
-                .setDescription(
-                    ['**Sinopsis**', synopsisBlock, '', metaLines].join('\n')
-                );
+                .setTitle(`🎌 ${anime.title}`)
+                .setDescription(['**Sinopsis**', synopsisEs || 'Sin resumen disponible.', '', metaLines].join('\n'));
 
-            if (coverUrl) embed.setImage(coverUrl);
-            if (anime?.url) embed.setURL(anime.url);
+            if (anime.coverUrl) embed.setImage(anime.coverUrl);
+            if (anime.url) embed.setURL(anime.url);
             setInteractionFooter(embed, requester.tag, null);
 
             return interaction.editReply({ embeds: [embed] });
