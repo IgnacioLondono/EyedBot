@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { Lock, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -16,10 +17,12 @@ export function ModuleSidebar({
   search,
   children,
   className,
+  persistKey,
 }: {
   search?: ReactNode;
   children: ReactNode;
   className?: string;
+  persistKey?: string;
 }) {
   return (
     <div
@@ -30,14 +33,58 @@ export function ModuleSidebar({
       )}
     >
       {search}
-      <ModuleNav className="lg:w-full">{children}</ModuleNav>
+      <ModuleNav className="lg:w-full" persistKey={persistKey}>
+        {children}
+      </ModuleNav>
     </div>
   );
 }
 
-export function ModuleNav({ children, className }: { children: ReactNode; className?: string }) {
+export function ModuleNav({
+  children,
+  className,
+  persistKey,
+}: {
+  children: ReactNode;
+  className?: string;
+  persistKey?: string;
+}) {
+  const ref = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !persistKey || typeof window === "undefined") return;
+
+    const storageKey = `eyedbot:module-nav-scroll:${persistKey}`;
+    try {
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as { top?: number; left?: number };
+        if (Number.isFinite(saved.top)) el.scrollTop = Number(saved.top);
+        if (Number.isFinite(saved.left)) el.scrollLeft = Number(saved.left);
+      }
+    } catch {
+      /* noop */
+    }
+
+    const onScroll = () => {
+      try {
+        window.sessionStorage.setItem(
+          storageKey,
+          JSON.stringify({ top: el.scrollTop, left: el.scrollLeft })
+        );
+      } catch {
+        /* noop */
+      }
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [persistKey]);
+
   return (
     <aside
+      ref={ref}
       className={cn(
         "panel-scroll flex shrink-0 gap-1.5",
         "max-h-[min(38dvh,16rem)] flex-row overflow-x-auto overflow-y-hidden pb-1",

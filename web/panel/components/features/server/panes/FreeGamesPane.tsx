@@ -13,6 +13,7 @@ import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -37,6 +38,7 @@ const FREE_GAMES_TABS = [
   { id: "offers", label: "Ofertas" },
   { id: "preview", label: "Vista previa" },
 ];
+const FREE_GAMES_TAB_IDS = FREE_GAMES_TABS.map((item) => item.id);
 
 type FreeGamesState = {
   enabled: boolean;
@@ -154,7 +156,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("config");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "free-games"), "config", FREE_GAMES_TAB_IDS);
   const [form, setForm] = useState<FreeGamesState>({
     enabled: false,
     channelId: "",

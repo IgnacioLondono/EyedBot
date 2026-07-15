@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
@@ -122,12 +123,13 @@ const VERIFY_TABS = [
   { id: "embed", label: "Embed" },
   { id: "media", label: "Imagen" },
 ];
+const VERIFY_TAB_IDS = VERIFY_TABS.map((item) => item.id);
 
 export function VerifyPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("config");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "verify"), "config", VERIFY_TAB_IDS);
   const [form, setForm] = useState<VerifyState>({
     enabled: false,
     channelId: "",

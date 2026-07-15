@@ -92,6 +92,7 @@ export default function ServerPage() {
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6 xl:gap-8">
         <ModuleSidebar
+          persistKey={guildId}
           search={
             <div className="relative w-full">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -113,6 +114,7 @@ export default function ServerPage() {
                 <Link
                   key={item.id}
                   href={serverPaneHref(guildId, item.slug)}
+                  scroll={false}
                   className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm whitespace-nowrap ${
                     active ? "bg-violet-600/25 text-white" : "text-zinc-400 hover:bg-white/5"
                   }`}

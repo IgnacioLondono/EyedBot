@@ -15,6 +15,7 @@ import {
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
@@ -132,8 +133,12 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const { bootstrap } = usePanel();
   const welcomeCardEnabled = bootstrap?.welcomeCardStyleEnabled !== false;
   const { toast } = useToast();
-  const [tab, setTab] = useState("welcome");
-  const [sectionTab, setSectionTab] = useState("general");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "welcome"), "welcome", ["welcome", "goodbye"]);
+  const [sectionTab, setSectionTab] = usePersistedTab(
+    paneTabKey(guildId, "welcome", "section"),
+    "general",
+    ["general", "content", "design", "media", "dm", "message"]
+  );
   const [welcome, setWelcome] = useState<ConfigState>(defaultState);
   const [goodbye, setGoodbye] = useState<ConfigState>(defaultState);
   const [loading, setLoading] = useState(true);
@@ -328,7 +333,6 @@ export function WelcomePane({ guildId }: { guildId: string }) {
             value={tab}
             onValueChange={(value) => {
               setTab(value);
-              setSectionTab("general");
             }}
           />
         }

@@ -16,6 +16,7 @@ import {
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -79,6 +80,7 @@ const TABS = [
   { id: "events", label: "Eventos" },
   { id: "config", label: "Configuración" },
 ];
+const EVENT_TAB_IDS = TABS.map((item) => item.id);
 
 function normalizeConfig(value: unknown): ModuleConfig {
   const data = asRecord(value);
@@ -139,7 +141,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("giveaways");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "events"), "giveaways", EVENT_TAB_IDS);
   const [config, setConfig] = useState<ModuleConfig>({
     enabled: true,
     defaultChannelId: "",

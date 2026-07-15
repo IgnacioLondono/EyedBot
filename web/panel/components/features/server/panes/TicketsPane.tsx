@@ -12,6 +12,7 @@ import { TicketsManagePanel } from "@/components/features/server/panes/TicketsMa
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
@@ -43,6 +44,7 @@ const TICKET_TABS = [
   { id: "manage", label: "Gestión" },
   { id: "guide", label: "Guía" },
 ];
+const TICKET_TAB_IDS = TICKET_TABS.map((item) => item.id);
 
 type TicketOption = { value: string; label: string; description: string };
 
@@ -172,7 +174,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   const { premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
-  const [tab, setTab] = useState("manage");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "tickets"), "manage", TICKET_TAB_IDS);
   const [config, setConfig] = useState<TicketConfigState>({
     enabled: false,
     panelChannelId: "",

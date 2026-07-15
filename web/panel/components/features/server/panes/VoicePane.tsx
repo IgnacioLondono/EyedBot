@@ -5,6 +5,7 @@ import { Lock, Mic2, Pencil, Users } from "lucide-react";
 import { getTempVoiceConfig, saveTempVoiceConfig } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
@@ -35,6 +36,7 @@ const VOICE_TABS = [
   { id: "panel", label: "Panel de control" },
   { id: "preview", label: "Vista previa" },
 ];
+const VOICE_TAB_IDS = VOICE_TABS.map((item) => item.id);
 
 function normalizeVoiceConfig(value: unknown): VoiceState {
   const data = asRecord(value);
@@ -98,7 +100,7 @@ function VoicePanelPreview({ form }: { form: VoiceState }) {
 export function VoicePane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("config");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "voice"), "config", VOICE_TAB_IDS);
   const [form, setForm] = useState<VoiceState>({
     enabled: false,
     creatorChannelId: "",

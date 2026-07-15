@@ -19,6 +19,7 @@ import {
 } from "@/components/features/shared/LeaderboardPodium";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -38,6 +39,16 @@ import { asArray, asRecord, extractLeaderboard, getErrorMessage, toBooleanValue,
 import { GachaShopPanel } from "@/components/features/server/panes/GachaShopPanel";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 
+const GACHA_TABS = [
+  { id: "config", label: "Config" },
+  { id: "economy", label: "Economía" },
+  { id: "shop", label: "Tienda" },
+  { id: "market", label: "Mercado" },
+  { id: "inventory", label: "Inventario" },
+  { id: "top", label: "Ranking" },
+];
+const GACHA_TAB_IDS = GACHA_TABS.map((item) => item.id);
+
 type GachaState = {
   enabled: boolean;
   channelId: string;
@@ -55,7 +66,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
   const { bootstrap, premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("config");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "gacha"), "config", GACHA_TAB_IDS);
   const [form, setForm] = useState<GachaState>({
     enabled: false,
     channelId: "",
@@ -177,14 +188,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
         action={<PremiumLock locked={premiumLocked} />}
       >
         <Tabs
-          items={[
-            { id: "config", label: "Config" },
-            { id: "economy", label: "Economía" },
-            { id: "shop", label: "Tienda" },
-            { id: "market", label: "Mercado" },
-            { id: "inventory", label: "Inventario" },
-            { id: "top", label: "Ranking" },
-          ]}
+          items={GACHA_TABS}
           value={tab}
           onValueChange={setTab}
           className="mb-6"

@@ -10,6 +10,7 @@ import {
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -31,6 +32,15 @@ import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { CrunchyrollAlertsTab } from "@/components/features/server/panes/CrunchyrollAlertsTab";
 import { plainColorToHex } from "@/lib/embed-utils";
 import { asArray, asRecord, formatDate, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
+
+const NOTIFICATION_TABS = [
+  { id: "channel", label: "Canal" },
+  { id: "stream", label: "Directos" },
+  { id: "crunchyroll", label: "Crunchyroll" },
+  { id: "events", label: "Eventos" },
+  { id: "digest", label: "Resumen" },
+];
+const NOTIFICATION_TAB_IDS = NOTIFICATION_TABS.map((item) => item.id);
 
 type StreamPlatform = "twitch" | "youtube" | "tiktok" | "custom";
 
@@ -123,7 +133,7 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("channel");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "notifications"), "channel", NOTIFICATION_TAB_IDS);
   const [form, setForm] = useState<StreamAlertState>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -184,13 +194,7 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
     <PaneGrid>
       <SectionCard title="Centro de alertas" description="Canales, fuentes en directo y resumen de publicaciones.">
         <Tabs
-          items={[
-            { id: "channel", label: "Canal" },
-            { id: "stream", label: "Directos" },
-            { id: "crunchyroll", label: "Crunchyroll" },
-            { id: "events", label: "Eventos" },
-            { id: "digest", label: "Resumen" },
-          ]}
+          items={NOTIFICATION_TABS}
           value={tab}
           onValueChange={setTab}
           className="mb-5"

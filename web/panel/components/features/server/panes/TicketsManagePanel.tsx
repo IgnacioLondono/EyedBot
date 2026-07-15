@@ -14,6 +14,7 @@ import {
   unclaimTicket,
 } from "@/lib/api/endpoints";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -21,6 +22,13 @@ import { Tabs } from "@/components/ui/Tabs";
 import { LineChart } from "@/components/ui/LineChart";
 import { Field, Input, SectionCard, Textarea } from "@/components/features/shared";
 import { asArray, asRecord, formatDate, getErrorMessage, toNumberValue, toStringValue } from "@/lib/utils";
+
+const MANAGE_TABS = [
+  { id: "pending", label: "Pendientes" },
+  { id: "active", label: "Activos" },
+  { id: "history", label: "Historial" },
+];
+const MANAGE_TAB_IDS = MANAGE_TABS.map((item) => item.id);
 
 type TicketRow = {
   id: string;
@@ -90,7 +98,11 @@ function parseTicketReport(payload: unknown): TicketReportDetail | null {
 
 export function TicketsManagePanel({ guildId }: { guildId: string }) {
   const { toast } = useToast();
-  const [manageTab, setManageTab] = useState("pending");
+  const [manageTab, setManageTab] = usePersistedTab(
+    paneTabKey(guildId, "tickets", "manage"),
+    "pending",
+    MANAGE_TAB_IDS
+  );
   const [stats, setStats] = useState<Record<string, unknown>>({});
   const [pending, setPending] = useState<TicketRow[]>([]);
   const [active, setActive] = useState<TicketRow[]>([]);
@@ -233,11 +245,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
       ) : null}
 
       <Tabs
-        items={[
-          { id: "pending", label: "Pendientes" },
-          { id: "active", label: "Activos" },
-          { id: "history", label: "Historial" },
-        ]}
+        items={MANAGE_TABS}
         value={manageTab}
         onValueChange={setManageTab}
         className="mb-4"

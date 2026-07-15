@@ -28,6 +28,7 @@ import { Select } from "@/components/ui/Select";
 import { Field, PaneGrid, SectionCard } from "@/components/features/shared";
 import { discordAvatarUrl, discordGuildIconUrl } from "@/lib/discord-media";
 import { asArray, asRecord, formatDate, getErrorMessage, toNumberValue, toStringValue } from "@/lib/utils";
+import { usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { OwnerBotsTab } from "@/components/features/settings/OwnerBotsTab";
 import { OwnerWebConfigTab } from "@/components/features/settings/OwnerWebConfigTab";
 
@@ -39,6 +40,7 @@ const OWNER_TABS = [
   { id: "logs", label: "Logs" },
   { id: "system", label: "Sistema" },
 ];
+const OWNER_TAB_IDS = OWNER_TABS.map((item) => item.id);
 
 type RegistryGuild = {
   id: string;
@@ -323,7 +325,7 @@ function UserRow({
 
 export function OwnerSettings() {
   const { toast } = useToast();
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = usePersistedTab("eyedbot:owner-settings-tab", "overview", OWNER_TAB_IDS);
   const [stats, setStats] = useState<Record<string, unknown>>({});
   const [logs, setLogs] = useState<Record<string, unknown>[]>([]);
   const [users, setUsers] = useState<RegistryUser[]>([]);

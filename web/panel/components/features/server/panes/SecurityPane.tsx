@@ -6,6 +6,7 @@ import { getAntiRaidConfig, saveAntiRaidConfig } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
@@ -26,6 +27,7 @@ const SECURITY_TABS = [
   { id: "antispam", label: "Anti-spam" },
   { id: "content", label: "Contenido" },
 ];
+const SECURITY_TAB_IDS = SECURITY_TABS.map((item) => item.id);
 
 type AntiRaidState = {
   enabled: boolean;
@@ -108,7 +110,7 @@ export function SecurityPane({ guildId }: { guildId: string }) {
   const { premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("raid");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "security"), "raid", SECURITY_TAB_IDS);
   const [antiRaid, setAntiRaid] = useState<AntiRaidState>(defaultAntiRaid);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

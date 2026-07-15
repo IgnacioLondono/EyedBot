@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, FolderTree, Layers3, Play, RefreshCw, Wand2 } from "lucide-react";
 import { applyChannelSetup, getChannelSetup } from "@/lib/api/endpoints";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +19,7 @@ const AUTOMATION_TABS = [
   { id: "apply", label: "Aplicar" },
   { id: "guide", label: "Guía" },
 ];
+const AUTOMATION_TAB_IDS = AUTOMATION_TABS.map((item) => item.id);
 
 type ChannelPreviewRow = {
   categorySlug: string;
@@ -75,7 +77,7 @@ function groupByCategory(rows: ChannelPreviewRow[]) {
 
 export function AutomationPane({ guildId }: { guildId: string }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState("templates");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "automation"), "templates", AUTOMATION_TAB_IDS);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [conflictsByTemplate, setConflictsByTemplate] = useState<Record<string, TemplateConflict[]>>({});
   const [selectedTemplateId, setSelectedTemplateId] = useState("standard");

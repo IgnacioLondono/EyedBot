@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Ban, Clock, Gavel, RefreshCw, Search, Shield, UserX } from "lucide-react";
 import { getGuildBans, getGuildMembers, moderateMember, unbanMember } from "@/lib/api/endpoints";
 import { useToast } from "@/components/providers/ToastProvider";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -19,6 +20,7 @@ const MOD_TABS = [
   { id: "bans", label: "Bans" },
   { id: "guide", label: "Guía" },
 ];
+const MOD_TAB_IDS = MOD_TABS.map((item) => item.id);
 
 const TIMEOUT_PRESETS = [
   { label: "10 minutos", ms: 10 * 60 * 1000 },
@@ -46,7 +48,7 @@ type BanItem = {
 
 export function ModerationPane({ guildId }: { guildId: string }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState("members");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "moderation"), "members", MOD_TAB_IDS);
   const [query, setQuery] = useState("");
   const [actionUserId, setActionUserId] = useState("");
   const [reason, setReason] = useState("");

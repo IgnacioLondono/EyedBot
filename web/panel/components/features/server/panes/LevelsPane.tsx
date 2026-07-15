@@ -5,6 +5,7 @@ import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import { getLevelingConfig, getLevelingLeaderboard, saveLevelingConfig } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
+import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
@@ -56,6 +57,7 @@ const LEVEL_TABS = [
   { id: "rewards", label: "Recompensas" },
   { id: "leaderboard", label: "Leaderboard" },
 ];
+const LEVEL_TAB_IDS = LEVEL_TABS.map((item) => item.id);
 
 function normalizeConfig(value: unknown): LevelingState {
   const data = asRecord(value);
@@ -88,7 +90,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
-  const [tab, setTab] = useState("config");
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "levels"), "config", LEVEL_TAB_IDS);
   const [form, setForm] = useState<LevelingState>(() => normalizeConfig({}));
   const [leaderboard, setLeaderboard] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);

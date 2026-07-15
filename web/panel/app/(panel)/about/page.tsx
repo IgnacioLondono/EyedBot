@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Tabs } from "@/components/ui/Tabs";
+import { usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import {
   DashboardShowcase,
   EmbedShowcase,
@@ -38,6 +39,7 @@ const ABOUT_TABS = [
   { id: "premium", label: "EyedPlus+" },
   { id: "guide", label: "Guía rápida" },
 ];
+const ABOUT_TAB_IDS = ABOUT_TABS.map((item) => item.id);
 
 const HIGHLIGHT_MODULES = [
   { icon: LayoutGrid, title: "Resumen", desc: "Estadísticas, gráficos y drill-down de miembros, canales y actividad." },
@@ -52,7 +54,7 @@ const HIGHLIGHT_MODULES = [
 
 export default function AboutPage() {
   const [overview, setOverview] = useState<AboutOverview | null>(null);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = usePersistedTab("eyedbot:about-tab", "overview", ABOUT_TAB_IDS);
 
   useEffect(() => {
     void getAboutOverview().then(setOverview).catch(() => null);
