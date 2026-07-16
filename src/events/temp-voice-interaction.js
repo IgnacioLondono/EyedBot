@@ -195,18 +195,21 @@ async function handleTempVoiceButton(interaction) {
                 ?.deny
                 ?.has(PermissionsBitField.Flags.Connect) === true;
 
-            // Bloquear solo impide entrar (Connect). Chat/archivos siguen para quien ya está dentro.
-            const chatPerms = {
+            // Bloquear solo impide entrar (Connect). Chat, voz y transmisión siguen dentro.
+            const sharedPerms = {
                 SendMessages: true,
                 AttachFiles: true,
                 EmbedLinks: true,
-                ReadMessageHistory: true
+                ReadMessageHistory: true,
+                Speak: true,
+                Stream: true,
+                UseVAD: true
             };
 
             if (isLocked) {
                 await channel.permissionOverwrites.edit(everyoneRoleId, {
                     Connect: null,
-                    ...chatPerms
+                    ...sharedPerms
                 }).catch(() => null);
                 await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado', {
                     isLocked: false
@@ -214,18 +217,15 @@ async function handleTempVoiceButton(interaction) {
             } else {
                 await channel.permissionOverwrites.edit(everyoneRoleId, {
                     Connect: false,
-                    ...chatPerms
+                    ...sharedPerms
                 }).catch(() => null);
                 await channel.permissionOverwrites.edit(interaction.user.id, {
                     ViewChannel: true,
                     Connect: true,
-                    Speak: true,
-                    Stream: true,
-                    UseVAD: true,
-                    ...chatPerms,
                     MoveMembers: true,
                     MuteMembers: true,
-                    DeafenMembers: true
+                    DeafenMembers: true,
+                    ...sharedPerms
                 }).catch(() => null);
                 await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal bloqueado', {
                     isLocked: true

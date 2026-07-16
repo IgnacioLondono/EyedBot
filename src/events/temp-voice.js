@@ -351,11 +351,15 @@ async function ensureManagementEmbedIfMissing(channel, member, voiceConfig) {
 async function ensureTempVoiceChatPerms(channel) {
     if (!channel?.permissionOverwrites?.edit || !channel.guild?.roles?.everyone) return;
     const everyoneId = channel.guild.roles.everyone.id;
+    // Chat + voz/media: heredar del category a veces niega Stream y nadie puede transmitir/ver.
     await channel.permissionOverwrites.edit(everyoneId, {
         SendMessages: true,
         AttachFiles: true,
         EmbedLinks: true,
-        ReadMessageHistory: true
+        ReadMessageHistory: true,
+        Speak: true,
+        Stream: true,
+        UseVAD: true
     }).catch(() => null);
 }
 
@@ -402,22 +406,25 @@ async function ensureOwnerChannel(guild, member, creatorChannel, config, preferr
         PermissionsBitField.Flags.EmbedLinks,
         PermissionsBitField.Flags.ReadMessageHistory
     ];
+    const voiceMediaAllow = [
+        PermissionsBitField.Flags.Speak,
+        PermissionsBitField.Flags.Stream,
+        PermissionsBitField.Flags.UseVAD
+    ];
     const overwrites = [
         {
             id: guild.roles.everyone.id,
-            allow: [...chatAllow]
+            allow: [...chatAllow, ...voiceMediaAllow]
         },
         {
             id: member.id,
             allow: [
                 PermissionsBitField.Flags.ViewChannel,
                 PermissionsBitField.Flags.Connect,
-                PermissionsBitField.Flags.Speak,
-                PermissionsBitField.Flags.Stream,
-                PermissionsBitField.Flags.UseVAD,
                 PermissionsBitField.Flags.MoveMembers,
                 PermissionsBitField.Flags.MuteMembers,
                 PermissionsBitField.Flags.DeafenMembers,
+                ...voiceMediaAllow,
                 ...chatAllow
             ]
         }
