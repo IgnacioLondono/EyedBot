@@ -529,6 +529,28 @@ async function handleJoinCreatorChannel(newState, config) {
     }
 }
 
+function countHumanMembers(channel) {
+    if (!channel?.members) return 0;
+    return channel.members.filter((m) => m.user?.bot !== true).size;
+}
+
+async function deleteEmptyTempChannel(guild, channel, ownerId) {
+    if (countHumanMembers(channel) > 0) return false;
+
+    const deleted = await channel.delete('Canal de voz temporal vacío')
+        .then(() => true)
+        .catch((error) => {
+            // Si falla, mantener el registro para reintentar en el próximo evento/barrido.
+            console.warn(`[TempVoice] No se pudo borrar canal vacío ${channel.id}:`, error?.message || error);
+            return false;
+        });
+
+    if (deleted) {
+        await tempVoiceStore.clearActiveChannel(guild.id, ownerId, channel.id);
+    }
+    return deleted;
+}
+
 async function handleLeaveTempChannel(oldState) {
     const oldChannel = oldState.channel;
     const guild = oldState.guild;
@@ -537,10 +559,35 @@ async function handleLeaveTempChannel(oldState) {
     const ownerId = await tempVoiceStore.getOwnerByChannelId(guild.id, oldChannel.id);
     if (!ownerId) return;
 
-    if ((oldChannel.members?.size || 0) > 0) return;
+    await deleteEmptyTempChannel(guild, oldChannel, ownerId);
+}
 
-    await oldChannel.delete('Canal de voz temporal vacío').catch(() => null);
-    await tempVoiceStore.clearActiveChannel(guild.id, ownerId, oldChannel.id);
+/**
+ * Limpia canales temporales que quedaron vacíos mientras el bot estaba caído
+ * o cuyo borrado falló en su momento.
+ */
+async function sweepOrphanTempChannels(client) {
+    for (const guild of client.guilds.cache.values()) {
+        let entries = [];
+        try {
+            entries = tempVoiceStore.listOwnedChannels(guild.id);
+        } catch {
+            continue;
+        }
+
+        for (const { channelId, ownerId } of entries) {
+            const channel = guild.channels.cache.get(channelId)
+                || await guild.channels.fetch(channelId).catch(() => null);
+
+            if (!channel) {
+                await tempVoiceStore.clearActiveChannel(guild.id, ownerId, channelId);
+                continue;
+            }
+            if (channel.type !== ChannelType.GuildVoice) continue;
+
+            await deleteEmptyTempChannel(guild, channel, ownerId);
+        }
+    }
 }
 
 async function handleVoiceStateUpdate(oldState, newState) {
@@ -571,5 +618,6 @@ module.exports = {
     sanitizeChannelName,
     createOrMoveMemberTempChannel,
     buildManagementPanelPayload,
-    buildVoiceChannelInfoEmbed
+    buildVoiceChannelInfoEmbed,
+    sweepOrphanTempChannels
 };

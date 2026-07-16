@@ -242,6 +242,14 @@ async function setUserCustomName(guildId, userId, name) {
     return safe;
 }
 
+function listOwnedChannels(guildId) {
+    const store = readStore();
+    const owned = store.guilds[String(guildId)]?.ownerByChannel || {};
+    return Object.entries(owned)
+        .map(([channelId, ownerId]) => ({ channelId: String(channelId), ownerId: String(ownerId || '') }))
+        .filter((entry) => entry.channelId && entry.ownerId);
+}
+
 module.exports = {
     defaultConfig,
     getTempVoiceConfig,
@@ -251,5 +259,6 @@ module.exports = {
     getOwnerByChannelId,
     clearActiveChannel,
     getUserCustomName,
-    setUserCustomName
+    setUserCustomName,
+    listOwnedChannels
 };

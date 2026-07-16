@@ -19,7 +19,7 @@ const {
     stopVoiceXpLoop
 } = require('./events/leveling-tracker');
 const { handleCountingMessage } = require('./events/counting-game');
-const { handleVoiceStateUpdate } = require('./events/temp-voice');
+const { handleVoiceStateUpdate, sweepOrphanTempChannels } = require('./events/temp-voice');
 const { handleTempVoiceButton, handleTempVoiceModal } = require('./events/temp-voice-interaction');
 const { handleAFKAuthorReturn, handleAFKMentions } = require('./events/messageCreate');
 const guildActivityStore = require('./utils/guild-activity-store');
@@ -378,6 +378,14 @@ client.once('clientReady', async () => {
     startBackupScheduler();
     startVoiceXpLoop(client);
     seedVoiceAnalyticsSessions(client);
+
+    // Borrar temporales que quedaron vacíos con el bot caído; reintento periódico por fallos puntuales.
+    sweepOrphanTempChannels(client).catch((error) => {
+        console.warn('⚠️ Limpieza inicial de voz temporal falló:', error?.message || error);
+    });
+    setInterval(() => {
+        sweepOrphanTempChannels(client).catch(() => null);
+    }, 10 * 60 * 1000).unref?.();
     startStreamAlertScheduler(client);
     startFreeGamesScheduler(client);
     startCrunchyrollScheduler(client);
