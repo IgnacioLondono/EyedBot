@@ -348,11 +348,23 @@ async function ensureManagementEmbedIfMissing(channel, member, voiceConfig) {
     }
 }
 
+async function ensureTempVoiceChatPerms(channel) {
+    if (!channel?.permissionOverwrites?.edit || !channel.guild?.roles?.everyone) return;
+    const everyoneId = channel.guild.roles.everyone.id;
+    await channel.permissionOverwrites.edit(everyoneId, {
+        SendMessages: true,
+        AttachFiles: true,
+        EmbedLinks: true,
+        ReadMessageHistory: true
+    }).catch(() => null);
+}
+
 async function ensureOwnerChannel(guild, member, creatorChannel, config, preferredNameOverride = null) {
     const existingChannelId = await tempVoiceStore.getActiveChannelId(guild.id, member.id);
     if (existingChannelId) {
         const existing = guild.channels.cache.get(existingChannelId) || await guild.channels.fetch(existingChannelId).catch(() => null);
         if (existing && existing.type === ChannelType.GuildVoice) {
+            await ensureTempVoiceChatPerms(existing);
             await existing.permissionOverwrites.edit(member.id, {
                 ManageChannels: false,
                 ViewChannel: true,

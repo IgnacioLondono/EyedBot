@@ -195,13 +195,18 @@ async function handleTempVoiceButton(interaction) {
                 ?.deny
                 ?.has(PermissionsBitField.Flags.Connect) === true;
 
+            // Bloquear solo impide entrar (Connect). Chat/archivos siguen para quien ya está dentro.
+            const chatPerms = {
+                SendMessages: true,
+                AttachFiles: true,
+                EmbedLinks: true,
+                ReadMessageHistory: true
+            };
+
             if (isLocked) {
                 await channel.permissionOverwrites.edit(everyoneRoleId, {
                     Connect: null,
-                    SendMessages: true,
-                    AttachFiles: true,
-                    EmbedLinks: true,
-                    ReadMessageHistory: true
+                    ...chatPerms
                 }).catch(() => null);
                 await refreshManagementInteraction(interaction, channel, interaction.user.id, 'Canal desbloqueado', {
                     isLocked: false
@@ -209,8 +214,7 @@ async function handleTempVoiceButton(interaction) {
             } else {
                 await channel.permissionOverwrites.edit(everyoneRoleId, {
                     Connect: false,
-                    SendMessages: false,
-                    AttachFiles: false
+                    ...chatPerms
                 }).catch(() => null);
                 await channel.permissionOverwrites.edit(interaction.user.id, {
                     ViewChannel: true,
@@ -218,10 +222,7 @@ async function handleTempVoiceButton(interaction) {
                     Speak: true,
                     Stream: true,
                     UseVAD: true,
-                    SendMessages: true,
-                    AttachFiles: true,
-                    EmbedLinks: true,
-                    ReadMessageHistory: true,
+                    ...chatPerms,
                     MoveMembers: true,
                     MuteMembers: true,
                     DeafenMembers: true

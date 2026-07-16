@@ -52,11 +52,14 @@ module.exports = {
 
         try {
             if (activate) {
+                // Privado = nadie nuevo entra; chat/archivos siguen habilitados dentro del canal.
                 await channel.permissionOverwrites.edit(guildId, {
                     ViewChannel: true,
                     Connect: false,
-                    SendMessages: false,
-                    AttachFiles: false
+                    SendMessages: true,
+                    AttachFiles: true,
+                    EmbedLinks: true,
+                    ReadMessageHistory: true
                 });
 
                 await channel.permissionOverwrites.edit(interaction.user.id, {
@@ -81,7 +84,7 @@ module.exports = {
                             .setColor(config.embedColor)
                             .setTitle('🔒 Canal privado activado')
                             .setDescription(
-                                'Tu canal temporal ahora es privado. Usa `/vozinvitar` para dar acceso (voz + chat/archivos).'
+                                'Tu canal temporal ahora es privado. Usa `/vozinvitar` para dar acceso de entrada. Quien ya está dentro puede seguir chateando y enviando archivos.'
                             )
                     ],
                     flags: 64
