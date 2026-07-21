@@ -1,4 +1,5 @@
 const presenceStore = require('../utils/presence-store');
+const { communityEventBus } = require('../utils/community-event-bus');
 
 function attachPresenceTracking(client) {
     client.on('presenceUpdate', (_oldPresence, newPresence) => {
@@ -12,6 +13,16 @@ function attachPresenceTracking(client) {
             const payload = presenceStore.serializePresence(newPresence, user);
             if (payload) {
                 presenceStore.setPresence(user.id, payload);
+                communityEventBus.appendCoalesced({
+                    guildId,
+                    type: 'presence.changed',
+                    scope: 'guild_public',
+                    subjectUserId: user.id,
+                    payload: {
+                        userId: String(user.id),
+                        status: String(payload.status || 'offline')
+                    }
+                }, `presence:${guildId}:${user.id}`, 500);
             }
         } catch (error) {
             console.error('Error en presenceUpdate:', error?.message || error);

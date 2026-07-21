@@ -24,6 +24,10 @@ const { handleTempVoiceButton, handleTempVoiceModal } = require('./events/temp-v
 const { handleAFKAuthorReturn, handleAFKMentions } = require('./events/messageCreate');
 const guildActivityStore = require('./utils/guild-activity-store');
 const db = require('./utils/database');
+const {
+    startDiscordOutboxDispatcher,
+    stopDiscordOutboxDispatcher
+} = require('./utils/community-challenges-achievements');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startStreamAlertScheduler, stopStreamAlertScheduler } = require('./utils/stream-alert-scheduler');
 const { startFreeGamesScheduler, stopFreeGamesScheduler } = require('./utils/free-games-service');
@@ -376,8 +380,9 @@ client.once('clientReady', async () => {
     }
 
     startBackupScheduler();
+    await seedVoiceAnalyticsSessions(client);
     startVoiceXpLoop(client);
-    seedVoiceAnalyticsSessions(client);
+    startDiscordOutboxDispatcher(client);
 
     // Borrar temporales que quedaron vacíos con el bot caído; reintento periódico por fallos puntuales.
     sweepOrphanTempChannels(client).catch((error) => {
@@ -744,6 +749,7 @@ async function gracefulShutdown(signal) {
     try {
         stopBackupScheduler();
         stopVoiceXpLoop();
+        stopDiscordOutboxDispatcher();
         await flushAllVoiceAnalyticsSessions();
         stopStreamAlertScheduler();
         stopFreeGamesScheduler();

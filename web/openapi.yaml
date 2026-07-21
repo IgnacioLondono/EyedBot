@@ -24,6 +24,7 @@ tags:
   - name: Panel
   - name: Moderation
   - name: Music
+  - name: Community
 
 components:
   securitySchemes:
@@ -31,6 +32,10 @@ components:
       type: apiKey
       in: cookie
       name: tulabot.session
+    communityBearer:
+      type: http
+      scheme: bearer
+      description: COMMUNITY_API_KEY; no usa EYEDBOT_API_KEY.
 
   schemas:
     ErrorResponse:
@@ -89,6 +94,28 @@ components:
       required: true
       schema:
         type: string
+    CommunityUserId:
+      in: header
+      name: X-Community-User-Id
+      required: true
+      schema: { type: string }
+    CommunityTimestamp:
+      in: header
+      name: X-Community-Timestamp
+      required: true
+      description: Unix timestamp, segundos o milisegundos; tolerancia máxima 5 minutos.
+      schema: { type: string }
+    CommunityNonce:
+      in: header
+      name: X-Community-Nonce
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+    CommunitySignature:
+      in: header
+      name: X-Community-Signature
+      required: true
+      description: HMAC-SHA256 hex con COMMUNITY_SIGNING_SECRET sobre method/path/bodyhash/user/timestamp/nonce.
+      schema: { type: string }
 
 paths:
   /health:
@@ -759,3 +786,421 @@ paths:
       responses:
         '200':
           description: Control aplicado
+
+  /api/community/profile/{userId}:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Perfil privado de la identidad firmada
+      description: El userId del path debe coincidir exactamente con X-Community-User-Id.
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - { in: path, name: userId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Estadísticas, economía y actividad privadas propias }
+        '403': { description: El target no coincide con la identidad firmada }
+
+  /api/community/server:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Estadísticas públicas del servidor para un viewer firmado actual
+      responses:
+        '200': { description: Resumen, serie y leaderboard del servidor }
+
+  /api/community/members:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Lobby de miembros para un viewer firmado actual
+      responses:
+        '200': { description: Lista de resúmenes públicos de miembros }
+
+  /api/community/member/{memberId}:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Perfil público seguro de un miembro
+      description: Omite EyedCoins, tiradas, actividad privada y superficies de círculos no funcionales.
+      parameters:
+        - { in: path, name: memberId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Identidad, presencia general, nivel, XP, mensajes, voz y badges públicos }
+        '404': { description: Miembro no encontrado }
+
+  /api/community/activity/{userId}:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Serie diaria privada y densa de la identidad firmada
+      description: El userId del path debe coincidir exactamente con X-Community-User-Id.
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: days
+          schema: { type: integer, default: 168, minimum: 1, maximum: 366 }
+      responses:
+        '200':
+          description: Incluye trackingStartedAt, timezone, dataFrom, dataTo, activeVoice y series.
+        '401': { description: Bearer o firma inválidos }
+        '403': { description: Target distinto o identidad sin membresía }
+        '409': { description: Nonce reutilizado }
+
+  /api/community/ranking:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Ranking determinista de todos los miembros humanos, incluidos ceros
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: query
+          name: metric
+          schema: { type: string, enum: [xp, messages, voice], default: xp }
+        - in: query
+          name: period
+          schema: { type: string, enum: [all, week, month, year], default: all }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Página con requesterPosition y nextCursor.
+
+  /api/community/challenges/{userId}:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Retos privados de la identidad firmada
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Periodo semanal y lista de retos }
+
+  /api/community/challenges/{challengeId}/claim:
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Reclama idempotentemente la recompensa de un reto semanal completado
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: path
+          name: challengeId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId: { type: string, description: Debe coincidir con la identidad firmada }
+      responses:
+        '200': { description: Recompensa aplicada o reclamo previamente procesado }
+        '409': { description: Reto incompleto }
+
+  /api/community/achievements/{userId}:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Logros privados de la identidad firmada
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Lista de logros y fechas de desbloqueo }
+
+  /api/community/events:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Stream SSE autorizado con replay persistente
+      description: |
+        Endpoint server-to-server. Requiere Bearer y cabeceras de identidad firmada.
+        Filtra self, participants y staff para impedir datos privados de otros usuarios.
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: header
+          name: Last-Event-ID
+          required: false
+          schema: { type: string, pattern: '^[0-9]{1,20}$' }
+        - in: query
+          name: lastEventId
+          required: false
+          description: Alternativa a Last-Event-ID; si se envían ambos deben coincidir.
+          schema: { type: string, pattern: '^[0-9]{1,20}$' }
+      responses:
+        '200':
+          description: Eventos SSE, directiva retry y heartbeats periódicos.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '400': { description: Last-Event-ID inválido o conflictivo }
+        '429': { description: Límite de conexiones o solicitudes excedido }
+
+  /api/community/plans:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Lista planes visibles para la identidad firmada
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: query
+          name: status
+          schema: { type: string, example: upcoming,active }
+      responses:
+        '200': { description: Planes guild y privados autorizados }
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Crea un plan y registra al owner como asistente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, capacity, startsAt]
+              properties:
+                title: { type: string, minLength: 3, maxLength: 120 }
+                description: { type: string, maxLength: 2000 }
+                location: { type: string, maxLength: 200 }
+                capacity: { type: integer, minimum: 2, maximum: 500 }
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
+                status: { type: string, enum: [upcoming, active] }
+                visibility: { type: string, enum: [guild, private] }
+      responses:
+        '201': { description: Plan persistido }
+
+  /api/community/plans/{id}/join:
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Se une idempotentemente a un plan con cupo
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Asistencia registrada }
+        '409': { description: Plan cerrado o sin cupo }
+    delete:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Abandona idempotentemente un plan
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Asistencia eliminada }
+
+  /api/community/plans/{id}/status:
+    patch:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Cambia el estado de un plan como owner o manager
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [upcoming, active, completed, cancelled] }
+      responses:
+        '200': { description: Estado y versión actualizados }
+        '403': { description: Se requiere owner o rol manager }
+        '409': { description: El plan ya está cerrado }
+
+  /api/community/plans/{id}/invitations:
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Invita persistentemente a un miembro humano como owner o manager
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string, pattern: '^[0-9]{10,25}$' }
+      responses:
+        '201': { description: Invitación pendiente creada o renovada }
+        '403': { description: Se requiere owner o rol manager }
+        '404': { description: Plan o miembro actual no encontrado }
+
+  /api/community/plans/{id}/invitations/{decision}:
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Acepta o rechaza la invitación de la identidad firmada
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: decision, required: true, schema: { type: string, enum: [accept, reject] } }
+      responses:
+        '200': { description: Invitación respondida; aceptar registra asistencia atómicamente }
+        '404': { description: Invitación no encontrada }
+        '409': { description: Invitación ya respondida, plan cerrado o sin cupo }
+
+  /api/community/parties:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Lista sesiones EyedParty persistentes
+      responses:
+        '200': { description: Lista de partidas }
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Crea una partida trivia o dados
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, gameType]
+              properties:
+                title: { type: string, minLength: 3, maxLength: 100 }
+                gameType: { type: string, enum: [trivia, dice] }
+                capacity: { type: integer, minimum: 2, maximum: 20, default: 8 }
+      responses:
+        '201': { description: Partida creada en waiting }
+
+  /api/community/parties/{id}:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Obtiene estado y versión actual de EyedParty
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Estado público persistido }
+
+  /api/community/parties/{id}/join:
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Se une idempotentemente antes del inicio
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Participante registrado }
+        '409': { description: Sin cupo o partida iniciada }
+    delete:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Abandona idempotentemente una partida antes del inicio
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Participante eliminado }
+        '409': { description: Owner o partida ya iniciada }
+
+  /api/community/parties/{id}/action:
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Aplica una acción idempotente con control de turno y versión
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actionId, expectedVersion, type]
+              properties:
+                actionId: { type: string, minLength: 8, maxLength: 80 }
+                expectedVersion: { type: integer, minimum: 1 }
+                type: { type: string, enum: [start, answer, roll] }
+                choice: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: Acción y estado resultante; recompensa exactly-once al completar }
+        '409': { description: Conflicto de versión, turno o acción repetida por usuario }
+
+  /api/community/parties/{id}/ticket:
+    post:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Emite ticket WebSocket corto y de un solo uso para un participante
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '201': { description: Ticket efímero para /api/community/party-ws?ticket=... }
+        '403': { description: La identidad no participa en la partida }
+
+  /api/community/wrapped/{userId}/{year}:
+    get:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Wrapped privado de la identidad firmada
+      description: |
+        El userId del path debe coincidir exactamente con X-Community-User-Id.
+        El rank usa exclusivamente XP diario del año solicitado, conserva a los usuarios
+        con datos de ese año e incluye miembros humanos actuales sin actividad, con desempate
+        estable por userId. Un año pasado sin snapshot se finaliza de forma idempotente al solicitarlo.
+      parameters:
+        - { $ref: '#/components/parameters/CommunityUserId' }
+        - { $ref: '#/components/parameters/CommunityTimestamp' }
+        - { $ref: '#/components/parameters/CommunityNonce' }
+        - { $ref: '#/components/parameters/CommunitySignature' }
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: year
+          required: true
+          schema: { type: integer, minimum: 2020 }
+      responses:
+        '200':
+          description: |
+            Incluye dataFrom/dataTo reales (null si el usuario no tuvo actividad registrada),
+            generatedAt ISO-8601, finalized boolean y schemaVersion entero. Solo años pasados
+            desde trackingStartedAt se persisten finalizados.
+        '404': { description: No existe tracking para el año solicitado }

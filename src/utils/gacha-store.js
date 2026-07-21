@@ -98,6 +98,12 @@ function cacheSet(key, value) {
     cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+function scheduleCommunityEvaluation(guildId, userId) {
+    setImmediate(() => {
+        require('./community-challenges-achievements').evaluateUser(guildId, userId).catch(() => null);
+    });
+}
+
 function ensureStore() {
     const dir = path.dirname(STORE_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -558,6 +564,7 @@ async function setProfile(guildId, userId, profile) {
     store.guilds[guildId].profiles[userId] = normalized;
     writeStore(store);
     cacheSet(key, normalized);
+    scheduleCommunityEvaluation(guildId, userId);
     return normalized;
 }
 
@@ -1309,13 +1316,75 @@ async function ensureGuildEconomyContent(guildId) {
     }
 }
 
-async function addCoins(guildId, userId, amount = 0) {
+function parseStoredProfile(value, userId) {
+    if (value && typeof value === 'object') return normalizeProfile(value, userId);
+    try {
+        return normalizeProfile(JSON.parse(String(value || '{}')), userId);
+    } catch {
+        return normalizeProfile(defaultProfile(userId), userId);
+    }
+}
+
+async function addCoinsInTransaction(tx, guildId, userId, delta, options = {}) {
+    const key = `gacha_profile_${guildId}_${userId}`;
+    const seed = normalizeProfile(defaultProfile(userId), userId);
+    await tx.query(
+        'INSERT IGNORE INTO key_value_store (`key`, `value`) VALUES (?, ?)',
+        [key, JSON.stringify(seed)]
+    );
+    const profileRows = await tx.query(
+        'SELECT `value` FROM key_value_store WHERE `key` = ? FOR UPDATE',
+        [key]
+    );
+    const profile = parseStoredProfile(profileRows[0]?.value, userId);
+    const idempotencyKey = String(
+        options.idempotencyKey || `legacy:${Date.now()}:${Math.random().toString(36).slice(2)}`
+    ).slice(0, 191);
+    const existing = await tx.query(
+        `SELECT balance_after FROM community_reward_ledger
+         WHERE guild_id = ? AND user_id = ? AND idempotency_key = ? LIMIT 1`,
+        [String(guildId), String(userId), idempotencyKey]
+    );
+    if (existing[0]) {
+        return { profile, applied: false };
+    }
+
+    profile.coins = Math.max(0, (Number(profile.coins) || 0) + delta);
+    profile.updatedAt = new Date().toISOString();
+    await tx.query(
+        'UPDATE key_value_store SET `value` = ? WHERE `key` = ?',
+        [JSON.stringify(profile), key]
+    );
+    await tx.query(
+        `INSERT INTO community_reward_ledger
+            (guild_id, user_id, idempotency_key, source_type, source_id, amount, balance_after, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            String(guildId), String(userId), idempotencyKey,
+            String(options.sourceType || 'legacy').slice(0, 48),
+            options.sourceId ? String(options.sourceId).slice(0, 191) : null,
+            delta, profile.coins, new Date()
+        ]
+    );
+    return { profile, applied: true };
+}
+
+async function addCoins(guildId, userId, amount = 0, options = {}) {
     const delta = Math.max(0, Number.parseInt(`${amount || 0}`, 10) || 0);
     if (!delta) return getProfile(guildId, userId);
 
-    const profile = await getProfile(guildId, userId);
-    profile.coins = Math.max(0, (profile.coins || 0) + delta);
-    return setProfile(guildId, userId, profile);
+    const run = (tx) => addCoinsInTransaction(tx, guildId, userId, delta, options);
+    if (options.transaction) {
+        const result = await run(options.transaction);
+        return options.returnMeta ? result : result.profile;
+    }
+    const result = await db.transaction(run);
+    cache.delete(`gacha_profile_${guildId}_${userId}`);
+    return options.returnMeta ? result : result.profile;
+}
+
+function invalidateProfileCache(guildId, userId) {
+    cache.delete(`gacha_profile_${guildId}_${userId}`);
 }
 
 async function trySpendCoins(guildId, userId, amount = 0) {
@@ -1408,6 +1477,8 @@ module.exports = {
     deleteGuildCatalogItem,
     ensureGuildEconomyContent,
     addCoins,
+    addCoinsInTransaction,
+    invalidateProfileCache,
     trySpendCoins,
     purchaseShopCharacter,
     getGuildCatalogShopImageBlob,

@@ -53,7 +53,37 @@ const {
 const levelingStore = require('../src/utils/leveling-store');
 const guildActivityStore = require('../src/utils/guild-activity-store');
 const communityStatsStore = require('../src/utils/community-stats-store');
-const { safeSecretEqual, bearerToken, communityUserId } = require('../src/utils/community-access');
+const {
+    createWrappedService,
+    createWrappedScheduler
+} = require('../src/utils/community-wrapped-service');
+const communityChallenges = require('../src/utils/community-challenges-achievements');
+const { createPlansService, PlansError } = require('../src/utils/community-plans-service');
+const { createPartyService, PartyError } = require('../src/utils/eyed-party-service');
+const { attachPartyWebSocket } = require('../src/utils/eyed-party-websocket');
+const {
+    communityEventBus,
+    HEARTBEAT_MS,
+    RETRY_MS,
+    REPLAY_LIMIT,
+    parseEventId,
+    formatSseEvent,
+    heartbeatFrame
+} = require('../src/utils/community-event-bus');
+const communityPlans = createPlansService();
+const eyedParty = createPartyService();
+let partyWebSocket = null;
+const {
+    safeSecretEqual,
+    bearerToken,
+    communityUserId,
+    communityRateLimitKey,
+    signedTargetMatches,
+    verifyCommunitySignature,
+    consumeCommunityNonce,
+    encodeRankingCursor,
+    decodeRankingCursor
+} = require('../src/utils/community-access');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
 const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
@@ -556,7 +586,8 @@ const apiRateLimiter = rateLimit({
     max: IS_PRODUCTION ? 180 : 1200,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'Límite de solicitudes alcanzado. Espera un momento.' }
+    message: { error: 'Límite de solicitudes alcanzado. Espera un momento.' },
+    skip: (req) => String(req.originalUrl || '').startsWith('/api/community')
 });
 
 function assertProductionSecurityConfig() {
@@ -1006,7 +1037,11 @@ app.use(compression({
         return compression.filter(req, res);
     }
 }));
-app.use(express.json());
+app.use(express.json({
+    verify: (req, res, buffer) => {
+        req.rawJsonBody = Buffer.from(buffer);
+    }
+}));
 app.use(express.urlencoded({ extended: true }));
 // Necesario si se usa proxy inverso para respetar cookies seguras.
 app.set('trust proxy', 1);
@@ -2022,6 +2057,22 @@ function setBotClient(client) {
     setDiscordClient(client);
     twitchEventSub.setDiscordClient(client);
     if (client) scheduleAllStreamPushSync();
+    if (client && !client.__communityAccessRevocationListener) {
+        client.__communityAccessRevocationListener = true;
+        client.on('guildMemberRemove', (member) => {
+            const guildId = String(member.guild?.id || '');
+            const userId = String(member.id || '');
+            if (!guildId || !userId) return;
+            partyWebSocket?.disconnectUser(guildId, userId);
+            const communityGuildId = String(process.env.DISCORD_GUILD_ID || process.env.GUILD_ID || '');
+            if (!communityGuildId || guildId === communityGuildId) {
+                for (const response of communityEventConnections.get(userId) || []) {
+                    response.end();
+                }
+            }
+        });
+    }
+    communityWrappedScheduler.start(client);
 }
 
 // Rutas de autenticación
@@ -7870,18 +7921,122 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
     }
 });
 
-const COMMUNITY_GUILD_ID = String(process.env.GUILD_ID || '').trim();
+const COMMUNITY_GUILD_ID = String(process.env.DISCORD_GUILD_ID || process.env.GUILD_ID || '').trim();
+const communityWrapped = createWrappedService({ memberView: communityMemberView });
+const communityWrappedScheduler = createWrappedScheduler({
+    guildId: COMMUNITY_GUILD_ID,
+    wrapped: communityWrapped
+});
 
-function requireCommunityService(req, res, next) {
-    const expected = String(process.env.COMMUNITY_API_KEY || process.env.EYEDBOT_API_KEY || '').trim();
+function communityError(res, status, code, message) {
+    return res.status(status).json({
+        error: { code, message },
+        requestId: res.locals.communityRequestId
+    });
+}
+
+app.use('/api/community', (req, res, next) => {
+    res.locals.communityRequestId = String(req.headers['x-request-id'] || crypto.randomUUID());
+    res.set('X-Request-Id', res.locals.communityRequestId);
+    res.set('Cache-Control', 'no-store');
+    const originalJson = res.json.bind(res);
+    res.json = (payload) => {
+        if (res.statusCode >= 400 && typeof payload?.error === 'string') {
+            return originalJson({
+                error: { code: 'COMMUNITY_REQUEST_FAILED', message: payload.error },
+                requestId: res.locals.communityRequestId
+            });
+        }
+        return originalJson(payload);
+    };
+    next();
+});
+
+async function requireCommunityService(req, res, next) {
+    if (req.communityIdentity) return next();
+    const expected = String(process.env.COMMUNITY_API_KEY || '').trim();
+    const signingSecret = String(process.env.COMMUNITY_SIGNING_SECRET || '').trim();
     if (!expected) {
-        return res.status(503).json({ error: 'API comunitaria no configurada' });
+        return communityError(res, 503, 'SERVICE_NOT_CONFIGURED', 'API comunitaria no configurada');
+    }
+    if (!signingSecret) {
+        return communityError(res, 503, 'SIGNING_NOT_CONFIGURED', 'Firma comunitaria no configurada');
     }
     const provided = bearerToken(req.headers.authorization);
     if (!safeSecretEqual(provided, expected)) {
-        return res.status(401).json({ error: 'Credenciales de servicio inválidas' });
+        return communityError(res, 401, 'INVALID_SERVICE_CREDENTIALS', 'Credenciales de servicio inválidas');
     }
-    return next();
+    const signedRequest = {
+        method: req.method,
+        path: req.originalUrl,
+        body: req.rawJsonBody || '',
+        userId: req.headers['x-community-user-id'],
+        timestamp: req.headers['x-community-timestamp'],
+        nonce: req.headers['x-community-nonce'],
+        signature: req.headers['x-community-signature']
+    };
+    const verification = verifyCommunitySignature(signedRequest, signingSecret);
+    if (!verification.ok) {
+        return communityError(res, 401, verification.reason.toUpperCase(), 'Identidad comunitaria inválida');
+    }
+    try {
+        const freshNonce = await consumeCommunityNonce(
+            verification.userId, signedRequest.nonce, signedRequest.timestamp
+        );
+        if (!freshNonce) {
+            return communityError(res, 409, 'NONCE_REPLAYED', 'La solicitud ya fue utilizada');
+        }
+        const access = await requireCommunityMember(verification.userId);
+        if (access.error) {
+            return communityError(res, access.status, 'MEMBERSHIP_REQUIRED', access.error);
+        }
+        req.communityIdentity = { userId: verification.userId, ...access };
+        return next();
+    } catch (error) {
+        console.error('Error validando acceso comunitario:', error?.message || error);
+        return communityError(res, 503, 'ACCESS_VALIDATION_FAILED', 'No se pudo validar el acceso comunitario');
+    }
+}
+
+function communityLimiterKey(req) {
+    return communityRateLimitKey(
+        req.communityIdentity?.userId,
+        bearerToken(req.headers.authorization)
+    );
+}
+
+const communityRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: Math.max(10, Number.parseInt(process.env.COMMUNITY_RATE_LIMIT_PER_MINUTE || '120', 10) || 120),
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: communityLimiterKey,
+    handler: (req, res) => communityError(res, 429, 'RATE_LIMITED', 'Demasiadas solicitudes comunitarias')
+});
+
+const communityMutationRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: Math.max(5, Number.parseInt(process.env.COMMUNITY_MUTATION_RATE_LIMIT_PER_MINUTE || '30', 10) || 30),
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: communityLimiterKey,
+    skip: (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method),
+    handler: (req, res) => communityError(res, 429, 'MUTATION_RATE_LIMITED', 'Demasiadas modificaciones comunitarias')
+});
+
+app.use('/api/community', requireCommunityService, communityRateLimiter, communityMutationRateLimiter);
+
+function requireSignedTarget(req, res, rawTarget) {
+    const target = communityUserId(rawTarget);
+    if (!target) {
+        communityError(res, 400, 'INVALID_USER', 'Usuario inválido');
+        return '';
+    }
+    if (!signedTargetMatches(req.communityIdentity?.userId, target)) {
+        communityError(res, 403, 'SAME_USER_REQUIRED', 'Solo puedes consultar tus propios datos');
+        return '';
+    }
+    return target;
 }
 
 async function requireCommunityMember(userId) {
@@ -7893,6 +8048,151 @@ async function requireCommunityMember(userId) {
     if (!member || member.user?.bot) return { error: 'Debes pertenecer a EyedComun', status: 403 };
     return { guild, member };
 }
+
+const communityEventConnections = new Map();
+const COMMUNITY_EVENT_MAX_CONNECTIONS = Math.max(
+    1,
+    Math.min(10, Number.parseInt(process.env.COMMUNITY_EVENTS_MAX_CONNECTIONS_PER_USER || '3', 10) || 3)
+);
+const COMMUNITY_EVENT_MEMBERSHIP_RECHECK_MS = Math.max(
+    30_000,
+    Number.parseInt(process.env.COMMUNITY_EVENTS_MEMBERSHIP_RECHECK_MS || '120000', 10) || 120_000
+);
+
+app.get('/api/community/events', requireCommunityService, async (req, res) => {
+    const headerId = req.headers['last-event-id'];
+    const queryId = req.query.lastEventId;
+    if (headerId !== undefined && queryId !== undefined && String(headerId) !== String(queryId)) {
+        return communityError(res, 400, 'LAST_EVENT_ID_CONFLICT', 'Last-Event-ID no coincide');
+    }
+    const lastEventId = headerId ?? queryId ?? '0';
+    const parsedLastId = parseEventId(lastEventId);
+    if (parsedLastId === null) {
+        return communityError(res, 400, 'INVALID_LAST_EVENT_ID', 'Last-Event-ID inválido');
+    }
+
+    const userId = req.communityIdentity.userId;
+    const active = communityEventConnections.get(userId) || new Set();
+    if (active.size >= COMMUNITY_EVENT_MAX_CONNECTIONS) {
+        return communityError(res, 429, 'EVENT_CONNECTION_LIMIT', 'Demasiadas conexiones de eventos');
+    }
+
+    let planViewer;
+    try {
+        planViewer = await communityPlanViewer(req);
+    } catch (error) {
+        console.error('[community-events] No se pudo resolver rol staff:', error?.message || error);
+        return communityError(res, 503, 'EVENT_ACCESS_FAILED', 'No se pudo autorizar el stream');
+    }
+    const viewer = {
+        guildId: req.communityIdentity.guild.id,
+        userId,
+        isStaff: planViewer.isManager === true
+    };
+    let lastSentId = parsedLastId;
+    let replaying = true;
+    const pendingLive = [];
+    let heartbeat = null;
+    let subscription = null;
+    let closed = false;
+    let membershipCheckRunning = false;
+    let lastMembershipCheckAt = Date.now();
+
+    function sendEvent(event) {
+        const eventId = parseEventId(event.id);
+        if (eventId === null || eventId <= lastSentId) return true;
+        const writable = res.write(formatSseEvent(event));
+        lastSentId = eventId;
+        return writable;
+    }
+
+    function cleanup() {
+        if (closed) return;
+        closed = true;
+        if (heartbeat) clearInterval(heartbeat);
+        subscription?.close();
+        active.delete(res);
+        if (!active.size) communityEventConnections.delete(userId);
+    }
+
+    res.status(200);
+    res.set({
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    });
+    res.flushHeaders?.();
+    res.write(`retry: ${RETRY_MS}\n\n`);
+
+    active.add(res);
+    communityEventConnections.set(userId, active);
+    subscription = communityEventBus.subscribe(viewer, {
+        send(event) {
+            if (replaying) {
+                if (pendingLive.length >= REPLAY_LIMIT) {
+                    cleanup();
+                    res.end();
+                    return false;
+                }
+                pendingLive.push(event);
+                return true;
+            }
+            return sendEvent(event);
+        },
+        close() {
+            if (!closed) res.end();
+        }
+    });
+    res.on('drain', () => subscription?.resume());
+    req.on('close', cleanup);
+    res.on('close', cleanup);
+
+    try {
+        const replay = await communityEventBus.replay(viewer, parsedLastId.toString(), REPLAY_LIMIT);
+        for (const event of replay) {
+            if (!sendEvent(event)) break;
+        }
+        replaying = false;
+        pendingLive.sort((left, right) => (
+            parseEventId(left.id) < parseEventId(right.id) ? -1 : 1
+        ));
+        for (const event of pendingLive.splice(0)) {
+            if (!sendEvent(event)) break;
+        }
+        heartbeat = setInterval(async () => {
+            if (closed) return;
+            const now = Date.now();
+            if (
+                !membershipCheckRunning
+                && now - lastMembershipCheckAt >= COMMUNITY_EVENT_MEMBERSHIP_RECHECK_MS
+            ) {
+                membershipCheckRunning = true;
+                lastMembershipCheckAt = now;
+                try {
+                    const access = await requireCommunityMember(userId);
+                    if (access.error) {
+                        cleanup();
+                        res.end();
+                        return;
+                    }
+                } catch {
+                    // Un fallo transitorio no expulsa al usuario; se reintentará después.
+                } finally {
+                    membershipCheckRunning = false;
+                }
+            }
+            if (!closed && !res.write(heartbeatFrame())) {
+                // Los eventos quedan en cola hasta que el socket vuelva a drenar.
+            }
+        }, HEARTBEAT_MS);
+        heartbeat.unref?.();
+    } catch (error) {
+        console.error('[community-events] Falló replay SSE:', error?.message || error);
+        cleanup();
+        res.end();
+    }
+});
 
 function communityMemberView(member) {
     return {
@@ -7913,19 +8213,19 @@ async function communityRanking(guildId) {
 }
 
 app.get('/api/community/membership/:userId', requireCommunityService, async (req, res) => {
-    const userId = communityUserId(req.params.userId);
-    if (!userId) return res.status(400).json({ error: 'Usuario inválido' });
+    const userId = requireSignedTarget(req, res, req.params.userId);
+    if (!userId) return;
     const access = await requireCommunityMember(userId);
-    if (access.error) return res.status(access.status).json({ error: access.error });
+    if (access.error) return communityError(res, access.status, 'MEMBERSHIP_REQUIRED', access.error);
     return res.json({ member: true, user: communityMemberView(access.member) });
 });
 
 app.get('/api/community/profile/:userId', requireCommunityService, async (req, res) => {
     try {
-        const userId = communityUserId(req.params.userId);
-        if (!userId) return res.status(400).json({ error: 'Usuario inválido' });
+        const userId = requireSignedTarget(req, res, req.params.userId);
+        if (!userId) return;
         const access = await requireCommunityMember(userId);
-        if (access.error) return res.status(access.status).json({ error: access.error });
+        if (access.error) return communityError(res, access.status, 'MEMBERSHIP_REQUIRED', access.error);
 
         const [state, gacha, ranking, activity] = await Promise.all([
             levelingStore.getUserState(access.guild.id, userId),
@@ -7961,10 +8261,10 @@ app.get('/api/community/profile/:userId', requireCommunityService, async (req, r
 
 app.get('/api/community/server', requireCommunityService, async (req, res) => {
     try {
-        const userId = communityUserId(req.query.userId);
-        if (!userId) return res.status(400).json({ error: 'Usuario inválido' });
-        const access = await requireCommunityMember(userId);
-        if (access.error) return res.status(access.status).json({ error: access.error });
+        if (req.query.userId && !signedTargetMatches(req.communityIdentity.userId, req.query.userId)) {
+            return communityError(res, 403, 'SAME_USER_REQUIRED', 'La identidad consultada no coincide con la firma');
+        }
+        const access = req.communityIdentity;
 
         const [activity, ranking] = await Promise.all([
             guildActivityStore.getGuildActivity(access.guild.id),
@@ -8051,10 +8351,10 @@ async function communityMemberSummary(member, stats = {}, rank = null) {
 
 app.get('/api/community/members', requireCommunityService, async (req, res) => {
     try {
-        const viewerId = communityUserId(req.query.userId);
-        if (!viewerId) return res.status(400).json({ error: 'Usuario inválido' });
-        const access = await requireCommunityMember(viewerId);
-        if (access.error) return res.status(access.status).json({ error: access.error });
+        if (req.query.userId && !signedTargetMatches(req.communityIdentity.userId, req.query.userId)) {
+            return communityError(res, 403, 'SAME_USER_REQUIRED', 'La identidad consultada no coincide con la firma');
+        }
+        const access = req.communityIdentity;
 
         const ranking = await communityRanking(access.guild.id);
         const members = await Promise.all(ranking.slice(0, 60).map(async (row, index) => {
@@ -8071,19 +8371,19 @@ app.get('/api/community/members', requireCommunityService, async (req, res) => {
 
 app.get('/api/community/member/:memberId', requireCommunityService, async (req, res) => {
     try {
-        const viewerId = communityUserId(req.query.userId);
         const memberId = communityUserId(req.params.memberId);
-        if (!viewerId || !memberId) return res.status(400).json({ error: 'Usuario inválido' });
-        const access = await requireCommunityMember(viewerId);
-        if (access.error) return res.status(access.status).json({ error: access.error });
+        if (!memberId) return communityError(res, 400, 'INVALID_USER', 'Usuario inválido');
+        if (req.query.userId && !signedTargetMatches(req.communityIdentity.userId, req.query.userId)) {
+            return communityError(res, 403, 'SAME_USER_REQUIRED', 'La identidad consultada no coincide con la firma');
+        }
+        const access = req.communityIdentity;
 
         const member = access.guild.members.cache.get(memberId)
             || await access.guild.members.fetch(memberId).catch(() => null);
         if (!member || member.user?.bot) return res.status(404).json({ error: 'Miembro no encontrado' });
 
-        const [state, gacha, ranking] = await Promise.all([
+        const [state, ranking] = await Promise.all([
             levelingStore.getUserState(access.guild.id, memberId),
-            gachaStore.getProfile(access.guild.id, memberId),
             communityRanking(access.guild.id)
         ]);
         const rankIndex = ranking.findIndex((row) => row.userId === memberId);
@@ -8093,75 +8393,385 @@ app.get('/api/community/member/:memberId', requireCommunityService, async (req, 
         if (rankIndex >= 0 && rankIndex < 3) badges.push('Top 3');
         if (member.joinedTimestamp && Date.now() - member.joinedTimestamp >= 365 * 24 * 60 * 60 * 1000) badges.push('Veterano');
 
-        return res.json({
-            user: await communityMemberSummary(member, state, rankIndex >= 0 ? rankIndex + 1 : null),
-            gacha: {
-                coins: Number(gacha.coins) || 0,
-                collectionSize: Number(gacha.collectionCount) || 0,
-                pulls: Number(gacha.totalRolls) || 0,
-                bestRarity: gacha.bestRarity || null
-            },
-            badges,
-            mutualCircles: []
-        });
+        const summary = await communityMemberSummary(member, state, rankIndex >= 0 ? rankIndex + 1 : null);
+        const { activity: _privateActivity, ...publicUser } = summary;
+        return res.json({ user: publicUser, badges });
     } catch (error) {
         console.error('Error cargando perfil comunitario público:', error);
         return res.status(500).json({ error: 'No se pudo cargar el perfil' });
     }
 });
 
+app.get('/api/community/activity/:userId', requireCommunityService, async (req, res) => {
+    try {
+        const userId = requireSignedTarget(req, res, req.params.userId);
+        const days = Math.max(1, Math.min(366, Number.parseInt(req.query.days || '168', 10) || 168));
+        if (!userId) return;
+        const target = await requireCommunityMember(userId);
+        if (target.error) return communityError(res, target.status, 'MEMBER_NOT_FOUND', target.error);
+        const activity = await communityStatsStore.getUserActivity(target.guild.id, userId, days);
+        return res.json({
+            user: communityMemberView(target.member),
+            ...activity,
+            requestId: res.locals.communityRequestId
+        });
+    } catch (error) {
+        console.error('Error cargando actividad comunitaria:', error);
+        return communityError(res, 500, 'ACTIVITY_FAILED', 'No se pudo cargar la actividad');
+    }
+});
+
+app.get('/api/community/ranking', requireCommunityService, async (req, res) => {
+    try {
+        const metric = ['xp', 'messages', 'voice'].includes(String(req.query.metric))
+            ? String(req.query.metric)
+            : 'xp';
+        const period = ['all', 'week', 'month', 'year'].includes(String(req.query.period))
+            ? String(req.query.period)
+            : 'all';
+        const limit = Math.max(1, Math.min(50, Number.parseInt(req.query.limit || '25', 10) || 25));
+        const cursor = req.query.cursor ? decodeRankingCursor(req.query.cursor) : null;
+        if (req.query.cursor && !cursor) {
+            return communityError(res, 400, 'INVALID_CURSOR', 'Cursor inválido');
+        }
+
+        const guild = req.communityIdentity.guild;
+        const fetched = await guild.members.fetch().catch(() => guild.members.cache);
+        const humans = Array.from(fetched.values()).filter((member) => !member.user?.bot);
+        const aggregate = await communityStatsStore.getPeriodRanking(guild.id, metric, period);
+        const ranked = humans.map((member) => ({
+            userId: member.user.id,
+            member,
+            value: aggregate.values.get(member.user.id) || 0
+        })).sort((left, right) => right.value - left.value || left.userId.localeCompare(right.userId));
+        const requesterPosition = ranked.findIndex(
+            (row) => row.userId === req.communityIdentity.userId
+        ) + 1;
+        const eligible = cursor
+            ? ranked.filter((row) => (
+                row.value < cursor.metricValue
+                || (row.value === cursor.metricValue && row.userId > cursor.userId)
+            ))
+            : ranked;
+        const page = eligible.slice(0, limit);
+        const hasMore = eligible.length > limit;
+        const last = page[page.length - 1];
+        return res.json({
+            metric,
+            period,
+            trackingStartedAt: aggregate.trackingStartedAt,
+            timezone: aggregate.timezone,
+            dataFrom: aggregate.dataFrom,
+            dataTo: aggregate.dataTo,
+            requesterPosition: requesterPosition || null,
+            items: page.map((row) => ({
+                position: ranked.findIndex((candidate) => candidate.userId === row.userId) + 1,
+                user: communityMemberView(row.member),
+                value: row.value,
+                voiceSeconds: metric === 'voice' ? row.value : undefined
+            })),
+            nextCursor: hasMore && last ? encodeRankingCursor(last.value, last.userId) : null,
+            requestId: res.locals.communityRequestId
+        });
+    } catch (error) {
+        console.error('Error cargando ranking comunitario:', error);
+        return communityError(res, 500, 'RANKING_FAILED', 'No se pudo cargar el ranking');
+    }
+});
+
+app.get('/api/community/challenges/:userId', requireCommunityService, async (req, res) => {
+    try {
+        const userId = requireSignedTarget(req, res, req.params.userId);
+        if (!userId) return;
+        const target = await requireCommunityMember(userId);
+        if (target.error) return communityError(res, target.status, 'MEMBER_NOT_FOUND', target.error);
+        const challenges = await communityChallenges.getChallenges(target.guild.id, userId);
+        return res.json({ userId, ...challenges, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        console.error('Error cargando retos comunitarios:', error);
+        return communityError(res, 500, 'CHALLENGES_FAILED', 'No se pudieron cargar los retos');
+    }
+});
+
+app.post('/api/community/challenges/:challengeId/claim', requireCommunityService, async (req, res) => {
+    try {
+        if (req.body?.userId !== undefined && !communityUserId(req.body.userId)) {
+            return communityError(res, 400, 'INVALID_USER', 'Usuario inválido');
+        }
+        const userId = communityUserId(req.body?.userId) || req.communityIdentity.userId;
+        if (!signedTargetMatches(req.communityIdentity.userId, userId)) {
+            return communityError(res, 403, 'SAME_USER_REQUIRED', 'Solo puedes reclamar tus propios retos');
+        }
+        const challengeId = String(req.params.challengeId || '').trim();
+        if (!/^[a-z0-9_-]{1,64}$/i.test(challengeId)) {
+            return communityError(res, 400, 'INVALID_CHALLENGE', 'Reto inválido');
+        }
+        const result = await communityChallenges.claimChallenge(
+            req.communityIdentity.guild.id, userId, challengeId
+        );
+        if (!result.ok && result.reason === 'not_found') {
+            return communityError(res, 404, 'CHALLENGE_NOT_FOUND', 'Reto no encontrado para el periodo actual');
+        }
+        if (!result.ok && result.reason === 'incomplete') {
+            return communityError(res, 409, 'CHALLENGE_INCOMPLETE', 'El reto todavía no está completado');
+        }
+        return res.json({
+            claimed: true,
+            idempotent: result.idempotent === true,
+            challengeId,
+            reward: result.reward,
+            balance: Number(result.profile?.coins) || 0,
+            requestId: res.locals.communityRequestId
+        });
+    } catch (error) {
+        console.error('Error reclamando reto comunitario:', error);
+        return communityError(res, 500, 'CHALLENGE_CLAIM_FAILED', 'No se pudo reclamar la recompensa');
+    }
+});
+
+app.get('/api/community/achievements/:userId', requireCommunityService, async (req, res) => {
+    try {
+        const userId = requireSignedTarget(req, res, req.params.userId);
+        if (!userId) return;
+        const target = await requireCommunityMember(userId);
+        if (target.error) return communityError(res, target.status, 'MEMBER_NOT_FOUND', target.error);
+        const achievements = await communityChallenges.getAchievements(target.guild.id, userId);
+        return res.json({ userId, ...achievements, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        console.error('Error cargando logros comunitarios:', error);
+        return communityError(res, 500, 'ACHIEVEMENTS_FAILED', 'No se pudieron cargar los logros');
+    }
+});
+
+function communityServiceFailure(res, error, fallbackCode, fallbackMessage) {
+    if (error instanceof PlansError || error instanceof PartyError) {
+        return communityError(res, error.status, error.code, error.message);
+    }
+    console.error(`${fallbackMessage}:`, error);
+    return communityError(res, 500, fallbackCode, fallbackMessage);
+}
+
+async function communityPlanViewer(req) {
+    return communityPlans.viewerContext(
+        req.communityIdentity.guild.id,
+        req.communityIdentity.userId,
+        req.communityIdentity.member
+    );
+}
+
+app.get('/api/community/plans', requireCommunityService, async (req, res) => {
+    try {
+        const viewer = await communityPlanViewer(req);
+        const plans = await communityPlans.list(req.communityIdentity.guild.id, viewer, req.query);
+        return res.json({ plans, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PLANS_LIST_FAILED', 'No se pudieron cargar los planes');
+    }
+});
+
+app.post('/api/community/plans', requireCommunityService, async (req, res) => {
+    try {
+        const viewer = await communityPlanViewer(req);
+        const plan = await communityPlans.create(req.communityIdentity.guild.id, viewer, req.body);
+        return res.status(201).json({ plan, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PLAN_CREATE_FAILED', 'No se pudo crear el plan');
+    }
+});
+
+app.post('/api/community/plans/:id/join', requireCommunityService, async (req, res) => {
+    try {
+        const viewer = await communityPlanViewer(req);
+        const result = await communityPlans.join(req.communityIdentity.guild.id, req.params.id, viewer);
+        return res.json({ ...result, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PLAN_JOIN_FAILED', 'No se pudo unir al plan');
+    }
+});
+
+app.delete('/api/community/plans/:id/join', requireCommunityService, async (req, res) => {
+    try {
+        const viewer = await communityPlanViewer(req);
+        const result = await communityPlans.leave(req.communityIdentity.guild.id, req.params.id, viewer);
+        return res.json({ ...result, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PLAN_LEAVE_FAILED', 'No se pudo abandonar el plan');
+    }
+});
+
+app.patch('/api/community/plans/:id/status', requireCommunityService, async (req, res) => {
+    try {
+        const viewer = await communityPlanViewer(req);
+        const plan = await communityPlans.updateStatus(
+            req.communityIdentity.guild.id,
+            req.params.id,
+            viewer,
+            req.body?.status
+        );
+        return res.json({ plan, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PLAN_STATUS_FAILED', 'No se pudo cambiar el estado del plan');
+    }
+});
+
+app.post('/api/community/plans/:id/invitations', requireCommunityService, async (req, res) => {
+    try {
+        const inviteeId = communityUserId(req.body?.userId);
+        if (!inviteeId) return communityError(res, 400, 'INVALID_INVITEE', 'Invitado inválido');
+        const target = await requireCommunityMember(inviteeId);
+        if (target.error) return communityError(res, target.status, 'INVITEE_NOT_FOUND', 'El invitado debe ser un miembro humano actual');
+        const viewer = await communityPlanViewer(req);
+        const invitation = await communityPlans.invite(
+            req.communityIdentity.guild.id, req.params.id, viewer, inviteeId
+        );
+        return res.status(201).json({ invitation, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PLAN_INVITE_FAILED', 'No se pudo enviar la invitación');
+    }
+});
+
+app.post('/api/community/plans/:id/invitations/:decision', requireCommunityService, async (req, res) => {
+    try {
+        const decision = String(req.params.decision) === 'accept' ? 'accepted'
+            : String(req.params.decision) === 'reject' ? 'rejected'
+                : '';
+        if (!decision) return communityError(res, 400, 'INVALID_INVITATION_DECISION', 'Respuesta inválida');
+        const viewer = await communityPlanViewer(req);
+        const invitation = await communityPlans.respondInvitation(
+            req.communityIdentity.guild.id, req.params.id, viewer, decision
+        );
+        return res.json({ invitation, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PLAN_INVITATION_FAILED', 'No se pudo responder la invitación');
+    }
+});
+
+app.get('/api/community/parties', requireCommunityService, async (req, res) => {
+    try {
+        const parties = await eyedParty.list(
+            req.communityIdentity.guild.id, req.communityIdentity.userId, req.query
+        );
+        return res.json({ parties, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTIES_LIST_FAILED', 'No se pudieron cargar las partidas');
+    }
+});
+
+app.post('/api/community/parties', requireCommunityService, async (req, res) => {
+    try {
+        const party = await eyedParty.create(
+            req.communityIdentity.guild.id, req.communityIdentity.userId, req.body
+        );
+        return res.status(201).json({ party, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_CREATE_FAILED', 'No se pudo crear la partida');
+    }
+});
+
+app.get('/api/community/parties/:id', requireCommunityService, async (req, res) => {
+    try {
+        const party = await eyedParty.get(
+            req.communityIdentity.guild.id, req.params.id, req.communityIdentity.userId
+        );
+        return res.json({ party, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_GET_FAILED', 'No se pudo cargar la partida');
+    }
+});
+
+app.post('/api/community/parties/:id/join', requireCommunityService, async (req, res) => {
+    try {
+        const party = await eyedParty.join(
+            req.communityIdentity.guild.id, req.params.id, req.communityIdentity.userId
+        );
+        partyWebSocket?.broadcast(req.params.id, { type: 'party.updated', party });
+        return res.json({ party, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_JOIN_FAILED', 'No se pudo unir a la partida');
+    }
+});
+
+app.delete('/api/community/parties/:id/join', requireCommunityService, async (req, res) => {
+    try {
+        const result = await eyedParty.leave(
+            req.communityIdentity.guild.id, req.params.id, req.communityIdentity.userId
+        );
+        partyWebSocket?.disconnect(
+            req.params.id,
+            req.communityIdentity.userId,
+            1008,
+            'party_left'
+        );
+        partyWebSocket?.broadcast(req.params.id, { type: 'party.updated', party: result.party });
+        return res.json({ ...result, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_LEAVE_FAILED', 'No se pudo abandonar la partida');
+    }
+});
+
+app.post('/api/community/parties/:id/action', requireCommunityService, async (req, res) => {
+    try {
+        const result = await eyedParty.action(
+            req.communityIdentity.guild.id, req.params.id, req.communityIdentity.userId, req.body
+        );
+        partyWebSocket?.broadcast(req.params.id, { type: 'party.updated', party: result.party });
+        return res.json({ ...result, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_ACTION_FAILED', 'No se pudo aplicar la acción');
+    }
+});
+
+app.post('/api/community/parties/:id/ticket', requireCommunityService, async (req, res) => {
+    try {
+        const ticket = await eyedParty.createTicket(
+            req.communityIdentity.guild.id, req.params.id, req.communityIdentity.userId
+        );
+        return res.status(201).json({ ...ticket, path: '/api/community/party-ws' });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_TICKET_FAILED', 'No se pudo emitir el ticket');
+    }
+});
+
 app.get('/api/community/wrapped/:userId/:year', requireCommunityService, async (req, res) => {
     try {
-        const userId = communityUserId(req.params.userId);
-        const year = Number.parseInt(req.params.year, 10);
-        const currentYear = new Date().getUTCFullYear();
-        if (!userId || !Number.isInteger(year) || year < 2020 || year > currentYear) {
-            return res.status(400).json({ error: 'Usuario o año inválido' });
+        const userId = requireSignedTarget(req, res, req.params.userId);
+        if (!userId) return;
+        const yearText = String(req.params.year || '');
+        const year = /^\d{4}$/.test(yearText) ? Number(yearText) : Number.NaN;
+        const metadata = await communityStatsStore.getTrackingMetadata(req.communityIdentity.guild.id);
+        const currentYear = Number(communityStatsStore.dateKey(new Date(), metadata.timezone).slice(0, 4));
+        const trackingYear = metadata.trackingStartedAt
+            ? Number(communityStatsStore.dateKey(metadata.trackingStartedAt, metadata.timezone).slice(0, 4))
+            : null;
+        if (!Number.isInteger(year) || year < 2020 || year > currentYear) {
+            return communityError(res, 400, 'INVALID_WRAPPED_YEAR', 'Año inválido');
         }
-        const access = await requireCommunityMember(userId);
-        if (access.error) return res.status(access.status).json({ error: access.error });
-
-        if (year < currentYear) {
-            const existing = await communityStatsStore.getWrappedSnapshot(access.guild.id, userId, year);
-            if (existing) return res.json(existing);
+        if (!trackingYear || year < trackingYear) {
+            return communityError(
+                res,
+                404,
+                'WRAPPED_DATA_UNAVAILABLE',
+                'No existe tracking para ese año'
+            );
         }
-
-        const [period, state, ranking, activity] = await Promise.all([
-            communityStatsStore.getUserYearStats(access.guild.id, userId, year),
-            levelingStore.getUserState(access.guild.id, userId),
-            communityRanking(access.guild.id),
-            guildActivityStore.getGuildActivity(access.guild.id)
-        ]);
-        const rankIndex = ranking.findIndex((row) => row.userId === userId);
-        const hasDailyData = Boolean(period.availableFrom);
-        const messages = hasDailyData ? period.messages : Number(state.messageCount) || 0;
-        const voiceMinutes = hasDailyData ? period.voiceMinutes : Number(state.voiceMinutes) || 0;
-        const highlights = [];
-        if (messages > 0) highlights.push(`Escribiste ${messages.toLocaleString('es')} mensajes en la comunidad.`);
-        if (voiceMinutes > 0) highlights.push(`Compartiste ${Math.round(voiceMinutes / 60)} horas en canales de voz.`);
-        if (rankIndex >= 0 && rankIndex < 10) highlights.push(`Terminaste entre los 10 miembros con más experiencia.`);
-
-        const payload = {
+        const target = await requireCommunityMember(userId);
+        if (target.error) return communityError(res, target.status, 'MEMBER_NOT_FOUND', target.error);
+        const fetchedMembers = await target.guild.members.fetch();
+        const memberIds = Array.from(fetchedMembers.values())
+            .filter((member) => !member.user?.bot)
+            .map((member) => String(member.user.id));
+        const payload = await communityWrapped.getOrGenerate({
+            guildId: target.guild.id,
+            userId,
             year,
-            availableFrom: period.availableFrom || activity.trackingStartedAt || null,
-            isCompletePeriod: hasDailyData && period.isCompletePeriod,
-            user: communityMemberView(access.member),
-            stats: {
-                messages,
-                voiceMinutes,
-                xpEarned: hasDailyData ? period.xpEarned : Number(state.xp) || 0,
-                activeDays: hasDailyData ? period.activeDays : 0,
-                favoriteDay: period.favoriteDay,
-                monthly: hasDailyData ? period.monthly : [],
-                rank: rankIndex >= 0 ? rankIndex + 1 : null
-            },
-            highlights
-        };
-        await communityStatsStore.saveWrappedSnapshot(access.guild.id, userId, year, payload);
-        return res.json(payload);
+            member: target.member,
+            memberIds,
+            currentYear
+        });
+        return res.json({ ...payload, requestId: res.locals.communityRequestId });
     } catch (error) {
         console.error('Error generando Wrapped comunitario:', error);
-        return res.status(500).json({ error: 'No se pudo generar el Wrapped' });
+        return communityError(res, 500, 'WRAPPED_FAILED', 'No se pudo generar el Wrapped');
     }
 });
 
@@ -8186,6 +8796,7 @@ function attachNextPanelWithTimeout(app) {
 }
 
 async function startWebServer() {
+    communityEventBus.startCleanup();
     server = app.listen(PORT, BIND_HOST, () => {
         const bindLabel = BIND_HOST === '0.0.0.0' ? 'todas las interfaces' : BIND_HOST;
         console.log(`🌐 Panel web iniciado en http://${bindLabel}:${PORT}`);
@@ -8213,6 +8824,7 @@ async function startWebServer() {
             console.error('❌ Error iniciando panel web:', error);
         }
     });
+    partyWebSocket = attachPartyWebSocket(server, eyedParty);
 
     try {
         await attachNextPanelWithTimeout(app);
