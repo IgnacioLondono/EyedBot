@@ -170,9 +170,26 @@ function createPartyService({
              ORDER BY created_at DESC LIMIT ${limit}`,
             params
         );
-        return Promise.all(rows.map(async (row) => (
-            publicParty(row, await participants(db, row.party_id), viewerId)
-        )));
+        if (!rows.length) return [];
+        const partyIds = rows.map((row) => String(row.party_id));
+        const memberRows = await db.query(
+            `SELECT party_id, user_id, joined_at
+             FROM community_party_participants
+             WHERE party_id IN (${partyIds.map(() => '?').join(',')})
+             ORDER BY party_id ASC, joined_at ASC, user_id ASC`,
+            partyIds
+        );
+        const membersByParty = new Map();
+        for (const member of memberRows) {
+            const partyId = String(member.party_id);
+            if (!membersByParty.has(partyId)) membersByParty.set(partyId, []);
+            membersByParty.get(partyId).push(member);
+        }
+        return rows.map((row) => publicParty(
+            row,
+            membersByParty.get(String(row.party_id)) || [],
+            viewerId
+        ));
     }
 
     async function create(guildId, userId, raw) {

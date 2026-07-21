@@ -59,6 +59,35 @@ test('listas usan límites enteros compatibles con MySQL 8.4', async () => {
     assert.ok(queries.every(({ sql }) => !sql.includes('LIMIT ?')));
 });
 
+test('EyedParty carga participantes en una sola consulta', async () => {
+    const queries = [];
+    const db = {
+        async query(sql) {
+            queries.push(sql);
+            if (sql.includes('FROM community_party_sessions')) {
+                const base = {
+                    title: 'Partida', game_type: 'dice', owner_id: '100000000000000001',
+                    capacity: 8, participant_count: 1, version: 1,
+                    state_json: '{}', status: 'waiting', created_at: new Date(), updated_at: new Date()
+                };
+                return [
+                    { ...base, party_id: 'party-1' },
+                    { ...base, party_id: 'party-2' },
+                ];
+            }
+            return [
+                { party_id: 'party-1', user_id: '100000000000000001', joined_at: new Date() },
+                { party_id: 'party-2', user_id: '100000000000000002', joined_at: new Date() },
+            ];
+        }
+    };
+    const parties = await createPartyService({ db }).list('guild-1', '100000000000000001');
+    assert.equal(queries.length, 2);
+    assert.equal(parties.length, 2);
+    assert.equal(parties[0].participants.length, 1);
+    assert.equal(parties[1].participants.length, 1);
+});
+
 test('invitación privada exige manager y persiste un estado pendiente', async () => {
     const writes = [];
     const events = [];

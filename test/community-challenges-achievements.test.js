@@ -1,11 +1,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+    achievementNotificationsEnabled,
     weeklyPeriod,
     metricValue,
     CHALLENGE_DEFINITIONS
 } = require('../src/utils/community-challenges-achievements');
 const { addCoinsInTransaction } = require('../src/utils/gacha-store');
+
+test('permite activar y desactivar avisos de logros', () => {
+    assert.equal(achievementNotificationsEnabled(undefined), true);
+    assert.equal(achievementNotificationsEnabled('true'), true);
+    assert.equal(achievementNotificationsEnabled('false'), false);
+    assert.equal(achievementNotificationsEnabled(' FALSE '), false);
+});
 
 test('la semana comunitaria es lunes a domingo en la zona indicada', () => {
     assert.deepEqual(

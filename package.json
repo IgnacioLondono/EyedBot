@@ -8,7 +8,7 @@
     "dev": "nodemon src/index.js",
     "deploy": "node src/deploy-commands.js",
     "backup:now": "node src/scripts/backup-now.js",
-    "test:community": "node --test test/community-access.test.js test/community-stats-store.test.js test/community-wrapped-service.test.js test/community-challenges-achievements.test.js test/community-plans-parties.test.js test/community-event-bus.test.js",
+    "test:community": "node --test test/community-access.test.js test/community-admin-settings.test.js test/community-stats-store.test.js test/community-wrapped-service.test.js test/community-challenges-achievements.test.js test/community-plans-parties.test.js test/community-event-bus.test.js",
     "verify-oauth": "node verificar-oauth.js",
     "verify-gemini": "node verificar-gemini.js"
   },

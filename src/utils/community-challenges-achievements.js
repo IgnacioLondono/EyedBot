@@ -1,6 +1,7 @@
 const db = require('./database');
 const communityStatsStore = require('./community-stats-store');
 const { communityEventBus } = require('./community-event-bus');
+const { getCommunityAdminSettings } = require('./community-admin-settings');
 
 const CHALLENGE_DEFINITIONS = Object.freeze([
     { id: 'weekly_messages_50', title: 'Conversación semanal', description: 'Envía 50 mensajes esta semana.', metric: 'messages', target: 50, reward: 100, order: 10 },
@@ -23,6 +24,10 @@ const ACHIEVEMENT_DEFINITIONS = Object.freeze([
 
 function nonNegativeInt(value) {
     return Math.max(0, Number.parseInt(value || 0, 10) || 0);
+}
+
+function achievementNotificationsEnabled(value = process.env.COMMUNITY_ACHIEVEMENT_NOTIFICATIONS_ENABLED) {
+    return String(value ?? 'true').trim().toLowerCase() !== 'false';
 }
 
 function parseJson(value) {
@@ -192,16 +197,18 @@ async function unlockAchievements(tx, guildId, userId, snapshot, rewardStore) {
                 sourceId: definition.id
             });
         }
-        await tx.query(
-            `INSERT IGNORE INTO community_discord_outbox
-                (guild_id, user_id, event_type, event_key, payload, status, attempts, next_attempt_at)
-             VALUES (?, ?, 'achievement_unlocked', ?, ?, 'pending', 0, ?)`,
-            [
-                String(guildId), String(userId), definition.id,
-                JSON.stringify({ achievementId: definition.id, title: definition.title, rewardCoins: definition.reward }),
-                now
-            ]
-        );
+        if (achievementNotificationsEnabled()) {
+            await tx.query(
+                `INSERT IGNORE INTO community_discord_outbox
+                    (guild_id, user_id, event_type, event_key, payload, status, attempts, next_attempt_at)
+                 VALUES (?, ?, 'achievement_unlocked', ?, ?, 'pending', 0, ?)`,
+                [
+                    String(guildId), String(userId), definition.id,
+                    JSON.stringify({ achievementId: definition.id, title: definition.title, rewardCoins: definition.reward }),
+                    now
+                ]
+            );
+        }
         unlocked.push(definition.id);
     }
     return unlocked;
@@ -368,6 +375,19 @@ async function dispatchDiscordOutbox(client, limit = 10) {
     if (!client || dispatching) return 0;
     dispatching = true;
     try {
+        const guildId = String(process.env.DISCORD_GUILD_ID || process.env.GUILD_ID || '').trim();
+        const runtimeEnabled = guildId
+            ? (await getCommunityAdminSettings(guildId)).achievementNotifications
+            : true;
+        if (!achievementNotificationsEnabled() || !runtimeEnabled) {
+            await db.query(
+                `UPDATE community_discord_outbox
+                 SET status = 'dead', last_error = 'notifications_disabled'
+                 WHERE status IN ('pending','processing')${guildId ? ' AND guild_id = ?' : ''}`,
+                guildId ? [guildId] : []
+            );
+            return 0;
+        }
         const batchLimit = Math.max(1, Math.min(50, nonNegativeInt(limit) || 10));
         await db.query(
             `UPDATE community_discord_outbox SET status = 'pending'
@@ -444,6 +464,7 @@ function stopDiscordOutboxDispatcher() {
 module.exports = {
     CHALLENGE_DEFINITIONS,
     ACHIEVEMENT_DEFINITIONS,
+    achievementNotificationsEnabled,
     weeklyPeriod,
     metricValue,
     seedDefinitions,

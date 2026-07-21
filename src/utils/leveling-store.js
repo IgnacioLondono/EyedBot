@@ -10,6 +10,9 @@ const FILE_WRITE_BLOCK_MS = Math.max(60_000, Number.parseInt(process.env.LEVELIN
 const FILE_WRITE_WARN_MS = Math.max(60_000, Number.parseInt(process.env.LEVELING_FILE_WARN_MS || '300000', 10) || 300_000);
 
 const cache = new Map();
+const mergedGuildCache = new Map();
+const mergedGuildLoads = new Map();
+const MERGED_GUILD_TTL_MS = 5000;
 let fileWriteBlockedUntil = 0;
 let lastFileWriteWarnAt = 0;
 
@@ -228,6 +231,7 @@ async function setUserState(guildId, userId, userState) {
     const normalized = normalizeUserState(userState);
     const dbOk = await persistToDatabase(`leveling_user_${guildId}_${userId}`, normalized);
     cacheSet(`leveling_user_${guildId}_${userId}`, normalized);
+    mergedGuildCache.delete(String(guildId));
 
     if (!dbOk) {
         mirrorUserToFile(guildId, userId, normalized);
@@ -285,7 +289,7 @@ function mergeLevelingRows(a, b) {
 }
 
 /** Usuarios con datos de nivelación en archivo local + MySQL (unión por userId). */
-async function listGuildUsersMerged(guildId) {
+async function loadGuildUsersMerged(guildId) {
     const gid = String(guildId);
     const map = new Map();
     const fromFile = listGuildUsers(gid);
@@ -316,6 +320,22 @@ async function listGuildUsersMerged(guildId) {
     }
 
     return Array.from(map.values());
+}
+
+async function listGuildUsersMerged(guildId) {
+    const gid = String(guildId);
+    const cached = mergedGuildCache.get(gid);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const activeLoad = mergedGuildLoads.get(gid);
+    if (activeLoad) return activeLoad;
+    const load = loadGuildUsersMerged(gid)
+        .then((value) => {
+            mergedGuildCache.set(gid, { value, expiresAt: Date.now() + MERGED_GUILD_TTL_MS });
+            return value;
+        })
+        .finally(() => mergedGuildLoads.delete(gid));
+    mergedGuildLoads.set(gid, load);
+    return load;
 }
 
 module.exports = {

@@ -58,6 +58,12 @@ const {
     createWrappedScheduler
 } = require('../src/utils/community-wrapped-service');
 const communityChallenges = require('../src/utils/community-challenges-achievements');
+const {
+    FEATURE_KEYS: COMMUNITY_FEATURE_KEYS,
+    isCommunityAdmin,
+    getCommunityAdminSettings,
+    updateCommunityAdminSettings
+} = require('../src/utils/community-admin-settings');
 const { createPlansService, PlansError } = require('../src/utils/community-plans-service');
 const { createPartyService, PartyError } = require('../src/utils/eyed-party-service');
 const { attachPartyWebSocket } = require('../src/utils/eyed-party-websocket');
@@ -2059,10 +2065,14 @@ function setBotClient(client) {
     if (client) scheduleAllStreamPushSync();
     if (client && !client.__communityAccessRevocationListener) {
         client.__communityAccessRevocationListener = true;
+        client.on('guildMemberAdd', (member) => {
+            invalidateCommunityMemberSnapshot(member.guild?.id);
+        });
         client.on('guildMemberRemove', (member) => {
             const guildId = String(member.guild?.id || '');
             const userId = String(member.id || '');
             if (!guildId || !userId) return;
+            invalidateCommunityMemberSnapshot(guildId);
             partyWebSocket?.disconnectUser(guildId, userId);
             const communityGuildId = String(process.env.DISCORD_GUILD_ID || process.env.GUILD_ID || '');
             if (!communityGuildId || guildId === communityGuildId) {
@@ -7922,6 +7932,41 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
 });
 
 const COMMUNITY_GUILD_ID = String(process.env.DISCORD_GUILD_ID || process.env.GUILD_ID || '').trim();
+const communityMemberSnapshots = new Map();
+const communityMemberSnapshotLoads = new Map();
+const COMMUNITY_MEMBER_SNAPSHOT_TTL_MS = 60_000;
+
+function invalidateCommunityMemberSnapshot(guildId) {
+    if (guildId) communityMemberSnapshots.delete(String(guildId));
+}
+
+async function communityHumanMembers(guild) {
+    const guildId = String(guild.id);
+    const cached = communityMemberSnapshots.get(guildId);
+    if (cached && cached.expiresAt > Date.now()) return cached.members;
+    const cachedMembers = Array.from(guild.members.cache.values()).filter((member) => !member.user?.bot);
+    if (cachedMembers.length) {
+        communityMemberSnapshots.set(guildId, {
+            members: cachedMembers,
+            expiresAt: Date.now() + COMMUNITY_MEMBER_SNAPSHOT_TTL_MS
+        });
+        return cachedMembers;
+    }
+    if (communityMemberSnapshotLoads.has(guildId)) return communityMemberSnapshotLoads.get(guildId);
+    const load = guild.members.fetch()
+        .then((members) => Array.from(members.values()).filter((member) => !member.user?.bot))
+        .then((members) => {
+            communityMemberSnapshots.set(guildId, {
+                members,
+                expiresAt: Date.now() + COMMUNITY_MEMBER_SNAPSHOT_TTL_MS
+            });
+            return members;
+        })
+        .finally(() => communityMemberSnapshotLoads.delete(guildId));
+    communityMemberSnapshotLoads.set(guildId, load);
+    return load;
+}
+
 const communityWrapped = createWrappedService({ memberView: communityMemberView });
 const communityWrappedScheduler = createWrappedScheduler({
     guildId: COMMUNITY_GUILD_ID,
@@ -8206,7 +8251,7 @@ function communityMemberView(member) {
 
 async function communityRanking(guildId) {
     const users = await levelingStore.listGuildUsersMerged(guildId);
-    return users.sort((a, b) => (
+    return [...users].sort((a, b) => (
         (Number(b.xp) || 0) - (Number(a.xp) || 0)
         || (Number(b.messageCount) || 0) - (Number(a.messageCount) || 0)
     ));
@@ -8218,6 +8263,69 @@ app.get('/api/community/membership/:userId', requireCommunityService, async (req
     const access = await requireCommunityMember(userId);
     if (access.error) return communityError(res, access.status, 'MEMBERSHIP_REQUIRED', access.error);
     return res.json({ member: true, user: communityMemberView(access.member) });
+});
+
+app.get('/api/community/settings', requireCommunityService, async (req, res) => {
+    try {
+        const settings = await getCommunityAdminSettings(req.communityIdentity.guild.id);
+        return res.json({
+            settings,
+            isAdmin: isCommunityAdmin(req.communityIdentity.userId),
+            requestId: res.locals.communityRequestId
+        });
+    } catch (error) {
+        console.error('Error cargando configuración comunitaria:', error);
+        return communityError(res, 500, 'SETTINGS_FAILED', 'No se pudo cargar la configuración');
+    }
+});
+
+app.patch('/api/community/admin/settings', requireCommunityService, async (req, res) => {
+    try {
+        if (!isCommunityAdmin(req.communityIdentity.userId)) {
+            return communityError(res, 403, 'ADMIN_REQUIRED', 'Se requiere acceso administrativo');
+        }
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const patch = {};
+        if (body.maintenance !== undefined) {
+            if (typeof body.maintenance !== 'boolean') {
+                return communityError(res, 400, 'INVALID_SETTINGS', 'maintenance debe ser booleano');
+            }
+            patch.maintenance = body.maintenance;
+        }
+        if (body.achievementNotifications !== undefined) {
+            if (typeof body.achievementNotifications !== 'boolean') {
+                return communityError(res, 400, 'INVALID_SETTINGS', 'achievementNotifications debe ser booleano');
+            }
+            patch.achievementNotifications = body.achievementNotifications;
+        }
+        if (body.features !== undefined) {
+            if (!body.features || typeof body.features !== 'object' || Array.isArray(body.features)) {
+                return communityError(res, 400, 'INVALID_SETTINGS', 'features debe ser un objeto');
+            }
+            patch.features = {};
+            for (const [key, value] of Object.entries(body.features)) {
+                if (!COMMUNITY_FEATURE_KEYS.includes(key) || typeof value !== 'boolean') {
+                    return communityError(res, 400, 'INVALID_SETTINGS', `Feature inválida: ${key}`);
+                }
+                patch.features[key] = value;
+            }
+        }
+        const settings = await updateCommunityAdminSettings(
+            req.communityIdentity.guild.id,
+            patch,
+            req.communityIdentity.userId
+        );
+        communityEventBus.appendAsync({
+            guildId: req.communityIdentity.guild.id,
+            type: 'community.settings_changed',
+            scope: 'guild_public',
+            payload: { features: settings.features, maintenance: settings.maintenance }
+        }, 'community.settings_changed');
+        return res.json({ settings, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        console.error('Error actualizando configuración comunitaria:', error);
+        return communityError(res, 500, 'SETTINGS_UPDATE_FAILED', 'No se pudo guardar la configuración');
+    }
 });
 
 app.get('/api/community/profile/:userId', requireCommunityService, async (req, res) => {
@@ -8443,8 +8551,7 @@ app.get('/api/community/ranking', requireCommunityService, async (req, res) => {
         }
 
         const guild = req.communityIdentity.guild;
-        const fetched = await guild.members.fetch().catch(() => guild.members.cache);
-        const humans = Array.from(fetched.values()).filter((member) => !member.user?.bot);
+        const humans = await communityHumanMembers(guild);
         const aggregate = await communityStatsStore.getPeriodRanking(guild.id, metric, period);
         const ranked = humans.map((member) => ({
             userId: member.user.id,
@@ -8763,9 +8870,7 @@ app.get('/api/community/wrapped/:userId/:year', requireCommunityService, async (
         }
         const target = await requireCommunityMember(userId);
         if (target.error) return communityError(res, target.status, 'MEMBER_NOT_FOUND', target.error);
-        const fetchedMembers = await target.guild.members.fetch();
-        const memberIds = Array.from(fetchedMembers.values())
-            .filter((member) => !member.user?.bot)
+        const memberIds = (await communityHumanMembers(target.guild))
             .map((member) => String(member.user.id));
         const payload = await communityWrapped.getOrGenerate({
             guildId: target.guild.id,
