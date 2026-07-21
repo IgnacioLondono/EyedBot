@@ -125,7 +125,7 @@ function createPlansService({
             statusClause = ` AND p.status IN (${statuses.map(() => '?').join(',')})`;
             params.push(...statuses);
         }
-        params.push(viewer.isManager ? 1 : 0, String(viewer.userId), String(viewer.userId), String(viewer.userId), limit);
+        params.push(viewer.isManager ? 1 : 0, String(viewer.userId), String(viewer.userId), String(viewer.userId));
         const rows = await db.query(
             `SELECT p.*, (mine.user_id IS NOT NULL) AS viewer_attending,
                     invitation.status AS invitation_status
@@ -138,7 +138,7 @@ function createPlansService({
                AND (p.visibility = 'guild' OR ? = 1 OR p.owner_id = ? OR mine.user_id = ?
                     OR (invitation.invitee_id = ? AND invitation.status IN ('pending','accepted')))
              ORDER BY p.starts_at ASC, p.plan_id ASC
-             LIMIT ?`,
+             LIMIT ${limit}`,
             params
         );
         return rows.map((row) => mapPlan(row, viewer));

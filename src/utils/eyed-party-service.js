@@ -164,11 +164,10 @@ function createPartyService({
         const params = [String(guildId)];
         const statusSql = status ? ' AND status = ?' : '';
         if (status) params.push(status);
-        params.push(limit);
         const rows = await db.query(
             `SELECT * FROM community_party_sessions
              WHERE guild_id = ?${statusSql}
-             ORDER BY created_at DESC LIMIT ?`,
+             ORDER BY created_at DESC LIMIT ${limit}`,
             params
         );
         return Promise.all(rows.map(async (row) => (

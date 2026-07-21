@@ -8328,9 +8328,11 @@ function communityPresence(member) {
     return { status, activity };
 }
 
-async function communityMemberSummary(member, stats = {}, rank = null) {
+async function communityMemberSummary(member, stats = {}, rank = null, fetchFullUser = false) {
     const presence = communityPresence(member);
-    const fullUser = await member.client.users.fetch(member.user.id, { force: true }).catch(() => member.user);
+    const fullUser = fetchFullUser
+        ? await member.client.users.fetch(member.user.id, { force: true }).catch(() => member.user)
+        : member.user;
     const accentNumber = Number(fullUser?.accentColor);
     const accentColor = Number.isInteger(accentNumber) && accentNumber >= 0
         ? `#${accentNumber.toString(16).padStart(6, '0')}`
@@ -8393,7 +8395,12 @@ app.get('/api/community/member/:memberId', requireCommunityService, async (req, 
         if (rankIndex >= 0 && rankIndex < 3) badges.push('Top 3');
         if (member.joinedTimestamp && Date.now() - member.joinedTimestamp >= 365 * 24 * 60 * 60 * 1000) badges.push('Veterano');
 
-        const summary = await communityMemberSummary(member, state, rankIndex >= 0 ? rankIndex + 1 : null);
+        const summary = await communityMemberSummary(
+            member,
+            state,
+            rankIndex >= 0 ? rankIndex + 1 : null,
+            true
+        );
         const { activity: _privateActivity, ...publicUser } = summary;
         return res.json({ user: publicUser, badges });
     } catch (error) {

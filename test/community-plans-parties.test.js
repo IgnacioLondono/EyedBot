@@ -35,6 +35,30 @@ test('planes valida cupo, fechas, visibilidad y permisos owner/manager', () => {
     assert.equal(canManagePlan({ owner_id: 'owner' }, { userId: 'other', isManager: false }), false);
 });
 
+test('listas usan límites enteros compatibles con MySQL 8.4', async () => {
+    const queries = [];
+    const db = {
+        async query(sql, params) {
+            queries.push({ sql, params });
+            return [];
+        }
+    };
+    await createPlansService({ db }).list(
+        'guild-1',
+        { userId: '100000000000000001', isManager: false },
+        { limit: 25 }
+    );
+    await createPartyService({ db }).list(
+        'guild-1',
+        '100000000000000001',
+        { limit: 15 }
+    );
+
+    assert.match(queries[0].sql, /LIMIT 25$/);
+    assert.match(queries[1].sql, /LIMIT 15$/);
+    assert.ok(queries.every(({ sql }) => !sql.includes('LIMIT ?')));
+});
+
 test('invitación privada exige manager y persiste un estado pendiente', async () => {
     const writes = [];
     const events = [];

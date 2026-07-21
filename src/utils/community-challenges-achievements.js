@@ -368,6 +368,7 @@ async function dispatchDiscordOutbox(client, limit = 10) {
     if (!client || dispatching) return 0;
     dispatching = true;
     try {
+        const batchLimit = Math.max(1, Math.min(50, nonNegativeInt(limit) || 10));
         await db.query(
             `UPDATE community_discord_outbox SET status = 'pending'
              WHERE status = 'processing' AND updated_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)`
@@ -376,8 +377,7 @@ async function dispatchDiscordOutbox(client, limit = 10) {
             `SELECT outbox_id, guild_id, user_id, payload, attempts
              FROM community_discord_outbox
              WHERE status = 'pending' AND next_attempt_at <= NOW(3)
-             ORDER BY outbox_id ASC LIMIT ?`,
-            [Math.max(1, Math.min(50, nonNegativeInt(limit) || 10))]
+             ORDER BY outbox_id ASC LIMIT ${batchLimit}`
         );
         let sent = 0;
         for (const row of rows) {

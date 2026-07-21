@@ -242,7 +242,7 @@ function createCommunityEventBus({
                         )
                     )
                )
-             ORDER BY event_id ASC LIMIT ?`,
+             ORDER BY event_id ASC LIMIT ${limit}`,
             [
                 String(viewer.guildId),
                 parsedId.toString(),
@@ -250,8 +250,7 @@ function createCommunityEventBus({
                 staffFlag,
                 viewerId,
                 viewerId,
-                viewerId,
-                limit
+                viewerId
             ]
         );
         const visible = [];

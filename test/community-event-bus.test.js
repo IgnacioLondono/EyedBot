@@ -77,8 +77,8 @@ test('replay filtra autorización antes del límite y mantiene defensa en profun
         999
     );
     assert.deepEqual(replay.map((event) => event.id), ['11', '13']);
-    assert.match(capturedSql, /scope = 'self'.*ORDER BY event_id ASC LIMIT \?/s);
-    assert.deepEqual(captured, ['guild-1', '10', 'viewer', 0, 'viewer', 'viewer', 'viewer', 2]);
+    assert.match(capturedSql, /scope = 'self'.*ORDER BY event_id ASC LIMIT 2/s);
+    assert.deepEqual(captured, ['guild-1', '10', 'viewer', 0, 'viewer', 'viewer', 'viewer']);
     await assert.rejects(() => bus.replay({ guildId: 'guild-1' }, '-1'), /Last-Event-ID/);
 });
 
