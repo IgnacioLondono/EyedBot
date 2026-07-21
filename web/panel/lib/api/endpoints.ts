@@ -403,6 +403,21 @@ export const getGachaLeaderboard = (guildId: string) =>
 export const getGachaShop = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/gacha-shop`);
 
+export const getCommunityShopProducts = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/community-shop-products`);
+
+export const createCommunityShopProduct = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/community-shop-products`, { method: "POST", body });
+
+export const updateCommunityShopProduct = (guildId: string, productId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/community-shop-products/${encodeURIComponent(productId)}`, { method: "PATCH", body });
+
+export const archiveCommunityShopProduct = (guildId: string, productId: string, expectedVersion: number) =>
+  apiFetch(`/api/guild/${g(guildId)}/community-shop-products/${encodeURIComponent(productId)}`, {
+    method: "DELETE",
+    body: { expectedVersion },
+  });
+
 export const getGachaMarket = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/gacha-market`);
 

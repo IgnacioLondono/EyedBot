@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Switch } from "@/components/ui/Switch";
 import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { Field, Input, Select, Textarea } from "@/components/features/shared";
+import { CommunityShopProductsPanel } from "@/components/features/server/panes/CommunityShopProductsPanel";
 import { asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
 
 type ShopItem = Record<string, unknown>;
@@ -180,16 +181,24 @@ export function GachaShopPanel({
 
   if (!items.length) {
     return (
-      <EmptyState
-        icon={<ShoppingBag className="h-6 w-6" />}
-        title="Tienda vacía"
-        description="No hay artículos cargados en la tienda del servidor."
-      />
+      <div className="space-y-5">
+        <CommunityShopProductsPanel guildId={guildId} characters={[]} premiumLocked={premiumLocked} />
+        <EmptyState
+          icon={<ShoppingBag className="h-6 w-6" />}
+          title="Catálogo gacha vacío"
+          description="No hay personajes cargados en el catálogo clásico."
+        />
+      </div>
     );
   }
 
   return (
     <div className="space-y-5">
+      <CommunityShopProductsPanel guildId={guildId} characters={items} premiumLocked={premiumLocked} />
+
+      <div className="border-t border-white/10 pt-5">
+        <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Catálogo gacha clásico</p>
+      </div>
       <Field label="Buscar en catálogo">
         <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, serie o ID" />
       </Field>

@@ -21,4 +21,5 @@ test('normaliza módulos y conserva defaults seguros', () => {
     assert.equal(settings.achievementNotifications, false);
     assert.equal(settings.features.party, false);
     assert.equal(settings.features.wrapped, true);
+    assert.equal(settings.features.shop, true);
 });

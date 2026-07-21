@@ -66,6 +66,7 @@ const {
 } = require('../src/utils/community-admin-settings');
 const { createPlansService, PlansError } = require('../src/utils/community-plans-service');
 const { createPartyService, PartyError } = require('../src/utils/eyed-party-service');
+const { createCommunityShopService, CommunityShopError } = require('../src/utils/community-shop-service');
 const { attachPartyWebSocket } = require('../src/utils/eyed-party-websocket');
 const {
     communityEventBus,
@@ -78,6 +79,7 @@ const {
 } = require('../src/utils/community-event-bus');
 const communityPlans = createPlansService();
 const eyedParty = createPartyService();
+const communityShop = createCommunityShopService();
 let partyWebSocket = null;
 const {
     safeSecretEqual,
@@ -5599,6 +5601,115 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, requirePremium, async (re
     }
 });
 
+function requireGuildShopManager(req, res) {
+    const userGuild = req.session.guilds?.find((guild) => guild.id === req.params.guildId);
+    if (!userGuild) {
+        res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        return null;
+    }
+    if (!hasAdminOrManageGuildPermission(userGuild)) {
+        res.status(403).json({ error: 'Necesitas permisos de gestión en este servidor' });
+        return null;
+    }
+    return userGuild;
+}
+
+function validateManagedShopRole(guildId, body = {}) {
+    if (String(body.type || '') !== 'role' && body.roleId === undefined) return;
+    const roleId = String(body.roleId || '').trim();
+    const guild = botClient?.guilds.cache.get(String(guildId));
+    const role = guild?.roles.cache.get(roleId);
+    if (!role) throw new CommunityShopError('INVALID_ROLE', 'El rol no existe en el servidor');
+    if (!role.editable) throw new CommunityShopError('ROLE_NOT_MANAGEABLE', 'EyedBot no puede administrar ese rol');
+}
+
+app.get('/api/guild/:guildId/community-shop-products', requireAuth, requirePremium, async (req, res) => {
+    try {
+        if (!requireGuildShopManager(req, res)) return;
+        const products = await communityShop.listAdmin(req.params.guildId);
+        return res.json({ success: true, products });
+    } catch (error) {
+        console.error('Error obteniendo productos comunitarios:', error);
+        return res.status(500).json({ error: 'No se pudieron cargar los productos' });
+    }
+});
+
+app.post('/api/guild/:guildId/community-shop-products', requireAuth, requirePremium, async (req, res) => {
+    try {
+        if (!requireGuildShopManager(req, res)) return;
+        validateManagedShopRole(req.params.guildId, req.body);
+        const product = await communityShop.create(
+            req.params.guildId,
+            req.body,
+            req.session.user?.id || 'web'
+        );
+        communityEventBus.appendAsync({
+            guildId: req.params.guildId,
+            type: 'shop.products_changed',
+            scope: 'guild_public',
+            payload: { productId: product.id }
+        }, 'shop.products_changed');
+        return res.status(201).json({ success: true, product });
+    } catch (error) {
+        if (error instanceof CommunityShopError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('Error creando producto comunitario:', error);
+        return res.status(500).json({ error: 'No se pudo crear el producto' });
+    }
+});
+
+app.patch('/api/guild/:guildId/community-shop-products/:productId', requireAuth, requirePremium, async (req, res) => {
+    try {
+        if (!requireGuildShopManager(req, res)) return;
+        validateManagedShopRole(req.params.guildId, req.body);
+        const product = await communityShop.update(
+            req.params.guildId,
+            req.params.productId,
+            req.body,
+            req.session.user?.id || 'web'
+        );
+        communityEventBus.appendAsync({
+            guildId: req.params.guildId,
+            type: 'shop.products_changed',
+            scope: 'guild_public',
+            payload: { productId: product.id }
+        }, 'shop.products_changed');
+        return res.json({ success: true, product });
+    } catch (error) {
+        if (error instanceof CommunityShopError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('Error actualizando producto comunitario:', error);
+        return res.status(500).json({ error: 'No se pudo actualizar el producto' });
+    }
+});
+
+app.delete('/api/guild/:guildId/community-shop-products/:productId', requireAuth, requirePremium, async (req, res) => {
+    try {
+        if (!requireGuildShopManager(req, res)) return;
+        const result = await communityShop.archive(
+            req.params.guildId,
+            req.params.productId,
+            req.body?.expectedVersion,
+            req.session.user?.id || 'web'
+        );
+        communityEventBus.appendAsync({
+            guildId: req.params.guildId,
+            type: 'shop.products_changed',
+            scope: 'guild_public',
+            payload: { productId: req.params.productId }
+        }, 'shop.products_changed');
+        return res.json({ success: true, ...result });
+    } catch (error) {
+        if (error instanceof CommunityShopError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('Error archivando producto comunitario:', error);
+        return res.status(500).json({ error: 'No se pudo archivar el producto' });
+    }
+});
+
 app.post('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, requirePremium, async (req, res) => {
     try {
         const { guildId, characterId } = req.params;
@@ -8328,6 +8439,93 @@ app.patch('/api/community/admin/settings', requireCommunityService, async (req, 
     }
 });
 
+async function requireCommunityShopEnabled(req, res) {
+    const guildId = req.communityIdentity.guild.id;
+    const [settings, config] = await Promise.all([
+        getCommunityAdminSettings(guildId),
+        gachaStore.getConfig(guildId)
+    ]);
+    if (settings.features.shop === false) {
+        communityError(res, 404, 'FEATURE_DISABLED', 'La tienda está desactivada');
+        return false;
+    }
+    if (!config.economyEnabled || !config.shopEnabled) {
+        communityError(res, 503, 'SHOP_DISABLED', 'La economía o la tienda están desactivadas en EyedBot');
+        return false;
+    }
+    return true;
+}
+
+app.get('/api/community/shop', requireCommunityService, async (req, res) => {
+    try {
+        if (!await requireCommunityShopEnabled(req, res)) return;
+        const catalog = await communityShop.list(
+            req.communityIdentity.guild.id,
+            req.communityIdentity.userId
+        );
+        return res.json({ ...catalog, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        if (error instanceof CommunityShopError) {
+            return communityError(res, error.status, error.code, error.message);
+        }
+        console.error('Error cargando tienda comunitaria:', error);
+        return communityError(res, 500, 'SHOP_LIST_FAILED', 'No se pudo cargar la tienda');
+    }
+});
+
+app.post('/api/community/shop/purchases', requireCommunityService, async (req, res) => {
+    try {
+        if (!await requireCommunityShopEnabled(req, res)) return;
+        const guild = req.communityIdentity.guild;
+        const member = req.communityIdentity.member;
+        let selectedRole = null;
+        const result = await communityShop.purchase(
+            guild.id,
+            req.communityIdentity.userId,
+            req.body || {},
+            {
+                validate: async (roleId) => {
+                    selectedRole = guild.roles.cache.get(roleId)
+                        || await guild.roles.fetch(roleId).catch(() => null);
+                    if (!selectedRole) {
+                        throw new CommunityShopError('ROLE_NOT_FOUND', 'El rol ya no existe', 410);
+                    }
+                    if (!selectedRole.editable) {
+                        throw new CommunityShopError('ROLE_NOT_MANAGEABLE', 'EyedBot no puede entregar este rol', 409);
+                    }
+                    return { alreadyOwned: member.roles.cache.has(selectedRole.id) };
+                },
+                apply: async (roleId) => {
+                    const role = selectedRole || guild.roles.cache.get(roleId);
+                    if (!role) throw new Error('role_not_found');
+                    if (!member.roles.cache.has(role.id)) {
+                        await member.roles.add(role, 'Compra en la tienda de EyedComun');
+                    }
+                }
+            }
+        );
+        communityEventBus.appendAsync({
+            guildId: guild.id,
+            userId: req.communityIdentity.userId,
+            type: 'shop.purchase_completed',
+            scope: 'user_private',
+            payload: {
+                purchaseId: result.purchaseId,
+                productId: result.productId,
+                quantity: result.quantity,
+                balance: result.balance
+            }
+        }, 'shop.purchase_completed');
+        return res.json({ ...result, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        if (error instanceof CommunityShopError) {
+            return communityError(res, error.status, error.code, error.message);
+        }
+        console.error('Error procesando compra comunitaria:', error);
+        return communityError(res, 500, 'SHOP_PURCHASE_FAILED', 'No se pudo completar la compra');
+    }
+});
+
 app.get('/api/community/profile/:userId', requireCommunityService, async (req, res) => {
     try {
         const userId = requireSignedTarget(req, res, req.params.userId);
@@ -8335,16 +8533,21 @@ app.get('/api/community/profile/:userId', requireCommunityService, async (req, r
         const access = await requireCommunityMember(userId);
         if (access.error) return communityError(res, access.status, 'MEMBERSHIP_REQUIRED', access.error);
 
-        const [state, gacha, ranking, activity] = await Promise.all([
+        const [state, gacha, ranking, activity, appearance] = await Promise.all([
             levelingStore.getUserState(access.guild.id, userId),
             gachaStore.getProfile(access.guild.id, userId),
             communityRanking(access.guild.id),
-            communityStatsStore.getUserDailyStats(access.guild.id, userId, 180)
+            communityStatsStore.getUserDailyStats(access.guild.id, userId, 180),
+            communityMemberSummary(access.member, {}, null)
         ]);
         const rankIndex = ranking.findIndex((row) => row.userId === userId);
 
         return res.json({
-            user: communityMemberView(access.member),
+            user: {
+                ...communityMemberView(access.member),
+                bannerUrl: appearance.bannerUrl,
+                accentColor: appearance.accentColor
+            },
             stats: {
                 xp: Number(state.xp) || 0,
                 level: Number(state.level) || 0,
@@ -8436,20 +8639,66 @@ function communityPresence(member) {
     return { status, activity };
 }
 
-async function communityMemberSummary(member, stats = {}, rank = null, fetchFullUser = false) {
+const communityUserProfileCache = new Map();
+const communityUserProfileLoads = new Map();
+const COMMUNITY_USER_PROFILE_TTL_MS = 15 * 60 * 1000;
+
+function invalidateCommunityUserProfile(userId) {
+    if (userId) communityUserProfileCache.delete(String(userId));
+}
+
+async function resolveCommunityUserProfile(client, userId) {
+    const id = String(userId || '');
+    if (!id) return null;
+    const cached = communityUserProfileCache.get(id);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    if (communityUserProfileLoads.has(id)) return communityUserProfileLoads.get(id);
+
+    const load = Promise.resolve()
+        .then(async () => {
+            const user = await client.users.fetch(id, { force: true }).catch(() => client.users.cache.get(id) || null);
+            const accentNumber = Number(user?.accentColor);
+            const value = {
+                avatarUrl: user?.displayAvatarURL?.({ size: 256, dynamic: true }) || null,
+                bannerUrl: user?.bannerURL?.({ size: 1024, dynamic: true }) || null,
+                accentColor: Number.isInteger(accentNumber) && accentNumber >= 0
+                    ? `#${accentNumber.toString(16).padStart(6, '0')}`
+                    : null
+            };
+            communityUserProfileCache.set(id, {
+                value,
+                expiresAt: Date.now() + COMMUNITY_USER_PROFILE_TTL_MS
+            });
+            return value;
+        })
+        .finally(() => communityUserProfileLoads.delete(id));
+
+    communityUserProfileLoads.set(id, load);
+    return load;
+}
+
+async function mapWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let next = 0;
+    const runners = Array.from({ length: Math.max(1, Math.min(limit, items.length || 1)) }, async () => {
+        while (next < items.length) {
+            const index = next;
+            next += 1;
+            results[index] = await worker(items[index], index);
+        }
+    });
+    await Promise.all(runners);
+    return results;
+}
+
+async function communityMemberSummary(member, stats = {}, rank = null) {
     const presence = communityPresence(member);
-    const fullUser = fetchFullUser
-        ? await member.client.users.fetch(member.user.id, { force: true }).catch(() => member.user)
-        : member.user;
-    const accentNumber = Number(fullUser?.accentColor);
-    const accentColor = Number.isInteger(accentNumber) && accentNumber >= 0
-        ? `#${accentNumber.toString(16).padStart(6, '0')}`
-        : null;
+    const profile = await resolveCommunityUserProfile(member.client, member.user.id);
     return {
         ...communityMemberView(member),
-        avatarUrl: fullUser?.displayAvatarURL?.({ size: 256 }) || member.displayAvatarURL?.({ size: 256 }) || null,
-        bannerUrl: fullUser?.bannerURL?.({ size: 1024 }) || null,
-        accentColor,
+        avatarUrl: profile?.avatarUrl || member.displayAvatarURL?.({ size: 256 }) || null,
+        bannerUrl: profile?.bannerUrl || null,
+        accentColor: profile?.accentColor || null,
         ...presence,
         level: Number(stats.level) || 0,
         xp: Number(stats.xp) || 0,
@@ -8467,11 +8716,11 @@ app.get('/api/community/members', requireCommunityService, async (req, res) => {
         const access = req.communityIdentity;
 
         const ranking = await communityRanking(access.guild.id);
-        const members = await Promise.all(ranking.slice(0, 60).map(async (row, index) => {
+        const members = await mapWithConcurrency(ranking.slice(0, 60), 6, async (row, index) => {
             const member = access.guild.members.cache.get(row.userId)
                 || await access.guild.members.fetch(row.userId).catch(() => null);
             return member ? await communityMemberSummary(member, row, index + 1) : null;
-        }));
+        });
         return res.json({ members: members.filter(Boolean) });
     } catch (error) {
         console.error('Error cargando lobby comunitario:', error);
@@ -8506,8 +8755,7 @@ app.get('/api/community/member/:memberId', requireCommunityService, async (req, 
         const summary = await communityMemberSummary(
             member,
             state,
-            rankIndex >= 0 ? rankIndex + 1 : null,
-            true
+            rankIndex >= 0 ? rankIndex + 1 : null
         );
         const { activity: _privateActivity, ...publicUser } = summary;
         return res.json({ user: publicUser, badges });

@@ -11,7 +11,8 @@ const FEATURE_KEYS = Object.freeze([
     'circle',
     'plans',
     'party',
-    'challenges'
+    'challenges',
+    'shop'
 ]);
 const CACHE_TTL_MS = 15_000;
 const cache = new Map();
