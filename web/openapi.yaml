@@ -1184,6 +1184,8 @@ paths:
         El rank usa exclusivamente XP diario del año solicitado, conserva a los usuarios
         con datos de ese año e incluye miembros humanos actuales sin actividad, con desempate
         estable por userId. Un año pasado sin snapshot se finaliza de forma idempotente al solicitarlo.
+        `stats` conserva la atribución anual estricta; `lifetime` expone aparte los acumulados
+        históricos conocidos de mensajes, voz, XP y nivel porque el legado no guardaba sus fechas.
       parameters:
         - { $ref: '#/components/parameters/CommunityUserId' }
         - { $ref: '#/components/parameters/CommunityTimestamp' }

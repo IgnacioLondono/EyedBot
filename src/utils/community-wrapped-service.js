@@ -1,6 +1,7 @@
 const defaultStore = require('./community-stats-store');
+const defaultLevelingStore = require('./leveling-store');
 
-const WRAPPED_SCHEMA_VERSION = 3;
+const WRAPPED_SCHEMA_VERSION = 4;
 const DEFAULT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_BATCH_SIZE = 25;
 
@@ -68,6 +69,7 @@ function isCurrentSnapshot(payload) {
 
 function createWrappedService(options = {}) {
     const store = options.store || defaultStore;
+    const levelingStore = options.levelingStore || defaultLevelingStore;
     const now = options.now || (() => new Date());
     const memberView = options.memberView || ((member) => ({
         id: member.user.id,
@@ -78,9 +80,10 @@ function createWrappedService(options = {}) {
     }));
 
     async function generate({ guildId, userId, year, member, memberIds, finalized, xpValues }) {
-        const [period, annualXp] = await Promise.all([
+        const [period, annualXp, lifetime] = await Promise.all([
             store.getUserYearStats(guildId, userId, year),
-            xpValues ? Promise.resolve(xpValues) : store.getYearXpValues(guildId, year)
+            xpValues ? Promise.resolve(xpValues) : store.getYearXpValues(guildId, year),
+            levelingStore.getUserState(guildId, userId)
         ]);
         const rank = rankYearXp(memberIds, annualXp, userId);
         if (rank === null) throw new Error('El usuario no está incluido entre los miembros humanos');
@@ -112,6 +115,13 @@ function createWrappedService(options = {}) {
                 favoriteDay: period.favoriteDay,
                 monthly: period.monthly,
                 rank
+            },
+            lifetime: {
+                messages: Math.max(0, Number.parseInt(lifetime?.messageCount || 0, 10) || 0),
+                voiceMinutes: Math.max(0, Number.parseInt(lifetime?.voiceMinutes || 0, 10) || 0),
+                xp: Math.max(0, Number.parseInt(lifetime?.xp || 0, 10) || 0),
+                level: Math.max(0, Number.parseInt(lifetime?.level || 0, 10) || 0),
+                updatedAt: lifetime?.updatedAt || null
             },
             highlights
         };

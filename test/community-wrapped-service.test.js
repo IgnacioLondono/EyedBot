@@ -51,6 +51,17 @@ test('genera Wrapped reutilizable con metadatos estrictos y rank anual', async (
     };
     const service = createWrappedService({
         store,
+        levelingStore: {
+            async getUserState() {
+                return {
+                    messageCount: 900,
+                    voiceMinutes: 1200,
+                    xp: 4500,
+                    level: 12,
+                    updatedAt: '2026-01-01T00:00:00.000Z'
+                };
+            }
+        },
         now: () => new Date('2026-01-02T03:04:05.000Z'),
         memberView: (member) => ({ id: member.user.id })
     });
@@ -69,6 +80,13 @@ test('genera Wrapped reutilizable con metadatos estrictos y rank anual', async (
     assert.equal(payload.generatedAt, '2026-01-02T03:04:05.000Z');
     assert.equal(payload.finalized, true);
     assert.equal(payload.schemaVersion, WRAPPED_SCHEMA_VERSION);
+    assert.deepEqual(payload.lifetime, {
+        messages: 900,
+        voiceMinutes: 1200,
+        xp: 4500,
+        level: 12,
+        updatedAt: '2026-01-01T00:00:00.000Z'
+    });
 });
 
 test('scheduler solo decide años cerrados desde tracking y limita el batch', () => {
