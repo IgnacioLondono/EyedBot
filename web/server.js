@@ -52,6 +52,8 @@ const {
 } = require('../src/utils/ticket-defaults');
 const levelingStore = require('../src/utils/leveling-store');
 const guildActivityStore = require('../src/utils/guild-activity-store');
+const communityStatsStore = require('../src/utils/community-stats-store');
+const { safeSecretEqual, bearerToken, communityUserId } = require('../src/utils/community-access');
 const tempVoiceStore = require('../src/utils/temp-voice-store');
 const antiRaidStore = require('../src/utils/anti-raid-config-store');
 const streamAlertStore = require('../src/utils/stream-alert-store');
@@ -7865,6 +7867,301 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error desbaneando usuario:', error);
         res.status(500).json({ error: 'Error al desbanear usuario' });
+    }
+});
+
+const COMMUNITY_GUILD_ID = String(process.env.GUILD_ID || '').trim();
+
+function requireCommunityService(req, res, next) {
+    const expected = String(process.env.COMMUNITY_API_KEY || process.env.EYEDBOT_API_KEY || '').trim();
+    if (!expected) {
+        return res.status(503).json({ error: 'API comunitaria no configurada' });
+    }
+    const provided = bearerToken(req.headers.authorization);
+    if (!safeSecretEqual(provided, expected)) {
+        return res.status(401).json({ error: 'Credenciales de servicio inválidas' });
+    }
+    return next();
+}
+
+async function requireCommunityMember(userId) {
+    if (!botClient || !COMMUNITY_GUILD_ID) return { error: 'Bot comunitario no disponible', status: 503 };
+    const guild = botClient.guilds.cache.get(COMMUNITY_GUILD_ID);
+    if (!guild) return { error: 'Servidor comunitario no disponible', status: 503 };
+    const member = guild.members.cache.get(userId)
+        || await guild.members.fetch(userId).catch(() => null);
+    if (!member || member.user?.bot) return { error: 'Debes pertenecer a EyedComun', status: 403 };
+    return { guild, member };
+}
+
+function communityMemberView(member) {
+    return {
+        id: member.user.id,
+        username: member.user.username,
+        displayName: member.displayName || member.user.globalName || member.user.username,
+        avatarUrl: member.displayAvatarURL?.({ size: 256 }) || null,
+        joinedAt: member.joinedAt?.toISOString?.() || null
+    };
+}
+
+async function communityRanking(guildId) {
+    const users = await levelingStore.listGuildUsersMerged(guildId);
+    return users.sort((a, b) => (
+        (Number(b.xp) || 0) - (Number(a.xp) || 0)
+        || (Number(b.messageCount) || 0) - (Number(a.messageCount) || 0)
+    ));
+}
+
+app.get('/api/community/membership/:userId', requireCommunityService, async (req, res) => {
+    const userId = communityUserId(req.params.userId);
+    if (!userId) return res.status(400).json({ error: 'Usuario inválido' });
+    const access = await requireCommunityMember(userId);
+    if (access.error) return res.status(access.status).json({ error: access.error });
+    return res.json({ member: true, user: communityMemberView(access.member) });
+});
+
+app.get('/api/community/profile/:userId', requireCommunityService, async (req, res) => {
+    try {
+        const userId = communityUserId(req.params.userId);
+        if (!userId) return res.status(400).json({ error: 'Usuario inválido' });
+        const access = await requireCommunityMember(userId);
+        if (access.error) return res.status(access.status).json({ error: access.error });
+
+        const [state, gacha, ranking, activity] = await Promise.all([
+            levelingStore.getUserState(access.guild.id, userId),
+            gachaStore.getProfile(access.guild.id, userId),
+            communityRanking(access.guild.id),
+            communityStatsStore.getUserDailyStats(access.guild.id, userId, 180)
+        ]);
+        const rankIndex = ranking.findIndex((row) => row.userId === userId);
+
+        return res.json({
+            user: communityMemberView(access.member),
+            stats: {
+                xp: Number(state.xp) || 0,
+                level: Number(state.level) || 0,
+                messages: Number(state.messageCount) || 0,
+                voiceMinutes: Number(state.voiceMinutes) || 0,
+                rank: rankIndex >= 0 ? rankIndex + 1 : null,
+                memberCount: access.guild.memberCount
+            },
+            gacha: {
+                coins: Number(gacha.coins) || 0,
+                collectionSize: Number(gacha.collectionCount) || 0,
+                pulls: Number(gacha.totalRolls) || 0,
+                bestRarity: gacha.bestRarity || null
+            },
+            activity
+        });
+    } catch (error) {
+        console.error('Error en perfil comunitario:', error);
+        return res.status(500).json({ error: 'No se pudo cargar el perfil comunitario' });
+    }
+});
+
+app.get('/api/community/server', requireCommunityService, async (req, res) => {
+    try {
+        const userId = communityUserId(req.query.userId);
+        if (!userId) return res.status(400).json({ error: 'Usuario inválido' });
+        const access = await requireCommunityMember(userId);
+        if (access.error) return res.status(access.status).json({ error: access.error });
+
+        const [activity, ranking] = await Promise.all([
+            guildActivityStore.getGuildActivity(access.guild.id),
+            communityRanking(access.guild.id)
+        ]);
+        const leaders = await Promise.all(ranking.slice(0, 10).map(async (row) => {
+            const member = access.guild.members.cache.get(row.userId)
+                || await access.guild.members.fetch(row.userId).catch(() => null);
+            return {
+                userId: row.userId,
+                displayName: member?.displayName || member?.user?.username || 'Miembro',
+                avatarUrl: member?.displayAvatarURL?.({ size: 128 }) || null,
+                xp: Number(row.xp) || 0,
+                level: Number(row.level) || 0,
+                messages: Number(row.messageCount) || 0,
+                voiceMinutes: Number(row.voiceMinutes) || 0
+            };
+        }));
+        const daily = Object.entries(activity.daily || {})
+            .sort(([left], [right]) => left.localeCompare(right))
+            .slice(-90)
+            .map(([date, value]) => ({
+                date,
+                messages: Number(value.messages) || 0,
+                voiceMinutes: Number(value.voiceMinutes) || 0,
+                joins: Number(value.joins) || 0,
+                leaves: Number(value.leaves) || 0
+            }));
+        const onlineCount = access.guild.members.cache.filter((member) => (
+            !member.user.bot && member.presence?.status && member.presence.status !== 'offline'
+        )).size;
+
+        return res.json({
+            guild: {
+                id: access.guild.id,
+                name: access.guild.name,
+                iconUrl: access.guild.iconURL?.({ size: 256 }) || null,
+                memberCount: access.guild.memberCount,
+                onlineCount
+            },
+            totals: {
+                messages: Number(activity.totals?.messages) || 0,
+                voiceMinutes: Number(activity.totals?.voiceMinutes) || 0,
+                joins: Number(activity.totals?.joins) || 0,
+                leaves: Number(activity.totals?.leaves) || 0
+            },
+            trackingStartedAt: activity.trackingStartedAt,
+            daily,
+            leaderboard: leaders
+        });
+    } catch (error) {
+        console.error('Error en estadísticas comunitarias:', error);
+        return res.status(500).json({ error: 'No se pudieron cargar las estadísticas del servidor' });
+    }
+});
+
+function communityPresence(member) {
+    const rawStatus = String(member?.presence?.status || 'offline');
+    const status = ['online', 'idle', 'dnd'].includes(rawStatus) ? rawStatus : 'offline';
+    const activity = member?.presence?.activities?.find((entry) => entry?.name && entry.type !== 4)?.name || null;
+    return { status, activity };
+}
+
+async function communityMemberSummary(member, stats = {}, rank = null) {
+    const presence = communityPresence(member);
+    const fullUser = await member.client.users.fetch(member.user.id, { force: true }).catch(() => member.user);
+    const accentNumber = Number(fullUser?.accentColor);
+    const accentColor = Number.isInteger(accentNumber) && accentNumber >= 0
+        ? `#${accentNumber.toString(16).padStart(6, '0')}`
+        : null;
+    return {
+        ...communityMemberView(member),
+        avatarUrl: fullUser?.displayAvatarURL?.({ size: 256 }) || member.displayAvatarURL?.({ size: 256 }) || null,
+        bannerUrl: fullUser?.bannerURL?.({ size: 1024 }) || null,
+        accentColor,
+        ...presence,
+        level: Number(stats.level) || 0,
+        xp: Number(stats.xp) || 0,
+        rank,
+        messages: Number(stats.messageCount) || 0,
+        voiceMinutes: Number(stats.voiceMinutes) || 0
+    };
+}
+
+app.get('/api/community/members', requireCommunityService, async (req, res) => {
+    try {
+        const viewerId = communityUserId(req.query.userId);
+        if (!viewerId) return res.status(400).json({ error: 'Usuario inválido' });
+        const access = await requireCommunityMember(viewerId);
+        if (access.error) return res.status(access.status).json({ error: access.error });
+
+        const ranking = await communityRanking(access.guild.id);
+        const members = await Promise.all(ranking.slice(0, 60).map(async (row, index) => {
+            const member = access.guild.members.cache.get(row.userId)
+                || await access.guild.members.fetch(row.userId).catch(() => null);
+            return member ? await communityMemberSummary(member, row, index + 1) : null;
+        }));
+        return res.json({ members: members.filter(Boolean) });
+    } catch (error) {
+        console.error('Error cargando lobby comunitario:', error);
+        return res.status(500).json({ error: 'No se pudo cargar el lobby' });
+    }
+});
+
+app.get('/api/community/member/:memberId', requireCommunityService, async (req, res) => {
+    try {
+        const viewerId = communityUserId(req.query.userId);
+        const memberId = communityUserId(req.params.memberId);
+        if (!viewerId || !memberId) return res.status(400).json({ error: 'Usuario inválido' });
+        const access = await requireCommunityMember(viewerId);
+        if (access.error) return res.status(access.status).json({ error: access.error });
+
+        const member = access.guild.members.cache.get(memberId)
+            || await access.guild.members.fetch(memberId).catch(() => null);
+        if (!member || member.user?.bot) return res.status(404).json({ error: 'Miembro no encontrado' });
+
+        const [state, gacha, ranking] = await Promise.all([
+            levelingStore.getUserState(access.guild.id, memberId),
+            gachaStore.getProfile(access.guild.id, memberId),
+            communityRanking(access.guild.id)
+        ]);
+        const rankIndex = ranking.findIndex((row) => row.userId === memberId);
+        const badges = [];
+        if ((Number(state.messageCount) || 0) >= 10_000) badges.push('Conversador');
+        if ((Number(state.voiceMinutes) || 0) >= 6_000) badges.push('Nunca cuelga');
+        if (rankIndex >= 0 && rankIndex < 3) badges.push('Top 3');
+        if (member.joinedTimestamp && Date.now() - member.joinedTimestamp >= 365 * 24 * 60 * 60 * 1000) badges.push('Veterano');
+
+        return res.json({
+            user: await communityMemberSummary(member, state, rankIndex >= 0 ? rankIndex + 1 : null),
+            gacha: {
+                coins: Number(gacha.coins) || 0,
+                collectionSize: Number(gacha.collectionCount) || 0,
+                pulls: Number(gacha.totalRolls) || 0,
+                bestRarity: gacha.bestRarity || null
+            },
+            badges,
+            mutualCircles: []
+        });
+    } catch (error) {
+        console.error('Error cargando perfil comunitario público:', error);
+        return res.status(500).json({ error: 'No se pudo cargar el perfil' });
+    }
+});
+
+app.get('/api/community/wrapped/:userId/:year', requireCommunityService, async (req, res) => {
+    try {
+        const userId = communityUserId(req.params.userId);
+        const year = Number.parseInt(req.params.year, 10);
+        const currentYear = new Date().getUTCFullYear();
+        if (!userId || !Number.isInteger(year) || year < 2020 || year > currentYear) {
+            return res.status(400).json({ error: 'Usuario o año inválido' });
+        }
+        const access = await requireCommunityMember(userId);
+        if (access.error) return res.status(access.status).json({ error: access.error });
+
+        if (year < currentYear) {
+            const existing = await communityStatsStore.getWrappedSnapshot(access.guild.id, userId, year);
+            if (existing) return res.json(existing);
+        }
+
+        const [period, state, ranking, activity] = await Promise.all([
+            communityStatsStore.getUserYearStats(access.guild.id, userId, year),
+            levelingStore.getUserState(access.guild.id, userId),
+            communityRanking(access.guild.id),
+            guildActivityStore.getGuildActivity(access.guild.id)
+        ]);
+        const rankIndex = ranking.findIndex((row) => row.userId === userId);
+        const hasDailyData = Boolean(period.availableFrom);
+        const messages = hasDailyData ? period.messages : Number(state.messageCount) || 0;
+        const voiceMinutes = hasDailyData ? period.voiceMinutes : Number(state.voiceMinutes) || 0;
+        const highlights = [];
+        if (messages > 0) highlights.push(`Escribiste ${messages.toLocaleString('es')} mensajes en la comunidad.`);
+        if (voiceMinutes > 0) highlights.push(`Compartiste ${Math.round(voiceMinutes / 60)} horas en canales de voz.`);
+        if (rankIndex >= 0 && rankIndex < 10) highlights.push(`Terminaste entre los 10 miembros con más experiencia.`);
+
+        const payload = {
+            year,
+            availableFrom: period.availableFrom || activity.trackingStartedAt || null,
+            isCompletePeriod: hasDailyData && period.isCompletePeriod,
+            user: communityMemberView(access.member),
+            stats: {
+                messages,
+                voiceMinutes,
+                xpEarned: hasDailyData ? period.xpEarned : Number(state.xp) || 0,
+                activeDays: hasDailyData ? period.activeDays : 0,
+                favoriteDay: period.favoriteDay,
+                monthly: hasDailyData ? period.monthly : [],
+                rank: rankIndex >= 0 ? rankIndex + 1 : null
+            },
+            highlights
+        };
+        await communityStatsStore.saveWrappedSnapshot(access.guild.id, userId, year, payload);
+        return res.json(payload);
+    } catch (error) {
+        console.error('Error generando Wrapped comunitario:', error);
+        return res.status(500).json({ error: 'No se pudo generar el Wrapped' });
     }
 });
 

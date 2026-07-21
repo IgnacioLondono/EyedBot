@@ -8,6 +8,7 @@
     "dev": "nodemon src/index.js",
     "deploy": "node src/deploy-commands.js",
     "backup:now": "node src/scripts/backup-now.js",
+    "test:community": "node --test test/community-access.test.js",
     "verify-oauth": "node verificar-oauth.js",
     "verify-gemini": "node verificar-gemini.js"
   },

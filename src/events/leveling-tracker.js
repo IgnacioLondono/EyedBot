@@ -1,6 +1,7 @@
 const { ChannelType, PermissionsBitField } = require('discord.js');
 const levelingStore = require('../utils/leveling-store');
 const guildActivityStore = require('../utils/guild-activity-store');
+const communityStatsStore = require('../utils/community-stats-store');
 const { getLevelFromXp, sanitizeDifficulty, scaleXpByMultiplier } = require('../utils/leveling-math');
 const { parseRoleRewards } = require('../utils/leveling-rewards');
 const {
@@ -44,6 +45,11 @@ async function flushVoiceAnalyticsSession(guildId, userId, endedAt = Date.now())
 
     await levelingStore.incrementUserStats(guildId, userId, { voiceMinutes: earnedMinutes });
     await guildActivityStore.incrementGuildMetric(guildId, 'voiceMinutes', earnedMinutes).catch(() => null);
+    await communityStatsStore.incrementDailyUserStats(
+        guildId,
+        userId,
+        { voiceMinutes: earnedMinutes }
+    ).catch(() => null);
     return earnedMinutes;
 }
 
@@ -154,6 +160,13 @@ async function applyXpDeltaToMember(member, delta, options = {}) {
     };
 
     await levelingStore.setUserState(guildId, userId, nextState);
+    if (signedDelta > 0) {
+        await communityStatsStore.incrementDailyUserStats(
+            guildId,
+            userId,
+            { xpEarned: signedDelta }
+        ).catch(() => null);
+    }
 
     if (signedDelta > 0 && awardCoins && cfg?.enabled === true) {
         await awardCoinsForXp(guildId, userId, signedDelta).catch(() => null);
@@ -182,6 +195,11 @@ async function handleMessageCreate(message) {
 
     await levelingStore.incrementUserStats(message.guild.id, message.author.id, { messageCount: 1 });
     await guildActivityStore.incrementGuildMetric(message.guild.id, 'messages', 1).catch(() => null);
+    await communityStatsStore.incrementDailyUserStats(
+        message.guild.id,
+        message.author.id,
+        { messages: 1 }
+    ).catch(() => null);
 
     const cfg = await levelingStore.getLevelingConfig(message.guild.id);
     if (!cfg || cfg.enabled !== true || cfg.messageXpEnabled !== true) return;

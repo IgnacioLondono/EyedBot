@@ -62,6 +62,31 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Métricas personales diarias para el portal comunitario y Wrapped
+CREATE TABLE IF NOT EXISTS community_user_daily_stats (
+    guild_id VARCHAR(32) NOT NULL,
+    user_id VARCHAR(32) NOT NULL,
+    stat_date DATE NOT NULL,
+    messages INT UNSIGNED NOT NULL DEFAULT 0,
+    voice_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+    xp_earned INT UNSIGNED NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (guild_id, user_id, stat_date),
+    INDEX idx_community_daily_guild_date (guild_id, stat_date),
+    INDEX idx_community_daily_user_date (user_id, stat_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS community_wrapped_snapshots (
+    guild_id VARCHAR(32) NOT NULL,
+    user_id VARCHAR(32) NOT NULL,
+    wrapped_year SMALLINT UNSIGNED NOT NULL,
+    payload JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (guild_id, user_id, wrapped_year),
+    INDEX idx_community_wrapped_year (guild_id, wrapped_year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Crear usuario si no existe (ya debería estar creado por variables de entorno)
 -- Pero por si acaso, aquí está el comando SQL equivalente:
 -- CREATE USER IF NOT EXISTS 'tulabot'@'%' IDENTIFIED BY 'tulabot_password';
