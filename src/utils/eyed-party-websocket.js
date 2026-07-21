@@ -40,6 +40,13 @@ function attachPartyWebSocket(httpServer, partyService) {
         }
     }
 
+    function disconnectRoom(partyId, code = 1008, reason = 'party_deleted') {
+        for (const client of [...(rooms.get(String(partyId)) || [])]) {
+            client.close(code, reason);
+        }
+        rooms.delete(String(partyId));
+    }
+
     function disconnectUser(guildId, userId, code = 1008, reason = 'guild_access_revoked') {
         for (const client of wss.clients) {
             if (String(client.guildId) !== String(guildId) || String(client.userId) !== String(userId)) continue;
@@ -134,7 +141,7 @@ function attachPartyWebSocket(httpServer, partyService) {
     heartbeat.unref?.();
     wss.on('close', () => clearInterval(heartbeat));
 
-    const api = { wss, broadcast, disconnect, disconnectUser, close: () => wss.close() };
+    const api = { wss, broadcast, disconnect, disconnectRoom, disconnectUser, close: () => wss.close() };
     httpServer.__eyedPartyWs = api;
     return api;
 }

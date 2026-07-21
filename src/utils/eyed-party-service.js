@@ -317,6 +317,96 @@ function createPartyService({
         return { party, left, idempotent: !left };
     }
 
+    async function invite(guildId, partyId, ownerId, targetUserId) {
+        const targetId = String(targetUserId || '').trim();
+        if (!/^\d{10,25}$/.test(targetId)) {
+            throw new PartyError('INVALID_USER', 'Usuario inválido');
+        }
+        if (String(ownerId) === targetId) {
+            throw new PartyError('ALREADY_PARTICIPANT', 'Ya estás en la sala', 409);
+        }
+        let invited = false;
+        const party = await db.transaction(async (tx) => {
+            const rows = await tx.query(
+                `SELECT * FROM community_party_sessions
+                 WHERE party_id = ? AND guild_id = ? FOR UPDATE`,
+                [String(partyId), String(guildId)]
+            );
+            const current = rows[0];
+            if (!current) throw new PartyError('PARTY_NOT_FOUND', 'EyedParty no encontrada', 404);
+            if (String(current.owner_id) !== String(ownerId)) {
+                throw new PartyError('OWNER_REQUIRED', 'Solo el creador puede añadir jugadores', 403);
+            }
+            if (current.status !== 'waiting') {
+                throw new PartyError('PARTY_STARTED', 'La partida ya comenzó', 409);
+            }
+            if (Number(current.participant_count) >= Number(current.capacity)) {
+                throw new PartyError('PARTY_FULL', 'La partida alcanzó su cupo', 409);
+            }
+            const existing = await tx.query(
+                `SELECT 1 FROM community_party_participants
+                 WHERE party_id = ? AND user_id = ?`,
+                [String(partyId), targetId]
+            );
+            if (existing[0]) {
+                return publicParty(current, await participants(tx, partyId), ownerId);
+            }
+            const now = new Date();
+            await tx.query(
+                `INSERT INTO community_party_participants (party_id, guild_id, user_id, joined_at)
+                 VALUES (?, ?, ?, ?)`,
+                [String(partyId), String(guildId), targetId, now]
+            );
+            invited = true;
+            await tx.query(
+                `UPDATE community_party_sessions
+                 SET participant_count = participant_count + 1, version = version + 1, updated_at = ?
+                 WHERE party_id = ?`,
+                [now, String(partyId)]
+            );
+            const updated = {
+                ...current,
+                participant_count: Number(current.participant_count) + 1,
+                version: Number(current.version) + 1,
+                updated_at: now
+            };
+            return publicParty(updated, await participants(tx, partyId), ownerId);
+        });
+        if (invited) {
+            await eventBus.append(partyDiscoveryEvent(guildId, 'joined', partyId, {
+                participantCount: party.participantCount
+            }));
+        }
+        return party;
+    }
+
+    async function remove(guildId, partyId, userId) {
+        const snapshot = await db.transaction(async (tx) => {
+            const rows = await tx.query(
+                'SELECT * FROM community_party_sessions WHERE party_id = ? AND guild_id = ? FOR UPDATE',
+                [String(partyId), String(guildId)]
+            );
+            const current = rows[0];
+            if (!current) throw new PartyError('PARTY_NOT_FOUND', 'EyedParty no encontrada', 404);
+            if (String(current.owner_id) !== String(userId)) {
+                throw new PartyError('OWNER_REQUIRED', 'Solo el creador puede eliminar la sala', 403);
+            }
+            const members = await participants(tx, partyId);
+            const party = publicParty(current, members, userId);
+            await tx.query(
+                'DELETE FROM community_party_sessions WHERE party_id = ? AND guild_id = ?',
+                [String(partyId), String(guildId)]
+            );
+            return party;
+        });
+        await eventBus.append(partyDiscoveryEvent(guildId, 'status', partyId, {
+            status: 'cancelled',
+            participantCount: snapshot.participantCount,
+            deleted: true
+        }));
+        return { deleted: true, partyId: String(partyId), party: { ...snapshot, status: 'cancelled' } };
+    }
+
     async function action(guildId, partyId, userId, raw) {
         const input = validateActionInput(raw);
         let previousStatus = null;
@@ -509,7 +599,7 @@ function createPartyService({
         });
     }
 
-    return { get, list, create, join, leave, action, createTicket, consumeTicket };
+    return { get, list, create, join, leave, invite, remove, action, createTicket, consumeTicket };
 }
 
 module.exports = {

@@ -1119,6 +1119,16 @@ paths:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
         '200': { description: Estado público persistido }
+    delete:
+      tags: [Community]
+      security: [{ communityBearer: [] }]
+      summary: Elimina la sala (solo el owner)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Sala eliminada }
+        '403': { description: No eres el creador }
+        '404': { description: Partida no encontrada }
 
   /api/community/parties/{id}/join:
     post:

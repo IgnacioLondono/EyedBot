@@ -210,6 +210,53 @@ test('eventos de descubrimiento de party son públicos y mínimos', () => {
     }
 });
 
+test('solo el owner puede eliminar una EyedParty', async () => {
+    const statements = [];
+    const fakeDb = {
+        transaction: async (work) => work({
+            query: async (sql, params = []) => {
+                statements.push(sql);
+                if (sql.includes('SELECT * FROM community_party_sessions')) {
+                    return [{
+                        party_id: '11111111-1111-4111-8111-111111111111',
+                        guild_id: 'guild-1',
+                        owner_id: '100000000000000001',
+                        title: 'Sala test',
+                        game_type: 'dice',
+                        status: 'waiting',
+                        capacity: 8,
+                        participant_count: 1,
+                        turn_user_id: null,
+                        state_json: '{}',
+                        version: 1,
+                        created_at: new Date(),
+                        updated_at: new Date(),
+                        completed_at: null
+                    }];
+                }
+                if (sql.includes('FROM community_party_participants')) {
+                    return [{ user_id: '100000000000000001', joined_at: new Date() }];
+                }
+                return { affectedRows: 1 };
+            }
+        })
+    };
+    const events = [];
+    const service = createPartyService({
+        db: fakeDb,
+        eventBus: { append: async (event) => { events.push(event); } }
+    });
+    await assert.rejects(
+        () => service.remove('guild-1', '11111111-1111-4111-8111-111111111111', '100000000000000002'),
+        (error) => error instanceof PartyError && error.code === 'OWNER_REQUIRED'
+    );
+    const result = await service.remove('guild-1', '11111111-1111-4111-8111-111111111111', '100000000000000001');
+    assert.equal(result.deleted, true);
+    assert.ok(statements.some((sql) => sql.includes('DELETE FROM community_party_sessions')));
+    assert.equal(events[0]?.type, 'party.status');
+    assert.equal(events[0]?.payload?.status, 'cancelled');
+});
+
 test('actionId repetido devuelve la respuesta persistida sin ejecutar otra acción', async () => {
     let queryCount = 0;
     const response = { actionId: 'action-123', result: { roll: 4 }, idempotent: false };

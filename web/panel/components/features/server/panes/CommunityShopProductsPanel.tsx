@@ -186,8 +186,10 @@ export function CommunityShopProductsPanel({
     <section className="space-y-5 rounded-3xl border border-fuchsia-400/15 bg-fuchsia-400/[0.035] p-5">
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-fuchsia-300">Tienda de EyedComun</p>
-        <h3 className="mt-1 text-xl font-semibold text-white">Productos y entregas</h3>
-        <p className="mt-1 text-sm text-zinc-400">Crea personajes, roles automáticos u objetos virtuales con stock opcional.</p>
+        <h3 className="mt-1 text-xl font-semibold text-white">Extras y entregas especiales</h3>
+        <p className="mt-1 text-sm text-zinc-400">
+          El catálogo gacha clásico (abajo) ya se publica solo en EyedShop. Usa esta sección para roles, objetos o packs extra.
+        </p>
       </div>
 
       <div className="grid gap-3 rounded-2xl border border-white/8 bg-black/25 p-4 md:grid-cols-2">

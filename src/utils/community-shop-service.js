@@ -150,7 +150,48 @@ function publicProduct(row) {
         updatedAt: _updatedAt,
         ...product
     } = mapProduct(row);
-    return product;
+    return { ...product, source: 'community', sourceId: null, hasCatalogImage: false };
+}
+
+const GACHA_PRODUCT_NS = 'eyedcomun-gacha-v1';
+
+function gachaProductId(characterId) {
+    const hash = crypto.createHash('sha1')
+        .update(`${GACHA_PRODUCT_NS}:${String(characterId || '')}`)
+        .digest();
+    hash[6] = (hash[6] & 0x0f) | 0x50;
+    hash[8] = (hash[8] & 0x3f) | 0x80;
+    const hex = hash.subarray(0, 16).toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+function mapGachaCatalogProduct(character, { ownedQuantity = 0, hasCatalogImage = false } = {}) {
+    const series = String(character.series || '').trim();
+    const rarity = String(character.rarity || '').trim().toUpperCase();
+    const description = String(character.description || '').trim()
+        || [rarity, series].filter(Boolean).join(' · ');
+    const remote = String(character?.imageUrl || '').trim();
+    const imageUrl = /^https?:\/\//i.test(remote) ? remote.slice(0, 500) : null;
+    return {
+        id: gachaProductId(character.id),
+        type: 'character',
+        name: String(character.name || character.id),
+        description: description.slice(0, 500),
+        imageUrl,
+        category: normalizeCategory(series || 'personajes'),
+        priceCoins: Math.max(1, Number(character.price) || 1),
+        stock: null,
+        remainingStock: null,
+        soldCount: 0,
+        perUserLimit: null,
+        purchasedQuantity: 0,
+        ownedQuantity: Math.max(0, Number(ownedQuantity) || 0),
+        active: true,
+        sortOrder: 0,
+        source: 'gacha',
+        sourceId: String(character.id),
+        hasCatalogImage: Boolean(hasCatalogImage)
+    };
 }
 
 function validateReferences(product) {
@@ -177,25 +218,157 @@ function validateReferences(product) {
 
 function createCommunityShopService({ db = defaultDb } = {}) {
     async function list(guildId, userId) {
-        const rows = await db.query(
-            `SELECT p.*,
-                    COALESCE((
-                        SELECT SUM(b.quantity) FROM community_shop_purchases b
-                        WHERE b.product_id = p.product_id AND b.guild_id = p.guild_id
-                          AND b.user_id = ? AND b.status IN ('pending','completed')
-                    ), 0) AS purchased_quantity,
-                    COALESCE(i.quantity, 0) AS owned_quantity
-             FROM community_shop_products p
-             LEFT JOIN community_shop_inventory i
-               ON i.product_id = p.product_id AND i.guild_id = p.guild_id AND i.user_id = ?
-             WHERE p.guild_id = ? AND p.active = TRUE
-             ORDER BY p.category ASC, p.sort_order ASC, p.created_at DESC`,
-            [String(userId), String(userId), String(guildId)]
-        );
-        const profile = await gachaStore.getProfile(guildId, userId);
-        const products = rows.map(publicProduct);
+        const [rows, profile, config, imageIds] = await Promise.all([
+            db.query(
+                `SELECT p.*,
+                        COALESCE((
+                            SELECT SUM(b.quantity) FROM community_shop_purchases b
+                            WHERE b.product_id = p.product_id AND b.guild_id = p.guild_id
+                              AND b.user_id = ? AND b.status IN ('pending','completed')
+                        ), 0) AS purchased_quantity,
+                        COALESCE(i.quantity, 0) AS owned_quantity
+                 FROM community_shop_products p
+                 LEFT JOIN community_shop_inventory i
+                   ON i.product_id = p.product_id AND i.guild_id = p.guild_id AND i.user_id = ?
+                 WHERE p.guild_id = ? AND p.active = TRUE
+                 ORDER BY p.category ASC, p.sort_order ASC, p.created_at DESC`,
+                [String(userId), String(userId), String(guildId)]
+            ),
+            gachaStore.getProfile(guildId, userId),
+            gachaStore.getConfig(guildId),
+            gachaStore.listGuildCatalogShopImageIds(guildId)
+        ]);
+        const ownedByCharacter = new Map();
+        for (const entry of profile.inventory || []) {
+            const characterId = String(entry?.characterId || '');
+            if (!characterId) continue;
+            ownedByCharacter.set(characterId, (ownedByCharacter.get(characterId) || 0) + 1);
+        }
+        const gachaCatalog = await gachaStore.getShopCatalog(guildId, config);
+        const gachaCharacterIds = new Set(gachaCatalog.map((item) => String(item.id)));
+        const gachaProducts = gachaCatalog.map((character) => mapGachaCatalogProduct(character, {
+            ownedQuantity: ownedByCharacter.get(String(character.id)) || 0,
+            hasCatalogImage: imageIds.has(String(character.id))
+        }));
+        const customProducts = rows
+            .filter((row) => !(
+                String(row.product_type) === 'character'
+                && gachaCharacterIds.has(String(row.character_id || ''))
+            ))
+            .map(publicProduct);
+        const products = [...gachaProducts, ...customProducts];
         const categories = [...new Set(products.map((item) => item.category))];
         return { products, categories, balance: Number(profile.coins) || 0 };
+    }
+
+    async function purchaseGachaCharacter(guildId, userId, characterId, quantity, idempotencyKey) {
+        const idemKey = `community_shop_gacha_idem_${guildId}_${userId}_${idempotencyKey}`;
+        const existing = await db.query('SELECT `value` FROM key_value_store WHERE `key` = ?', [idemKey]);
+        if (existing[0]?.value) {
+            const cached = parseJson(existing[0].value, null);
+            if (cached?.purchaseId) {
+                const balance = Number((await gachaStore.getProfile(guildId, userId)).coins) || 0;
+                return {
+                    purchaseId: String(cached.purchaseId),
+                    productId: String(cached.productId),
+                    quantity: Number(cached.quantity) || quantity,
+                    spentCoins: Number(cached.spentCoins) || 0,
+                    balance,
+                    status: 'completed',
+                    idempotent: true
+                };
+            }
+        }
+
+        const config = await gachaStore.getConfig(guildId);
+        if (!config.economyEnabled || config.shopEnabled === false) {
+            throw new CommunityShopError('SHOP_DISABLED', 'La tienda gacha está desactivada', 403);
+        }
+        const catalog = await gachaStore.getShopCatalog(guildId, config);
+        const character = catalog.find((item) => String(item.id) === String(characterId));
+        if (!character) throw new CommunityShopError('PRODUCT_UNAVAILABLE', 'Producto no disponible', 410);
+        const unitPrice = Math.max(1, Number(character.price) || 1);
+        const totalPrice = unitPrice * quantity;
+        if (!Number.isSafeInteger(totalPrice) || totalPrice < 1) {
+            throw new CommunityShopError('INVALID_PRODUCT_PRICE', 'Precio inválido', 500);
+        }
+
+        const outcome = await db.transaction(async (tx) => {
+            const profileKey = `gacha_profile_${guildId}_${userId}`;
+            const seed = gachaStore.normalizeProfile(gachaStore.defaultProfile(userId), userId);
+            await tx.query(
+                'INSERT IGNORE INTO key_value_store (`key`, `value`) VALUES (?, ?)',
+                [profileKey, JSON.stringify(seed)]
+            );
+            const profileRows = await tx.query(
+                'SELECT `value` FROM key_value_store WHERE `key` = ? FOR UPDATE',
+                [profileKey]
+            );
+            const idemRows = await tx.query(
+                'SELECT `value` FROM key_value_store WHERE `key` = ? FOR UPDATE',
+                [idemKey]
+            );
+            if (idemRows[0]?.value) {
+                const cached = parseJson(idemRows[0].value, null);
+                if (cached?.purchaseId) {
+                    const profile = gachaStore.normalizeProfile(parseJson(profileRows[0]?.value, seed), userId);
+                    return { cached, balance: profile.coins, idempotent: true };
+                }
+            }
+            const profile = gachaStore.normalizeProfile(parseJson(profileRows[0]?.value, seed), userId);
+            if (profile.coins < totalPrice) {
+                throw new CommunityShopError('INSUFFICIENT_BALANCE', 'No tienes suficientes EyedCoins', 409);
+            }
+            if ((profile.inventory?.length || 0) + quantity > 2000) {
+                throw new CommunityShopError('INVENTORY_FULL', 'Tu inventario está lleno', 409);
+            }
+            const entries = Array.from({ length: quantity }, () => gachaStore.buildInventoryEntry(character));
+            profile.inventory.unshift(...entries);
+            profile.collectionCount = profile.inventory.length;
+            const rarityRank = (value) => {
+                const order = { N: 1, R: 2, SR: 3, SSR: 4 };
+                return order[String(value || '').toUpperCase()] || 0;
+            };
+            for (const entry of entries) {
+                const rarity = String(entry.rarity || '').toUpperCase();
+                if (!profile.bestRarity || rarityRank(rarity) > rarityRank(profile.bestRarity)) {
+                    profile.bestRarity = rarity;
+                }
+            }
+            profile.coins -= totalPrice;
+            profile.updatedAt = new Date().toISOString();
+            await tx.query(
+                'UPDATE key_value_store SET `value` = ? WHERE `key` = ?',
+                [JSON.stringify(profile), profileKey]
+            );
+            const purchaseId = crypto.randomUUID();
+            const productId = gachaProductId(character.id);
+            const payload = {
+                purchaseId,
+                productId,
+                quantity,
+                spentCoins: totalPrice,
+                characterId: String(character.id),
+                status: 'completed'
+            };
+            await tx.query(
+                'INSERT INTO key_value_store (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)',
+                [idemKey, JSON.stringify(payload)]
+            );
+            return { cached: payload, balance: profile.coins, idempotent: false };
+        });
+
+        gachaStore.invalidateProfileCache(guildId, userId);
+        gachaStore.scheduleCommunityEvaluation(guildId, userId);
+        return {
+            purchaseId: String(outcome.cached.purchaseId),
+            productId: String(outcome.cached.productId),
+            quantity: Number(outcome.cached.quantity),
+            spentCoins: Number(outcome.cached.spentCoins),
+            balance: outcome.balance,
+            status: 'completed',
+            idempotent: outcome.idempotent
+        };
     }
 
     async function listAdmin(guildId) {
@@ -331,7 +504,13 @@ function createCommunityShopService({ db = defaultDb } = {}) {
             'SELECT product_type, role_id FROM community_shop_products WHERE guild_id = ? AND product_id = ?',
             [String(guildId), productId]
         );
-        if (!preflight[0]) throw new CommunityShopError('PRODUCT_NOT_FOUND', 'Producto no encontrado', 404);
+        if (!preflight[0]) {
+            const config = await gachaStore.getConfig(guildId);
+            const catalog = await gachaStore.getShopCatalog(guildId, config);
+            const character = catalog.find((item) => gachaProductId(item.id) === productId);
+            if (!character) throw new CommunityShopError('PRODUCT_NOT_FOUND', 'Producto no encontrado', 404);
+            return purchaseGachaCharacter(guildId, userId, character.id, quantity, idempotencyKey);
+        }
         let roleValidation = null;
         if (preflight[0].product_type === 'role' && typeof deliverRole?.validate === 'function') {
             roleValidation = await deliverRole.validate(String(preflight[0].role_id));
@@ -520,5 +699,7 @@ module.exports = {
     normalizeCategory,
     mapProduct,
     publicProduct,
+    gachaProductId,
+    mapGachaCatalogProduct,
     createCommunityShopService
 };

@@ -8473,6 +8473,24 @@ app.get('/api/community/shop', requireCommunityService, async (req, res) => {
     }
 });
 
+app.get('/api/community/gacha-catalog-image/:characterId', requireCommunityService, async (req, res) => {
+    try {
+        const characterId = String(req.params.characterId || '').trim().slice(0, 128);
+        if (!characterId || !/^[a-zA-Z0-9_-]{1,128}$/.test(characterId)) {
+            return communityError(res, 400, 'INVALID_CHARACTER', 'Personaje inválido');
+        }
+        const guildId = req.communityIdentity.guild.id;
+        const image = await gachaStore.resolveGuildCatalogShopImage(guildId, characterId);
+        if (!image?.data?.length) return res.status(404).json({ error: 'Imagen no encontrada' });
+        res.setHeader('Content-Type', image.mime || 'image/png');
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        return res.send(Buffer.from(image.data));
+    } catch (error) {
+        console.error('Error sirviendo imagen de catálogo gacha:', error);
+        return communityError(res, 500, 'CATALOG_IMAGE_FAILED', 'No se pudo cargar la imagen');
+    }
+});
+
 app.post('/api/community/shop/purchases', requireCommunityService, async (req, res) => {
     try {
         if (!await requireCommunityShopEnabled(req, res)) return;
@@ -8641,26 +8659,33 @@ function communityPresence(member) {
 
 const communityUserProfileCache = new Map();
 const communityUserProfileLoads = new Map();
-const COMMUNITY_USER_PROFILE_TTL_MS = 15 * 60 * 1000;
+const COMMUNITY_USER_PROFILE_TTL_MS = 45 * 1000;
 
 function invalidateCommunityUserProfile(userId) {
     if (userId) communityUserProfileCache.delete(String(userId));
 }
 
-async function resolveCommunityUserProfile(client, userId) {
+async function resolveCommunityUserProfile(client, userId, options = {}) {
     const id = String(userId || '');
     if (!id) return null;
-    const cached = communityUserProfileCache.get(id);
-    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const forceRefresh = options.forceRefresh === true;
+    if (!forceRefresh) {
+        const cached = communityUserProfileCache.get(id);
+        if (cached && cached.expiresAt > Date.now()) return cached.value;
+    } else {
+        communityUserProfileCache.delete(id);
+    }
     if (communityUserProfileLoads.has(id)) return communityUserProfileLoads.get(id);
 
     const load = Promise.resolve()
         .then(async () => {
             const user = await client.users.fetch(id, { force: true }).catch(() => client.users.cache.get(id) || null);
             const accentNumber = Number(user?.accentColor);
+            const bannerUrl = user?.bannerURL?.({ size: 1024, dynamic: true }) || null;
             const value = {
                 avatarUrl: user?.displayAvatarURL?.({ size: 256, dynamic: true }) || null,
-                bannerUrl: user?.bannerURL?.({ size: 1024, dynamic: true }) || null,
+                // Cache-bust Discord CDN when the hash is reused briefly after edits.
+                bannerUrl: bannerUrl ? `${bannerUrl}${bannerUrl.includes('?') ? '&' : '?'}v=${Date.now()}` : null,
                 accentColor: Number.isInteger(accentNumber) && accentNumber >= 0
                     ? `#${accentNumber.toString(16).padStart(6, '0')}`
                     : null
@@ -8714,6 +8739,29 @@ app.get('/api/community/members', requireCommunityService, async (req, res) => {
             return communityError(res, 403, 'SAME_USER_REQUIRED', 'La identidad consultada no coincide con la firma');
         }
         const access = req.communityIdentity;
+        const directoryMode = String(req.query.directory || '') === '1';
+
+        if (directoryMode) {
+            const humans = await communityHumanMembers(access.guild);
+            const members = humans
+                .map((member) => {
+                    const presence = communityPresence(member);
+                    return {
+                        ...communityMemberView(member),
+                        bannerUrl: null,
+                        accentColor: null,
+                        ...presence,
+                        level: 0,
+                        xp: 0,
+                        rank: null,
+                        messages: 0,
+                        voiceMinutes: 0
+                    };
+                })
+                .sort((left, right) => String(left.displayName || '').localeCompare(String(right.displayName || ''), 'es', { sensitivity: 'base' }))
+                .slice(0, 250);
+            return res.json({ members });
+        }
 
         const ranking = await communityRanking(access.guild.id);
         const members = await mapWithConcurrency(ranking.slice(0, 60), 6, async (row, index) => {
@@ -9053,6 +9101,27 @@ app.post('/api/community/parties/:id/join', requireCommunityService, async (req,
     }
 });
 
+app.post('/api/community/parties/:id/invite', requireCommunityService, async (req, res) => {
+    try {
+        const targetId = communityUserId(req.body?.userId);
+        if (!targetId) return communityError(res, 400, 'INVALID_USER', 'Usuario inválido');
+        const target = await requireCommunityMember(targetId);
+        if (target.error) {
+            return communityError(res, target.status, 'MEMBER_NOT_FOUND', 'El jugador debe ser un miembro del servidor');
+        }
+        const party = await eyedParty.invite(
+            req.communityIdentity.guild.id,
+            req.params.id,
+            req.communityIdentity.userId,
+            targetId
+        );
+        partyWebSocket?.broadcast(req.params.id, { type: 'party.updated', party });
+        return res.json({ party, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_INVITE_FAILED', 'No se pudo añadir al jugador');
+    }
+});
+
 app.delete('/api/community/parties/:id/join', requireCommunityService, async (req, res) => {
     try {
         const result = await eyedParty.leave(
@@ -9068,6 +9137,18 @@ app.delete('/api/community/parties/:id/join', requireCommunityService, async (re
         return res.json({ ...result, requestId: res.locals.communityRequestId });
     } catch (error) {
         return communityServiceFailure(res, error, 'PARTY_LEAVE_FAILED', 'No se pudo abandonar la partida');
+    }
+});
+
+app.delete('/api/community/parties/:id', requireCommunityService, async (req, res) => {
+    try {
+        const result = await eyedParty.remove(
+            req.communityIdentity.guild.id, req.params.id, req.communityIdentity.userId
+        );
+        partyWebSocket?.disconnectRoom(req.params.id, 1008, 'party_deleted');
+        return res.json({ ...result, requestId: res.locals.communityRequestId });
+    } catch (error) {
+        return communityServiceFailure(res, error, 'PARTY_DELETE_FAILED', 'No se pudo eliminar la partida');
     }
 });
 

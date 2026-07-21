@@ -11,9 +11,9 @@ La tienda admite compras únicamente cuando se cumplen las tres condiciones:
 - `economyEnabled` está activo en la configuración gacha de EyedBot.
 - `shopEnabled` está activo en la configuración gacha de EyedBot.
 
-Los productos se administran en **Panel EyedBot > Servidor > Gacha > Tienda**.
-Pueden ser personajes del catálogo gacha, roles administrables por EyedBot u
-objetos virtuales. El stock y el límite por usuario son opcionales.
+Los productos del catálogo gacha visible (`getShopCatalog`) se publican
+automáticamente en EyedComun. Además puedes crear en **Panel EyedBot >
+Servidor > Gacha > Tienda** roles, objetos o packs especiales.
 
 ## API de servicio
 

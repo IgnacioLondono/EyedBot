@@ -66,8 +66,24 @@ test('compra serializa por perfil y persiste idempotencia única', () => {
     assert.match(source, /sold_count = GREATEST\(0, sold_count - \?\)/);
 });
 
-test('normaliza categorías de tienda a claves estables', () => {
-    const { normalizeCategory } = require('../src/utils/community-shop-service');
-    assert.equal(normalizeCategory(' Cosméticos '), 'cosmeticos');
-    assert.equal(normalizeCategory(''), 'general');
+test('genera ids estables para productos del catálogo gacha', () => {
+    const { gachaProductId, mapGachaCatalogProduct } = require('../src/utils/community-shop-service');
+    const first = gachaProductId('ch_049');
+    const second = gachaProductId('ch_049');
+    assert.equal(first, second);
+    assert.match(first, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    const product = mapGachaCatalogProduct({
+        id: 'ch_049',
+        name: 'Mythra Veil',
+        series: 'Corte de Cristal',
+        rarity: 'SSR',
+        description: '',
+        price: 3120,
+        imageUrl: 'https://cdn.example/mythra.png'
+    }, { ownedQuantity: 2 });
+    assert.equal(product.source, 'gacha');
+    assert.equal(product.sourceId, 'ch_049');
+    assert.equal(product.category, 'corte-de-cristal');
+    assert.equal(product.ownedQuantity, 2);
+    assert.equal(product.priceCoins, 3120);
 });
