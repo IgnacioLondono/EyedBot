@@ -134,6 +134,7 @@ function mapProduct(row) {
         itemKey: row.item_key ? String(row.item_key) : null,
         active: Boolean(row.active),
         sortOrder: Number(row.sort_order) || 0,
+        rarity: null,
         version: Number(row.version) || 1,
         createdAt: new Date(row.created_at).toISOString(),
         updatedAt: new Date(row.updated_at).toISOString()
@@ -188,6 +189,7 @@ function mapGachaCatalogProduct(character, { ownedQuantity = 0, hasCatalogImage 
         ownedQuantity: Math.max(0, Number(ownedQuantity) || 0),
         active: true,
         sortOrder: 0,
+        rarity: rarity || null,
         source: 'gacha',
         sourceId: String(character.id),
         hasCatalogImage: Boolean(hasCatalogImage)
@@ -258,7 +260,13 @@ function createCommunityShopService({ db = defaultDb } = {}) {
             .map(publicProduct);
         const products = [...gachaProducts, ...customProducts];
         const categories = [...new Set(products.map((item) => item.category))];
-        return { products, categories, balance: Number(profile.coins) || 0 };
+        const rarities = [...new Set(
+            products.map((item) => String(item.rarity || '').trim().toUpperCase()).filter(Boolean)
+        )].sort((left, right) => {
+            const rank = { SSR: 4, SR: 3, R: 2, N: 1 };
+            return (rank[right] || 0) - (rank[left] || 0) || left.localeCompare(right);
+        });
+        return { products, categories, rarities, balance: Number(profile.coins) || 0 };
     }
 
     async function purchaseGachaCharacter(guildId, userId, characterId, quantity, idempotencyKey) {

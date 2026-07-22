@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, PackagePlus, Pencil, Save, X } from "lucide-react";
+import { Archive, PackagePlus, Pencil, Plus, Save, X } from "lucide-react";
 import {
   archiveCommunityShopProduct,
   createCommunityShopProduct,
@@ -11,6 +11,7 @@ import {
 import { useToast } from "@/components/providers/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { Switch } from "@/components/ui/Switch";
 import { Field, Input, Select, Textarea } from "@/components/features/shared";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
@@ -96,6 +97,10 @@ function requestBody(form: FormState) {
   };
 }
 
+function categoryLabel(value: string) {
+  return CATEGORY_OPTIONS.find((option) => option.value === value)?.label || value;
+}
+
 export function CommunityShopProductsPanel({
   guildId,
   characters,
@@ -110,6 +115,7 @@ export function CommunityShopProductsPanel({
   const [products, setProducts] = useState<Product[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -138,9 +144,22 @@ export function CommunityShopProductsPanel({
     [characters],
   );
 
-  function reset() {
+  function closeModal() {
+    setModalOpen(false);
     setEditingId(null);
     setForm(emptyForm);
+  }
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setModalOpen(true);
+  }
+
+  function openEdit(product: Product) {
+    setEditingId(toStringValue(product.id));
+    setForm(productForm(product));
+    setModalOpen(true);
   }
 
   async function save() {
@@ -157,7 +176,7 @@ export function CommunityShopProductsPanel({
         await createCommunityShopProduct(guildId, requestBody(form));
         toast({ title: "Producto creado", description: "Ya puede mostrarse en EyedComun.", tone: "success" });
       }
-      reset();
+      closeModal();
       await load();
     } catch (error) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(error), tone: "danger" });
@@ -172,7 +191,7 @@ export function CommunityShopProductsPanel({
     setSaving(true);
     try {
       await archiveCommunityShopProduct(guildId, id, toNumberValue(product.version, 1));
-      if (editingId === id) reset();
+      if (editingId === id) closeModal();
       await load();
       toast({ title: "Producto desactivado", tone: "success" });
     } catch (error) {
@@ -182,69 +201,34 @@ export function CommunityShopProductsPanel({
     }
   }
 
+  const categorySelectValue = CATEGORY_OPTIONS.some((option) => option.value === form.category)
+    ? form.category
+    : "__custom__";
+
   return (
     <section className="space-y-5 rounded-3xl border border-fuchsia-400/15 bg-fuchsia-400/[0.035] p-5">
-      <div>
-        <p className="text-xs uppercase tracking-[0.22em] text-fuchsia-300">Tienda de EyedComun</p>
-        <h3 className="mt-1 text-xl font-semibold text-white">Extras y entregas especiales</h3>
-        <p className="mt-1 text-sm text-zinc-400">
-          El catálogo gacha clásico (abajo) ya se publica solo en EyedShop. Usa esta sección para roles, objetos o packs extra.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-fuchsia-300">Tienda de EyedComun</p>
+          <h3 className="mt-1 text-xl font-semibold text-white">Extras y entregas especiales</h3>
+          <p className="mt-1 text-sm text-zinc-400">
+            El catálogo gacha clásico (abajo) ya se publica solo en EyedShop. Usa esta sección para roles, objetos o packs extra.
+          </p>
+        </div>
+        <Button disabled={premiumLocked} onClick={openCreate} size="icon" aria-label="Añadir producto">
+          <Plus className="h-5 w-5" />
+        </Button>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-white/8 bg-black/25 p-4 md:grid-cols-2">
-        <Field label="Tipo">
-          <Select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as ProductType }))}>
-            <option value="item">Objeto virtual</option>
-            <option value="character">Personaje gacha</option>
-            <option value="role">Rol de Discord</option>
-          </Select>
-        </Field>
-        <Field label="Nombre"><Input value={form.name} maxLength={120} onChange={(event) => setForm((c) => ({ ...c, name: event.target.value }))} /></Field>
-        <Field label="Categoría">
-          <Select value={form.category} onChange={(event) => setForm((c) => ({ ...c, category: event.target.value }))}>
-            {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Precio en EyedCoins"><Input type="number" min={1} value={form.priceCoins} onChange={(event) => setForm((c) => ({ ...c, priceCoins: event.target.value }))} /></Field>
-        <Field label="Stock" description="Vacío = ilimitado"><Input type="number" min={0} value={form.stock} onChange={(event) => setForm((c) => ({ ...c, stock: event.target.value }))} /></Field>
-        <Field label="Límite por usuario" description="Vacío = sin límite"><Input type="number" min={1} value={form.perUserLimit} disabled={form.type === "role"} onChange={(event) => setForm((c) => ({ ...c, perUserLimit: event.target.value }))} /></Field>
-        <Field label="Orden"><Input type="number" min={0} value={form.sortOrder} onChange={(event) => setForm((c) => ({ ...c, sortOrder: event.target.value }))} /></Field>
-        {form.type === "character" ? (
-          <Field label="Personaje">
-            <Select value={form.characterId} onChange={(event) => setForm((c) => ({ ...c, characterId: event.target.value }))}>
-              <option value="">Seleccionar personaje…</option>
-              {characterOptions.map((item) => <option key={toStringValue(item.id)} value={toStringValue(item.id)}>{toStringValue(item.name)} · {toStringValue(item.rarity)}</option>)}
-            </Select>
-          </Field>
-        ) : null}
-        {form.type === "role" ? (
-          <Field label="Rol que entrega EyedBot">
-            <Select value={form.roleId} onChange={(event) => setForm((c) => ({ ...c, roleId: event.target.value }))}>
-              <option value="">Seleccionar rol…</option>
-              {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-            </Select>
-          </Field>
-        ) : null}
-        {form.type === "item" ? (
-          <Field label="Clave del objeto" description="Ejemplo: ticket_dorado"><Input value={form.itemKey} maxLength={64} onChange={(event) => setForm((c) => ({ ...c, itemKey: event.target.value }))} /></Field>
-        ) : null}
-        <Field label="URL de imagen"><Input type="url" value={form.imageUrl} onChange={(event) => setForm((c) => ({ ...c, imageUrl: event.target.value }))} /></Field>
-        <div className="md:col-span-2"><Field label="Descripción"><Textarea value={form.description} maxLength={500} onChange={(event) => setForm((c) => ({ ...c, description: event.target.value }))} /></Field></div>
-        <div className="flex items-center justify-between gap-3 md:col-span-2">
-          <div><p className="text-sm text-white">Disponible</p><p className="text-xs text-zinc-500">Los inactivos no aparecen en EyedComun.</p></div>
-          <Switch checked={form.active} onCheckedChange={(active) => setForm((c) => ({ ...c, active }))} />
-        </div>
-        <div className="flex flex-wrap gap-2 md:col-span-2">
-          <Button disabled={premiumLocked || saving || !form.name.trim()} onClick={() => void save()}>
-            {editingId ? <Save className="mr-2 h-4 w-4" /> : <PackagePlus className="mr-2 h-4 w-4" />}
-            {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear producto"}
+      {loading ? <p className="text-sm text-zinc-500">Cargando productos…</p> : products.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-8 text-center">
+          <p className="text-sm text-zinc-400">Todavía no hay extras. Pulsa + para crear el primero.</p>
+          <Button className="mt-4" disabled={premiumLocked} onClick={openCreate}>
+            <PackagePlus className="mr-2 h-4 w-4" />
+            Nuevo producto
           </Button>
-          {editingId ? <Button variant="ghost" onClick={reset}><X className="mr-2 h-4 w-4" />Cancelar</Button> : null}
         </div>
-      </div>
-
-      {loading ? <p className="text-sm text-zinc-500">Cargando productos…</p> : (
+      ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {products.map((product) => {
             const id = toStringValue(product.id);
@@ -252,13 +236,18 @@ export function CommunityShopProductsPanel({
             return (
               <article key={id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div><h4 className="font-medium text-white">{toStringValue(product.name)}</h4><p className="mt-1 text-xs uppercase tracking-wider text-fuchsia-300">{toStringValue(product.category, "general")} · {toStringValue(product.type)}</p></div>
+                  <div>
+                    <h4 className="font-medium text-white">{toStringValue(product.name)}</h4>
+                    <p className="mt-1 text-xs uppercase tracking-wider text-fuchsia-300">
+                      {categoryLabel(toStringValue(product.category, "general"))} · {toStringValue(product.type)}
+                    </p>
+                  </div>
                   {!toBooleanValue(product.active) ? <Badge variant="danger">Inactivo</Badge> : null}
                 </div>
                 <p className="mt-3 line-clamp-2 text-sm text-zinc-400">{toStringValue(product.description, "Sin descripción")}</p>
                 <p className="mt-3 text-sm text-fuchsia-100">{toNumberValue(product.priceCoins).toLocaleString("es")} EyedCoins · {stock}</p>
                 <div className="mt-4 flex gap-2">
-                  <Button size="sm" variant="secondary" disabled={saving} onClick={() => { setEditingId(id); setForm(productForm(product)); }}>
+                  <Button size="sm" variant="secondary" disabled={saving} onClick={() => openEdit(product)}>
                     <Pencil className="mr-1 h-3.5 w-3.5" />Editar
                   </Button>
                   {toBooleanValue(product.active) ? (
@@ -272,6 +261,121 @@ export function CommunityShopProductsPanel({
           })}
         </div>
       )}
+
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        wide
+        title={editingId ? "Editar producto" : "Nuevo producto"}
+        description="Los cambios se reflejan en la tienda de EyedComun."
+        footer={(
+          <>
+            <Button variant="ghost" onClick={closeModal} disabled={saving}>
+              <X className="mr-2 h-4 w-4" />Cancelar
+            </Button>
+            <Button disabled={premiumLocked || saving || !form.name.trim()} onClick={() => void save()}>
+              {editingId ? <Save className="mr-2 h-4 w-4" /> : <PackagePlus className="mr-2 h-4 w-4" />}
+              {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear producto"}
+            </Button>
+          </>
+        )}
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Tipo">
+            <Select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as ProductType }))}>
+              <option value="item">Objeto virtual</option>
+              <option value="character">Personaje gacha</option>
+              <option value="role">Rol de Discord</option>
+            </Select>
+          </Field>
+          <Field label="Nombre">
+            <Input value={form.name} maxLength={120} onChange={(event) => setForm((c) => ({ ...c, name: event.target.value }))} />
+          </Field>
+          <Field label="Categoría">
+            <Select
+              value={categorySelectValue}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === "__custom__") {
+                  setForm((c) => ({
+                    ...c,
+                    category: CATEGORY_OPTIONS.some((o) => o.value === c.category) ? "" : c.category,
+                  }));
+                  return;
+                }
+                setForm((c) => ({ ...c, category: value }));
+              }}
+            >
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+              <option value="__custom__">Personalizada…</option>
+            </Select>
+          </Field>
+          <Field label="Precio en EyedCoins">
+            <Input type="number" min={1} value={form.priceCoins} onChange={(event) => setForm((c) => ({ ...c, priceCoins: event.target.value }))} />
+          </Field>
+          {categorySelectValue === "__custom__" ? (
+            <Field label="Categoría personalizada" description="Se normaliza a slug (ej. summer-fest)">
+              <Input
+                value={form.category}
+                maxLength={64}
+                placeholder="mi-categoria"
+                onChange={(event) => setForm((c) => ({ ...c, category: event.target.value }))}
+              />
+            </Field>
+          ) : null}
+          <Field label="Stock" description="Vacío = ilimitado">
+            <Input type="number" min={0} value={form.stock} onChange={(event) => setForm((c) => ({ ...c, stock: event.target.value }))} />
+          </Field>
+          <Field label="Límite por usuario" description="Vacío = sin límite">
+            <Input type="number" min={1} value={form.perUserLimit} disabled={form.type === "role"} onChange={(event) => setForm((c) => ({ ...c, perUserLimit: event.target.value }))} />
+          </Field>
+          <Field label="Orden">
+            <Input type="number" min={0} value={form.sortOrder} onChange={(event) => setForm((c) => ({ ...c, sortOrder: event.target.value }))} />
+          </Field>
+          {form.type === "character" ? (
+            <Field label="Personaje">
+              <Select value={form.characterId} onChange={(event) => setForm((c) => ({ ...c, characterId: event.target.value }))}>
+                <option value="">Seleccionar personaje…</option>
+                {characterOptions.map((item) => (
+                  <option key={toStringValue(item.id)} value={toStringValue(item.id)}>
+                    {toStringValue(item.name)} · {toStringValue(item.rarity)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : null}
+          {form.type === "role" ? (
+            <Field label="Rol que entrega EyedBot">
+              <Select value={form.roleId} onChange={(event) => setForm((c) => ({ ...c, roleId: event.target.value }))}>
+                <option value="">Seleccionar rol…</option>
+                {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+              </Select>
+            </Field>
+          ) : null}
+          {form.type === "item" ? (
+            <Field label="Clave del objeto" description="Ejemplo: ticket_dorado">
+              <Input value={form.itemKey} maxLength={64} onChange={(event) => setForm((c) => ({ ...c, itemKey: event.target.value }))} />
+            </Field>
+          ) : null}
+          <Field label="URL de imagen">
+            <Input type="url" value={form.imageUrl} onChange={(event) => setForm((c) => ({ ...c, imageUrl: event.target.value }))} />
+          </Field>
+          <div className="md:col-span-2">
+            <Field label="Descripción">
+              <Textarea value={form.description} maxLength={500} onChange={(event) => setForm((c) => ({ ...c, description: event.target.value }))} />
+            </Field>
+          </div>
+          <div className="flex items-center justify-between gap-3 md:col-span-2">
+            <div>
+              <p className="text-sm text-white">Disponible</p>
+              <p className="text-xs text-zinc-500">Los inactivos no aparecen en EyedComun.</p>
+            </div>
+            <Switch checked={form.active} onCheckedChange={(active) => setForm((c) => ({ ...c, active }))} />
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }

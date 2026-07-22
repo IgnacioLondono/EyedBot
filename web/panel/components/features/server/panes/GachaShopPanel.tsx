@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, RotateCcw, Save, ShoppingBag, Trash2 } from "lucide-react";
+import { Pencil, RotateCcw, Save, ShoppingBag, Trash2, X } from "lucide-react";
 import {
   deleteGachaCatalogItem,
   gachaCatalogImageUrl,
@@ -12,11 +12,12 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Modal } from "@/components/ui/Modal";
 import { Switch } from "@/components/ui/Switch";
 import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { Field, Input, Select, Textarea } from "@/components/features/shared";
 import { CommunityShopProductsPanel } from "@/components/features/server/panes/CommunityShopProductsPanel";
-import { asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
+import { getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
 
 type ShopItem = Record<string, unknown>;
 
@@ -30,6 +31,16 @@ type ShopEditState = {
   catalogRemoved: boolean;
   imageUrl: string;
 };
+
+const CATEGORY_OPTIONS = [
+  { value: "personajes", label: "Personajes" },
+  { value: "roles", label: "Roles" },
+  { value: "objetos", label: "Objetos" },
+  { value: "boosts", label: "Boosts" },
+  { value: "eventos", label: "Eventos" },
+  { value: "cosmeticos", label: "Cosméticos" },
+  { value: "general", label: "General" },
+];
 
 function itemToEditState(item: ShopItem): ShopEditState {
   const overridePrice = item.shopPriceOverride;
@@ -54,6 +65,12 @@ function resolveShopImage(item: ShopItem, guildId: string, cacheToken: number) {
   return "";
 }
 
+function categorySelectValue(series: string) {
+  const normalized = series.trim().toLowerCase();
+  if (CATEGORY_OPTIONS.some((option) => option.value === normalized)) return normalized;
+  return "__custom__";
+}
+
 export function GachaShopPanel({
   guildId,
   items,
@@ -66,12 +83,14 @@ export function GachaShopPanel({
   onReload: () => Promise<void>;
 }) {
   const { toast } = useToast();
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<ShopItem | null>(null);
   const [editForm, setEditForm] = useState<ShopEditState | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [imageCacheToken, setImageCacheToken] = useState(0);
   const [query, setQuery] = useState("");
+
+  const editingId = editingItem ? toStringValue(editingItem.id) : null;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -90,13 +109,12 @@ export function GachaShopPanel({
   }, [items, query]);
 
   function startEdit(item: ShopItem) {
-    const id = toStringValue(item.id);
-    setEditingId(id);
+    setEditingItem(item);
     setEditForm(itemToEditState(item));
   }
 
   function cancelEdit() {
-    setEditingId(null);
+    setEditingItem(null);
     setEditForm(null);
   }
 
@@ -192,6 +210,9 @@ export function GachaShopPanel({
     );
   }
 
+  const busy = Boolean(editingId && (savingId === editingId || uploadingId === editingId));
+  const selectedCategory = editForm ? categorySelectValue(editForm.series) : "personajes";
+
   return (
     <div className="space-y-5">
       <CommunityShopProductsPanel guildId={guildId} characters={items} premiumLocked={premiumLocked} />
@@ -206,14 +227,13 @@ export function GachaShopPanel({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filtered.map((item, index) => {
           const id = toStringValue(item.id, `shop-${index}`);
-          const isEditing = editingId === id;
           const imageSrc = resolveShopImage(item, guildId, imageCacheToken);
           const hasOverride =
             item.shopPriceOverride !== undefined ||
             toBooleanValue(item.shopHidden) ||
             toBooleanValue(item.catalogRemoved) ||
             toBooleanValue(item.catalogDbImage);
-          const busy = savingId === id || uploadingId === id;
+          const cardBusy = savingId === id || uploadingId === id;
 
           return (
             <div key={id} className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
@@ -248,96 +268,141 @@ export function GachaShopPanel({
                 <p className="truncate text-[11px] text-zinc-600">ID: {id}</p>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" disabled={premiumLocked || busy} onClick={() => (isEditing ? cancelEdit() : startEdit(item))}>
+                  <Button size="sm" variant="secondary" disabled={premiumLocked || cardBusy} onClick={() => startEdit(item)}>
                     <Pencil className="mr-1 h-3.5 w-3.5" />
-                    {isEditing ? "Cerrar" : "Editar"}
+                    Editar
                   </Button>
                   {hasOverride ? (
-                    <Button size="sm" variant="ghost" disabled={premiumLocked || busy} onClick={() => void handleReset(id)}>
+                    <Button size="sm" variant="ghost" disabled={premiumLocked || cardBusy} onClick={() => void handleReset(id)}>
                       <RotateCcw className="mr-1 h-3.5 w-3.5" />
                       Resetear
                     </Button>
                   ) : null}
                 </div>
-
-                {isEditing && editForm ? (
-                  <div className="space-y-3 rounded-2xl border border-white/8 bg-black/30 p-4">
-                    <Field label="Nombre">
-                      <Input value={editForm.name} onChange={(event) => setEditForm((c) => (c ? { ...c, name: event.target.value } : c))} />
-                    </Field>
-                    <Field label="Serie">
-                      <Input value={editForm.series} onChange={(event) => setEditForm((c) => (c ? { ...c, series: event.target.value } : c))} />
-                    </Field>
-                    <Field label="Rareza">
-                      <Select value={editForm.rarity} onChange={(event) => setEditForm((c) => (c ? { ...c, rarity: event.target.value } : c))}>
-                        <option value="SSR">SSR</option>
-                        <option value="SR">SR</option>
-                        <option value="R">R</option>
-                        <option value="N">N</option>
-                      </Select>
-                    </Field>
-                    <Field label="Descripción">
-                      <Textarea
-                        value={editForm.description}
-                        onChange={(event) => setEditForm((c) => (c ? { ...c, description: event.target.value } : c))}
-                        rows={3}
-                      />
-                    </Field>
-                    <Field label="Precio en tienda" description="Vacío = precio automático del bot">
-                      <Input
-                        type="number"
-                        value={editForm.shopPrice}
-                        onChange={(event) => setEditForm((c) => (c ? { ...c, shopPrice: event.target.value } : c))}
-                        placeholder={String(toNumberValue(item.shopPriceDefault, 0) || "")}
-                      />
-                    </Field>
-                    <EmbedImageField
-                      label="Imagen URL"
-                      description="URL externa o sube un archivo (reemplaza la imagen anterior)."
-                      value={editForm.imageUrl}
-                      onChange={(imageUrl) => setEditForm((c) => (c ? { ...c, imageUrl } : c))}
-                      uploading={uploadingId === id}
-                      onUpload={async (file) => handleUpload(id, file)}
-                      onDelete={() => void handleClearImage(id)}
-                      deleting={savingId === id}
-                    />
-                    <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-2">
-                      <div>
-                        <p className="text-sm text-white">Ocultar de la tienda</p>
-                        <p className="text-xs text-zinc-500">No aparece en la tienda del servidor.</p>
-                      </div>
-                      <Switch
-                        checked={editForm.shopHidden}
-                        onCheckedChange={(shopHidden) => setEditForm((c) => (c ? { ...c, shopHidden } : c))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-2">
-                      <div>
-                        <p className="text-sm text-white">Quitar del catálogo</p>
-                        <p className="text-xs text-zinc-500">El objeto deja de estar disponible en este servidor.</p>
-                      </div>
-                      <Switch
-                        checked={editForm.catalogRemoved}
-                        onCheckedChange={(catalogRemoved) => setEditForm((c) => (c ? { ...c, catalogRemoved } : c))}
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" disabled={premiumLocked || busy} onClick={() => void handleSave(id)}>
-                        <Save className="mr-1 h-3.5 w-3.5" />
-                        {savingId === id ? "Guardando..." : "Guardar"}
-                      </Button>
-                      <Button size="sm" variant="danger" disabled={premiumLocked || busy} onClick={() => void handleClearImage(id)}>
-                        <Trash2 className="mr-1 h-3.5 w-3.5" />
-                        Quitar imagen
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </div>
           );
         })}
       </div>
+
+      <Modal
+        open={Boolean(editingItem && editForm)}
+        onClose={cancelEdit}
+        wide
+        title={editForm ? `Editar ${editForm.name || "objeto"}` : "Editar objeto"}
+        description="La categoría se usa como filtro en EyedShop. La serie personalizada también cuenta como categoría."
+        footer={(
+          <>
+            <Button variant="ghost" onClick={cancelEdit} disabled={busy}>
+              <X className="mr-2 h-4 w-4" />Cancelar
+            </Button>
+            {editingId ? (
+              <Button variant="danger" disabled={premiumLocked || busy} onClick={() => void handleClearImage(editingId)}>
+                <Trash2 className="mr-2 h-4 w-4" />Quitar imagen
+              </Button>
+            ) : null}
+            <Button disabled={premiumLocked || busy || !editingId} onClick={() => editingId && void handleSave(editingId)}>
+              <Save className="mr-2 h-4 w-4" />
+              {savingId === editingId ? "Guardando…" : "Guardar cambios"}
+            </Button>
+          </>
+        )}
+      >
+        {editForm && editingItem && editingId ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Nombre">
+              <Input value={editForm.name} onChange={(event) => setEditForm((c) => (c ? { ...c, name: event.target.value } : c))} />
+            </Field>
+            <Field label="Rareza">
+              <Select value={editForm.rarity} onChange={(event) => setEditForm((c) => (c ? { ...c, rarity: event.target.value } : c))}>
+                <option value="SSR">SSR</option>
+                <option value="SR">SR</option>
+                <option value="R">R</option>
+                <option value="N">N</option>
+              </Select>
+            </Field>
+            <Field label="Categoría (EyedComun)">
+              <Select
+                value={selectedCategory}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "__custom__") {
+                    setEditForm((c) => (c ? {
+                      ...c,
+                      series: CATEGORY_OPTIONS.some((o) => o.value === c.series.trim().toLowerCase()) ? "" : c.series,
+                    } : c));
+                    return;
+                  }
+                  setEditForm((c) => (c ? { ...c, series: value } : c));
+                }}
+              >
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+                <option value="__custom__">Personalizada / serie…</option>
+              </Select>
+            </Field>
+            <Field label="Precio en tienda" description="Vacío = precio automático del bot">
+              <Input
+                type="number"
+                value={editForm.shopPrice}
+                onChange={(event) => setEditForm((c) => (c ? { ...c, shopPrice: event.target.value } : c))}
+                placeholder={String(toNumberValue(editingItem.shopPriceDefault, 0) || "")}
+              />
+            </Field>
+            {selectedCategory === "__custom__" ? (
+              <Field label="Serie / categoría personalizada" description="Aparece como filtro de categoría en EyedShop">
+                <Input
+                  value={editForm.series}
+                  onChange={(event) => setEditForm((c) => (c ? { ...c, series: event.target.value } : c))}
+                  placeholder="Ej. Corte de Cristal"
+                />
+              </Field>
+            ) : null}
+            <div className="md:col-span-2">
+              <Field label="Descripción">
+                <Textarea
+                  value={editForm.description}
+                  onChange={(event) => setEditForm((c) => (c ? { ...c, description: event.target.value } : c))}
+                  rows={3}
+                />
+              </Field>
+            </div>
+            <div className="md:col-span-2">
+              <EmbedImageField
+                label="Imagen URL"
+                description="URL externa o sube un archivo (reemplaza la imagen anterior)."
+                value={editForm.imageUrl}
+                onChange={(imageUrl) => setEditForm((c) => (c ? { ...c, imageUrl } : c))}
+                uploading={uploadingId === editingId}
+                onUpload={async (file) => handleUpload(editingId, file)}
+                onDelete={() => void handleClearImage(editingId)}
+                deleting={savingId === editingId}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-2 md:col-span-2">
+              <div>
+                <p className="text-sm text-white">Ocultar de la tienda</p>
+                <p className="text-xs text-zinc-500">No aparece en la tienda del servidor ni en EyedShop.</p>
+              </div>
+              <Switch
+                checked={editForm.shopHidden}
+                onCheckedChange={(shopHidden) => setEditForm((c) => (c ? { ...c, shopHidden } : c))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-2 md:col-span-2">
+              <div>
+                <p className="text-sm text-white">Quitar del catálogo</p>
+                <p className="text-xs text-zinc-500">El objeto deja de estar disponible en este servidor.</p>
+              </div>
+              <Switch
+                checked={editForm.catalogRemoved}
+                onCheckedChange={(catalogRemoved) => setEditForm((c) => (c ? { ...c, catalogRemoved } : c))}
+              />
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

@@ -84,6 +84,7 @@ test('genera ids estables para productos del catálogo gacha', () => {
     assert.equal(product.source, 'gacha');
     assert.equal(product.sourceId, 'ch_049');
     assert.equal(product.category, 'corte-de-cristal');
+    assert.equal(product.rarity, 'SSR');
     assert.equal(product.ownedQuantity, 2);
     assert.equal(product.priceCoins, 3120);
 });
