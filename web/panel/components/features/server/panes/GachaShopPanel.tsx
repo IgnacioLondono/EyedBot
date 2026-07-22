@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Pencil, RotateCcw, Save, ShoppingBag, Trash2, X } from "lucide-react";
 import {
+  banGachaCatalogItem,
   deleteGachaCatalogItem,
   gachaCatalogImageUrl,
   saveGachaCatalogItem,
@@ -165,6 +166,28 @@ export function GachaShopPanel({
     }
   }
 
+  async function handleBanFromShop(characterId: string, itemName: string) {
+    if (!window.confirm(
+      `¿Quitar "${itemName}" de la tienda y borrar sus datos insertados (imagen, precio custom, etc.)?\n\nEl personaje global no se borra; solo deja de venderse en este servidor.`,
+    )) return;
+    setSavingId(characterId);
+    try {
+      await banGachaCatalogItem(guildId, characterId);
+      toast({
+        title: "Eliminado de la tienda",
+        description: "Se borraron los datos de catálogo insertados y ya no aparece en EyedShop.",
+        tone: "success",
+      });
+      if (editingId === characterId) cancelEdit();
+      setImageCacheToken((value) => value + 1);
+      await onReload();
+    } catch (err) {
+      toast({ title: "No se pudo eliminar", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function handleUpload(characterId: string, file: File | null) {
     if (!file) return;
     setUploadingId(characterId);
@@ -272,7 +295,16 @@ export function GachaShopPanel({
                     <Pencil className="mr-1 h-3.5 w-3.5" />
                     Editar
                   </Button>
-                  {hasOverride ? (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={premiumLocked || cardBusy}
+                    onClick={() => void handleBanFromShop(id, toStringValue(item.name, "objeto"))}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {toBooleanValue(item.catalogRemoved) ? "Purgar datos" : "Quitar de tienda"}
+                  </Button>
+                  {hasOverride && !toBooleanValue(item.catalogRemoved) ? (
                     <Button size="sm" variant="ghost" disabled={premiumLocked || cardBusy} onClick={() => void handleReset(id)}>
                       <RotateCcw className="mr-1 h-3.5 w-3.5" />
                       Resetear
@@ -297,8 +329,18 @@ export function GachaShopPanel({
               <X className="mr-2 h-4 w-4" />Cancelar
             </Button>
             {editingId ? (
-              <Button variant="danger" disabled={premiumLocked || busy} onClick={() => void handleClearImage(editingId)}>
-                <Trash2 className="mr-2 h-4 w-4" />Quitar imagen
+              <Button
+                variant="danger"
+                className="mr-auto"
+                disabled={premiumLocked || busy}
+                onClick={() => void handleBanFromShop(editingId, editForm?.name || "objeto")}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />Quitar de tienda
+              </Button>
+            ) : null}
+            {editingId ? (
+              <Button variant="ghost" disabled={premiumLocked || busy} onClick={() => void handleClearImage(editingId)}>
+                Quitar imagen
               </Button>
             ) : null}
             <Button disabled={premiumLocked || busy || !editingId} onClick={() => editingId && void handleSave(editingId)}>
@@ -392,8 +434,10 @@ export function GachaShopPanel({
             </div>
             <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-2 md:col-span-2">
               <div>
-                <p className="text-sm text-white">Quitar del catálogo</p>
-                <p className="text-xs text-zinc-500">El objeto deja de estar disponible en este servidor.</p>
+                <p className="text-sm text-white">Quitar del catálogo / tienda</p>
+                <p className="text-xs text-zinc-500">
+                  Al guardar o usar «Quitar de tienda» se borran imagen y datos insertados; solo queda fuera de EyedShop.
+                </p>
               </div>
               <Switch
                 checked={editForm.catalogRemoved}

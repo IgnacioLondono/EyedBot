@@ -5831,20 +5831,30 @@ app.delete('/api/guild/:guildId/gacha-catalog/:characterId', requireAuth, requir
             return res.status(403).json({ error: 'Necesitas permisos de gestión en este servidor' });
         }
 
-        const result = await gachaStore.deleteGuildCatalogItem(
-            guildId,
-            characterId,
-            req.session.user?.id || 'web'
-        );
+        const banFromShop = req.body?.ban === true
+            || req.query.ban === '1'
+            || req.query.ban === 'true'
+            || req.query.mode === 'ban';
+
+        const result = banFromShop
+            ? await gachaStore.banGuildCatalogItem(guildId, characterId, req.session.user?.id || 'web')
+            : await gachaStore.deleteGuildCatalogItem(guildId, characterId, req.session.user?.id || 'web');
+
         if (!result.ok) {
             const msg = result.reason === 'no_override'
                 ? 'Este personaje no tiene personalización guardada en la base de datos.'
-                : (result.reason || 'No se pudo eliminar');
+                : result.reason === 'item_not_found'
+                    ? 'Personaje no encontrado en el catálogo global.'
+                    : (result.reason || 'No se pudo eliminar');
             return res.status(400).json({ error: msg });
         }
 
         await gachaStore.ensureGuildEconomyContent(guildId);
-        res.json({ success: true, item: result.item });
+        res.json({
+            success: true,
+            banned: banFromShop,
+            item: result.item
+        });
     } catch (error) {
         console.error('Error eliminando personalización del catálogo:', error);
         res.status(500).json({ error: 'Error al eliminar objeto del catálogo' });

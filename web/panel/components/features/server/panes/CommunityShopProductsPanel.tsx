@@ -205,22 +205,28 @@ export function CommunityShopProductsPanel({
     }
   }
 
-  async function removeProduct() {
-    if (!editingId) return;
-    const current = products.find((item) => toStringValue(item.id) === editingId);
-    const name = form.name.trim() || toStringValue(current?.name, "este producto");
-    if (!window.confirm(`¿Eliminar definitivamente "${name}"? Se borrarán compras e inventario asociados.`)) return;
+  async function removeProductById(product: Product) {
+    const id = toStringValue(product.id);
+    const name = toStringValue(product.name, "este producto");
+    if (!window.confirm(`¿Eliminar definitivamente "${name}"? Se borrará de la base de datos (compras e inventario incluidos).`)) return;
     setSaving(true);
     try {
-      await deleteCommunityShopProduct(guildId, editingId, toNumberValue(current?.version, 1));
+      await deleteCommunityShopProduct(guildId, id, toNumberValue(product.version, 1));
       toast({ title: "Producto eliminado", tone: "success" });
-      closeModal();
+      if (editingId === id) closeModal();
       await load();
     } catch (error) {
       toast({ title: "No se pudo eliminar", description: getErrorMessage(error), tone: "danger" });
     } finally {
       setSaving(false);
     }
+  }
+
+  async function removeProduct() {
+    if (!editingId) return;
+    const current = products.find((item) => toStringValue(item.id) === editingId);
+    if (!current) return;
+    await removeProductById(current);
   }
 
   async function handleUpload(file: File) {
@@ -286,6 +292,9 @@ export function CommunityShopProductsPanel({
                 <div className="mt-4 flex gap-2">
                   <Button size="sm" variant="secondary" disabled={saving} onClick={() => openEdit(product)}>
                     <Pencil className="mr-1 h-3.5 w-3.5" />Editar
+                  </Button>
+                  <Button size="sm" variant="danger" disabled={saving} onClick={() => void removeProductById(product)}>
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />Eliminar
                   </Button>
                   {toBooleanValue(product.active) ? (
                     <Button size="sm" variant="ghost" disabled={saving} onClick={() => void archive(product)}>

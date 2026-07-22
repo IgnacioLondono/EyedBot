@@ -472,22 +472,33 @@ function createCommunityShopService({ db = defaultDb } = {}) {
     }
 
     async function remove(guildId, productId, expectedVersion) {
-        const version = intInRange(expectedVersion, 1, 2_147_483_647);
-        if (!version) throw new CommunityShopError('INVALID_VERSION', 'Versión inválida');
+        const version = expectedVersion === undefined || expectedVersion === null || expectedVersion === ''
+            ? null
+            : intInRange(expectedVersion, 1, 2_147_483_647);
+        if (expectedVersion !== undefined && expectedVersion !== null && expectedVersion !== '' && !version) {
+            throw new CommunityShopError('INVALID_VERSION', 'Versión inválida');
+        }
         const deleted = await db.transaction(async (tx) => {
-            const rows = await tx.query(
-                `SELECT product_id, image_url FROM community_shop_products
-                 WHERE guild_id = ? AND product_id = ? AND version = ?
-                 FOR UPDATE`,
-                [String(guildId), String(productId), version]
-            );
+            const rows = version
+                ? await tx.query(
+                    `SELECT product_id, image_url, version FROM community_shop_products
+                     WHERE guild_id = ? AND product_id = ? AND version = ?
+                     FOR UPDATE`,
+                    [String(guildId), String(productId), version]
+                )
+                : await tx.query(
+                    `SELECT product_id, image_url, version FROM community_shop_products
+                     WHERE guild_id = ? AND product_id = ?
+                     FOR UPDATE`,
+                    [String(guildId), String(productId)]
+                );
             const row = rows[0];
             if (!row) throw new CommunityShopError('VERSION_CONFLICT', 'Producto no encontrado o modificado', 409);
             await tx.query('DELETE FROM community_shop_inventory WHERE product_id = ?', [String(productId)]);
             await tx.query('DELETE FROM community_shop_purchases WHERE product_id = ?', [String(productId)]);
             const result = await tx.query(
-                'DELETE FROM community_shop_products WHERE guild_id = ? AND product_id = ? AND version = ?',
-                [String(guildId), String(productId), version]
+                'DELETE FROM community_shop_products WHERE guild_id = ? AND product_id = ?',
+                [String(guildId), String(productId)]
             );
             if (!result.affectedRows) {
                 throw new CommunityShopError('VERSION_CONFLICT', 'Producto no encontrado o modificado', 409);

@@ -445,6 +445,12 @@ export const saveGachaCatalogItem = (guildId: string, characterId: string, body:
 export const deleteGachaCatalogItem = (guildId: string, characterId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/gacha-catalog/${encodeURIComponent(characterId)}`, { method: "DELETE" });
 
+export const banGachaCatalogItem = (guildId: string, characterId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/gacha-catalog/${encodeURIComponent(characterId)}`, {
+    method: "DELETE",
+    body: { ban: true },
+  });
+
 export const uploadGachaCatalogImage = (guildId: string, characterId: string, file: File) => {
   const form = new FormData();
   form.append("characterId", characterId);

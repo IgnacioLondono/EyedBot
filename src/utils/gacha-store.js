@@ -1201,6 +1201,26 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
         delete merged.removedFromGuildCatalog;
     }
 
+    // Si se saca del catálogo, no conservar personalizaciones ni blobs insertados.
+    if (merged.removedFromGuildCatalog === true) {
+        await deleteGuildCatalogShopImageBlob(guildId, base.id);
+        overrides[base.id] = {
+            removedFromGuildCatalog: true,
+            updatedAt: new Date().toISOString(),
+            updatedBy: String(updatedBy || 'system')
+        };
+        await setGuildCatalogOverrides(guildId, overrides);
+        await pruneHiddenSystemListings(guildId);
+        return {
+            ok: true,
+            item: {
+                ...normalizeCharacterRecord(base),
+                catalogRemoved: true,
+                shopHidden: false
+            }
+        };
+    }
+
     merged.updatedAt = new Date().toISOString();
     merged.updatedBy = String(updatedBy || 'system');
     overrides[base.id] = merged;
@@ -1239,6 +1259,39 @@ async function deleteGuildCatalogItem(guildId, characterId = '', updatedBy = 'sy
         ok: true,
         item: base ? normalizeCharacterRecord(base) : null,
         clearedBy: String(updatedBy || 'system')
+    };
+}
+
+/**
+ * Saca el personaje de la tienda del servidor y borra datos insertados
+ * (imagen MySQL/disco, precio custom, nombre, etc.). Solo deja el flag de exclusión.
+ */
+async function banGuildCatalogItem(guildId, characterId = '', updatedBy = 'system') {
+    const id = String(characterId || '').trim();
+    if (!id) return { ok: false, reason: 'invalid_id' };
+
+    const base = getCharacterPool().find((item) => item.id === id);
+    if (!base) return { ok: false, reason: 'item_not_found' };
+
+    await deleteGuildCatalogShopImageBlob(guildId, id);
+
+    const overrides = await getGuildCatalogOverrides(guildId);
+    overrides[id] = {
+        removedFromGuildCatalog: true,
+        updatedAt: new Date().toISOString(),
+        updatedBy: String(updatedBy || 'system')
+    };
+    await setGuildCatalogOverrides(guildId, overrides);
+    await pruneHiddenSystemListings(guildId);
+
+    return {
+        ok: true,
+        item: {
+            ...normalizeCharacterRecord(base),
+            catalogRemoved: true,
+            shopHidden: false
+        },
+        bannedBy: String(updatedBy || 'system')
     };
 }
 
@@ -1478,6 +1531,7 @@ module.exports = {
     listShopCatalogForAdmin,
     setGuildCatalogItem,
     deleteGuildCatalogItem,
+    banGuildCatalogItem,
     ensureGuildEconomyContent,
     addCoins,
     addCoinsInTransaction,
