@@ -1243,6 +1243,25 @@ function ensureGachaCatalogUploadsDir() {
     return uploadsDir;
 }
 
+function ensureCommunityShopUploadsDir(guildId = '') {
+    const safeGuildId = String(guildId || 'shared').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'shared';
+    const uploadsDir = path.join(uploadsRoot, 'community-shop', safeGuildId);
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    return { uploadsDir, safeGuildId };
+}
+
+function deleteCommunityShopUploadIfOwned(imageUrl = '') {
+    const raw = String(imageUrl || '').trim();
+    if (!raw) return false;
+    try {
+        const pathname = raw.startsWith('http') ? new URL(raw).pathname : raw.split('?')[0];
+        if (!pathname.startsWith('/uploads/community-shop/')) return false;
+        return deleteUploadDiskFile(pathname);
+    } catch {
+        return false;
+    }
+}
+
 function sanitizeUploadName(name = 'welcome-image') {
     return String(name)
         .toLowerCase()
@@ -5688,10 +5707,27 @@ app.patch('/api/guild/:guildId/community-shop-products/:productId', requireAuth,
 app.delete('/api/guild/:guildId/community-shop-products/:productId', requireAuth, requirePremium, async (req, res) => {
     try {
         if (!requireGuildShopManager(req, res)) return;
+        const hard = req.body?.hard === true || req.query.hard === '1' || req.query.hard === 'true';
+        const expectedVersion = req.body?.expectedVersion;
+        if (hard) {
+            const result = await communityShop.remove(
+                req.params.guildId,
+                req.params.productId,
+                expectedVersion
+            );
+            deleteCommunityShopUploadIfOwned(result.imageUrl);
+            communityEventBus.appendAsync({
+                guildId: req.params.guildId,
+                type: 'shop.products_changed',
+                scope: 'guild_public',
+                payload: { productId: req.params.productId, deleted: true }
+            }, 'shop.products_changed');
+            return res.json({ success: true, deleted: true });
+        }
         const result = await communityShop.archive(
             req.params.guildId,
             req.params.productId,
-            req.body?.expectedVersion,
+            expectedVersion,
             req.session.user?.id || 'web'
         );
         communityEventBus.appendAsync({
@@ -5705,8 +5741,39 @@ app.delete('/api/guild/:guildId/community-shop-products/:productId', requireAuth
         if (error instanceof CommunityShopError) {
             return res.status(error.status).json({ error: error.message, code: error.code });
         }
-        console.error('Error archivando producto comunitario:', error);
-        return res.status(500).json({ error: 'No se pudo archivar el producto' });
+        console.error('Error eliminando producto comunitario:', error);
+        return res.status(500).json({ error: 'No se pudo eliminar el producto' });
+    }
+});
+
+app.post('/api/guild/:guildId/community-shop-upload', requireAuth, requirePremium, upload.single('imageFile'), async (req, res) => {
+    try {
+        if (!requireGuildShopManager(req, res)) return;
+        const file = req.file;
+        if (!file?.buffer) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+        if (!String(file.mimetype || '').startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
+        if (file.buffer.length > 8 * 1024 * 1024) {
+            return res.status(400).json({ error: 'La imagen no puede superar 8 MB' });
+        }
+
+        const previousUrl = String(req.body?.previousUrl || '').trim();
+        const { uploadsDir, safeGuildId } = ensureCommunityShopUploadsDir(req.params.guildId);
+        const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || 'shop-item');
+        const extension = extFromMimeOrName(file.mimetype, file.originalname);
+        const fileName = `${Date.now()}_${baseName}${extension}`;
+        const outputPath = path.join(uploadsDir, fileName);
+        fs.writeFileSync(outputPath, file.buffer);
+        const publicPath = `/uploads/community-shop/${safeGuildId}/${fileName}`;
+        const imageUrl = buildPublicUploadUrl(req, publicPath);
+        if (previousUrl && previousUrl !== imageUrl) {
+            deleteCommunityShopUploadIfOwned(previousUrl);
+        }
+        return res.json({ success: true, imageUrl, path: publicPath });
+    } catch (error) {
+        console.error('Error subiendo imagen de tienda comunitaria:', error);
+        return res.status(500).json({ error: 'No se pudo subir la imagen' });
     }
 });
 

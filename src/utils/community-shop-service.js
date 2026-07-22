@@ -471,6 +471,32 @@ function createCommunityShopService({ db = defaultDb } = {}) {
         return { archived: true };
     }
 
+    async function remove(guildId, productId, expectedVersion) {
+        const version = intInRange(expectedVersion, 1, 2_147_483_647);
+        if (!version) throw new CommunityShopError('INVALID_VERSION', 'Versión inválida');
+        const deleted = await db.transaction(async (tx) => {
+            const rows = await tx.query(
+                `SELECT product_id, image_url FROM community_shop_products
+                 WHERE guild_id = ? AND product_id = ? AND version = ?
+                 FOR UPDATE`,
+                [String(guildId), String(productId), version]
+            );
+            const row = rows[0];
+            if (!row) throw new CommunityShopError('VERSION_CONFLICT', 'Producto no encontrado o modificado', 409);
+            await tx.query('DELETE FROM community_shop_inventory WHERE product_id = ?', [String(productId)]);
+            await tx.query('DELETE FROM community_shop_purchases WHERE product_id = ?', [String(productId)]);
+            const result = await tx.query(
+                'DELETE FROM community_shop_products WHERE guild_id = ? AND product_id = ? AND version = ?',
+                [String(guildId), String(productId), version]
+            );
+            if (!result.affectedRows) {
+                throw new CommunityShopError('VERSION_CONFLICT', 'Producto no encontrado o modificado', 409);
+            }
+            return { deleted: true, imageUrl: row.image_url ? String(row.image_url) : null };
+        });
+        return deleted;
+    }
+
     async function refundRolePurchase(guildId, userId, purchaseId, reason) {
         await db.transaction(async (tx) => {
             const key = `gacha_profile_${guildId}_${userId}`;
@@ -695,7 +721,7 @@ function createCommunityShopService({ db = defaultDb } = {}) {
         };
     }
 
-    return { list, listAdmin, create, update, archive, purchase };
+    return { list, listAdmin, create, update, archive, remove, purchase };
 }
 
 module.exports = {

@@ -1,18 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, PackagePlus, Pencil, Plus, Save, X } from "lucide-react";
+import { Archive, PackagePlus, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import {
   archiveCommunityShopProduct,
   createCommunityShopProduct,
+  deleteCommunityShopProduct,
   getCommunityShopProducts,
   updateCommunityShopProduct,
+  uploadCommunityShopImage,
 } from "@/lib/api/endpoints";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Switch } from "@/components/ui/Switch";
+import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { Field, Input, Select, Textarea } from "@/components/features/shared";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { asArray, asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
@@ -118,6 +121,7 @@ export function CommunityShopProductsPanel({
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     const payload = asRecord(await getCommunityShopProducts(guildId));
@@ -201,6 +205,39 @@ export function CommunityShopProductsPanel({
     }
   }
 
+  async function removeProduct() {
+    if (!editingId) return;
+    const current = products.find((item) => toStringValue(item.id) === editingId);
+    const name = form.name.trim() || toStringValue(current?.name, "este producto");
+    if (!window.confirm(`¿Eliminar definitivamente "${name}"? Se borrarán compras e inventario asociados.`)) return;
+    setSaving(true);
+    try {
+      await deleteCommunityShopProduct(guildId, editingId, toNumberValue(current?.version, 1));
+      toast({ title: "Producto eliminado", tone: "success" });
+      closeModal();
+      await load();
+    } catch (error) {
+      toast({ title: "No se pudo eliminar", description: getErrorMessage(error), tone: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpload(file: File) {
+    setUploading(true);
+    try {
+      const payload = asRecord(await uploadCommunityShopImage(guildId, file, form.imageUrl || undefined));
+      const imageUrl = toStringValue(payload.imageUrl);
+      if (!imageUrl) throw new Error("La subida no devolvió una URL");
+      setForm((current) => ({ ...current, imageUrl }));
+      toast({ title: "Imagen subida", description: "Quedará guardada al crear o actualizar el producto.", tone: "success" });
+    } catch (error) {
+      toast({ title: "No se pudo subir la imagen", description: getErrorMessage(error), tone: "danger" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const categorySelectValue = CATEGORY_OPTIONS.some((option) => option.value === form.category)
     ? form.category
     : "__custom__";
@@ -270,10 +307,15 @@ export function CommunityShopProductsPanel({
         description="Los cambios se reflejan en la tienda de EyedComun."
         footer={(
           <>
-            <Button variant="ghost" onClick={closeModal} disabled={saving}>
+            {editingId ? (
+              <Button variant="danger" className="mr-auto" disabled={premiumLocked || saving || uploading} onClick={() => void removeProduct()}>
+                <Trash2 className="mr-2 h-4 w-4" />Eliminar
+              </Button>
+            ) : null}
+            <Button variant="ghost" onClick={closeModal} disabled={saving || uploading}>
               <X className="mr-2 h-4 w-4" />Cancelar
             </Button>
-            <Button disabled={premiumLocked || saving || !form.name.trim()} onClick={() => void save()}>
+            <Button disabled={premiumLocked || saving || uploading || !form.name.trim()} onClick={() => void save()}>
               {editingId ? <Save className="mr-2 h-4 w-4" /> : <PackagePlus className="mr-2 h-4 w-4" />}
               {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear producto"}
             </Button>
@@ -359,9 +401,17 @@ export function CommunityShopProductsPanel({
               <Input value={form.itemKey} maxLength={64} onChange={(event) => setForm((c) => ({ ...c, itemKey: event.target.value }))} />
             </Field>
           ) : null}
-          <Field label="URL de imagen">
-            <Input type="url" value={form.imageUrl} onChange={(event) => setForm((c) => ({ ...c, imageUrl: event.target.value }))} />
-          </Field>
+          <div className="md:col-span-2">
+            <EmbedImageField
+              label="Imagen del producto"
+              description="Sube un archivo o pega una URL pública. La imagen se muestra en EyedShop."
+              value={form.imageUrl}
+              onChange={(imageUrl) => setForm((c) => ({ ...c, imageUrl }))}
+              uploading={uploading}
+              onUpload={handleUpload}
+              onDelete={() => setForm((c) => ({ ...c, imageUrl: "" }))}
+            />
+          </div>
           <div className="md:col-span-2">
             <Field label="Descripción">
               <Textarea value={form.description} maxLength={500} onChange={(event) => setForm((c) => ({ ...c, description: event.target.value }))} />

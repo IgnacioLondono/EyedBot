@@ -418,6 +418,19 @@ export const archiveCommunityShopProduct = (guildId: string, productId: string, 
     body: { expectedVersion },
   });
 
+export const deleteCommunityShopProduct = (guildId: string, productId: string, expectedVersion: number) =>
+  apiFetch(`/api/guild/${g(guildId)}/community-shop-products/${encodeURIComponent(productId)}`, {
+    method: "DELETE",
+    body: { expectedVersion, hard: true },
+  });
+
+export const uploadCommunityShopImage = (guildId: string, file: File, previousUrl?: string) => {
+  const form = new FormData();
+  form.append("imageFile", file);
+  if (previousUrl) form.append("previousUrl", previousUrl);
+  return apiForm(`/api/guild/${g(guildId)}/community-shop-upload`, form);
+};
+
 export const getGachaMarket = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/gacha-market`);
 
