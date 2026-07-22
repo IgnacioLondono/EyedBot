@@ -8715,6 +8715,7 @@ app.get('/api/community/profile/:userId', requireCommunityService, async (req, r
             gachaStore.getProfile(access.guild.id, userId),
             communityRanking(access.guild.id),
             communityStatsStore.getUserDailyStats(access.guild.id, userId, 180),
+            // Sin forceRefresh en cada visita: evita rate-limit de Discord y timeouts en EyedComun.
             communityMemberSummary(access.member, {}, null)
         ]);
         const rankIndex = ranking.findIndex((row) => row.userId === userId);
@@ -8818,7 +8819,11 @@ function communityPresence(member) {
 
 const communityUserProfileCache = new Map();
 const communityUserProfileLoads = new Map();
-const COMMUNITY_USER_PROFILE_TTL_MS = 45 * 1000;
+/** Cache de avatar/banner: balance entre frescura Nitro y no tumbar el lobby por rate-limit. */
+const COMMUNITY_USER_PROFILE_TTL_MS = Math.max(
+    60_000,
+    Number.parseInt(process.env.COMMUNITY_USER_PROFILE_TTL_MS || `${5 * 60 * 1000}`, 10) || 5 * 60 * 1000
+);
 
 function invalidateCommunityUserProfile(userId) {
     if (userId) communityUserProfileCache.delete(String(userId));
@@ -8838,13 +8843,24 @@ async function resolveCommunityUserProfile(client, userId, options = {}) {
 
     const load = Promise.resolve()
         .then(async () => {
-            const user = await client.users.fetch(id, { force: true }).catch(() => client.users.cache.get(id) || null);
+            let user = null;
+            if (forceRefresh) {
+                user = await client.users.fetch(id, { force: true }).catch(() => null);
+            }
+            if (!user) {
+                user = client.users.cache.get(id)
+                    || await client.users.fetch(id).catch(() => null);
+            }
             const accentNumber = Number(user?.accentColor);
             const bannerUrl = user?.bannerURL?.({ size: 1024, dynamic: true }) || null;
             const value = {
                 avatarUrl: user?.displayAvatarURL?.({ size: 256, dynamic: true }) || null,
-                // Cache-bust Discord CDN when the hash is reused briefly after edits.
-                bannerUrl: bannerUrl ? `${bannerUrl}${bannerUrl.includes('?') ? '&' : '?'}v=${Date.now()}` : null,
+                // Bust CDN solo al refrescar forzado; el hash de Discord ya cambia al editar banner.
+                bannerUrl: bannerUrl
+                    ? (forceRefresh
+                        ? `${bannerUrl}${bannerUrl.includes('?') ? '&' : '?'}v=${Date.now()}`
+                        : bannerUrl)
+                    : null,
                 accentColor: Number.isInteger(accentNumber) && accentNumber >= 0
                     ? `#${accentNumber.toString(16).padStart(6, '0')}`
                     : null
@@ -8875,9 +8891,9 @@ async function mapWithConcurrency(items, limit, worker) {
     return results;
 }
 
-async function communityMemberSummary(member, stats = {}, rank = null) {
+async function communityMemberSummary(member, stats = {}, rank = null, options = {}) {
     const presence = communityPresence(member);
-    const profile = await resolveCommunityUserProfile(member.client, member.user.id);
+    const profile = await resolveCommunityUserProfile(member.client, member.user.id, options);
     return {
         ...communityMemberView(member),
         avatarUrl: profile?.avatarUrl || member.displayAvatarURL?.({ size: 256 }) || null,
@@ -8923,9 +8939,10 @@ app.get('/api/community/members', requireCommunityService, async (req, res) => {
         }
 
         const ranking = await communityRanking(access.guild.id);
-        const members = await mapWithConcurrency(ranking.slice(0, 60), 6, async (row, index) => {
+        const members = await mapWithConcurrency(ranking.slice(0, 60), 8, async (row, index) => {
             const member = access.guild.members.cache.get(row.userId)
                 || await access.guild.members.fetch(row.userId).catch(() => null);
+            // Sin forceRefresh: el lobby no debe martillar Discord en cada carga.
             return member ? await communityMemberSummary(member, row, index + 1) : null;
         });
         return res.json({ members: members.filter(Boolean) });
