@@ -155,8 +155,8 @@ export function GachaPane({ guildId }: { guildId: string }) {
     }
   }
 
-  async function reloadShop() {
-    const shopData = asRecord(await getGachaShop(guildId));
+  async function reloadShop(options?: { includeRemoved?: boolean }) {
+    const shopData = asRecord(await getGachaShop(guildId, options));
     setShop(asArray(shopData.items || shopData).map((entry) => asRecord(entry)));
   }
 

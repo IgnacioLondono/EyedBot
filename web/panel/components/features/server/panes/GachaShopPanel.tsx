@@ -70,7 +70,7 @@ export function GachaShopPanel({
   guildId: string;
   items: ShopItem[];
   premiumLocked: boolean;
-  onReload: () => Promise<void>;
+  onReload: (options?: { includeRemoved?: boolean }) => Promise<void>;
 }) {
   const { toast } = useToast();
   const [editingItem, setEditingItem] = useState<ShopItem | null>(null);
@@ -82,16 +82,23 @@ export function GachaShopPanel({
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [removedCount, setRemovedCount] = useState(0);
 
   const editingId = editingItem ? toStringValue(editingItem.id) : null;
 
+  const activeItems = useMemo(
+    () => (showRemoved ? items.filter((item) => toBooleanValue(item.catalogRemoved)) : items.filter((item) => !toBooleanValue(item.catalogRemoved))),
+    [items, showRemoved],
+  );
+
   const existingCategories = useMemo(() => {
-    return [...new Set(items.map((item) => seriesKey(item)))].sort((a, b) => a.localeCompare(b, "es"));
-  }, [items]);
+    return [...new Set(activeItems.map((item) => seriesKey(item)))].sort((a, b) => a.localeCompare(b, "es"));
+  }, [activeItems]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((item) => {
+    return activeItems.filter((item) => {
       if (categoryFilter !== "all" && seriesKey(item) !== categoryFilter) return false;
       if (!q) return true;
       const haystack = [
@@ -104,7 +111,7 @@ export function GachaShopPanel({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [items, query, categoryFilter]);
+  }, [activeItems, query, categoryFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, ShopItem[]>();
@@ -121,6 +128,23 @@ export function GachaShopPanel({
     () => filtered.map((item, index) => toStringValue(item.id, `shop-${index}`)),
     [filtered],
   );
+
+  async function reload(options?: { includeRemoved?: boolean }) {
+    await onReload({ includeRemoved: options?.includeRemoved ?? showRemoved });
+  }
+
+  async function toggleShowRemoved() {
+    const next = !showRemoved;
+    setShowRemoved(next);
+    setSelectedIds([]);
+    setCategoryFilter("all");
+    try {
+      await onReload({ includeRemoved: next });
+    } catch (err) {
+      setShowRemoved(!next);
+      toast({ title: "No se pudo cargar el catálogo", description: getErrorMessage(err), tone: "danger" });
+    }
+  }
 
   function startEdit(item: ShopItem) {
     setEditingItem(item);
@@ -167,7 +191,7 @@ export function GachaShopPanel({
       await saveGachaCatalogItem(guildId, characterId, body);
       toast({ title: "Objeto actualizado", description: "Los cambios de la tienda quedaron guardados.", tone: "success" });
       cancelEdit();
-      await onReload();
+      await reload();
     } catch (err) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -179,10 +203,17 @@ export function GachaShopPanel({
     setSavingId(characterId);
     try {
       await deleteGachaCatalogItem(guildId, characterId);
-      toast({ title: "Personalización eliminada", description: "El objeto volvió al catálogo global.", tone: "success" });
+      toast({
+        title: showRemoved ? "Objeto restaurado" : "Personalización eliminada",
+        description: showRemoved
+          ? "Volvió a la tienda de este servidor."
+          : "El objeto volvió al catálogo global.",
+        tone: "success",
+      });
       if (editingId === characterId) cancelEdit();
       setImageCacheToken((value) => value + 1);
-      await onReload();
+      setRemovedCount((value) => Math.max(0, value - 1));
+      await reload({ includeRemoved: showRemoved });
     } catch (err) {
       toast({ title: "No se pudo resetear", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -192,20 +223,22 @@ export function GachaShopPanel({
 
   async function handleBanFromShop(characterId: string, itemName: string) {
     if (!window.confirm(
-      `¿Quitar "${itemName}" de la tienda y borrar sus datos insertados (imagen, precio custom, etc.)?\n\nEl personaje global no se borra; solo deja de venderse en este servidor.`,
+      `¿Eliminar "${itemName}" de la tienda?\n\nSe borran imagen y datos insertados de la base de datos. El personaje global no se borra; solo deja de venderse en este servidor.`,
     )) return;
     setSavingId(characterId);
     try {
       await banGachaCatalogItem(guildId, characterId);
       toast({
         title: "Eliminado de la tienda",
-        description: "Se borraron los datos de catálogo insertados y ya no aparece en EyedShop.",
+        description: "Datos de catálogo borrados de la BD. Desaparece de esta lista y de EyedShop.",
         tone: "success",
       });
       setSelectedIds((current) => current.filter((id) => id !== characterId));
       if (editingId === characterId) cancelEdit();
       setImageCacheToken((value) => value + 1);
-      await onReload();
+      setRemovedCount((value) => value + 1);
+      setShowRemoved(false);
+      await reload({ includeRemoved: false });
     } catch (err) {
       toast({ title: "No se pudo eliminar", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -215,18 +248,21 @@ export function GachaShopPanel({
 
   async function handleBulkBan() {
     if (!selectedIds.length) return;
-    if (!window.confirm(`¿Quitar ${selectedIds.length} objetos de la tienda y purgar sus datos insertados?`)) return;
+    if (!window.confirm(`¿Eliminar ${selectedIds.length} objetos de la tienda y borrar sus datos insertados de la BD?`)) return;
     setBulkBusy(true);
     try {
       const payload = asRecord(await banGachaCatalogItems(guildId, selectedIds));
+      const banned = toNumberValue(payload.banned);
       toast({
         title: "Eliminación masiva lista",
-        description: `${toNumberValue(payload.banned)} fuera de tienda · ${toNumberValue(payload.failed)} fallaron.`,
+        description: `${banned} eliminados · ${toNumberValue(payload.failed)} fallaron.`,
         tone: "success",
       });
       setSelectedIds([]);
       setImageCacheToken((value) => value + 1);
-      await onReload();
+      setRemovedCount((value) => value + banned);
+      setShowRemoved(false);
+      await reload({ includeRemoved: false });
     } catch (err) {
       toast({ title: "No se pudo eliminar la selección", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -241,7 +277,7 @@ export function GachaShopPanel({
       await uploadGachaCatalogImage(guildId, characterId, file);
       toast({ title: "Imagen actualizada", description: "La imagen anterior fue reemplazada.", tone: "success" });
       setImageCacheToken((value) => value + 1);
-      await onReload();
+      await reload();
       if (editingId === characterId) {
         setEditForm((current) => (current ? { ...current, imageUrl: "" } : current));
       }
@@ -258,7 +294,7 @@ export function GachaShopPanel({
       await saveGachaCatalogItem(guildId, characterId, { clearCatalogImage: true, imageUrl: "" });
       toast({ title: "Imagen eliminada", description: "Se quitó la imagen personalizada del objeto.", tone: "success" });
       setImageCacheToken((value) => value + 1);
-      await onReload();
+      await reload();
     } catch (err) {
       toast({ title: "No se pudo eliminar imagen", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -290,7 +326,7 @@ export function GachaShopPanel({
         <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Catálogo gacha clásico</p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto_auto]">
+      <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto_auto_auto]">
         <Field label="Buscar">
           <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, serie o ID" />
         </Field>
@@ -306,15 +342,61 @@ export function GachaShopPanel({
           </Select>
         </Field>
         <div className="flex items-end">
+          <Button
+            variant={showRemoved ? "secondary" : "ghost"}
+            disabled={!removedCount && !showRemoved && !items.some((item) => toBooleanValue(item.catalogRemoved))}
+            onClick={() => void toggleShowRemoved()}
+          >
+            {showRemoved ? "Ver activos" : `Quitados (${Math.max(removedCount, items.filter((item) => toBooleanValue(item.catalogRemoved)).length)})`}
+          </Button>
+        </div>
+        <div className="flex items-end">
           <Button variant="secondary" disabled={!visibleIds.length || bulkBusy} onClick={toggleSelectVisible}>
             {allVisibleSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}
             {allVisibleSelected ? "Quitar selección" : "Seleccionar visibles"}
           </Button>
         </div>
         <div className="flex items-end">
-          <Button variant="danger" disabled={premiumLocked || bulkBusy || selectedIds.length === 0} onClick={() => void handleBulkBan()}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Eliminar {selectedIds.length || ""}
+          <Button
+            variant="danger"
+            disabled={premiumLocked || bulkBusy || selectedIds.length === 0}
+            onClick={() => {
+              if (showRemoved) {
+                void (async () => {
+                  if (!selectedIds.length) return;
+                  if (!window.confirm(`¿Restaurar ${selectedIds.length} objetos a la tienda?`)) return;
+                  setBulkBusy(true);
+                  try {
+                    let restored = 0;
+                    for (const id of selectedIds) {
+                      try {
+                        await deleteGachaCatalogItem(guildId, id);
+                        restored += 1;
+                      } catch {
+                        /* continue */
+                      }
+                    }
+                    toast({
+                      title: "Restauración lista",
+                      description: `${restored} objetos volvieron a la tienda.`,
+                      tone: "success",
+                    });
+                    setSelectedIds([]);
+                    setRemovedCount((value) => Math.max(0, value - restored));
+                    await reload({ includeRemoved: true });
+                  } catch (err) {
+                    toast({ title: "No se pudo restaurar", description: getErrorMessage(err), tone: "danger" });
+                  } finally {
+                    setBulkBusy(false);
+                  }
+                })();
+                return;
+              }
+              void handleBulkBan();
+            }}
+          >
+            {showRemoved ? <RotateCcw className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
+            {showRemoved ? `Restaurar ${selectedIds.length || ""}` : `Eliminar ${selectedIds.length || ""}`}
           </Button>
         </div>
       </div>
@@ -384,25 +466,34 @@ export function GachaShopPanel({
                     </p>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" disabled={premiumLocked || cardBusy} onClick={() => startEdit(item)}>
-                        <Pencil className="mr-1 h-3.5 w-3.5" />
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        disabled={premiumLocked || cardBusy}
-                        onClick={() => void handleBanFromShop(id, toStringValue(item.name, "objeto"))}
-                      >
-                        <Trash2 className="mr-1 h-3.5 w-3.5" />
-                        {toBooleanValue(item.catalogRemoved) ? "Purgar" : "Quitar"}
-                      </Button>
-                      {hasOverride && !toBooleanValue(item.catalogRemoved) ? (
-                        <Button size="sm" variant="ghost" disabled={premiumLocked || cardBusy} onClick={() => void handleReset(id)}>
+                      {toBooleanValue(item.catalogRemoved) ? (
+                        <Button size="sm" variant="secondary" disabled={premiumLocked || cardBusy} onClick={() => void handleReset(id)}>
                           <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                          Resetear
+                          Restaurar
                         </Button>
-                      ) : null}
+                      ) : (
+                        <>
+                          <Button size="sm" variant="secondary" disabled={premiumLocked || cardBusy} onClick={() => startEdit(item)}>
+                            <Pencil className="mr-1 h-3.5 w-3.5" />
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={premiumLocked || cardBusy}
+                            onClick={() => void handleBanFromShop(id, toStringValue(item.name, "objeto"))}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" />
+                            Quitar
+                          </Button>
+                          {hasOverride ? (
+                            <Button size="sm" variant="ghost" disabled={premiumLocked || cardBusy} onClick={() => void handleReset(id)}>
+                              <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                              Resetear
+                            </Button>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

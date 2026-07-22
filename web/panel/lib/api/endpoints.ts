@@ -400,8 +400,10 @@ export const getGachaStats = (guildId: string) =>
 export const getGachaLeaderboard = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/gacha-leaderboard`);
 
-export const getGachaShop = (guildId: string) =>
-  apiFetch(`/api/guild/${g(guildId)}/gacha-shop`);
+export const getGachaShop = (guildId: string, options?: { includeRemoved?: boolean }) => {
+  const query = options?.includeRemoved ? "?includeRemoved=1" : "";
+  return apiFetch(`/api/guild/${g(guildId)}/gacha-shop${query}`);
+};
 
 export const getCommunityShopProducts = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/community-shop-products`);

@@ -898,18 +898,88 @@ async function setGuildCatalogOverrides(guildId, overrides = {}) {
     return normalized;
 }
 
+function catalogBannedKey(guildId) {
+    return `gacha_catalog_banned_${guildId}`;
+}
+
+async function getGuildCatalogBannedIds(guildId) {
+    const key = catalogBannedKey(guildId);
+    const fromCache = cacheGet(key);
+    if (fromCache !== null) return Array.isArray(fromCache) ? fromCache : [];
+
+    let banned = [];
+    try {
+        const fromDb = await db.get(key);
+        if (Array.isArray(fromDb)) {
+            banned = [...new Set(fromDb.map((id) => String(id || '').trim()).filter(Boolean))];
+        }
+    } catch {}
+
+    cacheSet(key, banned);
+    return banned;
+}
+
+async function setGuildCatalogBannedIds(guildId, bannedIds = []) {
+    const key = catalogBannedKey(guildId);
+    const banned = [...new Set((Array.isArray(bannedIds) ? bannedIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean))];
+    try { await db.set(key, banned); } catch {}
+    cacheSet(key, banned);
+    return banned;
+}
+
+/** Mueve stubs legacy `removedFromGuildCatalog` a la lista de baneados y limpia overrides. */
+async function migrateLegacyCatalogRemovals(guildId) {
+    const overrides = await getGuildCatalogOverrides(guildId);
+    const legacyIds = Object.entries(overrides)
+        .filter(([, entry]) => entry && entry.removedFromGuildCatalog === true)
+        .map(([id]) => id);
+    if (!legacyIds.length) {
+        return {
+            overrides,
+            banned: new Set(await getGuildCatalogBannedIds(guildId))
+        };
+    }
+
+    const banned = new Set(await getGuildCatalogBannedIds(guildId));
+    let changedOverrides = false;
+    for (const id of legacyIds) {
+        banned.add(id);
+        if (overrides[id]) {
+            delete overrides[id];
+            changedOverrides = true;
+        }
+        await deleteGuildCatalogShopImageBlob(guildId, id).catch(() => null);
+    }
+    await setGuildCatalogBannedIds(guildId, [...banned]);
+    if (changedOverrides) await setGuildCatalogOverrides(guildId, overrides);
+    return { overrides, banned };
+}
+
+async function getGuildCatalogExclusionState(guildId) {
+    return migrateLegacyCatalogRemovals(guildId);
+}
+
+function isCatalogExcluded(characterId, bannedSet, overrides = {}) {
+    const id = String(characterId || '');
+    if (!id) return false;
+    if (bannedSet?.has(id)) return true;
+    return overrides[id]?.removedFromGuildCatalog === true;
+}
+
 async function getGuildCharacterPool(guildId) {
     const base = getCharacterPool();
     if (!guildId) return base;
 
-    const overrides = await getGuildCatalogOverrides(guildId);
+    const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
     return base
-        .filter((character) => overrides[character.id]?.removedFromGuildCatalog !== true)
+        .filter((character) => !isCatalogExcluded(character.id, banned, overrides))
         .map((character) => applyCatalogOverride(character, overrides[character.id]));
 }
 
 async function getShopCatalog(guildId, config = {}) {
-    const overrides = await getGuildCatalogOverrides(guildId);
+    const { overrides } = await getGuildCatalogExclusionState(guildId);
     const pool = await getGuildCharacterPool(guildId);
     return pool
         .filter((character) => !overrides[character.id]?.shopHidden)
@@ -923,13 +993,14 @@ async function getShopCatalog(guildId, config = {}) {
         .sort((left, right) => right.price - left.price);
 }
 
-/** Catálogo completo para el panel web (incluye ocultos y eliminados del servidor). */
-async function listShopCatalogForAdmin(guildId, config = {}) {
-    const overrides = await getGuildCatalogOverrides(guildId);
+/** Catálogo para el panel. Por defecto no incluye los excluidos del servidor. */
+async function listShopCatalogForAdmin(guildId, config = {}, options = {}) {
+    const includeRemoved = options.includeRemoved === true;
+    const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
     const base = getCharacterPool();
     const rows = base.map((character) => {
         const entry = overrides[character.id];
-        const catalogRemoved = entry?.removedFromGuildCatalog === true;
+        const catalogRemoved = isCatalogExcluded(character.id, banned, overrides);
         const merged = applyCatalogOverride(character, entry || {});
         const price = resolveShopPrice(merged, config, entry || {});
         const custom = entry?.shopPrice;
@@ -944,7 +1015,8 @@ async function listShopCatalogForAdmin(guildId, config = {}) {
             catalogRemoved,
             ...(hasCustomPrice ? { shopPriceOverride: Math.min(1_000_000_000, customNum) } : {})
         };
-    });
+    }).filter((row) => includeRemoved || row.catalogRemoved !== true);
+
     rows.sort((left, right) => {
         const lr = left.catalogRemoved === true ? 1 : 0;
         const rr = right.catalogRemoved === true ? 1 : 0;
@@ -955,13 +1027,16 @@ async function listShopCatalogForAdmin(guildId, config = {}) {
 }
 
 async function pruneHiddenSystemListings(guildId) {
-    const overrides = await getGuildCatalogOverrides(guildId);
-    const blockedIds = new Set(Object.entries(overrides)
-        .filter(([, entry]) => entry && (
-            entry.shopHidden === true
-            || entry.removedFromGuildCatalog === true
-        ))
-        .map(([id]) => id));
+    const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
+    const blockedIds = new Set([
+        ...banned,
+        ...Object.entries(overrides)
+            .filter(([, entry]) => entry && (
+                entry.shopHidden === true
+                || entry.removedFromGuildCatalog === true
+            ))
+            .map(([id]) => id)
+    ]);
     if (!blockedIds.size) return false;
 
     const market = await getGuildMarket(guildId);
@@ -1184,10 +1259,14 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
     delete patch._explicitImageClear;
     delete patch._explicitShopPriceClear;
     delete patch._explicitGuildCatalogRestore;
-    const hasMutation = Object.keys(patch).length > 0 || explicitImageClear || explicitShopPriceClear || explicitGuildCatalogRestore;
+    const hasMutation = Object.keys(patch).length > 0
+        || explicitImageClear
+        || explicitShopPriceClear
+        || explicitGuildCatalogRestore
+        || rawPatch.removedFromGuildCatalog === true;
     if (!hasMutation) return { ok: false, reason: 'empty_patch' };
 
-    const overrides = await getGuildCatalogOverrides(guildId);
+    const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
     const prev = { ...(overrides[base.id] || {}) };
     const merged = { ...prev, ...patch };
 
@@ -1199,17 +1278,19 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
     }
     if (explicitGuildCatalogRestore) {
         delete merged.removedFromGuildCatalog;
+        banned.delete(base.id);
+        await setGuildCatalogBannedIds(guildId, [...banned]);
     }
 
-    // Si se saca del catálogo, no conservar personalizaciones ni blobs insertados.
-    if (merged.removedFromGuildCatalog === true) {
+    // Quitar de tienda: borra override/imagen de BD y deja solo el id en la lista de excluidos.
+    if (merged.removedFromGuildCatalog === true || rawPatch.removedFromGuildCatalog === true) {
         await deleteGuildCatalogShopImageBlob(guildId, base.id);
-        overrides[base.id] = {
-            removedFromGuildCatalog: true,
-            updatedAt: new Date().toISOString(),
-            updatedBy: String(updatedBy || 'system')
-        };
-        await setGuildCatalogOverrides(guildId, overrides);
+        if (overrides[base.id]) {
+            delete overrides[base.id];
+            await setGuildCatalogOverrides(guildId, overrides);
+        }
+        banned.add(base.id);
+        await setGuildCatalogBannedIds(guildId, [...banned]);
         await pruneHiddenSystemListings(guildId);
         return {
             ok: true,
@@ -1246,11 +1327,19 @@ async function deleteGuildCatalogItem(guildId, characterId = '', updatedBy = 'sy
     const id = String(characterId || '').trim();
     if (!id) return { ok: false, reason: 'invalid_id' };
 
-    const overrides = await getGuildCatalogOverrides(guildId);
-    if (!overrides[id]) return { ok: false, reason: 'no_override' };
+    const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
+    const hadOverride = Boolean(overrides[id]);
+    const wasBanned = banned.has(id);
+    if (!hadOverride && !wasBanned) return { ok: false, reason: 'no_override' };
 
-    delete overrides[id];
-    await setGuildCatalogOverrides(guildId, overrides);
+    if (hadOverride) {
+        delete overrides[id];
+        await setGuildCatalogOverrides(guildId, overrides);
+    }
+    if (wasBanned) {
+        banned.delete(id);
+        await setGuildCatalogBannedIds(guildId, [...banned]);
+    }
     await deleteGuildCatalogShopImageBlob(guildId, id);
     await pruneHiddenSystemListings(guildId);
 
@@ -1264,7 +1353,7 @@ async function deleteGuildCatalogItem(guildId, characterId = '', updatedBy = 'sy
 
 /**
  * Saca el personaje de la tienda del servidor y borra datos insertados
- * (imagen MySQL/disco, precio custom, nombre, etc.). Solo deja el flag de exclusión.
+ * (imagen MySQL/disco, precio custom, nombre, etc.). Solo deja el id excluido.
  */
 async function banGuildCatalogItem(guildId, characterId = '', updatedBy = 'system') {
     const id = String(characterId || '').trim();
@@ -1275,13 +1364,13 @@ async function banGuildCatalogItem(guildId, characterId = '', updatedBy = 'syste
 
     await deleteGuildCatalogShopImageBlob(guildId, id);
 
-    const overrides = await getGuildCatalogOverrides(guildId);
-    overrides[id] = {
-        removedFromGuildCatalog: true,
-        updatedAt: new Date().toISOString(),
-        updatedBy: String(updatedBy || 'system')
-    };
-    await setGuildCatalogOverrides(guildId, overrides);
+    const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
+    if (overrides[id]) {
+        delete overrides[id];
+        await setGuildCatalogOverrides(guildId, overrides);
+    }
+    banned.add(id);
+    await setGuildCatalogBannedIds(guildId, [...banned]);
     await pruneHiddenSystemListings(guildId);
 
     return {
@@ -1532,6 +1621,7 @@ module.exports = {
     setGuildCatalogItem,
     deleteGuildCatalogItem,
     banGuildCatalogItem,
+    getGuildCatalogBannedIds,
     ensureGuildEconomyContent,
     addCoins,
     addCoinsInTransaction,

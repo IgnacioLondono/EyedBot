@@ -5599,19 +5599,23 @@ app.get('/api/guild/:guildId/gacha-shop', requireAuth, requirePremium, async (re
 
         await gachaStore.ensureGuildEconomyContent(guildId);
         const config = await gachaStore.getConfig(guildId);
+        const includeRemoved = String(req.query.includeRemoved || '') === '1'
+            || String(req.query.includeRemoved || '') === 'true';
         const imageIds = await gachaStore.listGuildCatalogShopImageIds(guildId);
-        const items = (await gachaStore.listShopCatalogForAdmin(guildId, config)).slice(0, 250).map((row) => ({
-            ...row,
-            catalogDbImage: imageIds.has(row.id)
-        }));
+        const items = (await gachaStore.listShopCatalogForAdmin(guildId, config, { includeRemoved }))
+            .slice(0, 250)
+            .map((row) => ({
+                ...row,
+                catalogDbImage: imageIds.has(row.id)
+            }));
         const visibleShop = await gachaStore.getShopCatalog(guildId, config);
-        const removedFromCatalogCount = items.filter((item) => item.catalogRemoved === true).length;
+        const bannedIds = await gachaStore.getGuildCatalogBannedIds(guildId);
         res.json({
             success: true,
             items,
             visibleShopCount: visibleShop.length,
             totalItems: items.length,
-            removedFromCatalogCount,
+            removedFromCatalogCount: bannedIds.length,
             config
         });
     } catch (error) {
