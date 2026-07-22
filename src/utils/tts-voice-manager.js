@@ -18,7 +18,7 @@ const {
     formatGuildVoiceDisplay
 } = require('./tts-voice-catalog');
 
-/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: string[], processing: boolean, voiceId: string, idleTimer?: NodeJS.Timeout | null, listenChannelId: string, ownerUserId: string }} TtsGuildSession */
+/** @typedef {{ connection: import('@discordjs/voice').VoiceConnection, player: import('@discordjs/voice').AudioPlayer, queue: Array<{ text: string, voiceId: string }>, processing: boolean, voiceId: string, idleTimer?: NodeJS.Timeout | null, listenChannelId: string, ownerUserId: string, allowedUserIds: Set<string>, speakerVoices: Map<string, string> }} TtsGuildSession */
 
 /** @type {Map<string, TtsGuildSession>} */
 const sessions = new Map();
@@ -163,6 +163,125 @@ function messageMatchesListenChannel(message, listenChannelId) {
 }
 
 /**
+ * @param {TtsGuildSession} session
+ * @param {string} userId
+ */
+function canUserSpeak(session, userId) {
+    if (!READ_OWNER_ONLY) return true;
+    const id = String(userId || '');
+    if (!id || !session) return false;
+    if (session.allowedUserIds instanceof Set && session.allowedUserIds.size > 0) {
+        return session.allowedUserIds.has(id);
+    }
+    return String(session.ownerUserId || '') === id;
+}
+
+/**
+ * @param {string} guildId
+ * @param {string} ownerUserId
+ * @returns {Set<string>}
+ */
+function createAllowedSet(ownerUserId) {
+    const set = new Set();
+    const owner = String(ownerUserId || '');
+    if (owner) set.add(owner);
+    return set;
+}
+
+/**
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @param {TtsGuildSession} session
+ */
+function canManageSpeakers(interaction, session) {
+    if (!session) return false;
+    if (String(interaction.user.id) === String(session.ownerUserId)) return true;
+    const perms = interaction.memberPermissions;
+    return Boolean(perms?.has?.('ManageGuild') || perms?.has?.('Administrator'));
+}
+
+/**
+ * @param {string} guildId
+ * @param {string} targetUserId
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @param {string} [voiceChoice]
+ */
+function allowSpeaker(guildId, targetUserId, interaction, voiceChoice) {
+    const s = sessions.get(String(guildId || ''));
+    if (!s) return { ok: false, reason: 'no_sesion' };
+    if (!canManageSpeakers(interaction, s)) return { ok: false, reason: 'sin_permiso' };
+    const uid = String(targetUserId || '');
+    if (!/^\d{10,25}$/.test(uid)) return { ok: false, reason: 'usuario_invalido' };
+    if (!(s.allowedUserIds instanceof Set)) s.allowedUserIds = createAllowedSet(s.ownerUserId);
+    if (!(s.speakerVoices instanceof Map)) s.speakerVoices = new Map();
+    const voice = resolveVoiceChoice(voiceChoice || s.voiceId);
+    s.allowedUserIds.add(uid);
+    s.speakerVoices.set(uid, voice.id);
+    return {
+        ok: true,
+        reason: 'ok',
+        speakers: [...s.allowedUserIds],
+        voiceId: voice.id,
+        voiceDisplay: formatGuildVoiceDisplay(voice.id, null)
+    };
+}
+
+/**
+ * @param {string} guildId
+ * @param {string} targetUserId
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ */
+function revokeSpeaker(guildId, targetUserId, interaction) {
+    const s = sessions.get(String(guildId || ''));
+    if (!s) return { ok: false, reason: 'no_sesion' };
+    if (!canManageSpeakers(interaction, s)) return { ok: false, reason: 'sin_permiso' };
+    const uid = String(targetUserId || '');
+    if (!/^\d{10,25}$/.test(uid)) return { ok: false, reason: 'usuario_invalido' };
+    if (uid === String(s.ownerUserId)) return { ok: false, reason: 'es_dueno' };
+    if (!(s.allowedUserIds instanceof Set)) s.allowedUserIds = createAllowedSet(s.ownerUserId);
+    if (!(s.speakerVoices instanceof Map)) s.speakerVoices = new Map();
+    s.allowedUserIds.delete(uid);
+    s.speakerVoices.delete(uid);
+    return { ok: true, reason: 'ok', speakers: [...s.allowedUserIds] };
+}
+
+/**
+ * @param {string} guildId
+ */
+function listSpeakers(guildId) {
+    const s = sessions.get(String(guildId || ''));
+    if (!s) return { ok: false, reason: 'no_sesion' };
+    if (!(s.allowedUserIds instanceof Set)) s.allowedUserIds = createAllowedSet(s.ownerUserId);
+    if (!(s.speakerVoices instanceof Map)) s.speakerVoices = new Map();
+    const speakers = [...s.allowedUserIds].map((userId) => {
+        const voiceId = s.speakerVoices.get(userId) || (userId === String(s.ownerUserId) ? s.voiceId : s.voiceId);
+        return {
+            userId,
+            voiceId,
+            voiceDisplay: formatGuildVoiceDisplay(voiceId, null),
+            isOwner: userId === String(s.ownerUserId)
+        };
+    });
+    return {
+        ok: true,
+        reason: 'ok',
+        ownerUserId: String(s.ownerUserId || ''),
+        speakers
+    };
+}
+
+/**
+ * @param {TtsGuildSession} session
+ * @param {string} userId
+ */
+function resolveSpeakerVoiceId(session, userId) {
+    const uid = String(userId || '');
+    if (session?.speakerVoices instanceof Map && session.speakerVoices.has(uid)) {
+        return session.speakerVoices.get(uid);
+    }
+    return session?.voiceId || envDefaultVoiceId();
+}
+
+/**
  * Canal de texto a escuchar tras /tts unir o /tts escuchar (pendiente se consume al unir de nuevo si aplica).
  * @returns {string}
  */
@@ -278,12 +397,14 @@ async function drainQueue(guildId) {
 
     try {
         while (s.queue.length && sessions.has(id)) {
-            const line = s.queue.shift();
-            if (!String(line || '').trim()) continue;
+            const item = s.queue.shift();
+            const line = typeof item === 'string' ? item : String(item?.text || '');
+            const voiceId = typeof item === 'string' ? s.voiceId : String(item?.voiceId || s.voiceId);
+            if (!line.trim()) continue;
 
             let files = [];
             try {
-                const voice = resolveVoiceChoice(s.voiceId);
+                const voice = resolveVoiceChoice(voiceId);
                 files = await textToMp3TempFiles(line, { tl: voice.tl, semitones: voice.semitones });
                 for (const f of files) {
                     await playOneMp3Path(s, f).catch(() => null);
@@ -329,6 +450,8 @@ async function joinSession(interaction) {
             if (sess) {
                 sess.listenChannelId = resolveListenChannelIdFromInteraction(interaction);
                 sess.ownerUserId = interaction.user.id;
+                sess.allowedUserIds = createAllowedSet(interaction.user.id);
+                sess.speakerVoices = new Map([[interaction.user.id, sess.voiceId]]);
             }
             return { ok: true, reason: 'ya_conectado' };
         }
@@ -390,15 +513,19 @@ async function joinSession(interaction) {
 
     const listenChannelId = resolveListenChannelIdFromInteraction(interaction);
 
+    const ownerUserId = interaction.user.id;
+    const voiceId = guildPendingVoiceId.get(guildId) || envDefaultVoiceId();
     sessions.set(guildId, {
         connection,
         player,
         queue: [],
         processing: false,
-        voiceId: guildPendingVoiceId.get(guildId) || envDefaultVoiceId(),
+        voiceId,
         idleTimer: null,
         listenChannelId,
-        ownerUserId: interaction.user.id
+        ownerUserId,
+        allowedUserIds: createAllowedSet(ownerUserId),
+        speakerVoices: new Map([[ownerUserId, voiceId]])
     });
 
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
@@ -427,7 +554,7 @@ function hasGuildSession(guildId) {
  * Encola texto cuando ya hay sesión TTS activa.
  * @param {string} guildId
  * @param {string} text
- * @param {{ fromChat?: boolean }} [opts]
+ * @param {{ fromChat?: boolean, userId?: string, voiceId?: string }} [opts]
  */
 async function enqueueTextForGuild(guildId, text, opts = {}) {
     const gid = String(guildId || '');
@@ -441,7 +568,11 @@ async function enqueueTextForGuild(guildId, text, opts = {}) {
         return { ok: false, reason: 'cola_llena' };
     }
 
-    q.queue.push(line);
+    const voiceId = opts.voiceId
+        || (opts.userId ? resolveSpeakerVoiceId(q, opts.userId) : q.voiceId)
+        || q.voiceId;
+
+    q.queue.push({ text: line, voiceId: String(voiceId) });
     resetIdleTimer(gid);
     drainQueue(gid).catch((e) => console.warn('TTS drain:', e));
 
@@ -469,6 +600,8 @@ function setGuildVoiceId(guildId, rawChoice) {
     const q = sessions.get(gid);
     if (q) {
         q.voiceId = entry.id;
+        if (!(q.speakerVoices instanceof Map)) q.speakerVoices = new Map();
+        if (q.ownerUserId) q.speakerVoices.set(String(q.ownerUserId), entry.id);
     }
     return true;
 }
@@ -539,7 +672,7 @@ function attachCleanupListeners(client) {
             const gid = message.guildId;
             const s = sessions.get(gid);
             if (!s?.listenChannelId) return;
-            if (READ_OWNER_ONLY && s.ownerUserId && message.author.id !== s.ownerUserId) return;
+            if (READ_OWNER_ONLY && !canUserSpeak(s, message.author.id)) return;
             if (!messageMatchesListenChannel(message, s.listenChannelId)) return;
 
             Promise.resolve()
@@ -548,7 +681,10 @@ function attachCleanupListeners(client) {
                         const prefix = await getCachedGuildPrefix(gid);
                         if (prefix && message.content.startsWith(prefix)) return;
                     }
-                    await enqueueTextForGuild(gid, message.content, { fromChat: true });
+                    await enqueueTextForGuild(gid, message.content, {
+                        fromChat: true,
+                        userId: message.author.id
+                    });
                 })
                 .catch((e) => console.warn('TTS messageCreate:', e?.message || e));
         });
@@ -567,6 +703,9 @@ module.exports = {
     setGuildLang,
     setGuildListenChannel,
     getGuildLang,
+    allowSpeaker,
+    revokeSpeaker,
+    listSpeakers,
     attachCleanupListeners,
     destroyGuildSession,
     disconnectAll,
