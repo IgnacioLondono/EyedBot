@@ -5704,6 +5704,57 @@ app.patch('/api/guild/:guildId/community-shop-products/:productId', requireAuth,
     }
 });
 
+app.post('/api/guild/:guildId/community-shop-products/bulk-delete', requireAuth, requirePremium, async (req, res) => {
+    try {
+        if (!requireGuildShopManager(req, res)) return;
+        const rows = Array.isArray(req.body?.products) ? req.body.products : [];
+        const products = rows
+            .map((entry) => ({
+                id: String(entry?.id || '').trim(),
+                expectedVersion: entry?.expectedVersion
+            }))
+            .filter((entry) => entry.id)
+            .slice(0, 100);
+        if (!products.length) return res.status(400).json({ error: 'Selecciona al menos un producto' });
+
+        const results = [];
+        for (const product of products) {
+            try {
+                const removed = await communityShop.remove(
+                    req.params.guildId,
+                    product.id,
+                    product.expectedVersion
+                );
+                deleteCommunityShopUploadIfOwned(removed.imageUrl);
+                results.push({ id: product.id, ok: true });
+            } catch (error) {
+                results.push({
+                    id: product.id,
+                    ok: false,
+                    error: error instanceof CommunityShopError ? error.message : 'No se pudo eliminar'
+                });
+            }
+        }
+        if (results.some((item) => item.ok)) {
+            communityEventBus.appendAsync({
+                guildId: req.params.guildId,
+                type: 'shop.products_changed',
+                scope: 'guild_public',
+                payload: { bulkDeleted: results.filter((item) => item.ok).map((item) => item.id) }
+            }, 'shop.products_changed');
+        }
+        return res.json({
+            success: true,
+            deleted: results.filter((item) => item.ok).length,
+            failed: results.filter((item) => !item.ok).length,
+            results
+        });
+    } catch (error) {
+        console.error('Error en bulk-delete de tienda comunitaria:', error);
+        return res.status(500).json({ error: 'No se pudieron eliminar los productos' });
+    }
+});
+
 app.delete('/api/guild/:guildId/community-shop-products/:productId', requireAuth, requirePremium, async (req, res) => {
     try {
         if (!requireGuildShopManager(req, res)) return;
@@ -5774,6 +5825,37 @@ app.post('/api/guild/:guildId/community-shop-upload', requireAuth, requirePremiu
     } catch (error) {
         console.error('Error subiendo imagen de tienda comunitaria:', error);
         return res.status(500).json({ error: 'No se pudo subir la imagen' });
+    }
+});
+
+app.post('/api/guild/:guildId/gacha-catalog/bulk-ban', requireAuth, requirePremium, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!hasAdminOrManageGuildPermission(userGuild)) {
+            return res.status(403).json({ error: 'Necesitas permisos de gestión en este servidor' });
+        }
+        const ids = Array.isArray(req.body?.characterIds)
+            ? [...new Set(req.body.characterIds.map((id) => String(id || '').trim()).filter(Boolean))].slice(0, 200)
+            : [];
+        if (!ids.length) return res.status(400).json({ error: 'Selecciona al menos un objeto' });
+
+        const results = [];
+        for (const characterId of ids) {
+            const result = await gachaStore.banGuildCatalogItem(guildId, characterId, req.session.user?.id || 'web');
+            results.push({ characterId, ok: result.ok === true, reason: result.reason || null });
+        }
+        await gachaStore.ensureGuildEconomyContent(guildId);
+        return res.json({
+            success: true,
+            banned: results.filter((item) => item.ok).length,
+            failed: results.filter((item) => !item.ok).length,
+            results
+        });
+    } catch (error) {
+        console.error('Error en bulk-ban de catálogo gacha:', error);
+        return res.status(500).json({ error: 'No se pudieron eliminar los objetos' });
     }
 });
 

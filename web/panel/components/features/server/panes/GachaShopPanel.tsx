@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, RotateCcw, Save, ShoppingBag, Trash2, X } from "lucide-react";
+import { CheckSquare, Pencil, RotateCcw, Save, ShoppingBag, Square, Trash2, X } from "lucide-react";
 import {
   banGachaCatalogItem,
+  banGachaCatalogItems,
   deleteGachaCatalogItem,
   gachaCatalogImageUrl,
   saveGachaCatalogItem,
@@ -18,7 +19,7 @@ import { Switch } from "@/components/ui/Switch";
 import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { Field, Input, Select, Textarea } from "@/components/features/shared";
 import { CommunityShopProductsPanel } from "@/components/features/server/panes/CommunityShopProductsPanel";
-import { getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
+import { asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
 
 type ShopItem = Record<string, unknown>;
 
@@ -32,16 +33,6 @@ type ShopEditState = {
   catalogRemoved: boolean;
   imageUrl: string;
 };
-
-const CATEGORY_OPTIONS = [
-  { value: "personajes", label: "Personajes" },
-  { value: "roles", label: "Roles" },
-  { value: "objetos", label: "Objetos" },
-  { value: "boosts", label: "Boosts" },
-  { value: "eventos", label: "Eventos" },
-  { value: "cosmeticos", label: "Cosméticos" },
-  { value: "general", label: "General" },
-];
 
 function itemToEditState(item: ShopItem): ShopEditState {
   const overridePrice = item.shopPriceOverride;
@@ -66,10 +57,8 @@ function resolveShopImage(item: ShopItem, guildId: string, cacheToken: number) {
   return "";
 }
 
-function categorySelectValue(series: string) {
-  const normalized = series.trim().toLowerCase();
-  if (CATEGORY_OPTIONS.some((option) => option.value === normalized)) return normalized;
-  return "__custom__";
+function seriesKey(item: ShopItem) {
+  return toStringValue(item.series, "Sin categoría").trim() || "Sin categoría";
 }
 
 export function GachaShopPanel({
@@ -90,13 +79,21 @@ export function GachaShopPanel({
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [imageCacheToken, setImageCacheToken] = useState(0);
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const editingId = editingItem ? toStringValue(editingItem.id) : null;
 
+  const existingCategories = useMemo(() => {
+    return [...new Set(items.map((item) => seriesKey(item)))].sort((a, b) => a.localeCompare(b, "es"));
+  }, [items]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
     return items.filter((item) => {
+      if (categoryFilter !== "all" && seriesKey(item) !== categoryFilter) return false;
+      if (!q) return true;
       const haystack = [
         toStringValue(item.name),
         toStringValue(item.series),
@@ -107,7 +104,23 @@ export function GachaShopPanel({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [items, query]);
+  }, [items, query, categoryFilter]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, ShopItem[]>();
+    for (const item of filtered) {
+      const key = seriesKey(item);
+      const list = map.get(key) || [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
+  }, [filtered]);
+
+  const visibleIds = useMemo(
+    () => filtered.map((item, index) => toStringValue(item.id, `shop-${index}`)),
+    [filtered],
+  );
 
   function startEdit(item: ShopItem) {
     setEditingItem(item);
@@ -117,6 +130,17 @@ export function GachaShopPanel({
   function cancelEdit() {
     setEditingItem(null);
     setEditForm(null);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => (
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]
+    ));
+  }
+
+  function toggleSelectVisible() {
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? selectedIds.filter((id) => !visibleIds.includes(id)) : [...new Set([...selectedIds, ...visibleIds])]);
   }
 
   async function handleSave(characterId: string) {
@@ -178,6 +202,7 @@ export function GachaShopPanel({
         description: "Se borraron los datos de catálogo insertados y ya no aparece en EyedShop.",
         tone: "success",
       });
+      setSelectedIds((current) => current.filter((id) => id !== characterId));
       if (editingId === characterId) cancelEdit();
       setImageCacheToken((value) => value + 1);
       await onReload();
@@ -185,6 +210,27 @@ export function GachaShopPanel({
       toast({ title: "No se pudo eliminar", description: getErrorMessage(err), tone: "danger" });
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function handleBulkBan() {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`¿Quitar ${selectedIds.length} objetos de la tienda y purgar sus datos insertados?`)) return;
+    setBulkBusy(true);
+    try {
+      const payload = asRecord(await banGachaCatalogItems(guildId, selectedIds));
+      toast({
+        title: "Eliminación masiva lista",
+        description: `${toNumberValue(payload.banned)} fuera de tienda · ${toNumberValue(payload.failed)} fallaron.`,
+        tone: "success",
+      });
+      setSelectedIds([]);
+      setImageCacheToken((value) => value + 1);
+      await onReload();
+    } catch (err) {
+      toast({ title: "No se pudo eliminar la selección", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -233,8 +279,8 @@ export function GachaShopPanel({
     );
   }
 
-  const busy = Boolean(editingId && (savingId === editingId || uploadingId === editingId));
-  const selectedCategory = editForm ? categorySelectValue(editForm.series) : "personajes";
+  const busy = Boolean(editingId && (savingId === editingId || uploadingId === editingId)) || bulkBusy;
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
 
   return (
     <div className="space-y-5">
@@ -243,86 +289,135 @@ export function GachaShopPanel({
       <div className="border-t border-white/10 pt-5">
         <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Catálogo gacha clásico</p>
       </div>
-      <Field label="Buscar en catálogo">
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, serie o ID" />
-      </Field>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((item, index) => {
-          const id = toStringValue(item.id, `shop-${index}`);
-          const imageSrc = resolveShopImage(item, guildId, imageCacheToken);
-          const hasOverride =
-            item.shopPriceOverride !== undefined ||
-            toBooleanValue(item.shopHidden) ||
-            toBooleanValue(item.catalogRemoved) ||
-            toBooleanValue(item.catalogDbImage);
-          const cardBusy = savingId === id || uploadingId === id;
-
-          return (
-            <div key={id} className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
-              {imageSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageSrc} alt="" className="h-40 w-full object-cover" />
-              ) : (
-                <div className="flex h-40 items-center justify-center bg-white/5 text-sm text-zinc-500">Sin imagen</div>
-              )}
-              <div className="space-y-4 p-5">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-white">{toStringValue(item.name, "Item")}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.2em] text-fuchsia-300">
-                      {toStringValue(item.rarity, "N")} · {toStringValue(item.series, "sin serie")}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap justify-end gap-1">
-                    {toBooleanValue(item.shopHidden) ? <Badge variant="default">Oculto</Badge> : null}
-                    {toBooleanValue(item.catalogRemoved) ? <Badge variant="danger">Fuera catálogo</Badge> : null}
-                    {item.shopPriceOverride !== undefined ? <Badge variant="premium">Precio custom</Badge> : null}
-                  </div>
-                </div>
-
-                <p className="line-clamp-3 text-sm text-zinc-400">{toStringValue(item.description, "Sin descripción")}</p>
-                <p className="text-sm text-fuchsia-200">
-                  {toStringValue(item.price, "0")} monedas
-                  {item.shopPriceDefault !== undefined ? (
-                    <span className="ml-2 text-xs text-zinc-500">(base {toNumberValue(item.shopPriceDefault)})</span>
-                  ) : null}
-                </p>
-                <p className="truncate text-[11px] text-zinc-600">ID: {id}</p>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" disabled={premiumLocked || cardBusy} onClick={() => startEdit(item)}>
-                    <Pencil className="mr-1 h-3.5 w-3.5" />
-                    Editar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    disabled={premiumLocked || cardBusy}
-                    onClick={() => void handleBanFromShop(id, toStringValue(item.name, "objeto"))}
-                  >
-                    <Trash2 className="mr-1 h-3.5 w-3.5" />
-                    {toBooleanValue(item.catalogRemoved) ? "Purgar datos" : "Quitar de tienda"}
-                  </Button>
-                  {hasOverride && !toBooleanValue(item.catalogRemoved) ? (
-                    <Button size="sm" variant="ghost" disabled={premiumLocked || cardBusy} onClick={() => void handleReset(id)}>
-                      <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                      Resetear
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto_auto]">
+        <Field label="Buscar">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, serie o ID" />
+        </Field>
+        <Field label="Categoría existente">
+          <Select
+            value={existingCategories.includes(categoryFilter) || categoryFilter === "all" ? categoryFilter : "all"}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+          >
+            <option value="all">Todas ({existingCategories.length})</option>
+            {existingCategories.map((category) => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </Select>
+        </Field>
+        <div className="flex items-end">
+          <Button variant="secondary" disabled={!visibleIds.length || bulkBusy} onClick={toggleSelectVisible}>
+            {allVisibleSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}
+            {allVisibleSelected ? "Quitar selección" : "Seleccionar visibles"}
+          </Button>
+        </div>
+        <div className="flex items-end">
+          <Button variant="danger" disabled={premiumLocked || bulkBusy || selectedIds.length === 0} onClick={() => void handleBulkBan()}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Eliminar {selectedIds.length || ""}
+          </Button>
+        </div>
       </div>
+
+      {grouped.map(([category, categoryItems]) => (
+        <section key={category} className="space-y-3">
+          <h4 className="text-sm font-medium uppercase tracking-[0.14em] text-fuchsia-300">
+            {category} · {categoryItems.length}
+          </h4>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {categoryItems.map((item, index) => {
+              const id = toStringValue(item.id, `shop-${index}`);
+              const imageSrc = resolveShopImage(item, guildId, imageCacheToken);
+              const hasOverride =
+                item.shopPriceOverride !== undefined ||
+                toBooleanValue(item.shopHidden) ||
+                toBooleanValue(item.catalogRemoved) ||
+                toBooleanValue(item.catalogDbImage);
+              const cardBusy = savingId === id || uploadingId === id || bulkBusy;
+              const checked = selectedIds.includes(id);
+
+              return (
+                <div
+                  key={id}
+                  className={`overflow-hidden rounded-3xl border bg-black/20 ${
+                    checked ? "border-fuchsia-400/45" : "border-white/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 border-b border-white/8 px-4 py-2">
+                    <label className="flex items-center gap-2 text-xs text-zinc-400">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={premiumLocked || cardBusy}
+                        onChange={() => toggleSelected(id)}
+                      />
+                      Seleccionar
+                    </label>
+                    {toBooleanValue(item.catalogRemoved) ? <Badge variant="danger">Fuera catálogo</Badge> : null}
+                  </div>
+                  {imageSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imageSrc} alt="" className="h-40 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-40 items-center justify-center bg-white/5 text-sm text-zinc-500">Sin imagen</div>
+                  )}
+                  <div className="space-y-4 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-white">{toStringValue(item.name, "Item")}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-fuchsia-300">
+                          {toStringValue(item.rarity, "N")} · {seriesKey(item)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {toBooleanValue(item.shopHidden) ? <Badge variant="default">Oculto</Badge> : null}
+                        {item.shopPriceOverride !== undefined ? <Badge variant="premium">Precio custom</Badge> : null}
+                      </div>
+                    </div>
+
+                    <p className="line-clamp-3 text-sm text-zinc-400">{toStringValue(item.description, "Sin descripción")}</p>
+                    <p className="text-sm text-fuchsia-200">
+                      {toStringValue(item.price, "0")} monedas
+                      {item.shopPriceDefault !== undefined ? (
+                        <span className="ml-2 text-xs text-zinc-500">(base {toNumberValue(item.shopPriceDefault)})</span>
+                      ) : null}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" disabled={premiumLocked || cardBusy} onClick={() => startEdit(item)}>
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={premiumLocked || cardBusy}
+                        onClick={() => void handleBanFromShop(id, toStringValue(item.name, "objeto"))}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        {toBooleanValue(item.catalogRemoved) ? "Purgar" : "Quitar"}
+                      </Button>
+                      {hasOverride && !toBooleanValue(item.catalogRemoved) ? (
+                        <Button size="sm" variant="ghost" disabled={premiumLocked || cardBusy} onClick={() => void handleReset(id)}>
+                          <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                          Resetear
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       <Modal
         open={Boolean(editingItem && editForm)}
         onClose={cancelEdit}
         wide
         title={editForm ? `Editar ${editForm.name || "objeto"}` : "Editar objeto"}
-        description="La categoría se usa como filtro en EyedShop. La serie personalizada también cuenta como categoría."
+        description="La categoría/serie es libre: escribe una nueva o elige una que ya exista en el catálogo."
         footer={(
           <>
             <Button variant="ghost" onClick={cancelEdit} disabled={busy}>
@@ -363,26 +458,18 @@ export function GachaShopPanel({
                 <option value="N">N</option>
               </Select>
             </Field>
-            <Field label="Categoría (EyedComun)">
-              <Select
-                value={selectedCategory}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value === "__custom__") {
-                    setEditForm((c) => (c ? {
-                      ...c,
-                      series: CATEGORY_OPTIONS.some((o) => o.value === c.series.trim().toLowerCase()) ? "" : c.series,
-                    } : c));
-                    return;
-                  }
-                  setEditForm((c) => (c ? { ...c, series: value } : c));
-                }}
-              >
-                {CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+            <Field label="Categoría / serie" description="Solo usa categorías reales; puedes crear una nueva escribiendo.">
+              <Input
+                list={`gacha-series-${guildId}`}
+                value={editForm.series}
+                onChange={(event) => setEditForm((c) => (c ? { ...c, series: event.target.value } : c))}
+                placeholder="Ej. Corte de Cristal"
+              />
+              <datalist id={`gacha-series-${guildId}`}>
+                {existingCategories.map((category) => (
+                  <option key={category} value={category} />
                 ))}
-                <option value="__custom__">Personalizada / serie…</option>
-              </Select>
+              </datalist>
             </Field>
             <Field label="Precio en tienda" description="Vacío = precio automático del bot">
               <Input
@@ -392,15 +479,6 @@ export function GachaShopPanel({
                 placeholder={String(toNumberValue(editingItem.shopPriceDefault, 0) || "")}
               />
             </Field>
-            {selectedCategory === "__custom__" ? (
-              <Field label="Serie / categoría personalizada" description="Aparece como filtro de categoría en EyedShop">
-                <Input
-                  value={editForm.series}
-                  onChange={(event) => setEditForm((c) => (c ? { ...c, series: event.target.value } : c))}
-                  placeholder="Ej. Corte de Cristal"
-                />
-              </Field>
-            ) : null}
             <div className="md:col-span-2">
               <Field label="Descripción">
                 <Textarea
@@ -436,7 +514,7 @@ export function GachaShopPanel({
               <div>
                 <p className="text-sm text-white">Quitar del catálogo / tienda</p>
                 <p className="text-xs text-zinc-500">
-                  Al guardar o usar «Quitar de tienda» se borran imagen y datos insertados; solo queda fuera de EyedShop.
+                  Al guardar se borran imagen y datos insertados; solo queda fuera de EyedShop.
                 </p>
               </div>
               <Switch

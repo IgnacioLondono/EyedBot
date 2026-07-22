@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, PackagePlus, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Archive, CheckSquare, PackagePlus, Pencil, Plus, Save, Square, Trash2, X } from "lucide-react";
 import {
   archiveCommunityShopProduct,
   createCommunityShopProduct,
   deleteCommunityShopProduct,
+  deleteCommunityShopProducts,
   getCommunityShopProducts,
   updateCommunityShopProduct,
   uploadCommunityShopImage,
@@ -38,22 +39,12 @@ type FormState = {
   active: boolean;
 };
 
-const CATEGORY_OPTIONS = [
-  { value: "general", label: "General" },
-  { value: "personajes", label: "Personajes" },
-  { value: "roles", label: "Roles" },
-  { value: "objetos", label: "Objetos" },
-  { value: "boosts", label: "Boosts" },
-  { value: "eventos", label: "Eventos" },
-  { value: "cosmeticos", label: "Cosméticos" },
-];
-
 const emptyForm: FormState = {
   type: "item",
   name: "",
   description: "",
   imageUrl: "",
-  category: "general",
+  category: "",
   priceCoins: "100",
   stock: "",
   perUserLimit: "",
@@ -101,7 +92,7 @@ function requestBody(form: FormState) {
 }
 
 function categoryLabel(value: string) {
-  return CATEGORY_OPTIONS.find((option) => option.value === value)?.label || value;
+  return String(value || "sin-categoria").replace(/-/g, " ");
 }
 
 export function CommunityShopProductsPanel({
@@ -122,6 +113,8 @@ export function CommunityShopProductsPanel({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   const load = useCallback(async () => {
     const payload = asRecord(await getCommunityShopProducts(guildId));
@@ -148,6 +141,27 @@ export function CommunityShopProductsPanel({
     [characters],
   );
 
+  const existingCategories = useMemo(() => {
+    return [...new Set(products.map((item) => toStringValue(item.category, "general")).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "es"));
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    if (categoryFilter === "all") return products;
+    return products.filter((item) => toStringValue(item.category, "general") === categoryFilter);
+  }, [products, categoryFilter]);
+
+  const groupedProducts = useMemo(() => {
+    const map = new Map<string, Product[]>();
+    for (const product of filteredProducts) {
+      const key = toStringValue(product.category, "general");
+      const list = map.get(key) || [];
+      list.push(product);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
+  }, [filteredProducts]);
+
   function closeModal() {
     setModalOpen(false);
     setEditingId(null);
@@ -156,7 +170,10 @@ export function CommunityShopProductsPanel({
 
   function openCreate() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      category: existingCategories[0] || "",
+    });
     setModalOpen(true);
   }
 
@@ -164,6 +181,20 @@ export function CommunityShopProductsPanel({
     setEditingId(toStringValue(product.id));
     setForm(productForm(product));
     setModalOpen(true);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => (
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]
+    ));
+  }
+
+  function toggleSelectVisible() {
+    const visibleIds = filteredProducts.map((item) => toStringValue(item.id));
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected
+      ? selectedIds.filter((id) => !visibleIds.includes(id))
+      : [...new Set([...selectedIds, ...visibleIds])]);
   }
 
   async function save() {
@@ -213,6 +244,7 @@ export function CommunityShopProductsPanel({
     try {
       await deleteCommunityShopProduct(guildId, id, toNumberValue(product.version, 1));
       toast({ title: "Producto eliminado", tone: "success" });
+      setSelectedIds((current) => current.filter((entry) => entry !== id));
       if (editingId === id) closeModal();
       await load();
     } catch (error) {
@@ -227,6 +259,31 @@ export function CommunityShopProductsPanel({
     const current = products.find((item) => toStringValue(item.id) === editingId);
     if (!current) return;
     await removeProductById(current);
+  }
+
+  async function removeSelected() {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`¿Eliminar ${selectedIds.length} productos de la base de datos?`)) return;
+    setSaving(true);
+    try {
+      const payload = selectedIds.map((id) => {
+        const product = products.find((item) => toStringValue(item.id) === id);
+        return { id, expectedVersion: toNumberValue(product?.version, 1) };
+      });
+      const result = asRecord(await deleteCommunityShopProducts(guildId, payload));
+      toast({
+        title: "Eliminación masiva lista",
+        description: `${toNumberValue(result.deleted)} eliminados · ${toNumberValue(result.failed)} fallaron.`,
+        tone: "success",
+      });
+      setSelectedIds([]);
+      closeModal();
+      await load();
+    } catch (error) {
+      toast({ title: "No se pudo eliminar la selección", description: getErrorMessage(error), tone: "danger" });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleUpload(file: File) {
@@ -244,9 +301,8 @@ export function CommunityShopProductsPanel({
     }
   }
 
-  const categorySelectValue = CATEGORY_OPTIONS.some((option) => option.value === form.category)
-    ? form.category
-    : "__custom__";
+  const visibleIds = filteredProducts.map((item) => toStringValue(item.id));
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
 
   return (
     <section className="space-y-5 rounded-3xl border border-fuchsia-400/15 bg-fuchsia-400/[0.035] p-5">
@@ -263,6 +319,32 @@ export function CommunityShopProductsPanel({
         </Button>
       </div>
 
+      {!loading && products.length > 0 ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[180px] flex-1">
+            <Field label="Categoría existente">
+              <Select
+                value={existingCategories.includes(categoryFilter) || categoryFilter === "all" ? categoryFilter : "all"}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                <option value="all">Todas ({existingCategories.length})</option>
+                {existingCategories.map((category) => (
+                  <option key={category} value={category}>{categoryLabel(category)}</option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <Button variant="secondary" disabled={!visibleIds.length || saving} onClick={toggleSelectVisible}>
+            {allVisibleSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}
+            {allVisibleSelected ? "Quitar selección" : "Seleccionar visibles"}
+          </Button>
+          <Button variant="danger" disabled={premiumLocked || saving || selectedIds.length === 0} onClick={() => void removeSelected()}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Eliminar {selectedIds.length || ""}
+          </Button>
+        </div>
+      ) : null}
+
       {loading ? <p className="text-sm text-zinc-500">Cargando productos…</p> : products.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-8 text-center">
           <p className="text-sm text-zinc-400">Todavía no hay extras. Pulsa + para crear el primero.</p>
@@ -272,39 +354,58 @@ export function CommunityShopProductsPanel({
           </Button>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {products.map((product) => {
-            const id = toStringValue(product.id);
-            const stock = product.stock === null ? "Ilimitado" : `${toNumberValue(product.remainingStock)} restantes`;
-            return (
-              <article key={id} className="rounded-2xl border border-white/8 bg-black/20 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="font-medium text-white">{toStringValue(product.name)}</h4>
-                    <p className="mt-1 text-xs uppercase tracking-wider text-fuchsia-300">
-                      {categoryLabel(toStringValue(product.category, "general"))} · {toStringValue(product.type)}
-                    </p>
-                  </div>
-                  {!toBooleanValue(product.active) ? <Badge variant="danger">Inactivo</Badge> : null}
-                </div>
-                <p className="mt-3 line-clamp-2 text-sm text-zinc-400">{toStringValue(product.description, "Sin descripción")}</p>
-                <p className="mt-3 text-sm text-fuchsia-100">{toNumberValue(product.priceCoins).toLocaleString("es")} EyedCoins · {stock}</p>
-                <div className="mt-4 flex gap-2">
-                  <Button size="sm" variant="secondary" disabled={saving} onClick={() => openEdit(product)}>
-                    <Pencil className="mr-1 h-3.5 w-3.5" />Editar
-                  </Button>
-                  <Button size="sm" variant="danger" disabled={saving} onClick={() => void removeProductById(product)}>
-                    <Trash2 className="mr-1 h-3.5 w-3.5" />Eliminar
-                  </Button>
-                  {toBooleanValue(product.active) ? (
-                    <Button size="sm" variant="ghost" disabled={saving} onClick={() => void archive(product)}>
-                      <Archive className="mr-1 h-3.5 w-3.5" />Desactivar
-                    </Button>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
+        <div className="space-y-5">
+          {groupedProducts.map(([category, categoryItems]) => (
+            <div key={category} className="space-y-3">
+              <h4 className="text-xs font-medium uppercase tracking-[0.16em] text-fuchsia-300">
+                {categoryLabel(category)} · {categoryItems.length}
+              </h4>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {categoryItems.map((product) => {
+                  const id = toStringValue(product.id);
+                  const stock = product.stock === null ? "Ilimitado" : `${toNumberValue(product.remainingStock)} restantes`;
+                  const checked = selectedIds.includes(id);
+                  return (
+                    <article key={id} className={`rounded-2xl border bg-black/20 p-4 ${checked ? "border-fuchsia-400/45" : "border-white/8"}`}>
+                      <label className="mb-3 flex items-center gap-2 text-xs text-zinc-400">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={saving}
+                          onChange={() => toggleSelected(id)}
+                        />
+                        Seleccionar
+                      </label>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-medium text-white">{toStringValue(product.name)}</h4>
+                          <p className="mt-1 text-xs uppercase tracking-wider text-fuchsia-300">
+                            {categoryLabel(toStringValue(product.category, "general"))} · {toStringValue(product.type)}
+                          </p>
+                        </div>
+                        {!toBooleanValue(product.active) ? <Badge variant="danger">Inactivo</Badge> : null}
+                      </div>
+                      <p className="mt-3 line-clamp-2 text-sm text-zinc-400">{toStringValue(product.description, "Sin descripción")}</p>
+                      <p className="mt-3 text-sm text-fuchsia-100">{toNumberValue(product.priceCoins).toLocaleString("es")} EyedCoins · {stock}</p>
+                      <div className="mt-4 flex gap-2">
+                        <Button size="sm" variant="secondary" disabled={saving} onClick={() => openEdit(product)}>
+                          <Pencil className="mr-1 h-3.5 w-3.5" />Editar
+                        </Button>
+                        <Button size="sm" variant="danger" disabled={saving} onClick={() => void removeProductById(product)}>
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />Eliminar
+                        </Button>
+                        {toBooleanValue(product.active) ? (
+                          <Button size="sm" variant="ghost" disabled={saving} onClick={() => void archive(product)}>
+                            <Archive className="mr-1 h-3.5 w-3.5" />Desactivar
+                          </Button>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -313,7 +414,7 @@ export function CommunityShopProductsPanel({
         onClose={closeModal}
         wide
         title={editingId ? "Editar producto" : "Nuevo producto"}
-        description="Los cambios se reflejan en la tienda de EyedComun."
+        description="La categoría es libre: escribe una nueva o elige una que ya exista."
         footer={(
           <>
             {editingId ? (
@@ -342,40 +443,23 @@ export function CommunityShopProductsPanel({
           <Field label="Nombre">
             <Input value={form.name} maxLength={120} onChange={(event) => setForm((c) => ({ ...c, name: event.target.value }))} />
           </Field>
-          <Field label="Categoría">
-            <Select
-              value={categorySelectValue}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === "__custom__") {
-                  setForm((c) => ({
-                    ...c,
-                    category: CATEGORY_OPTIONS.some((o) => o.value === c.category) ? "" : c.category,
-                  }));
-                  return;
-                }
-                setForm((c) => ({ ...c, category: value }));
-              }}
-            >
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+          <Field label="Categoría" description="Escribe una categoría nueva o elige una existente">
+            <Input
+              list={`community-shop-categories-${guildId}`}
+              value={form.category}
+              maxLength={64}
+              placeholder="mi-categoria"
+              onChange={(event) => setForm((c) => ({ ...c, category: event.target.value }))}
+            />
+            <datalist id={`community-shop-categories-${guildId}`}>
+              {existingCategories.map((category) => (
+                <option key={category} value={category} />
               ))}
-              <option value="__custom__">Personalizada…</option>
-            </Select>
+            </datalist>
           </Field>
           <Field label="Precio en EyedCoins">
             <Input type="number" min={1} value={form.priceCoins} onChange={(event) => setForm((c) => ({ ...c, priceCoins: event.target.value }))} />
           </Field>
-          {categorySelectValue === "__custom__" ? (
-            <Field label="Categoría personalizada" description="Se normaliza a slug (ej. summer-fest)">
-              <Input
-                value={form.category}
-                maxLength={64}
-                placeholder="mi-categoria"
-                onChange={(event) => setForm((c) => ({ ...c, category: event.target.value }))}
-              />
-            </Field>
-          ) : null}
           <Field label="Stock" description="Vacío = ilimitado">
             <Input type="number" min={0} value={form.stock} onChange={(event) => setForm((c) => ({ ...c, stock: event.target.value }))} />
           </Field>

@@ -451,6 +451,18 @@ export const banGachaCatalogItem = (guildId: string, characterId: string) =>
     body: { ban: true },
   });
 
+export const banGachaCatalogItems = (guildId: string, characterIds: string[]) =>
+  apiFetch(`/api/guild/${g(guildId)}/gacha-catalog/bulk-ban`, {
+    method: "POST",
+    body: { characterIds },
+  });
+
+export const deleteCommunityShopProducts = (guildId: string, products: Array<{ id: string; expectedVersion?: number }>) =>
+  apiFetch(`/api/guild/${g(guildId)}/community-shop-products/bulk-delete`, {
+    method: "POST",
+    body: { products },
+  });
+
 export const uploadGachaCatalogImage = (guildId: string, characterId: string, file: File) => {
   const form = new FormData();
   form.append("characterId", characterId);
