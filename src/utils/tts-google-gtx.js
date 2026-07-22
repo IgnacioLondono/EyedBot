@@ -17,6 +17,13 @@ const MAX_INPUT = (() => {
     return Number.isFinite(n) && n > 0 ? n : 0;
 })();
 
+/** Velocidad de reproducción global (1 = Google nativo). <1 más lento; >1 más rápido. */
+const PLAYBACK_SPEED = (() => {
+    const n = Number.parseFloat(process.env.TTS_PLAYBACK_SPEED || '0.9');
+    if (!Number.isFinite(n)) return 0.9;
+    return Math.min(1.35, Math.max(0.65, n));
+})();
+
 function resolveFfmpegBinary() {
     try {
         const ffmpegStatic = require('ffmpeg-static');
@@ -28,38 +35,60 @@ function resolveFfmpegBinary() {
 }
 
 /**
- * Cambio de tono en semitonos (aprox. ♂/♀) sin API extra: asetrate + cadena de atempo.
- * @param {number} semitones
+ * Encadena filtros atempo (ffmpeg solo admite 0.5–2.0 por paso).
+ * @param {string[]} parts
+ * @param {number} tempo
  */
-function buildPitchAudioFilter(semitones) {
-    const ratio = Math.pow(2, Number(semitones) / 12);
-    const parts = [`asetrate=48000*${ratio}`, 'aresample=48000'];
-    let tempo = 1 / ratio;
-    for (let i = 0; i < 12 && Math.abs(tempo - 1) > 0.02; i += 1) {
-        if (tempo > 2) {
-            parts.push('atempo=2');
-            tempo /= 2;
-        } else if (tempo < 0.5) {
+function pushAtempoChain(parts, tempo) {
+    let t = Number(tempo);
+    if (!Number.isFinite(t) || t <= 0) return;
+    for (let i = 0; i < 12 && Math.abs(t - 1) > 0.01; i += 1) {
+        if (t > 2) {
+            parts.push('atempo=2.0');
+            t /= 2;
+        } else if (t < 0.5) {
             parts.push('atempo=0.5');
-            tempo /= 0.5;
+            t /= 0.5;
         } else {
-            parts.push(`atempo=${tempo}`);
-            tempo = 1;
+            parts.push(`atempo=${t.toFixed(4)}`);
+            t = 1;
         }
     }
+}
+
+/**
+ * Cambio de tono en semitonos + velocidad global.
+ * Primero normaliza a 48 kHz: las MP3 de Google suelen ser ~24 kHz; si se aplica
+ * asetrate=48000*ratio directo, la voz queda casi al doble de velocidad.
+ * @param {number} semitones
+ * @param {number} [speed=1]
+ */
+function buildPitchAudioFilter(semitones, speed = 1) {
+    const semi = Number(semitones) || 0;
+    const playback = Number.isFinite(Number(speed)) && Number(speed) > 0 ? Number(speed) : 1;
+    const parts = [];
+
+    if (semi) {
+        const ratio = Math.pow(2, semi / 12);
+        parts.push('aresample=48000', `asetrate=48000*${ratio}`, 'aresample=48000');
+        pushAtempoChain(parts, (1 / ratio) * playback);
+    } else if (Math.abs(playback - 1) > 0.01) {
+        pushAtempoChain(parts, playback);
+    }
+
     return parts.join(',');
 }
 
 /**
  * @param {string} inputPath
  * @param {number} semitones
+ * @param {number} [speed]
  * @returns {Promise<string>} ruta al MP3 resultante (borra la entrada solo si tiene éxito)
  */
-function pitchShiftMp3File(inputPath, semitones) {
-    const semi = Number(semitones);
-    if (!semi || semi === 0) return Promise.resolve(inputPath);
+function pitchShiftMp3File(inputPath, semitones, speed = PLAYBACK_SPEED) {
+    const filter = buildPitchAudioFilter(semitones, speed);
+    if (!filter) return Promise.resolve(inputPath);
 
-    const filter = buildPitchAudioFilter(semi);
     const outPath = path.join(os.tmpdir(), `eyedbot-tts-pitch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.mp3`);
     const bin = resolveFfmpegBinary();
 
@@ -133,7 +162,7 @@ async function fetchTtsMp3Chunk(text, lang = 'es') {
 /**
  * Devuelve rutas a MP3 temporales (una o varias); el llamador debe borrarlas.
  * @param {string} fullText
- * @param {string | { tl?: string; semitones?: number }} langOrVoice código `tl` o perfil desde el catálogo
+ * @param {string | { tl?: string; semitones?: number; speed?: number }} langOrVoice código `tl` o perfil desde el catálogo
  * @returns {Promise<string[]>}
  */
 async function textToMp3TempFiles(fullText, langOrVoice = 'es') {
@@ -142,9 +171,13 @@ async function textToMp3TempFiles(fullText, langOrVoice = 'es') {
 
     let tl = 'es';
     let semitones = 0;
+    let speed = PLAYBACK_SPEED;
     if (langOrVoice && typeof langOrVoice === 'object') {
         tl = String(langOrVoice.tl || 'es').trim().slice(0, 24) || 'es';
         semitones = Number(langOrVoice.semitones || 0) || 0;
+        if (Number.isFinite(Number(langOrVoice.speed)) && Number(langOrVoice.speed) > 0) {
+            speed = Math.min(1.35, Math.max(0.65, Number(langOrVoice.speed)));
+        }
     } else {
         tl = String(langOrVoice || 'es').trim().slice(0, 24) || 'es';
     }
@@ -153,16 +186,17 @@ async function textToMp3TempFiles(fullText, langOrVoice = 'es') {
     const parts = chunkText(clipped);
     const out = [];
     const base = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const needsFx = Boolean(semitones) || Math.abs(speed - 1) > 0.01;
 
     for (let i = 0; i < parts.length; i += 1) {
         const mp3 = await fetchTtsMp3Chunk(parts[i], tl);
         let p = path.join(os.tmpdir(), `eyedbot-tts-${base}-${i}.mp3`);
         fs.writeFileSync(p, mp3);
-        if (semitones) {
+        if (needsFx) {
             try {
-                p = await pitchShiftMp3File(p, semitones);
+                p = await pitchShiftMp3File(p, semitones, speed);
             } catch (e) {
-                console.warn('⚠️ TTS pitch ffmpeg falló (se usa voz neutra):', e?.message || e);
+                console.warn('⚠️ TTS pitch/speed ffmpeg falló (se usa audio crudo):', e?.message || e);
             }
         }
         out.push(p);
@@ -177,6 +211,8 @@ async function textToMp3TempFiles(fullText, langOrVoice = 'es') {
 module.exports = {
     chunkText,
     textToMp3TempFiles,
+    buildPitchAudioFilter,
     MAX_INPUT,
-    CHUNK_SIZE
+    CHUNK_SIZE,
+    PLAYBACK_SPEED
 };

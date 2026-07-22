@@ -15,13 +15,13 @@ function tri(flag, title, tl, id) {
         {
             id: `${id}_grave`,
             tl: String(tl),
-            semitones: -3,
+            semitones: -2,
             name: `${base} · ♂ hombre · tono grave`
         },
         {
             id: `${id}_aguda`,
             tl: String(tl),
-            semitones: 3,
+            semitones: 2,
             name: `${base} · ♀ mujer · tono aguda`
         }
     ];
