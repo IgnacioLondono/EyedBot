@@ -7216,9 +7216,18 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
         const thumbnailUpload = req.files?.thumbnailFile?.[0];
         const stamp = Date.now();
 
+        // Nombres seguros: EmbedBuilder exige que attachment:// sea una URL válida (sin espacios/comas).
+        const embedAttachmentName = (file, fallbackBase) => {
+            const ext = extFromMimeOrName(file?.mimetype, file?.originalname);
+            const base = sanitizeUploadName(
+                path.basename(String(file?.originalname || fallbackBase), path.extname(String(file?.originalname || '')))
+            ) || fallbackBase;
+            return `${base}${ext}`;
+        };
+
         // Preferir archivo subido: Discord lo sirve como adjunto (no depende del host del panel).
         if (imageUpload?.buffer) {
-            const imageName = imageUpload.originalname || `embed_image_${stamp}.jpg`;
+            const imageName = embedAttachmentName(imageUpload, `embed_image_${stamp}`);
             files.push({ attachment: imageUpload.buffer, name: imageName });
             discordEmbed.setImage(`attachment://${imageName}`);
         } else if (embed.image) {
@@ -7232,7 +7241,7 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
         }
 
         if (thumbnailUpload?.buffer) {
-            const thumbName = thumbnailUpload.originalname || `embed_thumb_${stamp}.jpg`;
+            const thumbName = embedAttachmentName(thumbnailUpload, `embed_thumb_${stamp}`);
             files.push({ attachment: thumbnailUpload.buffer, name: thumbName });
             discordEmbed.setThumbnail(`attachment://${thumbName}`);
         } else if (embed.thumbnail) {
