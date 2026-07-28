@@ -3749,7 +3749,9 @@ app.get('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
                 verificationMode: 'both',
                 restrictedChannelIds: [],
                 minAccountAgeDays: 0,
-                requireNewMemberRole: false,
+                requireNewMemberRole: true,
+                lockdownUnverified: true,
+                hideVerifyFromVerified: true,
                 logChannelId: '',
                 buttonLabel: 'Verificarme'
             });
@@ -3816,7 +3818,9 @@ app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
             verificationMode,
             restrictedChannelIds,
             minAccountAgeDays,
-            requireNewMemberRole: body.requireNewMemberRole === true,
+            requireNewMemberRole: body.requireNewMemberRole !== false,
+            lockdownUnverified: body.lockdownUnverified !== false,
+            hideVerifyFromVerified: body.hideVerifyFromVerified !== false,
             logChannelId: String(body.logChannelId || existing.logChannelId || '').trim(),
             buttonLabel: String(body.buttonLabel || existing.buttonLabel || 'Verificarme').slice(0, 80),
             updatedAt: new Date().toISOString(),
@@ -3852,6 +3856,15 @@ app.post('/api/guild/:guildId/verify-sync-permissions', requireAuth, async (req,
                 .map((id) => String(id || '').trim())
                 .filter(Boolean);
         }
+        if (body.lockdownUnverified !== undefined) {
+            cfg.lockdownUnverified = body.lockdownUnverified !== false;
+        }
+        if (body.hideVerifyFromVerified !== undefined) {
+            cfg.hideVerifyFromVerified = body.hideVerifyFromVerified !== false;
+        }
+        if (typeof body.channelId === 'string' && body.channelId.trim()) {
+            cfg.channelId = body.channelId.trim();
+        }
 
         const result = await syncRestrictedRolePermissions(guild, cfg);
         if (!result.ok) {
@@ -3860,7 +3873,10 @@ app.post('/api/guild/:guildId/verify-sync-permissions', requireAuth, async (req,
 
         const updatedCfg = {
             ...cfg,
+            channelId: result.channelId || cfg.channelId,
             restrictedChannelIds: result.channelIds,
+            lockdownUnverified: cfg.lockdownUnverified !== false,
+            hideVerifyFromVerified: cfg.hideVerifyFromVerified !== false,
             permissionsSyncedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             updatedBy: req.session.user?.id || 'unknown'
@@ -3870,6 +3886,9 @@ app.post('/api/guild/:guildId/verify-sync-permissions', requireAuth, async (req,
         res.json({
             success: true,
             synced: result.synced,
+            denied: result.denied || 0,
+            createdChannelId: result.createdChannelId || null,
+            lockdown: result.lockdown !== false,
             errors: result.errors,
             channelIds: result.channelIds,
             config: sanitizeVerifyConfigForPanel(updatedCfg)

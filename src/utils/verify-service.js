@@ -192,6 +192,83 @@ function usesButtonVerification(cfg) {
     return mode === 'button' || mode === 'both';
 }
 
+/**
+ * Crea un canal de verificación solo visible para el rol sin verificar.
+ * @returns {Promise<{ ok: true, channel: import('discord.js').GuildChannel } | { ok: false, error: string }>}
+ */
+async function createPrivateVerifyChannel(guild, newMemberRole, verifiedRole = null) {
+    const { ChannelType } = require('discord.js');
+    const overwrites = [
+        {
+            id: guild.id,
+            deny: [PermissionFlagsBits.ViewChannel]
+        },
+        {
+            id: newMemberRole.id,
+            allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory,
+                PermissionFlagsBits.AddReactions
+            ]
+        }
+    ];
+
+    if (verifiedRole && verifiedRole.id !== newMemberRole.id) {
+        overwrites.push({
+            id: verifiedRole.id,
+            deny: [PermissionFlagsBits.ViewChannel]
+        });
+    }
+
+    try {
+        const channel = await guild.channels.create({
+            name: 'verificacion',
+            type: ChannelType.GuildText,
+            topic: 'Verifícate aquí para desbloquear el resto del servidor.',
+            reason: 'EyedBot: canal privado de verificación',
+            permissionOverwrites: overwrites
+        });
+        return { ok: true, channel };
+    } catch (error) {
+        return { ok: false, error: error.message || 'No se pudo crear el canal de verificación.' };
+    }
+}
+
+async function applyUnverifiedAllowOverwrite(channel, role) {
+    const overwrite = { ViewChannel: true };
+    if (typeof channel.isTextBased === 'function' && channel.isTextBased()) {
+        overwrite.SendMessages = true;
+        overwrite.ReadMessageHistory = true;
+        overwrite.AddReactions = true;
+    }
+    if (typeof channel.isVoiceBased === 'function' && channel.isVoiceBased()) {
+        overwrite.Connect = true;
+        overwrite.Speak = true;
+    }
+    await channel.permissionOverwrites.edit(role, overwrite, 'EyedBot: permitir canal a no verificados');
+}
+
+async function applyVerifyChannelPrivacy(channel, cfg, newMemberRole, verifiedRole) {
+    const hideFromVerified = cfg.hideVerifyFromVerified !== false;
+
+    await channel.permissionOverwrites.edit(
+        channel.guild.id,
+        { ViewChannel: false },
+        'EyedBot: ocultar verify a @everyone'
+    ).catch(() => null);
+
+    await applyUnverifiedAllowOverwrite(channel, newMemberRole);
+
+    if (hideFromVerified && verifiedRole && verifiedRole.id !== newMemberRole.id) {
+        await channel.permissionOverwrites.edit(
+            verifiedRole,
+            { ViewChannel: false },
+            'EyedBot: ocultar verify a verificados'
+        ).catch(() => null);
+    }
+}
+
 async function syncRestrictedRolePermissions(guild, cfg) {
     const newMemberRoleId = String(cfg?.newMemberRoleId || '').trim();
     if (!newMemberRoleId) {
@@ -211,12 +288,34 @@ async function syncRestrictedRolePermissions(guild, cfg) {
         return { ok: false, error: 'El bot necesita el permiso Gestionar canales para sincronizar accesos.' };
     }
 
-    const channelIds = collectRestrictedChannelIds(cfg);
+    const verifiedRoleId = String(cfg?.roleId || '').trim();
+    const verifiedRole = verifiedRoleId
+        ? (guild.roles.cache.get(verifiedRoleId) || await guild.roles.fetch(verifiedRoleId).catch(() => null))
+        : null;
+
+    const lockdown = cfg.lockdownUnverified !== false;
+    let workingCfg = { ...cfg };
+    let createdChannelId = null;
+
+    if (!String(workingCfg.channelId || '').trim()) {
+        const created = await createPrivateVerifyChannel(guild, role, verifiedRole);
+        if (!created.ok) {
+            return { ok: false, error: created.error };
+        }
+        workingCfg.channelId = created.channel.id;
+        createdChannelId = created.channel.id;
+    }
+
+    const channelIds = collectRestrictedChannelIds(workingCfg);
     if (!channelIds.length) {
         return { ok: false, error: 'Selecciona al menos un canal visible para usuarios sin verificar.' };
     }
 
+    const allowedSet = new Set(channelIds);
+    const verifyChannelId = String(workingCfg.channelId || '').trim();
+
     let synced = 0;
+    let denied = 0;
     const errors = [];
 
     for (const channelId of channelIds) {
@@ -226,28 +325,52 @@ async function syncRestrictedRolePermissions(guild, cfg) {
             continue;
         }
 
-        const overwrite = {
-            ViewChannel: true
-        };
-        if (typeof channel.isTextBased === 'function' && channel.isTextBased()) {
-            overwrite.SendMessages = true;
-            overwrite.ReadMessageHistory = true;
-            overwrite.AddReactions = true;
-        }
-        if (typeof channel.isVoiceBased === 'function' && channel.isVoiceBased()) {
-            overwrite.Connect = true;
-            overwrite.Speak = true;
-        }
-
         try {
-            await channel.permissionOverwrites.edit(role, overwrite, 'EyedBot: sincronizar acceso de rol sin verificar');
+            if (channelId === verifyChannelId) {
+                await applyVerifyChannelPrivacy(channel, workingCfg, role, verifiedRole);
+            } else {
+                await applyUnverifiedAllowOverwrite(channel, role);
+            }
             synced += 1;
         } catch (error) {
             errors.push({ channelId, message: error.message || 'No se pudo actualizar el canal.' });
         }
     }
 
-    return { ok: true, synced, errors, channelIds };
+    if (lockdown) {
+        const allChannels = [...guild.channels.cache.values()].filter(
+            (channel) => channel?.permissionOverwrites && typeof channel.permissionOverwrites.edit === 'function'
+        );
+
+        for (const channel of allChannels) {
+            if (allowedSet.has(channel.id)) continue;
+
+            try {
+                await channel.permissionOverwrites.edit(
+                    role,
+                    { ViewChannel: false },
+                    'EyedBot: ocultar canal a no verificados'
+                );
+                denied += 1;
+            } catch (error) {
+                errors.push({
+                    channelId: channel.id,
+                    message: error.message || 'No se pudo denegar el canal.'
+                });
+            }
+        }
+    }
+
+    return {
+        ok: true,
+        synced,
+        denied,
+        errors,
+        channelIds,
+        channelId: workingCfg.channelId,
+        createdChannelId,
+        lockdown
+    };
 }
 
 async function handleVerifyButton(interaction) {

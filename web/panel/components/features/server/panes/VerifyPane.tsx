@@ -56,6 +56,8 @@ type VerifyState = {
   restrictedChannelIds: string[];
   minAccountAgeDays: number;
   requireNewMemberRole: boolean;
+  lockdownUnverified: boolean;
+  hideVerifyFromVerified: boolean;
   logChannelId: string;
   buttonLabel: string;
 };
@@ -87,7 +89,9 @@ function normalizeVerify(value: unknown): VerifyState {
       ? restrictedRaw.map((id) => toStringValue(id)).filter(Boolean)
       : [],
     minAccountAgeDays: Math.max(0, Number.parseInt(toStringValue(data.minAccountAgeDays || data.min_account_age_days, "0"), 10) || 0),
-    requireNewMemberRole: toBooleanValue(data.requireNewMemberRole || data.require_new_member_role),
+    requireNewMemberRole: data.requireNewMemberRole === false || data.require_new_member_role === false ? false : true,
+    lockdownUnverified: data.lockdownUnverified === false || data.lockdown_unverified === false ? false : true,
+    hideVerifyFromVerified: data.hideVerifyFromVerified === false || data.hide_verify_from_verified === false ? false : true,
     logChannelId: toStringValue(data.logChannelId || data.log_channel_id),
     buttonLabel: toStringValue(data.buttonLabel || data.button_label, "Verificarme"),
   };
@@ -111,6 +115,8 @@ function toVerifyPayload(form: VerifyState) {
     restrictedChannelIds: form.restrictedChannelIds,
     minAccountAgeDays: form.minAccountAgeDays,
     requireNewMemberRole: form.requireNewMemberRole,
+    lockdownUnverified: form.lockdownUnverified,
+    hideVerifyFromVerified: form.hideVerifyFromVerified,
     logChannelId: form.logChannelId,
     buttonLabel: form.buttonLabel,
   };
@@ -146,7 +152,9 @@ export function VerifyPane({ guildId }: { guildId: string }) {
     verificationMode: "both",
     restrictedChannelIds: [],
     minAccountAgeDays: 0,
-    requireNewMemberRole: false,
+    requireNewMemberRole: true,
+    lockdownUnverified: true,
+    hideVerifyFromVerified: true,
     logChannelId: "",
     buttonLabel: "Verificarme",
   });
@@ -207,19 +215,31 @@ export function VerifyPane({ guildId }: { guildId: string }) {
     setSyncingPermissions(true);
     try {
       await saveVerifyConfig(guildId, toVerifyPayload(form));
-      const result = asRecord(await syncVerifyPermissions(guildId, { restrictedChannelIds: form.restrictedChannelIds }));
+      const result = asRecord(
+        await syncVerifyPermissions(guildId, {
+          restrictedChannelIds: form.restrictedChannelIds,
+          lockdownUnverified: form.lockdownUnverified,
+          hideVerifyFromVerified: form.hideVerifyFromVerified,
+          channelId: form.channelId,
+        }),
+      );
       const synced = Number(result.synced || 0);
+      const denied = Number(result.denied || 0);
+      const createdChannelId = toStringValue(result.createdChannelId);
       const errors = Array.isArray(result.errors) ? result.errors : [];
       const config = asRecord(result.config);
       if (Object.keys(config).length) {
         setForm(normalizeVerify(config));
       }
+      const parts = [`Permitidos: ${synced}`];
+      if (denied > 0) parts.push(`ocultos: ${denied}`);
+      if (createdChannelId) parts.push("se creó #verificacion");
       toast({
-        title: "Permisos sincronizados",
+        title: "Puerta de verificación aplicada",
         description:
           errors.length > 0
-            ? `Se actualizaron ${synced} canales. ${errors.length} canal(es) fallaron.`
-            : `Se actualizaron ${synced} canal(es) para el rol sin verificar.`,
+            ? `${parts.join(" · ")}. ${errors.length} canal(es) fallaron.`
+            : `${parts.join(" · ")}.`,
         tone: errors.length > 0 ? "warning" : "success",
       });
     } catch (err) {
@@ -297,12 +317,32 @@ export function VerifyPane({ guildId }: { guildId: string }) {
         {tab === "acceso" ? (
           <div className="space-y-5">
             <Alert
-              title="Configura permisos en Discord"
-              description="Para que el rol sin verificar solo vea ciertos canales, niega «Ver canal» a @everyone en el resto del servidor (o categorías) y usa «Sincronizar permisos» para permitir acceso solo en los canales seleccionados."
+              title="Puerta de acceso"
+              description="Con el bloqueo activo, quienes tengan el rol sin verificar no verán el resto del servidor: solo el canal de verificación (y los extras que elijas). Si no hay canal elegido, el bot crea #verificacion privado."
             />
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
+                <p className="font-medium text-white">Ocultar el resto del servidor</p>
+                <p className="text-sm text-zinc-400">Niega «Ver canal» al rol sin verificar en todos los canales excepto los permitidos.</p>
+              </div>
+              <Switch
+                checked={form.lockdownUnverified}
+                onCheckedChange={(lockdownUnverified) => setForm((current) => ({ ...current, lockdownUnverified }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div>
+                <p className="font-medium text-white">Canal invisible para verificados</p>
+                <p className="text-sm text-zinc-400">El canal de verificación queda oculto a @everyone y al rol verificado; solo lo ven los no verificados.</p>
+              </div>
+              <Switch
+                checked={form.hideVerifyFromVerified}
+                onCheckedChange={(hideVerifyFromVerified) => setForm((current) => ({ ...current, hideVerifyFromVerified }))}
+              />
+            </div>
             <Field
               label="Canales visibles sin verificar"
-              description="Incluye reglas, verificación y bienvenida. El canal de verificación se añade automáticamente."
+              description="Opcional: reglas o bienvenida. El canal de verificación se incluye solo. Si está vacío y no hay canal, se crea #verificacion."
             >
               <MultiChannelSelect
                 value={form.restrictedChannelIds}
@@ -311,7 +351,7 @@ export function VerifyPane({ guildId }: { guildId: string }) {
               />
             </Field>
             <Button variant="secondary" onClick={() => void handleSyncPermissions()} disabled={syncingPermissions || !form.newMemberRoleId}>
-              {syncingPermissions ? "Sincronizando..." : "Sincronizar permisos del rol sin verificar"}
+              {syncingPermissions ? "Aplicando puerta..." : "Aplicar puerta de verificación"}
             </Button>
           </div>
         ) : null}
