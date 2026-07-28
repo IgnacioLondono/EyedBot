@@ -28,6 +28,7 @@ const {
     applyWelcomeMediaToEmbed
 } = require('../src/utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
+const { resolveEmbedImageForDiscord } = require('../src/utils/discord-media-url');
 const greetingImageStore = require('../src/utils/greeting-image-store');
 let welcomeCardUtils = null;
 function getWelcomeCardUtils() {
@@ -7190,8 +7191,6 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
         if (embed.description) discordEmbed.setDescription(tpl(embed.description));
         if (embed.color) discordEmbed.setColor(embed.color);
         if (embed.footer) discordEmbed.setFooter({ text: tpl(embed.footer) });
-        if (embed.image) discordEmbed.setImage(embed.image);
-        if (embed.thumbnail) discordEmbed.setThumbnail(embed.thumbnail);
         if (embed.timestamp) discordEmbed.setTimestamp();
         if (embed.author) {
             discordEmbed.setAuthor({
@@ -7215,17 +7214,35 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
         const files = [];
         const imageUpload = req.files?.imageFile?.[0];
         const thumbnailUpload = req.files?.thumbnailFile?.[0];
+        const stamp = Date.now();
 
+        // Preferir archivo subido: Discord lo sirve como adjunto (no depende del host del panel).
         if (imageUpload?.buffer) {
-            const imageName = imageUpload.originalname || `embed_image_${Date.now()}.jpg`;
+            const imageName = imageUpload.originalname || `embed_image_${stamp}.jpg`;
             files.push({ attachment: imageUpload.buffer, name: imageName });
-            if (!embed.image) discordEmbed.setImage(`attachment://${imageName}`);
+            discordEmbed.setImage(`attachment://${imageName}`);
+        } else if (embed.image) {
+            const resolved = await resolveEmbedImageForDiscord(embed.image, `embed_image_${stamp}`);
+            if (resolved?.mode === 'attachment') {
+                files.push({ attachment: resolved.data, name: resolved.name });
+                discordEmbed.setImage(`attachment://${resolved.name}`);
+            } else if (resolved?.mode === 'url') {
+                discordEmbed.setImage(resolved.url);
+            }
         }
 
         if (thumbnailUpload?.buffer) {
-            const thumbName = thumbnailUpload.originalname || `embed_thumb_${Date.now()}.jpg`;
+            const thumbName = thumbnailUpload.originalname || `embed_thumb_${stamp}.jpg`;
             files.push({ attachment: thumbnailUpload.buffer, name: thumbName });
-            if (!embed.thumbnail) discordEmbed.setThumbnail(`attachment://${thumbName}`);
+            discordEmbed.setThumbnail(`attachment://${thumbName}`);
+        } else if (embed.thumbnail) {
+            const resolved = await resolveEmbedImageForDiscord(embed.thumbnail, `embed_thumb_${stamp}`);
+            if (resolved?.mode === 'attachment') {
+                files.push({ attachment: resolved.data, name: resolved.name });
+                discordEmbed.setThumbnail(`attachment://${resolved.name}`);
+            } else if (resolved?.mode === 'url') {
+                discordEmbed.setThumbnail(resolved.url);
+            }
         }
 
         const hasFiles = files.length > 0;

@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { resolveEmbedImageForDiscord } = require('../../utils/discord-media-url');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -52,13 +53,34 @@ module.exports = {
             .setColor(color)
             .setTimestamp();
 
-        if (imagen) embed.setImage(imagen);
-        if (thumbnail) embed.setThumbnail(thumbnail);
         if (footer) embed.setFooter({ text: footer });
 
+        const files = [];
+        const stamp = Date.now();
+
+        if (imagen) {
+            const resolved = await resolveEmbedImageForDiscord(imagen, `slash_image_${stamp}`);
+            if (resolved?.mode === 'attachment') {
+                files.push({ attachment: resolved.data, name: resolved.name });
+                embed.setImage(`attachment://${resolved.name}`);
+            } else if (resolved?.mode === 'url') {
+                embed.setImage(resolved.url);
+            }
+        }
+
+        if (thumbnail) {
+            const resolved = await resolveEmbedImageForDiscord(thumbnail, `slash_thumb_${stamp}`);
+            if (resolved?.mode === 'attachment') {
+                files.push({ attachment: resolved.data, name: resolved.name });
+                embed.setThumbnail(`attachment://${resolved.name}`);
+            } else if (resolved?.mode === 'url') {
+                embed.setThumbnail(resolved.url);
+            }
+        }
+
         try {
-            await canal.send({ embeds: [embed] });
-            
+            await canal.send({ embeds: [embed], files });
+
             if (canal.id !== interaction.channel.id) {
                 await interaction.reply({ content: `✅ Embed enviado correctamente al canal ${canal}.`, flags: MessageFlags.Ephemeral });
             } else {

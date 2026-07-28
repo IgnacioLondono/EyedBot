@@ -248,7 +248,57 @@ async function fetchImageBufferForDiscordAttachment(imageUrl, fileBase) {
     }
 }
 
+/**
+ * Resuelve una URL de imagen/thumbnail de embed a algo que Discord pueda mostrar.
+ * - Rutas relativas /uploads/... o hosts localhost/LAN → lee disco o fetch y adjunto.
+ * - URLs HTTPS públicas alcanzables → se dejan como URL (proxy de Discord).
+ *
+ * @param {string} imageUrl
+ * @param {string} fileBase
+ * @returns {Promise<null | { mode: 'url', url: string } | { mode: 'attachment', name: string, data: Buffer }>}
+ */
+async function resolveEmbedImageForDiscord(imageUrl, fileBase) {
+    const raw = String(imageUrl || '').trim();
+    if (!raw) return null;
+
+    let absoluteUrl = raw;
+    if (raw.startsWith('/')) {
+        const origin = String(process.env.WEB_PUBLIC_ORIGIN || process.env.PUBLIC_ORIGIN || '')
+            .trim()
+            .replace(/\/+$/, '');
+        absoluteUrl = origin ? `${origin}${raw}` : `http://127.0.0.1${raw}`;
+    }
+
+    if (!/^https?:\/\/.+/i.test(absoluteUrl)) return null;
+
+    let pathname = '';
+    try {
+        pathname = new URL(absoluteUrl).pathname;
+    } catch {
+        return null;
+    }
+
+    const needsAttachment =
+        isUrlLikelyUnreachableFromDiscord(absoluteUrl) ||
+        /\/uploads\//i.test(pathname) ||
+        raw.startsWith('/');
+
+    if (needsAttachment) {
+        const fetched = await fetchImageBufferForDiscordAttachment(absoluteUrl, fileBase);
+        if (fetched) {
+            return { mode: 'attachment', name: fetched.name, data: fetched.data };
+        }
+        // No devolver URL que Discord no podrá abrir
+        if (isUrlLikelyUnreachableFromDiscord(absoluteUrl) || raw.startsWith('/')) {
+            return null;
+        }
+    }
+
+    return { mode: 'url', url: absoluteUrl };
+}
+
 module.exports = {
     isUrlLikelyUnreachableFromDiscord,
-    fetchImageBufferForDiscordAttachment
+    fetchImageBufferForDiscordAttachment,
+    resolveEmbedImageForDiscord
 };
