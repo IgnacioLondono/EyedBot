@@ -380,6 +380,15 @@ export const saveWeeklySummaryConfig = (guildId: string, body: Record<string, un
 export const sendWeeklySummaryNow = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/weekly-summary-send`, { method: "POST" });
 
+export const getPaymentReceiptConfig = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/payment-receipt-config`);
+
+export const savePaymentReceiptConfig = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/payment-receipt-config`, { method: "POST", body });
+
+export const sendPaymentReceipt = (guildId: string, body: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/payment-receipt-send`, { method: "POST", body });
+
 export const getChannelSetup = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/channel-setup`);
 

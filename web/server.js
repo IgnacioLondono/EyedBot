@@ -104,6 +104,8 @@ const {
 const { buildStreamAlertEmbed } = require('../src/utils/stream-alert-scheduler');
 const weeklySummaryStore = require('../src/utils/weekly-summary-store');
 const weeklySummaryService = require('../src/utils/weekly-summary-service');
+const paymentReceiptStore = require('../src/utils/payment-receipt-store');
+const paymentReceiptService = require('../src/utils/payment-receipt-service');
 const freeGamesStore = require('../src/utils/free-games-store');
 const freeGamesService = require('../src/utils/free-games-service');
 const crunchyrollStore = require('../src/utils/crunchyroll-store');
@@ -2740,6 +2742,39 @@ app.get('/api/panel/dashboard-summary', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('❌ Error en /api/panel/dashboard-summary:', error);
         res.status(500).json({ error: 'No se pudo cargar el resumen del dashboard' });
+    }
+});
+
+/** Webhook público de comprobantes (API externa). Auth solo por secreto, sin sesión panel. */
+app.post('/api/payment-receipt/webhook/:guildId', async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+
+        const cfg = await paymentReceiptStore.getConfig(guildId);
+        if (!cfg.enabled) return res.status(403).json({ error: 'Notificaciones de pago desactivadas' });
+        if (!paymentReceiptService.verifyWebhookSecret(cfg, req)) {
+            return res.status(401).json({ error: 'Secreto de webhook inválido' });
+        }
+
+        const result = await paymentReceiptService.sendPaymentNotification(botClient, guildId, req.body || {}, {
+            force: true,
+            source: 'webhook'
+        });
+
+        if (!result.ok) {
+            return res.status(400).json({ error: result.reason || 'send_failed', details: result });
+        }
+
+        res.json({
+            success: true,
+            channelSent: result.channelSent,
+            dmSent: result.dmSent,
+            orderId: result.receipt?.orderId || null
+        });
+    } catch (error) {
+        console.error('Error en payment receipt webhook:', error);
+        res.status(500).json({ error: 'Error procesando webhook de pago' });
     }
 });
 
@@ -5496,6 +5531,119 @@ app.post('/api/guild/:guildId/weekly-summary-send', requireAuth, async (req, res
     } catch (error) {
         console.error('Error enviando weekly summary:', error);
         res.status(500).json({ error: 'Error al enviar el resumen semanal' });
+    }
+});
+
+app.get('/api/guild/:guildId/payment-receipt-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const config = await paymentReceiptStore.getConfig(guildId);
+        res.json(paymentReceiptStore.publicConfig(config));
+    } catch (error) {
+        console.error('Error obteniendo payment receipt config:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de pagos' });
+    }
+});
+
+app.post('/api/guild/:guildId/payment-receipt-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const body = req.body || {};
+        if (body.enabled && body.sendToChannel !== false && !String(body.channelId || '').trim()) {
+            return res.status(400).json({ error: 'Selecciona un canal para las notificaciones de pago' });
+        }
+
+        const patch = {
+            updatedBy: req.session.user?.id || 'panel'
+        };
+        for (const key of [
+            'enabled',
+            'channelId',
+            'sendToChannel',
+            'sendDm',
+            'mentionRoleId',
+            'color',
+            'titleTemplate',
+            'descriptionTemplate',
+            'footerTemplate',
+            'webhookSecret',
+            'fieldMap'
+        ]) {
+            if (Object.prototype.hasOwnProperty.call(body, key)) patch[key] = body[key];
+        }
+        if (body.rotateWebhookSecret === true) {
+            patch.webhookSecret = require('crypto').randomBytes(24).toString('hex');
+        }
+
+        const config = await paymentReceiptStore.setConfig(guildId, patch);
+        res.json({ success: true, config: paymentReceiptStore.publicConfig(config) });
+    } catch (error) {
+        console.error('Error guardando payment receipt config:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de pagos' });
+    }
+});
+
+app.post('/api/guild/:guildId/payment-receipt-send', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const body = req.body || {};
+        const result = await paymentReceiptService.sendPaymentNotification(botClient, guildId, body, {
+            force: true,
+            source: 'panel',
+            sendToChannel: body.sendToChannel,
+            sendDm: body.sendDm,
+            channelId: body.channelId,
+            overrides: {
+                orderId: body.orderId,
+                amount: body.amount,
+                currency: body.currency,
+                product: body.product,
+                status: body.status,
+                buyerName: body.buyerName,
+                buyerDiscordId: body.buyerDiscordId || body.discordId,
+                date: body.date,
+                extra: body.extra
+            }
+        });
+
+        if (!result.ok) {
+            const reasons = {
+                disabled: 'El módulo de pagos está desactivado.',
+                empty_receipt: 'Faltan datos del pago (producto, monto u orden).',
+                no_channel: 'No hay canal configurado.',
+                channel_invalid: 'El canal no es válido o el bot no tiene acceso.',
+                guild_unavailable: 'El servidor no está disponible.',
+                dm_user_not_found: 'No se encontró el usuario de Discord para el DM.',
+                dm_closed: 'No se pudo enviar el DM (MD cerrados).',
+                dm_missing_discord_id: 'Falta el Discord ID para enviar DM.',
+                send_failed: 'No se pudo enviar la notificación.'
+            };
+            return res.status(400).json({
+                error: reasons[result.reason] || 'No se pudo enviar la notificación de pago.',
+                details: result
+            });
+        }
+
+        res.json({
+            success: true,
+            channelSent: result.channelSent,
+            dmSent: result.dmSent,
+            errors: result.errors || [],
+            receipt: result.receipt
+        });
+    } catch (error) {
+        console.error('Error enviando payment receipt:', error);
+        res.status(500).json({ error: 'Error al enviar la notificación de pago' });
     }
 });
 

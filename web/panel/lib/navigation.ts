@@ -20,6 +20,7 @@ import {
   Crown,
   Palette,
   Settings,
+  Wallet,
 } from "lucide-react";
 
 export type NavItem = {
@@ -66,6 +67,7 @@ export const SERVER_PANES: ServerPane[] = [
   { id: "embed", slug: "embed", label: "Embeds", icon: FileBadge2 },
   { id: "events", slug: "events", label: "Eventos y sorteos", icon: CalendarDays },
   { id: "weekly-summary", slug: "weekly-summary", label: "Resumen semanal", icon: BarChart3 },
+  { id: "payments", slug: "payments", label: "Pagos", icon: Wallet },
 ];
 
 export function serverPaneHref(guildId: string, slug = "overview") {

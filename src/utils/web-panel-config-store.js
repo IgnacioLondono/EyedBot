@@ -29,6 +29,7 @@ const DEFAULT_CONFIG = {
         freeGames: true,
         embed: true,
         events: true,
+        payments: true,
         themeCustomization: true
     },
     updatedAt: null,
@@ -161,6 +162,7 @@ function resolveModuleFromRequestPath(url = '') {
     if (path.includes('/notifications') || path.includes('/stream') || path.includes('/crunchyroll')) return 'notifications';
     if (path.includes('/embed')) return 'embed';
     if (path.includes('/giveaway') || path.includes('/server-event') || path.includes('/events-giveaways')) return 'events';
+    if (path.includes('/payment-receipt') || path.includes('/payments')) return 'payments';
     return null;
 }
 
