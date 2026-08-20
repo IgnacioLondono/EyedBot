@@ -66,13 +66,28 @@ function normalizeReceipt(rawPayload, fieldMap, overrides = {}) {
         currency: firstPresent(payload, map.currency) || overrides.currency || 'CLP',
         product: firstPresent(payload, map.product) || overrides.product || 'Compra',
         status: firstPresent(payload, map.status) || overrides.status || 'pagado',
-        buyerName: firstPresent(payload, map.buyerName) || overrides.buyerName || 'Cliente',
+        buyerName: firstPresent(payload, map.buyerName) || overrides.buyerName || '',
         buyerDiscordId: String(
             firstPresent(payload, map.buyerDiscordId) || overrides.buyerDiscordId || ''
         ).replace(/\D/g, ''),
         date: firstPresent(payload, map.date) || overrides.date || new Date().toISOString(),
-        extra: firstPresent(payload, map.extra) || overrides.extra || ''
+        extra: firstPresent(payload, map.extra) || overrides.extra || '',
+        steam: firstPresent(payload, map.steam) || overrides.steam || '',
+        email: firstPresent(payload, map.email) || overrides.email || '',
+        server: firstPresent(payload, map.server) || overrides.server || '',
+        rcon: firstPresent(payload, map.rcon) || overrides.rcon || ''
     };
+
+    // Si rcon viene como array de replies del shop Rust
+    if (!receipt.rcon && Array.isArray(payload?.rcon?.replies)) {
+        receipt.rcon = payload.rcon.replies
+            .map((row) => `${row.command || ''} → ${String(row.reply || '').replace(/\s+/g, ' ').slice(0, 180)}`)
+            .join('\n')
+            .slice(0, 900);
+    } else if (!receipt.rcon && payload?.rcon && typeof payload.rcon === 'object') {
+        if (payload.rcon.error) receipt.rcon = String(payload.rcon.error);
+        else if (payload.rcon.ok === false) receipt.rcon = 'sin respuesta';
+    }
 
     if (overrides && typeof overrides === 'object') {
         for (const [key, value] of Object.entries(overrides)) {
@@ -85,32 +100,68 @@ function normalizeReceipt(rawPayload, fieldMap, overrides = {}) {
         receipt.buyerDiscordId = '';
     }
 
+    const amountNum = Number(String(receipt.amount).replace(/[^\d.-]/g, ''));
+    receipt.amountFormatted = Number.isFinite(amountNum) && String(receipt.amount).trim() !== ''
+        ? `$${amountNum.toLocaleString('es-CL')} ${receipt.currency || 'CLP'}`.trim()
+        : (receipt.amount ? `${receipt.amount} ${receipt.currency || ''}`.trim() : '');
+
     return receipt;
 }
 
 function buildEmbed(cfg, receipt) {
     const values = {
         ...receipt,
-        buyer: receipt.buyerName,
-        discordId: receipt.buyerDiscordId
+        buyer: receipt.buyerName || '—',
+        discordId: receipt.buyerDiscordId,
+        amountDisplay: receipt.amountFormatted || receipt.amount || '—'
     };
 
     const embed = new EmbedBuilder()
         .setColor(colorToInt(cfg.color))
         .setTitle(applyTemplate(cfg.titleTemplate, values).slice(0, 256))
-        .setDescription(applyTemplate(cfg.descriptionTemplate, values).slice(0, 4000))
         .setTimestamp(new Date(receipt.date || Date.now()));
+
+    const desc = applyTemplate(cfg.descriptionTemplate || '', values).trim();
+    if (desc) embed.setDescription(desc.slice(0, 4000));
 
     if (cfg.footerTemplate) {
         embed.setFooter({ text: applyTemplate(cfg.footerTemplate, values).slice(0, 200) });
     }
 
-    if (receipt.extra && receipt.extra !== '—') {
-        embed.addFields({ name: 'Detalle', value: String(receipt.extra).slice(0, 1000) });
-    }
+    if (String(cfg.layout || 'fields') === 'fields') {
+        const fields = [];
+        const push = (name, value, inline = true) => {
+            const v = String(value || '').trim();
+            if (!v || v === '—') return;
+            fields.push({ name: String(name).slice(0, 80), value: v.slice(0, 1024), inline });
+        };
 
-    if (receipt.buyerDiscordId) {
-        embed.addFields({ name: 'Discord', value: `<@${receipt.buyerDiscordId}>`, inline: true });
+        // Mostrar campos clave aunque vengan vacíos (como el embed de referencia).
+        const force = (name, value, inline = true) => {
+            const v = String(value ?? '').trim() || '—';
+            fields.push({ name: String(name).slice(0, 80), value: v.slice(0, 1024), inline });
+        };
+        force(cfg.labelSteam || 'Steam', receipt.steam ? `\`${receipt.steam}\`` : '—', true);
+        force(cfg.labelName || 'Nombre', receipt.buyerName || '—', true);
+        force(cfg.labelEmail || 'Correo', receipt.email || '—', false);
+        force(cfg.labelOrder || 'Orden', receipt.orderId ? `\`${receipt.orderId}\`` : '—', false);
+        force(cfg.labelAmount || 'Monto', receipt.amountFormatted || receipt.amount || '—', true);
+        force(cfg.labelServer || 'Servidor', receipt.server || '—', true);
+        if (receipt.rcon) {
+            push(cfg.labelRcon || 'Detalle técnico', '```\n' + String(receipt.rcon).slice(0, 900) + '\n```', false);
+        }
+        if (receipt.extra) push('Detalle', receipt.extra, false);
+        if (receipt.buyerDiscordId) {
+            push(cfg.labelDiscord || 'Discord', `<@${receipt.buyerDiscordId}>`, true);
+        }
+        if (fields.length) embed.addFields(fields);
+    } else {
+        if (receipt.extra && receipt.extra !== '—') {
+            embed.addFields({ name: 'Detalle', value: String(receipt.extra).slice(0, 1000) });
+        }
+        if (receipt.buyerDiscordId) {
+            embed.addFields({ name: 'Discord', value: `<@${receipt.buyerDiscordId}>`, inline: true });
+        }
     }
 
     return embed;

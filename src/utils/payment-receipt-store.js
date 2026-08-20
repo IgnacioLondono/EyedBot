@@ -53,15 +53,19 @@ function writeStore(data) {
 
 function defaultFieldMap() {
     return {
-        orderId: 'order_id|orderId|id|folio|comprobante_id|receipt_id',
+        orderId: 'order_id|orderId|buyOrder|id|folio|comprobante_id|receipt_id',
         amount: 'amount|monto|total|value|pago',
         currency: 'currency|moneda|currency_code|divisa',
         product: 'product|producto|item|description|concepto|servicio|plan',
         status: 'status|estado|payment_status|estado_pago',
-        buyerName: 'buyer_name|buyer|cliente|customer_name|nombre|payer_name',
+        buyerName: 'buyer_name|buyer|cliente|customer_name|nombre|payer_name|playerName|player_name',
         buyerDiscordId: 'discord_id|discordId|buyer_discord_id|user_id|discord_user_id',
-        date: 'date|fecha|paid_at|created_at|timestamp',
-        extra: 'note|notes|detalle|message|comentario|observacion'
+        date: 'date|fecha|paid_at|created_at|timestamp|vipGrantedAt',
+        extra: 'note|notes|detalle|message|comentario|observacion',
+        steam: 'steam|steamId|steam_id|steamid',
+        email: 'email|correo|mail|payer_email',
+        server: 'server|servidor|server_status|rconText|rcon_status',
+        rcon: 'rcon|rcon_log|rconLog|replies|replyLine'
     };
 }
 
@@ -70,17 +74,21 @@ function defaultConfig() {
         enabled: false,
         channelId: '',
         sendToChannel: true,
-        sendDm: true,
+        sendDm: false,
         mentionRoleId: '',
-        color: '22c55e',
-        titleTemplate: 'Pago recibido',
-        descriptionTemplate:
-            '**{product}**\n' +
-            'Monto: **{amount} {currency}**\n' +
-            'Estado: `{status}`\n' +
-            'Orden: `{orderId}`\n' +
-            'Cliente: {buyerName}',
-        footerTemplate: 'EyedBot · Notificación de pago',
+        color: '5dce7a',
+        layout: 'fields',
+        titleTemplate: '{product} · pago confirmado',
+        descriptionTemplate: '',
+        footerTemplate: 'Notificación de pago',
+        labelSteam: 'Steam',
+        labelName: 'Nombre',
+        labelEmail: 'Correo',
+        labelOrder: 'Orden',
+        labelAmount: 'Monto',
+        labelServer: 'Servidor',
+        labelRcon: 'Detalle técnico',
+        labelDiscord: 'Discord',
         webhookSecret: '',
         fieldMap: defaultFieldMap(),
         history: [],
@@ -126,12 +134,21 @@ function sanitizeConfig(raw) {
         enabled: cfg.enabled === true,
         channelId: String(cfg.channelId || '').trim(),
         sendToChannel: cfg.sendToChannel !== false,
-        sendDm: cfg.sendDm !== false,
+        sendDm: cfg.sendDm === true,
         mentionRoleId: String(cfg.mentionRoleId || '').trim(),
-        color: /^[0-9a-fA-F]{6}$/.test(color) ? color.toLowerCase() : '22c55e',
+        color: /^[0-9a-fA-F]{6}$/.test(color) ? color.toLowerCase() : '5dce7a',
+        layout: String(cfg.layout || 'fields').toLowerCase() === 'text' ? 'text' : 'fields',
         titleTemplate: String(cfg.titleTemplate || defaultConfig().titleTemplate).slice(0, 256),
-        descriptionTemplate: String(cfg.descriptionTemplate || defaultConfig().descriptionTemplate).slice(0, 3500),
+        descriptionTemplate: String(cfg.descriptionTemplate ?? defaultConfig().descriptionTemplate).slice(0, 3500),
         footerTemplate: String(cfg.footerTemplate || defaultConfig().footerTemplate).slice(0, 200),
+        labelSteam: String(cfg.labelSteam || 'Steam').slice(0, 80),
+        labelName: String(cfg.labelName || 'Nombre').slice(0, 80),
+        labelEmail: String(cfg.labelEmail || 'Correo').slice(0, 80),
+        labelOrder: String(cfg.labelOrder || 'Orden').slice(0, 80),
+        labelAmount: String(cfg.labelAmount || 'Monto').slice(0, 80),
+        labelServer: String(cfg.labelServer || 'Servidor').slice(0, 80),
+        labelRcon: String(cfg.labelRcon || 'Detalle técnico').slice(0, 80),
+        labelDiscord: String(cfg.labelDiscord || 'Discord').slice(0, 80),
         webhookSecret: String(cfg.webhookSecret || '').trim().slice(0, 128),
         fieldMap: sanitizeFieldMap(cfg.fieldMap),
         history: sanitizeHistory(cfg.history),

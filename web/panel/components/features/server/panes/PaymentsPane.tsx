@@ -38,6 +38,10 @@ type FieldMapState = {
   buyerDiscordId: string;
   date: string;
   extra: string;
+  steam: string;
+  email: string;
+  server: string;
+  rcon: string;
 };
 
 type HistoryEntry = {
@@ -60,9 +64,18 @@ type PaymentsState = {
   sendDm: boolean;
   mentionRoleId: string;
   color: string;
+  layout: "fields" | "text";
   titleTemplate: string;
   descriptionTemplate: string;
   footerTemplate: string;
+  labelSteam: string;
+  labelName: string;
+  labelEmail: string;
+  labelOrder: string;
+  labelAmount: string;
+  labelServer: string;
+  labelRcon: string;
+  labelDiscord: string;
   webhookSecret: string;
   fieldMap: FieldMapState;
   history: HistoryEntry[];
@@ -76,34 +89,66 @@ type ManualForm = {
   status: string;
   buyerName: string;
   buyerDiscordId: string;
+  steam: string;
+  email: string;
+  server: string;
+  rcon: string;
   extra: string;
   sendToChannel: boolean;
   sendDm: boolean;
 };
 
 const DEFAULT_FIELD_MAP: FieldMapState = {
-  orderId: "order_id|orderId|id|folio|comprobante_id|receipt_id",
+  orderId: "order_id|orderId|buyOrder|id|folio|comprobante_id|receipt_id",
   amount: "amount|monto|total|value|pago",
   currency: "currency|moneda|currency_code|divisa",
   product: "product|producto|item|description|concepto|servicio|plan",
   status: "status|estado|payment_status|estado_pago",
-  buyerName: "buyer_name|buyer|cliente|customer_name|nombre|payer_name",
+  buyerName: "buyer_name|buyer|cliente|customer_name|nombre|payer_name|playerName|player_name",
   buyerDiscordId: "discord_id|discordId|buyer_discord_id|user_id|discord_user_id",
-  date: "date|fecha|paid_at|created_at|timestamp",
+  date: "date|fecha|paid_at|created_at|timestamp|vipGrantedAt",
   extra: "note|notes|detalle|message|comentario|observacion",
+  steam: "steam|steamId|steam_id|steamid",
+  email: "email|correo|mail|payer_email",
+  server: "server|servidor|server_status|rconText|rcon_status",
+  rcon: "rcon|rcon_log|rconLog|replies|replyLine",
+};
+
+const FIELD_MAP_LABELS: Record<keyof FieldMapState, string> = {
+  orderId: "Orden / folio",
+  amount: "Monto",
+  currency: "Moneda",
+  product: "Producto",
+  status: "Estado",
+  buyerName: "Nombre",
+  buyerDiscordId: "Discord ID",
+  date: "Fecha",
+  extra: "Detalle extra",
+  steam: "Steam",
+  email: "Correo",
+  server: "Servidor",
+  rcon: "Detalle técnico / RCON",
 };
 
 const defaultForm: PaymentsState = {
   enabled: false,
   channelId: "",
   sendToChannel: true,
-  sendDm: true,
+  sendDm: false,
   mentionRoleId: "",
-  color: "22c55e",
-  titleTemplate: "Pago recibido",
-  descriptionTemplate:
-    "**{product}**\nMonto: **{amount} {currency}**\nEstado: `{status}`\nOrden: `{orderId}`\nCliente: {buyerName}",
-  footerTemplate: "EyedBot · Notificación de pago",
+  color: "5dce7a",
+  layout: "fields",
+  titleTemplate: "{product} · pago confirmado",
+  descriptionTemplate: "",
+  footerTemplate: "Notificación de pago",
+  labelSteam: "Steam",
+  labelName: "Nombre",
+  labelEmail: "Correo",
+  labelOrder: "Orden",
+  labelAmount: "Monto",
+  labelServer: "Servidor",
+  labelRcon: "Detalle técnico",
+  labelDiscord: "Discord",
   webhookSecret: "",
   fieldMap: DEFAULT_FIELD_MAP,
   history: [],
@@ -117,9 +162,13 @@ const defaultManual: ManualForm = {
   status: "pagado",
   buyerName: "",
   buyerDiscordId: "",
+  steam: "",
+  email: "",
+  server: "",
+  rcon: "",
   extra: "",
   sendToChannel: true,
-  sendDm: true,
+  sendDm: false,
 };
 
 const TABS = [
@@ -141,6 +190,10 @@ function normalizeFieldMap(value: unknown): FieldMapState {
     buyerDiscordId: toStringValue(data.buyerDiscordId, DEFAULT_FIELD_MAP.buyerDiscordId),
     date: toStringValue(data.date, DEFAULT_FIELD_MAP.date),
     extra: toStringValue(data.extra, DEFAULT_FIELD_MAP.extra),
+    steam: toStringValue(data.steam, DEFAULT_FIELD_MAP.steam),
+    email: toStringValue(data.email, DEFAULT_FIELD_MAP.email),
+    server: toStringValue(data.server, DEFAULT_FIELD_MAP.server),
+    rcon: toStringValue(data.rcon, DEFAULT_FIELD_MAP.rcon),
   };
 }
 
@@ -169,12 +222,21 @@ function normalizeForm(value: unknown): PaymentsState {
     enabled: toBooleanValue(data.enabled),
     channelId: toStringValue(data.channelId),
     sendToChannel: data.sendToChannel === false ? false : true,
-    sendDm: data.sendDm === false ? false : true,
+    sendDm: data.sendDm === true,
     mentionRoleId: toStringValue(data.mentionRoleId),
-    color: toStringValue(data.color, "22c55e").replace("#", ""),
+    color: toStringValue(data.color, "5dce7a").replace("#", ""),
+    layout: toStringValue(data.layout, "fields") === "text" ? "text" : "fields",
     titleTemplate: toStringValue(data.titleTemplate, defaultForm.titleTemplate),
     descriptionTemplate: toStringValue(data.descriptionTemplate, defaultForm.descriptionTemplate),
     footerTemplate: toStringValue(data.footerTemplate, defaultForm.footerTemplate),
+    labelSteam: toStringValue(data.labelSteam, defaultForm.labelSteam),
+    labelName: toStringValue(data.labelName, defaultForm.labelName),
+    labelEmail: toStringValue(data.labelEmail, defaultForm.labelEmail),
+    labelOrder: toStringValue(data.labelOrder, defaultForm.labelOrder),
+    labelAmount: toStringValue(data.labelAmount, defaultForm.labelAmount),
+    labelServer: toStringValue(data.labelServer, defaultForm.labelServer),
+    labelRcon: toStringValue(data.labelRcon, defaultForm.labelRcon),
+    labelDiscord: toStringValue(data.labelDiscord, defaultForm.labelDiscord),
     webhookSecret: toStringValue(data.webhookSecret),
     fieldMap: normalizeFieldMap(data.fieldMap),
     history: normalizeHistory(data.history),
@@ -224,9 +286,18 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
           sendDm: form.sendDm,
           mentionRoleId: form.mentionRoleId || null,
           color: form.color,
+          layout: form.layout,
           titleTemplate: form.titleTemplate,
           descriptionTemplate: form.descriptionTemplate,
           footerTemplate: form.footerTemplate,
+          labelSteam: form.labelSteam,
+          labelName: form.labelName,
+          labelEmail: form.labelEmail,
+          labelOrder: form.labelOrder,
+          labelAmount: form.labelAmount,
+          labelServer: form.labelServer,
+          labelRcon: form.labelRcon,
+          labelDiscord: form.labelDiscord,
           webhookSecret: form.webhookSecret,
           fieldMap: form.fieldMap,
           ...extra,
@@ -277,7 +348,7 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
     <PaneGrid>
       <SectionCard
         title="Notificaciones de pago"
-        description="Avisa compras y comprobantes por canal y mensaje privado. Se adapta a la API de tu hermano con mapeo de campos."
+        description="Avisos de compra al canal (y opcionalmente por DM). Textos, etiquetas y mapeo de API son configurables y se guardan por servidor."
       >
         <Tabs items={TABS} value={tab} onValueChange={setTab} className="mb-5" />
 
@@ -331,11 +402,27 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
               <ColorInput value={form.color} onChange={(color) => setForm((c) => ({ ...c, color: color.replace("#", "") }))} />
             </Field>
 
-            <Field label="Título" description="Placeholders: {product} {amount} {currency} {status} {orderId} {buyerName}">
+            <Field label="Diseño del embed">
+              <select
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+                value={form.layout}
+                onChange={(e) =>
+                  setForm((c) => ({
+                    ...c,
+                    layout: e.target.value === "text" ? "text" : "fields",
+                  }))
+                }
+              >
+                <option value="fields">Campos (Steam, Orden, Monto…)</option>
+                <option value="text">Solo texto (plantilla)</option>
+              </select>
+            </Field>
+
+            <Field label="Título" description="Placeholders: {product} {amount} {currency} {status} {orderId} {buyerName} {steam} {email} {server}">
               <Input value={form.titleTemplate} onChange={(e) => setForm((c) => ({ ...c, titleTemplate: e.target.value }))} />
             </Field>
 
-            <Field label="Descripción">
+            <Field label="Descripción" description="Opcional. Con diseño por campos suele dejarse vacía.">
               <Textarea
                 value={form.descriptionTemplate}
                 onChange={(e) => setForm((c) => ({ ...c, descriptionTemplate: e.target.value }))}
@@ -345,6 +432,35 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
             <Field label="Footer">
               <Input value={form.footerTemplate} onChange={(e) => setForm((c) => ({ ...c, footerTemplate: e.target.value }))} />
             </Field>
+
+            {form.layout === "fields" ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Etiqueta Steam">
+                  <Input value={form.labelSteam} onChange={(e) => setForm((c) => ({ ...c, labelSteam: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta Nombre">
+                  <Input value={form.labelName} onChange={(e) => setForm((c) => ({ ...c, labelName: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta Correo">
+                  <Input value={form.labelEmail} onChange={(e) => setForm((c) => ({ ...c, labelEmail: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta Orden">
+                  <Input value={form.labelOrder} onChange={(e) => setForm((c) => ({ ...c, labelOrder: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta Monto">
+                  <Input value={form.labelAmount} onChange={(e) => setForm((c) => ({ ...c, labelAmount: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta Servidor">
+                  <Input value={form.labelServer} onChange={(e) => setForm((c) => ({ ...c, labelServer: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta detalle técnico">
+                  <Input value={form.labelRcon} onChange={(e) => setForm((c) => ({ ...c, labelRcon: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta Discord">
+                  <Input value={form.labelDiscord} onChange={(e) => setForm((c) => ({ ...c, labelDiscord: e.target.value }))} />
+                </Field>
+              </div>
+            ) : null}
 
             <FormActions onSave={() => void handleSave()} saving={saving} />
           </div>
@@ -374,6 +490,18 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
               </Field>
               <Field label="Nombre del cliente">
                 <Input value={manual.buyerName} onChange={(e) => setManual((c) => ({ ...c, buyerName: e.target.value }))} />
+              </Field>
+              <Field label="Steam ID">
+                <Input value={manual.steam} onChange={(e) => setManual((c) => ({ ...c, steam: e.target.value }))} />
+              </Field>
+              <Field label="Correo">
+                <Input value={manual.email} onChange={(e) => setManual((c) => ({ ...c, email: e.target.value }))} />
+              </Field>
+              <Field label="Servidor / estado">
+                <Input value={manual.server} onChange={(e) => setManual((c) => ({ ...c, server: e.target.value }))} />
+              </Field>
+              <Field label="Detalle técnico">
+                <Input value={manual.rcon} onChange={(e) => setManual((c) => ({ ...c, rcon: e.target.value }))} />
               </Field>
               <Field label="Discord ID (para DM)">
                 <Input
@@ -415,7 +543,7 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
           <div className="space-y-5">
             <Alert
               title="API de comprobantes"
-              description="Tu hermano puede POST-ear el JSON del pago a esta URL. EyedBot detecta campos comunes (monto, folio, discord_id, etc.) o los que configures abajo."
+              description="La tienda o API externa puede POST-ear el JSON del pago a esta URL. EyedBot detecta campos comunes o los que configures abajo."
             />
             <Field label="URL del webhook">
               <Input value={webhookUrl} readOnly />
@@ -435,14 +563,16 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
             <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-300">
               <p className="mb-2 font-medium text-white">Ejemplo de body</p>
               <pre className="overflow-x-auto whitespace-pre-wrap text-xs text-zinc-400">{`{
-  "order_id": "CMP-10021",
-  "monto": "9990",
-  "moneda": "CLP",
-  "producto": "EyedPlus mensual",
-  "estado": "pagado",
-  "nombre": "Nico",
-  "discord_id": "399740358101303316",
-  "detalle": "WebPay OK"
+  "buyOrder": "VIPmt1yljqw61899a",
+  "steamId": "76561198077647066",
+  "playerName": "",
+  "email": "cliente@correo.com",
+  "amount": 50,
+  "currency": "CLP",
+  "product": "VIP",
+  "status": "pagado_activado",
+  "server": "Activado en el servidor",
+  "rcon": "oxide.usergroup add … vip → Player added to group: vip"
 }`}</pre>
             </div>
 
@@ -450,7 +580,7 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
               Mapeo de campos (separados por <code>|</code>). Admite rutas como <code>data.amount</code>.
             </p>
             {(Object.keys(DEFAULT_FIELD_MAP) as Array<keyof FieldMapState>).map((key) => (
-              <Field key={key} label={key}>
+              <Field key={key} label={FIELD_MAP_LABELS[key]}>
                 <Input
                   value={form.fieldMap[key]}
                   onChange={(e) =>

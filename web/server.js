@@ -5572,6 +5572,15 @@ app.post('/api/guild/:guildId/payment-receipt-config', requireAuth, async (req, 
             'titleTemplate',
             'descriptionTemplate',
             'footerTemplate',
+            'layout',
+            'labelSteam',
+            'labelName',
+            'labelEmail',
+            'labelOrder',
+            'labelAmount',
+            'labelServer',
+            'labelRcon',
+            'labelDiscord',
             'webhookSecret',
             'fieldMap'
         ]) {
@@ -5612,7 +5621,11 @@ app.post('/api/guild/:guildId/payment-receipt-send', requireAuth, async (req, re
                 buyerName: body.buyerName,
                 buyerDiscordId: body.buyerDiscordId || body.discordId,
                 date: body.date,
-                extra: body.extra
+                extra: body.extra,
+                steam: body.steam || body.steamId,
+                email: body.email || body.correo,
+                server: body.server || body.servidor,
+                rcon: body.rcon || body.rcon_log
             }
         });
 
