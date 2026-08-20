@@ -27,6 +27,7 @@ import { SecurityPane } from "@/components/features/server/panes/SecurityPane";
 import { EmbedPane } from "@/components/features/server/panes/EmbedPane";
 import { EventsPane } from "@/components/features/server/panes/EventsPane";
 import { WeeklySummaryPane } from "@/components/features/server/panes/WeeklySummaryPane";
+import { PaymentsPane } from "@/components/features/server/panes/PaymentsPane";
 import { ModuleContent, ModuleSidebar } from "@/components/features/shared";
 
 const PANE_COMPONENTS = {
@@ -45,6 +46,7 @@ const PANE_COMPONENTS = {
   embed: EmbedPane,
   events: EventsPane,
   "weekly-summary": WeeklySummaryPane,
+  payments: PaymentsPane,
 } satisfies Record<string, ComponentType<{ guildId: string }>>;
 
 type ServerPaneSlug = keyof typeof PANE_COMPONENTS;
