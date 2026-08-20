@@ -42,6 +42,10 @@ type FieldMapState = {
   email: string;
   server: string;
   rcon: string;
+  gateway: string;
+  authCode: string;
+  paymentType: string;
+  cardLast4: string;
 };
 
 type HistoryEntry = {
@@ -76,6 +80,10 @@ type PaymentsState = {
   labelServer: string;
   labelRcon: string;
   labelDiscord: string;
+  labelGateway: string;
+  labelAuth: string;
+  labelPaymentType: string;
+  labelCard: string;
   webhookSecret: string;
   fieldMap: FieldMapState;
   history: HistoryEntry[];
@@ -112,6 +120,10 @@ const DEFAULT_FIELD_MAP: FieldMapState = {
   email: "email|correo|mail|payer_email",
   server: "server|servidor|server_status|rconText|rcon_status",
   rcon: "rcon|rcon_log|rconLog|replies|replyLine",
+  gateway: "gateway|pasarela|provider|payment_gateway|psp",
+  authCode: "authorization_code|autorizacion|auth_code|authorizationCode",
+  paymentType: "payment_type|tipo_pago|payment_type_code|paymentTypeCode",
+  cardLast4: "card_last4|tarjeta|card_number|cardLast4",
 };
 
 const FIELD_MAP_LABELS: Record<keyof FieldMapState, string> = {
@@ -128,6 +140,10 @@ const FIELD_MAP_LABELS: Record<keyof FieldMapState, string> = {
   email: "Correo",
   server: "Servidor",
   rcon: "Detalle técnico / RCON",
+  gateway: "Pasarela",
+  authCode: "Autorización",
+  paymentType: "Tipo de pago",
+  cardLast4: "Tarjeta",
 };
 
 const defaultForm: PaymentsState = {
@@ -149,6 +165,10 @@ const defaultForm: PaymentsState = {
   labelServer: "Servidor",
   labelRcon: "Detalle técnico",
   labelDiscord: "Discord",
+  labelGateway: "Pasarela",
+  labelAuth: "Autorización",
+  labelPaymentType: "Tipo de pago",
+  labelCard: "Tarjeta",
   webhookSecret: "",
   fieldMap: DEFAULT_FIELD_MAP,
   history: [],
@@ -194,6 +214,10 @@ function normalizeFieldMap(value: unknown): FieldMapState {
     email: toStringValue(data.email, DEFAULT_FIELD_MAP.email),
     server: toStringValue(data.server, DEFAULT_FIELD_MAP.server),
     rcon: toStringValue(data.rcon, DEFAULT_FIELD_MAP.rcon),
+    gateway: toStringValue(data.gateway, DEFAULT_FIELD_MAP.gateway),
+    authCode: toStringValue(data.authCode, DEFAULT_FIELD_MAP.authCode),
+    paymentType: toStringValue(data.paymentType, DEFAULT_FIELD_MAP.paymentType),
+    cardLast4: toStringValue(data.cardLast4, DEFAULT_FIELD_MAP.cardLast4),
   };
 }
 
@@ -237,6 +261,10 @@ function normalizeForm(value: unknown): PaymentsState {
     labelServer: toStringValue(data.labelServer, defaultForm.labelServer),
     labelRcon: toStringValue(data.labelRcon, defaultForm.labelRcon),
     labelDiscord: toStringValue(data.labelDiscord, defaultForm.labelDiscord),
+    labelGateway: toStringValue(data.labelGateway, defaultForm.labelGateway),
+    labelAuth: toStringValue(data.labelAuth, defaultForm.labelAuth),
+    labelPaymentType: toStringValue(data.labelPaymentType, defaultForm.labelPaymentType),
+    labelCard: toStringValue(data.labelCard, defaultForm.labelCard),
     webhookSecret: toStringValue(data.webhookSecret),
     fieldMap: normalizeFieldMap(data.fieldMap),
     history: normalizeHistory(data.history),
@@ -298,6 +326,10 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
           labelServer: form.labelServer,
           labelRcon: form.labelRcon,
           labelDiscord: form.labelDiscord,
+          labelGateway: form.labelGateway,
+          labelAuth: form.labelAuth,
+          labelPaymentType: form.labelPaymentType,
+          labelCard: form.labelCard,
           webhookSecret: form.webhookSecret,
           fieldMap: form.fieldMap,
           ...extra,
@@ -458,6 +490,18 @@ export function PaymentsPane({ guildId }: { guildId: string }) {
                 </Field>
                 <Field label="Etiqueta Discord">
                   <Input value={form.labelDiscord} onChange={(e) => setForm((c) => ({ ...c, labelDiscord: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta pasarela">
+                  <Input value={form.labelGateway} onChange={(e) => setForm((c) => ({ ...c, labelGateway: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta autorización">
+                  <Input value={form.labelAuth} onChange={(e) => setForm((c) => ({ ...c, labelAuth: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta tipo de pago">
+                  <Input value={form.labelPaymentType} onChange={(e) => setForm((c) => ({ ...c, labelPaymentType: e.target.value }))} />
+                </Field>
+                <Field label="Etiqueta tarjeta">
+                  <Input value={form.labelCard} onChange={(e) => setForm((c) => ({ ...c, labelCard: e.target.value }))} />
                 </Field>
               </div>
             ) : null}

@@ -65,7 +65,11 @@ function defaultFieldMap() {
         steam: 'steam|steamId|steam_id|steamid',
         email: 'email|correo|mail|payer_email',
         server: 'server|servidor|server_status|rconText|rcon_status',
-        rcon: 'rcon|rcon_log|rconLog|replies|replyLine'
+        rcon: 'rcon|rcon_log|rconLog|replies|replyLine',
+        gateway: 'gateway|pasarela|provider|payment_gateway|psp',
+        authCode: 'authorization_code|autorizacion|auth_code|authorizationCode',
+        paymentType: 'payment_type|tipo_pago|payment_type_code|paymentTypeCode',
+        cardLast4: 'card_last4|tarjeta|card_number|cardLast4'
     };
 }
 
@@ -89,6 +93,10 @@ function defaultConfig() {
         labelServer: 'Servidor',
         labelRcon: 'Detalle técnico',
         labelDiscord: 'Discord',
+        labelGateway: 'Pasarela',
+        labelAuth: 'Autorización',
+        labelPaymentType: 'Tipo de pago',
+        labelCard: 'Tarjeta',
         webhookSecret: '',
         fieldMap: defaultFieldMap(),
         history: [],
@@ -149,6 +157,10 @@ function sanitizeConfig(raw) {
         labelServer: String(cfg.labelServer || 'Servidor').slice(0, 80),
         labelRcon: String(cfg.labelRcon || 'Detalle técnico').slice(0, 80),
         labelDiscord: String(cfg.labelDiscord || 'Discord').slice(0, 80),
+        labelGateway: String(cfg.labelGateway || 'Pasarela').slice(0, 80),
+        labelAuth: String(cfg.labelAuth || 'Autorización').slice(0, 80),
+        labelPaymentType: String(cfg.labelPaymentType || 'Tipo de pago').slice(0, 80),
+        labelCard: String(cfg.labelCard || 'Tarjeta').slice(0, 80),
         webhookSecret: String(cfg.webhookSecret || '').trim().slice(0, 128),
         fieldMap: sanitizeFieldMap(cfg.fieldMap),
         history: sanitizeHistory(cfg.history),

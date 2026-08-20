@@ -5581,6 +5581,10 @@ app.post('/api/guild/:guildId/payment-receipt-config', requireAuth, async (req, 
             'labelServer',
             'labelRcon',
             'labelDiscord',
+            'labelGateway',
+            'labelAuth',
+            'labelPaymentType',
+            'labelCard',
             'webhookSecret',
             'fieldMap'
         ]) {

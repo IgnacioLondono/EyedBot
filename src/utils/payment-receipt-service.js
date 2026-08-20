@@ -75,8 +75,16 @@ function normalizeReceipt(rawPayload, fieldMap, overrides = {}) {
         steam: firstPresent(payload, map.steam) || overrides.steam || '',
         email: firstPresent(payload, map.email) || overrides.email || '',
         server: firstPresent(payload, map.server) || overrides.server || '',
-        rcon: firstPresent(payload, map.rcon) || overrides.rcon || ''
+        rcon: firstPresent(payload, map.rcon) || overrides.rcon || '',
+        gateway: firstPresent(payload, map.gateway) || overrides.gateway || '',
+        authCode: firstPresent(payload, map.authCode) || overrides.authCode || '',
+        paymentType: firstPresent(payload, map.paymentType) || overrides.paymentType || '',
+        cardLast4: firstPresent(payload, map.cardLast4) || overrides.cardLast4 || ''
     };
+
+    if (receipt.cardLast4 && !String(receipt.cardLast4).includes('*')) {
+        receipt.cardLast4 = `**** ${String(receipt.cardLast4).replace(/\D/g, '').slice(-4)}`;
+    }
 
     // Si rcon viene como array de replies del shop Rust
     if (!receipt.rcon && Array.isArray(payload?.rcon?.replies)) {
@@ -147,6 +155,10 @@ function buildEmbed(cfg, receipt) {
         force(cfg.labelOrder || 'Orden', receipt.orderId ? `\`${receipt.orderId}\`` : '—', false);
         force(cfg.labelAmount || 'Monto', receipt.amountFormatted || receipt.amount || '—', true);
         force(cfg.labelServer || 'Servidor', receipt.server || '—', true);
+        if (receipt.gateway) push(cfg.labelGateway || 'Pasarela', receipt.gateway, true);
+        if (receipt.authCode) push(cfg.labelAuth || 'Autorización', `\`${receipt.authCode}\``, true);
+        if (receipt.paymentType) push(cfg.labelPaymentType || 'Tipo de pago', receipt.paymentType, true);
+        if (receipt.cardLast4) push(cfg.labelCard || 'Tarjeta', receipt.cardLast4, true);
         if (receipt.rcon) {
             push(cfg.labelRcon || 'Detalle técnico', '```\n' + String(receipt.rcon).slice(0, 900) + '\n```', false);
         }
