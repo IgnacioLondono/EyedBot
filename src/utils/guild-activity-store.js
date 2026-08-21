@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'guild-activity-store.json');
 
@@ -78,6 +79,7 @@ function dayKey(date = new Date()) {
 }
 
 async function getGuildActivity(guildId) {
+    guildId = scopeKey(guildId);
     const key = `guild_activity_${guildId}`;
 
     try {
@@ -95,6 +97,7 @@ async function getGuildActivity(guildId) {
 }
 
 async function setGuildActivity(guildId, activity) {
+    guildId = scopeKey(guildId);
     const normalized = normalizeActivity(activity);
     const key = `guild_activity_${guildId}`;
 
@@ -112,6 +115,7 @@ async function setGuildActivity(guildId, activity) {
 }
 
 async function incrementGuildMetric(guildId, metric, amount = 1, when = new Date()) {
+    guildId = scopeKey(guildId);
     const safeMetric = String(metric || '').trim();
     if (!['joins', 'leaves', 'messages', 'voiceMinutes'].includes(safeMetric)) return null;
 

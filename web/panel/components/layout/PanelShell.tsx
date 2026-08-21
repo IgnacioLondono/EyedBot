@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronDown, Link2, LogIn, LogOut, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
 import { filterPrimaryNav } from "@/lib/web-config";
 import { EYEDBIO_URL } from "@/lib/eyedbio";
@@ -16,6 +16,7 @@ import { discordAvatarUrl } from "@/lib/discord-media";
 import { cn } from "@/lib/utils";
 import { WallpaperLayer } from "@/components/layout/WallpaperLayer";
 import { useThemeSettings } from "@/components/providers/ThemeProvider";
+import { resolvePanelBrand } from "@/lib/brand";
 
 export function PanelShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -29,6 +30,15 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   const primaryNav = filterPrimaryNav(PRIMARY_NAV, bootstrap?.webConfig);
   const maintenanceMessage = bootstrap?.webConfig?.maintenanceMessage;
   const showMaintenanceNotice = Boolean(bootstrap?.isRealOwner && bootstrap?.webConfig?.maintenanceMode);
+  const brand = resolvePanelBrand(bootstrap?.tenant);
+  const brandLabel = brand.isTenant ? `${brand.name} Panel` : "EyedBot Panel";
+
+  useEffect(() => {
+    if (!brand.isTenant) return;
+    const root = document.documentElement;
+    root.style.setProperty("--color-accent", brand.primaryColor);
+    root.style.setProperty("--color-brand", brand.primaryColor);
+  }, [brand.isTenant, brand.primaryColor]);
 
   return (
     <div className={cn("relative min-h-screen text-zinc-100", !hasActiveWallpaper && "bg-[var(--color-bg)]")}>
@@ -46,7 +56,15 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
           </div>
         ) : null}
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 lg:px-6">
-          <EyedBotLogo href={homeHref} label="EyedBot Panel" showText="desktop" className="font-semibold" />
+          {brand.logoUrl ? (
+            <Link href={homeHref} className="flex min-w-0 items-center gap-2.5 font-semibold text-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={brand.logoUrl} alt="" className="h-10 w-10 rounded-2xl object-cover" />
+              <span className="hidden truncate sm:block">{brandLabel}</span>
+            </Link>
+          ) : (
+            <EyedBotLogo href={homeHref} label={brandLabel} showText="desktop" className="font-semibold" />
+          )}
 
           <div className="hidden flex-1 items-center gap-1 md:flex">
             {primaryNav.map((item) => {

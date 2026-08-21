@@ -345,8 +345,11 @@ function attachInteractionHandler(client) {
 
 function attachGuildEventHandlers(client, options = {}) {
     const auxiliary = options.auxiliary === true;
+    const fullFeatures = options.fullFeatures === true;
 
-    if (auxiliary) {
+    // Auxiliares "ligeros": solo re-registro de slash al unirse a un servidor.
+    // Con fullFeatures (panel asignable) se usan los mismos eventos de módulos.
+    if (auxiliary && !fullFeatures) {
         client.on('guildCreate', (guild) => {
             const payloads = client.__eyedSlashPayloads;
             const token = client.__eyedBotToken;
@@ -362,6 +365,23 @@ function attachGuildEventHandlers(client, options = {}) {
             }, 10000);
         });
         return;
+    }
+
+    if (auxiliary && fullFeatures) {
+        client.on('guildCreate', (guild) => {
+            const payloads = client.__eyedSlashPayloads;
+            const token = client.__eyedBotToken;
+            if (!payloads?.length || !token) return;
+            setTimeout(() => {
+                registerSlashCommandsForClient(client, token, payloads, {
+                    guildIds: [guild.id],
+                    cleanupGlobal: false,
+                    retries: 3
+                }).catch((error) => {
+                    console.error('❌ Error sincronizando slash en nuevo servidor (tenant):', error?.message || error);
+                });
+            }, 10000);
+        });
     }
 
     client.on('messageCreate', async (message) => {
@@ -460,6 +480,8 @@ function createEyedBotClient() {
 
 function bootstrapAuxiliaryClient(client, token, options = {}) {
     const commandsEnabled = options.commandsEnabled !== false;
+    const fullFeatures = options.fullFeatures === true;
+    const tenantBotId = String(options.tenantBotId || '').trim();
     // Con comandos desactivados no se cargan/registran slash (evita "copiar" los comandos del bot principal).
     const commandPayloads = commandsEnabled ? loadBotCommands(client) : [];
     if (!commandsEnabled) {
@@ -470,9 +492,25 @@ function bootstrapAuxiliaryClient(client, token, options = {}) {
     client.__eyedCommandsEnabled = commandsEnabled;
     client.__eyedBotToken = token;
     client.__eyedAuxiliary = true;
+    client.__eyedFullFeatures = fullFeatures;
+    client.__eyedTenantBotId = tenantBotId || null;
 
-    attachAuxiliaryInteractionHandler(client);
-    attachGuildEventHandlers(client, { auxiliary: true });
+    if (tenantBotId && fullFeatures) {
+        const { runWithBotScope } = require('./config-scope');
+        const originalOn = client.on.bind(client);
+        client.on = (event, listener) => {
+            if (typeof listener !== 'function') return originalOn(event, listener);
+            return originalOn(event, (...args) => runWithBotScope(tenantBotId, () => listener(...args)));
+        };
+    }
+
+    if (fullFeatures) {
+        attachInteractionHandler(client);
+        attachGuildEventHandlers(client, { auxiliary: true, fullFeatures: true });
+    } else {
+        attachAuxiliaryInteractionHandler(client);
+        attachGuildEventHandlers(client, { auxiliary: true });
+    }
 
     if ((process.env.TTS_ENABLED || 'true').toLowerCase() !== 'false') {
         try {
@@ -487,7 +525,7 @@ function bootstrapAuxiliaryClient(client, token, options = {}) {
     }
 
     client.once('clientReady', async () => {
-        console.log(`🤖 Bot auxiliar conectado como ${client.user.tag}${options.label ? ` (${options.label})` : ''}`);
+        console.log(`🤖 Bot auxiliar conectado como ${client.user.tag}${options.label ? ` (${options.label})` : ''}${fullFeatures ? ' [panel completo]' : ''}`);
         if (MUSIC_ENABLED && config.lavalinkEnabled) {
             try {
                 const lavalink = require('./lavalink-shoukaku');

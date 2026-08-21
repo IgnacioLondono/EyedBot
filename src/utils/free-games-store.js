@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'free-games-configs.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '120000', 10));
@@ -98,6 +99,7 @@ function normalizeConfig(raw = {}) {
 }
 
 async function getFreeGamesConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `free_games_cfg_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -120,6 +122,7 @@ async function getFreeGamesConfig(guildId) {
 }
 
 async function setFreeGamesConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     const normalized = normalizeConfig(config);
 
     try {

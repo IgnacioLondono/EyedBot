@@ -80,11 +80,23 @@ export const updateUserBilling = (userId: string, body: Record<string, unknown>)
 export type OwnerBotSummary = {
   id: string;
   label: string;
+  slug?: string;
   enabled: boolean;
+  panelEnabled?: boolean;
   status: string;
   username: string;
   displayName: string;
   applicationId: string;
+  clientId?: string;
+  hasClientSecret?: boolean;
+  assignedDiscordUserId?: string;
+  brand?: {
+    name: string;
+    logoUrl: string;
+    primaryColor: string;
+  };
+  panelPath?: string;
+  panelAuthPath?: string;
   avatar: string | null;
   avatarUrl: string | null;
   guildCount: number;
@@ -97,8 +109,16 @@ export type OwnerBotSummary = {
 
 export const getOwnerBots = () => apiFetch<{ bots: OwnerBotSummary[] }>("/api/admin/bots");
 
-export const createOwnerBot = (body: { label?: string; token: string }) =>
-  apiFetch<{ bot: OwnerBotSummary }>("/api/admin/bots", { method: "POST", body });
+export const createOwnerBot = (body: {
+  label?: string;
+  token: string;
+  clientId?: string;
+  clientSecret?: string;
+  assignedDiscordUserId?: string;
+  slug?: string;
+  brand?: { name?: string; logoUrl?: string; primaryColor?: string };
+  panelEnabled?: boolean;
+}) => apiFetch<{ bot: OwnerBotSummary }>("/api/admin/bots", { method: "POST", body });
 
 export const updateOwnerBot = (botId: string, body: Record<string, unknown>) =>
   apiFetch<{ bot: OwnerBotSummary }>(`/api/admin/bots/${encodeURIComponent(botId)}`, {

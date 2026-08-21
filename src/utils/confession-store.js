@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'confession-configs.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -63,6 +64,7 @@ function ensureGuildBucket(store, guildId) {
 }
 
 async function getGuildConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `confession_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -85,6 +87,7 @@ async function getGuildConfig(guildId) {
 }
 
 async function persistGuildConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     const normalized = normalizeConfig(config);
 
     try {
@@ -102,6 +105,7 @@ async function persistGuildConfig(guildId, config) {
 }
 
 async function setChannelId(guildId, channelId) {
+    guildId = scopeKey(guildId);
     const current = await getGuildConfig(guildId);
     return persistGuildConfig(guildId, {
         ...current,
@@ -110,6 +114,7 @@ async function setChannelId(guildId, channelId) {
 }
 
 async function clearChannel(guildId) {
+    guildId = scopeKey(guildId);
     const current = await getGuildConfig(guildId);
     return persistGuildConfig(guildId, {
         ...current,
@@ -118,6 +123,7 @@ async function clearChannel(guildId) {
 }
 
 async function takeNextConfessionId(guildId) {
+    guildId = scopeKey(guildId);
     const current = await getGuildConfig(guildId);
     const id = current.nextId;
     await persistGuildConfig(guildId, {

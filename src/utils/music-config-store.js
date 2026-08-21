@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'music-configs.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -65,6 +66,7 @@ function sanitizeConfig(config) {
 }
 
 async function getMusicConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `music_cfg_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -87,6 +89,7 @@ async function getMusicConfig(guildId) {
 }
 
 async function setMusicConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     const cfg = sanitizeConfig(config);
     try {
         await db.set(`music_config_${guildId}`, cfg);

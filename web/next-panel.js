@@ -1,7 +1,7 @@
 const path = require('path');
 
 const SKIP_EXACT = new Set(['/callback', '/logout', '/favicon.ico', '/health']);
-const SKIP_PREFIX = ['/api', '/webhooks', '/auth/discord', '/uploads'];
+const SKIP_PREFIX = ['/api', '/webhooks', '/auth/discord', '/uploads', '/t'];
 
 /** Rutas del panel v1 → panel Next.js */
 const LEGACY_PAGE_REDIRECTS = {

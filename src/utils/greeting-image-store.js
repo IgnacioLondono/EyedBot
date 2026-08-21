@@ -1,4 +1,5 @@
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const MAX_GREETING_IMAGE_BYTES = 8 * 1024 * 1024;
 const VALID_SLOTS = new Set(['welcome', 'goodbye', 'welcome_thumb', 'goodbye_thumb']);
@@ -36,6 +37,7 @@ function normalizeSlot(slot = 'welcome') {
 }
 
 function buildApiPath(guildId, slot = 'welcome') {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim();
     const s = normalizeSlot(slot);
     return `/api/guild/${gid}/greeting-image/${s}`;
@@ -86,6 +88,7 @@ function bufferFromDbImageField(raw) {
 }
 
 async function setImage(guildId, slot, buffer, mimeType = 'image/jpeg') {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim().slice(0, 32);
     const s = normalizeSlot(slot);
     if (!gid || !Buffer.isBuffer(buffer) || buffer.length === 0) return false;
@@ -108,6 +111,7 @@ async function setImage(guildId, slot, buffer, mimeType = 'image/jpeg') {
 }
 
 async function getImage(guildId, slot) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim().slice(0, 32);
     const s = normalizeSlot(slot);
     if (!gid) return null;
@@ -129,6 +133,7 @@ async function getImage(guildId, slot) {
 }
 
 async function deleteImage(guildId, slot) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim().slice(0, 32);
     const s = normalizeSlot(slot);
     if (!gid) return false;
@@ -142,6 +147,7 @@ async function deleteImage(guildId, slot) {
 }
 
 async function hasImage(guildId, slot) {
+    guildId = scopeKey(guildId);
     const img = await getImage(guildId, slot);
     return !!(img?.data?.length);
 }

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'temp-voice-configs.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -87,6 +88,7 @@ function defaultConfig() {
 }
 
 async function getTempVoiceConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `tempVoice_cfg_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -108,6 +110,7 @@ async function getTempVoiceConfig(guildId) {
 }
 
 async function setTempVoiceConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`temp_voice_config_${guildId}`, config);
     } catch {
@@ -123,6 +126,7 @@ async function setTempVoiceConfig(guildId, config) {
 }
 
 async function getActiveChannelId(guildId, userId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `tempVoice_active_${guildId}_${userId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -144,6 +148,7 @@ async function getActiveChannelId(guildId, userId) {
 }
 
 async function setActiveChannel(guildId, userId, channelId) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`temp_voice_active_${guildId}_${userId}`, channelId || '');
         await db.set(`temp_voice_owner_${guildId}_${channelId}`, String(userId));
@@ -162,6 +167,7 @@ async function setActiveChannel(guildId, userId, channelId) {
 }
 
 async function getOwnerByChannelId(guildId, channelId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `tempVoice_owner_${guildId}_${channelId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -183,6 +189,7 @@ async function getOwnerByChannelId(guildId, channelId) {
 }
 
 async function clearActiveChannel(guildId, userId, channelId) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`temp_voice_active_${guildId}_${userId}`, '');
         if (channelId) await db.set(`temp_voice_owner_${guildId}_${channelId}`, '');
@@ -201,6 +208,7 @@ async function clearActiveChannel(guildId, userId, channelId) {
 }
 
 async function getUserCustomName(guildId, userId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `tempVoice_name_${guildId}_${userId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -222,6 +230,7 @@ async function getUserCustomName(guildId, userId) {
 }
 
 async function setUserCustomName(guildId, userId, name) {
+    guildId = scopeKey(guildId);
     const safe = String(name || '').trim();
 
     try {
@@ -243,6 +252,7 @@ async function setUserCustomName(guildId, userId, name) {
 }
 
 function listOwnedChannels(guildId) {
+    guildId = scopeKey(guildId);
     const store = readStore();
     const owned = store.guilds[String(guildId)]?.ownerByChannel || {};
     return Object.entries(owned)

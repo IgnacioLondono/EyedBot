@@ -295,7 +295,7 @@ app.get('/health', async (req, res) => {
     res.status(200).json({
         ok: true,
         service: 'web-panel',
-        botConnected: Boolean(botClient?.user?.id),
+        botConnected: Boolean(getBotClient()?.user?.id),
         dbOk,
         sessionCacheSize: sessionL1Cache.size
     });
@@ -319,17 +319,17 @@ async function resolveLivePresence(discordUserId) {
     const cached = presenceStore.getPresence(discordUserId);
     if (cached) return cached;
 
-    if (!botClient) return null;
+    if (!getBotClient()) return null;
 
     const filter = presenceStore.getPresenceGuildFilter();
     const guildIds = filter
         ? Array.from(filter)
-        : Array.from(botClient.guilds.cache.keys());
+        : Array.from(getBotClient().guilds.cache.keys());
 
     for (const guildId of guildIds) {
-        let guild = botClient.guilds.cache.get(String(guildId));
+        let guild = getBotClient().guilds.cache.get(String(guildId));
         if (!guild) {
-            guild = await botClient.guilds.fetch(String(guildId)).catch(() => null);
+            guild = await getBotClient().guilds.fetch(String(guildId)).catch(() => null);
         }
         if (!guild) continue;
 
@@ -357,7 +357,7 @@ app.get('/api/presence/:discordUserId', requireEyedBotApiKey, async (req, res) =
         return res.status(400).json({ success: false, error: 'Invalid Discord user ID' });
     }
 
-    if (!botClient?.user?.id) {
+    if (!getBotClient()?.user?.id) {
         return res.status(503).json({ success: false, error: 'Bot not connected' });
     }
 
@@ -1019,7 +1019,7 @@ app.use('/callback', authRateLimiter);
 app.use('/api/', apiRateLimiter);
 app.use((req, res, next) => {
     const path = String(req.path || '');
-    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/api/link/eyedbio', '/callback', '/api/user', '/api/guilds', '/api/panel/bootstrap'];
+    const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/api/link/eyedbio', '/callback', '/t/', '/api/user', '/api/guilds', '/api/panel/bootstrap'];
     if (neverCachePrefixes.some((prefix) => path.startsWith(prefix))) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
@@ -1105,7 +1105,44 @@ app.use('/uploads', express.static(uploadsRoot, {
 }));
 
 // Variable global para el cliente del bot (se inyectará desde index.js)
-let botClient = null;
+const { AsyncLocalStorage } = require('async_hooks');
+const { runWithBotScope, MAIN_BOT_ID } = require('../src/utils/config-scope');
+const botClientAls = new AsyncLocalStorage();
+let mainBotClient = null;
+
+function resolveBotClient(req) {
+    const tenantId = String(req?.session?.tenantBotId || '').trim();
+    if (tenantId) {
+        try {
+            const ownerBotManager = require('../src/utils/owner-bot-manager');
+            const client = ownerBotManager.getRuntimeClient(tenantId);
+            if (client) return client;
+        } catch {
+            /* noop */
+        }
+    }
+    return mainBotClient;
+}
+
+function getBotClient(req) {
+    if (req) return resolveBotClient(req);
+    return botClientAls.getStore()?.client || mainBotClient;
+}
+
+/** @deprecated use getBotClient(); kept as alias for gradual migration */
+function botClientRef() {
+    return getBotClient();
+}
+
+// Scope multi-tenant: config stores + client Discord activo por request
+app.use((req, res, next) => {
+    const tenantId = String(req.session?.tenantBotId || '').trim();
+    const botId = tenantId || MAIN_BOT_ID;
+    const client = resolveBotClient(req);
+    runWithBotScope(botId, () => {
+        botClientAls.run({ client }, () => next());
+    });
+});
 
 const templatesFilePath = path.join(__dirname, '..', 'data', 'embed-templates.json');
 
@@ -1341,7 +1378,7 @@ function moduleConfigActive(config, channelKey = 'channelId') {
 }
 
 async function buildGuildDashboardSummary(guildId) {
-    const guild = botClient?.guilds.cache.get(String(guildId));
+    const guild = getBotClient()?.guilds.cache.get(String(guildId));
     if (!guild) return null;
 
     const owner = await resolveGuildOwnerProfile(guild);
@@ -1450,7 +1487,7 @@ function sanitizeGuildSnapshot(guild) {
     const iconHash = String(guild?.icon || '').trim();
     const isOwner = guild?.owner === true;
     const isAdmin = hasAdminOrManageGuildPermission(guild);
-    const botGuild = botClient?.guilds?.cache?.get(guildId);
+    const botGuild = getBotClient()?.guilds?.cache?.get(guildId);
 
     return {
         name: String(guild?.name || 'Servidor sin nombre').slice(0, 120),
@@ -1492,12 +1529,12 @@ async function resolveGuildOwnerProfile(guild) {
         };
     }
 
-    if (!botClient) {
+    if (!getBotClient()) {
         return { id: ownerId, tag: `···${ownerId.slice(-4)}`, avatar: null };
     }
 
     try {
-        const user = await botClient.users.fetch(ownerId);
+        const user = await getBotClient().users.fetch(ownerId);
         return {
             id: ownerId,
             tag: user.tag || user.username || `···${ownerId.slice(-4)}`,
@@ -1523,7 +1560,7 @@ async function enrichUserRegistryGuilds(guilds = [], userId = '') {
     const list = Array.isArray(guilds) ? guilds : [];
     return Promise.all(list.map(async (guildEntry) => {
         const guildId = String(guildEntry?.id || '');
-        const botGuild = botClient?.guilds?.cache?.get(guildId);
+        const botGuild = getBotClient()?.guilds?.cache?.get(guildId);
         const isOwner = guildEntry?.isOwner === true
             || (botGuild && String(botGuild.ownerId) === String(userId));
         const isAdmin = guildEntry?.role === 'admin' || (guildEntry?.manages === true && !isOwner);
@@ -1588,13 +1625,13 @@ function sessionGuildAllowsManagement(sessionGuilds = [], guildId = '') {
     ));
 }
 
-function filterTrackableGuilds(guilds = []) {
+function filterTrackableGuilds(guilds = [], client = getBotClient()) {
     const list = Array.isArray(guilds) ? guilds : [];
     return list.filter((guild) => {
         if (!guild?.id) return false;
         if (!hasAdminOrManageGuildPermission(guild)) return false;
-        if (!botClient) return false;
-        return botClient.guilds.cache.has(String(guild.id));
+        if (!client) return false;
+        return client.guilds.cache.has(String(guild.id));
     });
 }
 
@@ -1806,7 +1843,7 @@ function resolveGuildUserTag(guild, userId) {
     const member = guild.members.cache.get(userId);
     if (member?.user?.tag) return member.user.tag;
     if (member?.displayName) return member.displayName;
-    const cachedUser = botClient?.users?.cache?.get(String(userId));
+    const cachedUser = getBotClient()?.users?.cache?.get(String(userId));
     if (cachedUser?.tag) return cachedUser.tag;
     if (cachedUser?.username) return cachedUser.username;
     return `Usuario ${String(userId).slice(-4)}`;
@@ -1821,7 +1858,7 @@ function resolveGuildUserAvatar(guild, userId) {
     if (typeof member?.user?.displayAvatarURL === 'function') {
         return member.user.displayAvatarURL({ dynamic: true, size: 128 });
     }
-    const cachedUser = botClient?.users?.cache?.get(String(userId));
+    const cachedUser = getBotClient()?.users?.cache?.get(String(userId));
     if (typeof cachedUser?.displayAvatarURL === 'function') {
         return cachedUser.displayAvatarURL({ dynamic: true, size: 128 });
     }
@@ -1846,7 +1883,7 @@ async function resolveGuildMemberProfile(guild, userId) {
         };
     }
 
-    const cachedUser = botClient?.users?.cache?.get(id);
+    const cachedUser = getBotClient()?.users?.cache?.get(id);
     if (cachedUser) {
         return {
             id,
@@ -1856,7 +1893,7 @@ async function resolveGuildMemberProfile(guild, userId) {
         };
     }
 
-    if (!botClient) {
+    if (!getBotClient()) {
         return { id, tag: `Usuario ···${id.slice(-4)}`, username: 'Usuario', avatar: null };
     }
 
@@ -1872,7 +1909,7 @@ async function resolveGuildMemberProfile(guild, userId) {
         };
     } catch {
         try {
-            const user = await botClient.users.fetch(id);
+            const user = await getBotClient().users.fetch(id);
             return {
                 id,
                 tag: user.tag || user.username || `···${id.slice(-4)}`,
@@ -2081,7 +2118,7 @@ function buildWeeklyTimeline(sinceDate, daily = {}) {
 
 // Función para inyectar el cliente del bot
 function setBotClient(client) {
-    botClient = client;
+    mainBotClient = client;
     const twitchEventSub = require('../src/utils/twitch-eventsub');
     const { setDiscordClient } = require('../src/utils/stream-push-runtime');
     setDiscordClient(client);
@@ -2351,6 +2388,7 @@ app.get('/callback', async (req, res) => {
         req.session.guilds = guilds;
         req.session.guildsSyncedAt = Date.now();
         req.session.accessToken = tokenData.access_token;
+        delete req.session.tenantBotId;
         delete req.session.oauthState;
         delete req.session.oauthStateIssuedAt;
 
@@ -2394,6 +2432,213 @@ app.get('/callback', async (req, res) => {
         }
 
         res.redirect('/login?error=auth_failed');
+    }
+});
+
+function buildPublicOrigin() {
+    try {
+        const fromRedirect = String(redirectUri || '').replace(/\/callback\/?$/i, '');
+        if (fromRedirect) return fromRedirect.replace(/\/+$/, '');
+    } catch {
+        /* noop */
+    }
+    return String(process.env.WEB_PUBLIC_ORIGIN || `http://localhost:${PORT}`).replace(/\/+$/, '');
+}
+
+function getOauthForTenant(record) {
+    const clientId = String(record?.clientId || record?.applicationId || '').trim();
+    const clientSecret = String(record?.clientSecret || '').trim();
+    const slug = String(record?.slug || '').trim();
+    if (!clientId || !clientSecret || !slug) return null;
+    const tenantRedirectUri = `${buildPublicOrigin()}/t/${encodeURIComponent(slug)}/callback`;
+    return {
+        oauth: new DiscordOauth2({
+            clientId,
+            clientSecret,
+            redirectUri: tenantRedirectUri
+        }),
+        redirectUri: tenantRedirectUri,
+        clientId
+    };
+}
+
+function tenantLandingHtml(record, opts = {}) {
+    const brand = record.brand || {};
+    const name = brand.name || record.label || 'Panel';
+    const color = brand.primaryColor ? `#${brand.primaryColor}` : '#f59e0b';
+    const logo = brand.logoUrl
+        ? `<img src="${String(brand.logoUrl).replace(/"/g, '')}" alt="" style="width:72px;height:72px;border-radius:18px;object-fit:cover;margin:0 auto 1rem;display:block;" />`
+        : '';
+    const error = opts.error
+        ? `<p style="color:#fca5a5;margin-top:1rem;">${String(opts.error).replace(/</g, '&lt;')}</p>`
+        : '';
+    const authPath = `/t/${encodeURIComponent(record.slug)}/auth`;
+    return `<!doctype html>
+<html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${name}</title>
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Segoe UI,system-ui,sans-serif;
+background:radial-gradient(circle at top,${color}33,transparent 45%),#0a0a0b;color:#fafafa}
+.card{width:min(420px,92vw);text-align:center;padding:2rem;border:1px solid #ffffff14;border-radius:24px;background:#111214cc;backdrop-filter:blur(12px)}
+a.btn{display:inline-block;margin-top:1.25rem;padding:.85rem 1.4rem;border-radius:999px;background:${color};color:#111;font-weight:700;text-decoration:none}
+p{opacity:.8;line-height:1.5}
+</style></head><body><div class="card">${logo}<h1 style="margin:0 0 .5rem;font-size:1.6rem">${name}</h1>
+<p>Entrá al panel de módulos de tu bot.</p>
+<a class="btn" href="${authPath}">Activar / entrar al panel</a>${error}</div></body></html>`;
+}
+
+app.get('/t/:slug', (req, res) => {
+    try {
+        const ownerBotManager = require('../src/utils/owner-bot-manager');
+        const record = ownerBotManager.getRecordBySlug(req.params.slug);
+        if (!record || record.panelEnabled !== true) {
+            return res.status(404).send('Panel no encontrado');
+        }
+        res.setHeader('Cache-Control', 'no-store');
+        return res.type('html').send(tenantLandingHtml(record));
+    } catch (error) {
+        console.error('Error en landing tenant:', error);
+        return res.status(500).send('Error');
+    }
+});
+
+app.get('/t/:slug/auth', (req, res) => {
+    try {
+        const ownerBotManager = require('../src/utils/owner-bot-manager');
+        const record = ownerBotManager.getRecordBySlug(req.params.slug);
+        if (!record || record.panelEnabled !== true) {
+            return res.status(404).send('Panel no encontrado');
+        }
+        const oauthPack = getOauthForTenant(record);
+        if (!oauthPack) {
+            return res.status(503).send(tenantLandingHtml(record, {
+                error: 'Falta Client ID / Client Secret en este bot. Pedile al admin que los complete.'
+            }));
+        }
+
+        const state = crypto.randomBytes(24).toString('hex');
+        req.session.oauthState = state;
+        req.session.oauthStateIssuedAt = Date.now();
+        req.session.oauthFlow = 'tenant';
+        req.session.oauthTenantBotId = record.id;
+        req.session.oauthTenantSlug = record.slug;
+        delete req.session.eyedbioLink;
+        rememberOauthState(state, req.sessionID);
+
+        saveSession(req)
+            .then(() => {
+                const url = oauthPack.oauth.generateAuthUrl({
+                    scope: ['identify', 'guilds'],
+                    state
+                });
+                res.redirect(url);
+            })
+            .catch((sessionError) => {
+                console.error('❌ Error guardando OAuth tenant:', sessionError);
+                res.redirect(`/t/${encodeURIComponent(record.slug)}?error=session`);
+            });
+    } catch (error) {
+        console.error('Error iniciando OAuth tenant:', error);
+        res.status(500).send('Error OAuth');
+    }
+});
+
+app.get('/t/:slug/callback', async (req, res) => {
+    const slug = String(req.params.slug || '').trim();
+    const fail = (code = 'auth_failed') => res.redirect(`/t/${encodeURIComponent(slug)}?error=${encodeURIComponent(code)}`);
+    try {
+        const ownerBotManager = require('../src/utils/owner-bot-manager');
+        const record = ownerBotManager.getRecordBySlug(slug);
+        if (!record || record.panelEnabled !== true) return res.status(404).send('Panel no encontrado');
+
+        const { code, error, state } = req.query;
+        if (error || !code) return fail('discord_error');
+
+        const oauthPack = getOauthForTenant(record);
+        if (!oauthPack) return fail('config_error');
+
+        const sessionState = String(req.session.oauthState || '');
+        const stateFromQuery = String(state || '');
+        const stateMatchesSession = Boolean(stateFromQuery && sessionState && stateFromQuery === sessionState);
+        const fallbackStateEntry = !stateMatchesSession ? consumeOauthStateFallback(stateFromQuery) : null;
+        if (!stateMatchesSession && !fallbackStateEntry) return fail('auth_failed');
+
+        const tokenData = await withOauthTimeout(oauthPack.oauth.tokenRequest({
+            code,
+            scope: 'identify guilds',
+            grantType: 'authorization_code'
+        }), 'tenant oauth.tokenRequest timeout');
+
+        if (!tokenData?.access_token) return fail('auth_failed');
+
+        const user = await withOauthTimeout(oauthPack.oauth.getUser(tokenData.access_token), 'tenant oauth.getUser timeout');
+        if (!user?.id) return fail('auth_failed');
+
+        const isOwner = isOwnerUser(user);
+        if (!ownerBotManager.userCanAccessTenant(record, user.id, { isOwner })) {
+            return fail('forbidden');
+        }
+
+        let guilds = [];
+        try {
+            const freshGuilds = await withOauthTimeout(
+                oauthPack.oauth.getUserGuilds(tokenData.access_token),
+                'tenant oauth.getUserGuilds'
+            );
+            if (Array.isArray(freshGuilds)) guilds = freshGuilds;
+        } catch (guildSyncError) {
+            console.warn('⚠️ Tenant guilds sync:', guildSyncError.message);
+        }
+
+        req.session.user = user;
+        req.session.guilds = guilds;
+        req.session.guildsSyncedAt = Date.now();
+        req.session.accessToken = tokenData.access_token;
+        req.session.tenantBotId = record.id;
+        delete req.session.oauthState;
+        delete req.session.oauthStateIssuedAt;
+        delete req.session.oauthFlow;
+        delete req.session.oauthTenantBotId;
+        delete req.session.oauthTenantSlug;
+
+        await saveSession(req);
+
+        const userId = String(user.id || '').trim();
+        if (userId && Array.isArray(guilds)) {
+            const tenantClient = ownerBotManager.getRuntimeClient(record.id);
+            const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(guilds, tenantClient));
+            guildsApiResponseCache.set(`tenant:${record.id}:${userId}`, {
+                data: botGuilds,
+                expiresAt: Date.now() + GUILDS_API_RESPONSE_CACHE_TTL_MS
+            });
+        }
+
+        console.log(`✅ Tenant login: ${user.username} → bot ${record.slug} (${record.id})`);
+        return res.redirect('/dashboard');
+    } catch (error) {
+        console.error('❌ Error en callback tenant:', error);
+        return fail('auth_failed');
+    }
+});
+
+app.post('/api/panel/tenant/select', requireAuth, (req, res) => {
+    try {
+        const ownerBotManager = require('../src/utils/owner-bot-manager');
+        const botId = String(req.body?.botId || '').trim();
+        if (!botId) {
+            delete req.session.tenantBotId;
+            return res.json({ success: true, tenant: null });
+        }
+        const record = ownerBotManager.getRecordById(botId);
+        const isOwner = isOwnerUser(req.session.user);
+        if (!ownerBotManager.userCanAccessTenant(record, req.session.user?.id, { isOwner })) {
+            return res.status(403).json({ error: 'Sin acceso a este panel' });
+        }
+        req.session.tenantBotId = record.id;
+        return res.json({ success: true, tenant: ownerBotManager.sanitizePublicRecord(record) });
+    } catch (error) {
+        console.error('Error seleccionando tenant:', error);
+        return res.status(500).json({ error: 'No se pudo cambiar de panel' });
     }
 });
 
@@ -2458,12 +2703,12 @@ function invalidateGuildsApiCache(userId = '') {
     guildsApiResponseCache.clear();
 }
 
-function buildBotGuildsPayload(guilds = []) {
+function buildBotGuildsPayload(guilds = [], client = getBotClient()) {
     const list = Array.isArray(guilds) ? guilds : [];
-    if (!botClient) return [];
+    if (!client) return [];
 
     return list.reduce((acc, guild) => {
-        const botGuild = botClient.guilds.cache.get(String(guild.id));
+        const botGuild = client.guilds.cache.get(String(guild.id));
         if (!botGuild) return acc;
 
         acc.push({
@@ -2560,6 +2805,11 @@ async function persistMercadoPagoSubscriptionForUser(userId, subscription, sourc
 
 async function requirePremium(req, res, next) {
     if (!isPremiumEnforcementEnabled()) {
+        return next();
+    }
+
+    // Paneles tenant asignados no usan EyedPlus+ del bot principal.
+    if (String(req.session?.tenantBotId || '').trim()) {
         return next();
     }
 
@@ -2663,8 +2913,10 @@ app.get('/api/user', requireAuth, async (req, res) => {
 
 async function resolvePanelGuildsForUser(req, options = {}) {
     const userId = String(req.session?.user?.id || '').trim();
+    const tenantId = String(req.session?.tenantBotId || '').trim();
+    const cacheKey = userId ? (tenantId ? `tenant:${tenantId}:${userId}` : userId) : '';
     const forceRefresh = options.force === true;
-    const cached = userId ? guildsApiResponseCache.get(userId) : null;
+    const cached = cacheKey ? guildsApiResponseCache.get(cacheKey) : null;
     if (!forceRefresh && cached && Number(cached.expiresAt || 0) > Date.now()) {
         return cached.data;
     }
@@ -2686,9 +2938,9 @@ async function resolvePanelGuildsForUser(req, options = {}) {
         }
     }
 
-    const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(sessionGuilds));
-    if (userId) {
-        guildsApiResponseCache.set(userId, {
+    const botGuilds = buildBotGuildsPayload(filterTrackableGuilds(sessionGuilds, getBotClient(req)), getBotClient(req));
+    if (cacheKey) {
+        guildsApiResponseCache.set(cacheKey, {
             data: botGuilds,
             expiresAt: Date.now() + GUILDS_API_RESPONSE_CACHE_TTL_MS
         });
@@ -2699,10 +2951,20 @@ async function resolvePanelGuildsForUser(req, options = {}) {
 app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
     try {
         const forceRefresh = String(req.query?.refresh || '') === '1';
-        const inviteUrl = CLIENT_ID
-            ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&permissions=${encodeURIComponent(BOT_INVITE_PERMISSIONS)}&scope=bot%20applications.commands`
+        const ownerBotManager = require('../src/utils/owner-bot-manager');
+        const tenantId = String(req.session?.tenantBotId || '').trim();
+        const tenantRecord = tenantId ? ownerBotManager.getRecordById(tenantId) : null;
+        const tenantPublic = tenantRecord ? ownerBotManager.sanitizePublicRecord(tenantRecord) : null;
+        const inviteClientId = tenantPublic?.clientId
+            || (tenantRecord?.applicationId)
+            || CLIENT_ID;
+        const inviteUrl = inviteClientId
+            ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(inviteClientId)}&permissions=${encodeURIComponent(BOT_INVITE_PERMISSIONS)}&scope=bot%20applications.commands`
             : '';
         const guilds = await resolvePanelGuildsForUser(req, { force: forceRefresh });
+        const assignedTenants = isOwnerUser(req.session.user)
+            ? ownerBotManager.listBotsPublic().filter((b) => b.panelEnabled)
+            : ownerBotManager.listBotsForAssignee(req.session.user?.id);
 
         res.setHeader('Cache-Control', 'no-store');
         res.json({
@@ -2713,12 +2975,31 @@ app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
             ownerModeEnabled: isOwnerModeEnabled(req),
             isRealOwner: isOwnerUser(req.session.user),
             isOwner: panelIsOwner(req),
-            hasPremium: hasPremiumGrant(req.session.user, { countOwner: isOwnerModeEnabled(req) }),
-            premiumRequired: isPremiumEnforcementEnabled(),
-            botConnected: Boolean(botClient?.user?.id),
+            hasPremium: tenantPublic
+                ? true
+                : hasPremiumGrant(req.session.user, { countOwner: isOwnerModeEnabled(req) }),
+            premiumRequired: tenantPublic ? false : isPremiumEnforcementEnabled(),
+            botConnected: Boolean(getBotClient(req)?.user?.id),
             guildsSyncedAt: Number.parseInt(req.session?.guildsSyncedAt || 0, 10) || 0,
             welcomeCardStyleEnabled: WELCOME_CARD_STYLE_ENABLED,
-            webConfig: webPanelConfigStore.getPublicConfig()
+            webConfig: webPanelConfigStore.getPublicConfig(),
+            tenant: tenantPublic
+                ? {
+                    id: tenantPublic.id,
+                    slug: tenantPublic.slug,
+                    label: tenantPublic.label,
+                    brand: tenantPublic.brand,
+                    panelPath: tenantPublic.panelPath,
+                    inviteUrl: tenantPublic.inviteUrl
+                }
+                : null,
+            assignedTenants: assignedTenants.map((b) => ({
+                id: b.id,
+                slug: b.slug,
+                label: b.label,
+                brand: b.brand,
+                panelPath: b.panelPath
+            }))
         });
     } catch (error) {
         console.error('❌ Error en /api/panel/bootstrap:', error);
@@ -2749,7 +3030,7 @@ app.get('/api/panel/dashboard-summary', requireAuth, async (req, res) => {
 app.post('/api/payment-receipt/webhook/:guildId', async (req, res) => {
     try {
         const { guildId } = req.params;
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
         const cfg = await paymentReceiptStore.getConfig(guildId);
         if (!cfg.enabled) return res.status(403).json({ error: 'Notificaciones de pago desactivadas' });
@@ -2757,7 +3038,7 @@ app.post('/api/payment-receipt/webhook/:guildId', async (req, res) => {
             return res.status(401).json({ error: 'Secreto de webhook inválido' });
         }
 
-        const result = await paymentReceiptService.sendPaymentNotification(botClient, guildId, req.body || {}, {
+        const result = await paymentReceiptService.sendPaymentNotification(getBotClient(), guildId, req.body || {}, {
             force: true,
             source: 'webhook'
         });
@@ -3020,10 +3301,10 @@ app.get('/api/showcase/gif/:action', async (req, res) => {
 });
 
 app.get('/api/about-overview', (req, res) => {
-    const totalServers = botClient?.guilds?.cache?.size || 0;
-    const totalCommands = botClient?.commands?.size || 0;
-    const botName = String(botClient?.user?.username || 'EyedBot');
-    const rawPing = Number(botClient?.ws?.ping);
+    const totalServers = getBotClient()?.guilds?.cache?.size || 0;
+    const totalCommands = getBotClient()?.commands?.size || 0;
+    const botName = String(getBotClient()?.user?.username || 'EyedBot');
+    const rawPing = Number(getBotClient()?.ws?.ping);
     const ping = Number.isFinite(rawPing) && rawPing >= 0 ? Math.round(rawPing) : null;
 
     res.json({
@@ -3032,7 +3313,7 @@ app.get('/api/about-overview', (req, res) => {
         totalCommands,
         purpose: 'Ayudar a gestionar comunidades de Discord con herramientas de organización, moderación y participación.',
         ping,
-        uptime: Number.isFinite(Number(botClient?.uptime)) ? Number(botClient.uptime) : null
+        uptime: Number.isFinite(Number(getBotClient()?.uptime)) ? Number(getBotClient().uptime) : null
     });
 });
 
@@ -3247,8 +3528,26 @@ app.get('/api/admin/bots', requireOwner, (_req, res) => {
 
 app.post('/api/admin/bots', requireOwner, async (req, res) => {
     try {
-        const { label, token } = req.body || {};
-        const bot = await ownerBotManager.createBot({ label, token });
+        const {
+            label,
+            token,
+            clientId,
+            clientSecret,
+            assignedDiscordUserId,
+            slug,
+            brand,
+            panelEnabled
+        } = req.body || {};
+        const bot = await ownerBotManager.createBot({
+            label,
+            token,
+            clientId,
+            clientSecret,
+            assignedDiscordUserId,
+            slug,
+            brand,
+            panelEnabled
+        });
         return res.status(201).json({ bot });
     } catch (error) {
         console.error('Error creando bot auxiliar:', error);
@@ -3383,11 +3682,11 @@ app.get('/api/guild/:guildId/channels', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
@@ -3615,12 +3914,12 @@ async function syncVerifyPanelReaction(message, cfg) {
 }
 
 async function refreshVerifyPanelMessage(guildId, updatedByUserId) {
-    if (!botClient) {
+    if (!getBotClient()) {
         const e = new Error('Bot no disponible');
         e.statusCode = 500;
         throw e;
     }
-    const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+    const guild = getBotClient().guilds.cache.get(guildId) || await getBotClient().guilds.fetch(guildId).catch(() => null);
     if (!guild) {
         const e = new Error('Servidor no encontrado');
         e.statusCode = 404;
@@ -3647,13 +3946,13 @@ async function refreshVerifyPanelMessage(guildId, updatedByUserId) {
         e.statusCode = 404;
         throw e;
     }
-    if (message.author.id !== botClient.user.id) {
+    if (message.author.id !== getBotClient().user.id) {
         const e = new Error('Ese mensaje no fue enviado por el bot; no se puede editar desde el panel.');
         e.statusCode = 400;
         throw e;
     }
 
-    const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+    const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
     if (!me) {
         const e = new Error('No pude obtener los permisos del bot en el servidor');
         e.statusCode = 500;
@@ -3689,12 +3988,12 @@ async function refreshVerifyPanelMessage(guildId, updatedByUserId) {
 }
 
 async function refreshTicketPanelMessage(guildId, updatedByUserId) {
-    if (!botClient) {
+    if (!getBotClient()) {
         const e = new Error('Bot no disponible');
         e.statusCode = 500;
         throw e;
     }
-    const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+    const guild = getBotClient().guilds.cache.get(guildId) || await getBotClient().guilds.fetch(guildId).catch(() => null);
     if (!guild) {
         const e = new Error('Servidor no encontrado');
         e.statusCode = 404;
@@ -3721,13 +4020,13 @@ async function refreshTicketPanelMessage(guildId, updatedByUserId) {
         e.statusCode = 404;
         throw e;
     }
-    if (message.author.id !== botClient.user.id) {
+    if (message.author.id !== getBotClient().user.id) {
         const e = new Error('Ese mensaje no fue enviado por el bot; no se puede editar desde el panel.');
         e.statusCode = 400;
         throw e;
     }
 
-    const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+    const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
     if (!me) {
         const e = new Error('No pude obtener los permisos del bot en el servidor');
         e.statusCode = 500;
@@ -3875,9 +4174,9 @@ app.post('/api/guild/:guildId/verify-sync-permissions', requireAuth, async (req,
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+        const guild = getBotClient().guilds.cache.get(guildId) || await getBotClient().guilds.fetch(guildId).catch(() => null);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const cfg = await verifyStore.getVerifyConfig(guildId);
@@ -3939,9 +4238,9 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const cfg = await verifyStore.getVerifyConfig(guildId);
@@ -3964,7 +4263,7 @@ app.post('/api/guild/:guildId/verify-publish', requireAuth, async (req, res) => 
             return res.status(404).json({ error: 'Rol inicial de nuevo miembro no encontrado' });
         }
 
-        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
         if (!me) return res.status(500).json({ error: 'No pude obtener los permisos del bot en el servidor' });
 
         if (!channel.permissionsFor(me)?.has(['SendMessages', 'EmbedLinks', 'AddReactions'])) {
@@ -4079,14 +4378,14 @@ app.post('/api/guild/:guildId/giveaways/create', requireAuth, async (req, res) =
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+        const guild = getBotClient().guilds.cache.get(guildId) || await getBotClient().guilds.fetch(guildId).catch(() => null);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const body = req.body || {};
         const cfg = await eventsGiveawaysStore.getConfig(guildId);
-        const giveaway = await giveawayService.createGiveaway(botClient, guild, {
+        const giveaway = await giveawayService.createGiveaway(getBotClient(), guild, {
             title: String(body.title || 'Sorteo').slice(0, 256),
             prize: String(body.prize || 'Premio').slice(0, 500),
             description: String(body.description || '').slice(0, 2000),
@@ -4110,9 +4409,9 @@ app.post('/api/guild/:guildId/giveaways/:giveawayId/end', requireAuth, async (re
         const { guildId, giveawayId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const giveaway = await giveawayService.endGiveaway(botClient, guildId, giveawayId, {
+        const giveaway = await giveawayService.endGiveaway(getBotClient(), guildId, giveawayId, {
             hostId: req.session.user?.id || 'panel'
         });
         res.json({ success: true, giveaway });
@@ -4127,9 +4426,9 @@ app.post('/api/guild/:guildId/giveaways/:giveawayId/reroll', requireAuth, async 
         const { guildId, giveawayId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const giveaway = await giveawayService.endGiveaway(botClient, guildId, giveawayId, {
+        const giveaway = await giveawayService.endGiveaway(getBotClient(), guildId, giveawayId, {
             reroll: true,
             hostId: req.session.user?.id || 'panel'
         });
@@ -4158,9 +4457,9 @@ app.post('/api/guild/:guildId/server-events/create', requireAuth, async (req, re
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null);
+        const guild = getBotClient().guilds.cache.get(guildId) || await getBotClient().guilds.fetch(guildId).catch(() => null);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const body = req.body || {};
@@ -4182,7 +4481,7 @@ app.post('/api/guild/:guildId/server-events/create', requireAuth, async (req, re
         });
 
         if (body.publish !== false) {
-            eventRow = await giveawayService.publishServerEvent(botClient, guild, eventRow);
+            eventRow = await giveawayService.publishServerEvent(getBotClient(), guild, eventRow);
         }
 
         res.json({ success: true, event: eventRow });
@@ -4414,9 +4713,9 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, requirePremium, asyn
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const cfg = await ticketStore.getTicketConfig(guildId);
@@ -4429,7 +4728,7 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, requirePremium, asyn
             return res.status(404).json({ error: 'Canal de panel no encontrado o no es de texto' });
         }
 
-        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
         if (!me) return res.status(500).json({ error: 'No pude obtener los permisos del bot en el servidor' });
 
         if (!channel.permissionsFor(me)?.has(['SendMessages', 'EmbedLinks'])) {
@@ -4635,8 +4934,8 @@ async function enrichActiveTickets(guild, botClient, active) {
     if (!active?.length) return [];
     const out = [];
     for (const item of active) {
-        const ownerUser = await botClient.users.fetch(item.ownerId).catch(() => null);
-        const claimerUser = item.claimedBy ? await botClient.users.fetch(item.claimedBy).catch(() => null) : null;
+        const ownerUser = await getBotClient().users.fetch(item.ownerId).catch(() => null);
+        const claimerUser = item.claimedBy ? await getBotClient().users.fetch(item.claimedBy).catch(() => null) : null;
         out.push({
             ...item,
             owner: ownerUser ? {
@@ -4660,7 +4959,7 @@ async function enrichPendingTickets(botClient, pending) {
     if (!pending?.length) return [];
     const out = [];
     for (const item of pending) {
-        const user = await botClient.users.fetch(item.requesterId).catch(() => null);
+        const user = await getBotClient().users.fetch(item.requesterId).catch(() => null);
         out.push({
             ...item,
             requester: user ? {
@@ -4678,8 +4977,8 @@ async function enrichReports(botClient, reports) {
     if (!reports?.length) return [];
     const out = [];
     for (const item of reports) {
-        const owner = item.ownerId ? await botClient.users.fetch(item.ownerId).catch(() => null) : null;
-        const closer = item.closedById ? await botClient.users.fetch(item.closedById).catch(() => null) : null;
+        const owner = item.ownerId ? await getBotClient().users.fetch(item.ownerId).catch(() => null) : null;
+        const closer = item.closedById ? await getBotClient().users.fetch(item.closedById).catch(() => null) : null;
         out.push({
             ...item,
             owner: owner ? {
@@ -4704,9 +5003,9 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, requirePremium, asy
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const historyLimitRaw = Number.parseInt(req.query.historyLimit, 10);
@@ -4719,9 +5018,9 @@ app.get('/api/guild/:guildId/tickets/overview', requireAuth, requirePremium, asy
         const rawReports = await listTicketReportSummaries(guildId, historyLimit);
 
         const [active, pending, history] = await Promise.all([
-            enrichActiveTickets(guild, botClient, rawActive),
-            enrichPendingTickets(botClient, rawPending),
-            enrichReports(botClient, rawReports)
+            enrichActiveTickets(guild, getBotClient(), rawActive),
+            enrichPendingTickets(getBotClient(), rawPending),
+            enrichReports(getBotClient(), rawReports)
         ]);
 
         const stats = buildTicketStats(
@@ -4752,10 +5051,10 @@ app.post('/api/guild/:guildId/tickets/pending/:requestId/accept', requireAuth, r
         const { guildId, requestId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
         const result = await acceptPendingFromWeb(
-            botClient,
+            getBotClient(),
             guildId,
             requestId,
             req.session.user?.id || ''
@@ -4781,12 +5080,12 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/claim', requireAuth, req
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
         const claimerId = req.session.user?.id || '';
         if (!claimerId) return res.status(401).json({ error: 'Sesion invalida' });
 
-        const result = await claimTicketFromWeb(botClient, guildId, channelId, claimerId);
+        const result = await claimTicketFromWeb(getBotClient(), guildId, channelId, claimerId);
 
         if (!result?.ok) {
             const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
@@ -4807,9 +5106,9 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/unclaim', requireAuth, r
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const result = await claimTicketFromWeb(botClient, guildId, channelId, '');
+        const result = await claimTicketFromWeb(getBotClient(), guildId, channelId, '');
 
         if (!result?.ok) {
             const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
@@ -4830,12 +5129,12 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/close', requireAuth, req
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
         const closerId = req.session.user?.id || '';
         if (!closerId) return res.status(401).json({ error: 'Sesion invalida' });
 
-        const result = await closeTicketFromWeb(botClient, guildId, channelId, closerId);
+        const result = await closeTicketFromWeb(getBotClient(), guildId, channelId, closerId);
 
         if (!result?.ok) {
             const code = result?.code || 'UNKNOWN';
@@ -4939,7 +5238,7 @@ app.get('/api/guild/:guildId/tickets/report/:reportId', requireAuth, requirePrem
         const report = await getTicketReport(guildId, reportId);
         if (!report) return res.status(404).json({ error: 'Comprobante no encontrado' });
 
-        const enriched = await enrichReportDetail(botClient, report);
+        const enriched = await enrichReportDetail(getBotClient(), report);
         res.json({ success: true, report: enriched });
     } catch (error) {
         console.error('Error obteniendo comprobante:', error);
@@ -5002,12 +5301,12 @@ app.get('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, r
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
         const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 60));
         const after = req.query.after ? String(req.query.after) : null;
 
-        const result = await listTicketChannelMessages(botClient, guildId, channelId, { limit, after });
+        const result = await listTicketChannelMessages(getBotClient(), guildId, channelId, { limit, after });
         if (!result?.ok) {
             const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
                 : result?.code === 'NOT_A_TICKET' ? 400
@@ -5037,7 +5336,7 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, 
         const { guildId, channelId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
         const content = String(req.body?.content || '').trim();
         if (!content) return res.status(400).json({ error: 'El mensaje no puede estar vacio' });
@@ -5046,7 +5345,7 @@ app.post('/api/guild/:guildId/tickets/active/:channelId/messages', requireAuth, 
         const sender = buildSenderFromSession(req.session.user);
         if (!sender?.id) return res.status(401).json({ error: 'Sesion invalida' });
 
-        const result = await sendWebMessageToTicket(botClient, guildId, channelId, sender, content);
+        const result = await sendWebMessageToTicket(getBotClient(), guildId, channelId, sender, content);
         if (!result?.ok) {
             const status = result?.code === 'CHANNEL_NOT_FOUND' ? 404
                 : result?.code === 'NOT_A_TICKET' ? 400
@@ -5407,9 +5706,9 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const current = await streamAlertStore.getStreamAlertConfig(guildId);
@@ -5516,9 +5815,9 @@ app.post('/api/guild/:guildId/weekly-summary-send', requireAuth, async (req, res
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const result = await weeklySummaryService.sendWeeklySummary(botClient, guildId, { rotate: false });
+        const result = await weeklySummaryService.sendWeeklySummary(getBotClient(), guildId, { rotate: false });
         if (!result.ok) {
             const reasons = {
                 no_channel: 'No hay canal configurado.',
@@ -5607,10 +5906,10 @@ app.post('/api/guild/:guildId/payment-receipt-send', requireAuth, async (req, re
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
         const body = req.body || {};
-        const result = await paymentReceiptService.sendPaymentNotification(botClient, guildId, body, {
+        const result = await paymentReceiptService.sendPaymentNotification(getBotClient(), guildId, body, {
             force: true,
             source: 'panel',
             sendToChannel: body.sendToChannel,
@@ -5707,13 +6006,13 @@ app.get('/api/guild/:guildId/gacha-stats', requireAuth, requirePremium, async (r
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const guild = botClient?.guilds?.cache?.get(guildId) || null;
+        const guild = getBotClient()?.guilds?.cache?.get(guildId) || null;
         const config = await gachaStore.getConfig(guildId);
         const stats = await gachaStore.getGuildStats(guildId);
         const top = await Promise.all((stats.topClaimers || []).slice(0, 15).map(async (item) => {
             const member = guild?.members?.cache?.get(item.userId)
                 || await guild?.members?.fetch?.(item.userId).catch(() => null);
-            const user = member?.user || botClient?.users?.cache?.get(item.userId) || null;
+            const user = member?.user || getBotClient()?.users?.cache?.get(item.userId) || null;
             return {
                 userId: item.userId,
                 username: user?.username || `ID ${item.userId}`,
@@ -5825,7 +6124,7 @@ function requireGuildShopManager(req, res) {
 function validateManagedShopRole(guildId, body = {}) {
     if (String(body.type || '') !== 'role' && body.roleId === undefined) return;
     const roleId = String(body.roleId || '').trim();
-    const guild = botClient?.guilds.cache.get(String(guildId));
+    const guild = getBotClient()?.guilds.cache.get(String(guildId));
     const role = guild?.roles.cache.get(roleId);
     if (!role) throw new CommunityShopError('INVALID_ROLE', 'El rol no existe en el servidor');
     if (!role.editable) throw new CommunityShopError('ROLE_NOT_MANAGEABLE', 'EyedBot no puede administrar ese rol');
@@ -6137,9 +6436,9 @@ app.get('/api/guild/:guildId/gacha-leaderboard', requireAuth, requirePremium, as
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         const config = await gachaStore.getConfig(guildId);
         const profiles = await gachaStore.listGuildProfiles(guildId);
         const sorted = profiles.slice().sort((left, right) => {
@@ -6303,9 +6602,9 @@ app.post('/api/guild/:guildId/free-games/test', requireAuth, requirePremium, asy
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const current = await freeGamesStore.getFreeGamesConfig(guildId);
@@ -6377,9 +6676,9 @@ app.post('/api/guild/:guildId/free-games/refresh-embeds', requireAuth, requirePr
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const current = await freeGamesStore.getFreeGamesConfig(guildId);
@@ -6414,7 +6713,7 @@ app.post('/api/guild/:guildId/free-games/refresh-embeds', requireAuth, requirePr
         const result = await freeGamesService.refreshFreeGameEmbedsInChannel(
             channel,
             config,
-            botClient.user.id,
+            getBotClient().user.id,
             { scanLimit: 100 }
         );
 
@@ -6550,9 +6849,9 @@ app.post('/api/guild/:guildId/crunchyroll/test', requireAuth, async (req, res) =
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const current = await crunchyrollStore.getCrunchyrollConfig(guildId);
@@ -6605,7 +6904,7 @@ app.post('/api/guild/:guildId/crunchyroll/test', requireAuth, async (req, res) =
             }
         }
 
-        const posted = await crunchyrollService.postEpisodeAlert(botClient, guildId, config, series, episode);
+        const posted = await crunchyrollService.postEpisodeAlert(getBotClient(), guildId, config, series, episode);
         if (!posted) {
             return res.status(400).json({ error: 'No se pudo publicar en el canal seleccionado' });
         }
@@ -6629,12 +6928,12 @@ app.get('/api/guild/:guildId/channel-setup', requireAuth, async (req, res) => {
         if (!canManageServerChannels(userGuild)) {
             return res.status(403).json({ error: 'Necesitas administrador, gestionar servidor o gestionar canales en Discord' });
         }
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'El bot no está en este servidor' });
 
-        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
         if (!me?.permissions?.has('ManageChannels')) {
             return res.status(403).json({ error: 'El bot necesita el permiso «Gestionar canales»' });
         }
@@ -6668,12 +6967,12 @@ app.post('/api/guild/:guildId/channel-setup/apply', requireAuth, async (req, res
         if (!canManageServerChannels(userGuild)) {
             return res.status(403).json({ error: 'Necesitas administrador, gestionar servidor o gestionar canales en Discord' });
         }
-        if (!botClient) return res.status(503).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(503).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'El bot no está en este servidor' });
 
-        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
         if (!me?.permissions?.has('ManageChannels')) {
             return res.status(403).json({ error: 'El bot necesita el permiso «Gestionar canales»' });
         }
@@ -6736,9 +7035,9 @@ app.get('/api/guild/:guildId/leveling-leaderboard', requireAuth, async (req, res
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const config = await levelingStore.getLevelingConfig(guildId);
@@ -7109,9 +7408,9 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const cfg = await welcomeStore.getWelcomeConfig(guildId);
@@ -7178,9 +7477,9 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const body = req.body || {};
@@ -7295,9 +7594,9 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const cfg = await welcomeStore.getGoodbyeConfig(guildId);
@@ -7345,7 +7644,7 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             return res.status(400).json({ error: 'Payload de embed inválido' });
         }
 
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
@@ -7355,7 +7654,7 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             return res.status(403).json({ error: 'No tienes permisos para gestionar este servidor' });
         }
 
-        const guild = botClient.guilds.cache.get(safeGuildId) || await botClient.guilds.fetch(safeGuildId).catch(() => null);
+        const guild = getBotClient().guilds.cache.get(safeGuildId) || await getBotClient().guilds.fetch(safeGuildId).catch(() => null);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
@@ -7453,7 +7752,7 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             if (!message) {
                 return res.status(404).json({ error: 'No se encontró el mensaje en ese canal (revisa el ID y el canal)' });
             }
-            if (message.author.id !== botClient.user.id) {
+            if (message.author.id !== getBotClient().user.id) {
                 return res.status(400).json({ error: 'Solo se pueden editar mensajes enviados por el bot' });
             }
 
@@ -7489,14 +7788,14 @@ app.post('/api/guild/:guildId/nuke', requireOwner, async (req, res) => {
         if (!guildId) {
             return res.status(400).json({ error: 'Falta el servidor objetivo' });
         }
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        let guild = botClient.guilds.cache.get(guildId);
+        let guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) {
             try {
-                guild = await botClient.guilds.fetch(guildId);
+                guild = await getBotClient().guilds.fetch(guildId);
             } catch {
                 return res.status(404).json({ error: 'Servidor no encontrado' });
             }
@@ -7505,7 +7804,7 @@ app.post('/api/guild/:guildId/nuke', requireOwner, async (req, res) => {
         const actorTag = req.session.user?.username
             ? `${req.session.user.username} (panel web)`
             : 'owner (panel web)';
-        const result = await executeGuildNuke(guild, botClient, actorTag);
+        const result = await executeGuildNuke(guild, getBotClient(), actorTag);
 
         console.log(`[Nuke] ${actorTag} ejecutó nuke en ${guild.name} (${guild.id})`);
         return res.json({
@@ -7527,17 +7826,17 @@ app.post('/api/send-owner-attachment', requireOwner, handleOwnerAttachmentUpload
         if (!guildId || !channelId) {
             return res.status(400).json({ error: 'Faltan servidor o canal' });
         }
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
         if (!req.file) {
             return res.status(400).json({ error: 'No se recibió ningún archivo' });
         }
 
-        let guild = botClient.guilds.cache.get(String(guildId));
+        let guild = getBotClient().guilds.cache.get(String(guildId));
         if (!guild) {
             try {
-                guild = await botClient.guilds.fetch(String(guildId));
+                guild = await getBotClient().guilds.fetch(String(guildId));
             } catch {
                 return res.status(404).json({ error: 'Servidor no encontrado' });
             }
@@ -7687,20 +7986,20 @@ app.get('/api/stats', requireAuth, (req, res) => {
         return res.status(403).json({ error: 'Estadisticas disponibles solo para el creador' });
     }
 
-    if (!botClient) {
+    if (!getBotClient()) {
         return res.status(500).json({ error: 'Bot no disponible' });
     }
 
-    const rawPing = Number(botClient.ws?.ping);
+    const rawPing = Number(getBotClient().ws?.ping);
     const normalizedPing = Number.isFinite(rawPing) && rawPing >= 0 ? Math.round(rawPing) : null;
 
     const stats = {
-        guilds: botClient.guilds.cache.size,
-        users: botClient.users.cache.size,
-        channels: botClient.channels.cache.size,
-        uptime: botClient.uptime,
+        guilds: getBotClient().guilds.cache.size,
+        users: getBotClient().users.cache.size,
+        channels: getBotClient().channels.cache.size,
+        uptime: getBotClient().uptime,
         ping: normalizedPing,
-        commands: botClient.commands?.size || 0,
+        commands: getBotClient().commands?.size || 0,
         memory: process.memoryUsage(),
         nodeVersion: process.version,
         platform: process.platform
@@ -7795,7 +8094,7 @@ app.get('/api/logs/stream', requireAuth, (req, res) => {
 
 // Ruta para obtener lista de comandos
 app.get('/api/commands', (req, res) => {
-    if (!botClient || !botClient.commands) {
+    if (!getBotClient() || !getBotClient().commands) {
         return res.status(500).json({ error: 'Bot no disponible' });
     }
 
@@ -7803,7 +8102,7 @@ app.get('/api/commands', (req, res) => {
     const path = require('path');
     const commandsPath = path.join(__dirname, '..', 'src', 'commands');
     
-    const commands = Array.from(botClient.commands.values()).map(cmd => {
+    const commands = Array.from(getBotClient().commands.values()).map(cmd => {
         // Intentar obtener la categoría de la ruta del archivo
         let category = 'other';
         
@@ -7846,11 +8145,11 @@ app.get('/api/guild/:guildId/info', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
@@ -8108,7 +8407,7 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Faltan parámetros obligatorios' });
         }
 
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
@@ -8117,12 +8416,12 @@ app.post('/api/moderate', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'No tienes permisos para gestionar este servidor' });
         }
 
-        const guild = botClient.guilds.cache.get(safeGuildId);
+        const guild = getBotClient().guilds.cache.get(safeGuildId);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
 
-        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
         if (!me) {
             return res.status(500).json({ error: 'No se pudo validar permisos del bot' });
         }
@@ -8195,17 +8494,17 @@ app.get('/api/guild/:guildId/music', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
 
         // Intentar obtener información del sistema de música
-        const musicSystem = botClient.musicSystem;
+        const musicSystem = getBotClient().musicSystem;
         if (!musicSystem) {
             return res.json({ 
                 playing: false, 
@@ -8251,16 +8550,16 @@ app.post('/api/guild/:guildId/music/control', requireAuth, async (req, res) => {
         const { guildId } = req.params;
         const { action } = req.body;
         
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
 
-        const musicSystem = botClient.musicSystem;
+        const musicSystem = getBotClient().musicSystem;
         if (!musicSystem) {
             return res.status(500).json({ error: 'Sistema de música no disponible' });
         }
@@ -8315,11 +8614,11 @@ app.get('/api/guild/:guildId/members', requireAuth, async (req, res) => {
         const { guildId } = req.params;
         const query = req.query.q || '';
         
-        if (!botClient) {
+        if (!getBotClient()) {
             return res.status(500).json({ error: 'Bot no disponible' });
         }
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) {
             return res.status(404).json({ error: 'Servidor no encontrado' });
         }
@@ -8365,12 +8664,12 @@ app.get('/api/guild/:guildId/members', requireAuth, async (req, res) => {
 app.get('/api/guild/:guildId/bans', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
 
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
 
         const bans = await guild.bans.fetch().catch(() => null);
@@ -8394,12 +8693,12 @@ app.post('/api/guild/:guildId/unban', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { userId, reason } = req.body || {};
-        if (!botClient) return res.status(500).json({ error: 'Bot no disponible' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
         if (!userId) return res.status(400).json({ error: 'Falta userId' });
 
-        const guild = botClient.guilds.cache.get(guildId);
+        const guild = getBotClient().guilds.cache.get(guildId);
         if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
-        const me = guild.members.me || await guild.members.fetch(botClient.user.id).catch(() => null);
+        const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
         if (!me || !me.permissions.has('BanMembers')) {
             return res.status(403).json({ error: 'El bot no tiene permisos para desbanear en este servidor' });
         }
@@ -8569,8 +8868,8 @@ function requireSignedTarget(req, res, rawTarget) {
 }
 
 async function requireCommunityMember(userId) {
-    if (!botClient || !COMMUNITY_GUILD_ID) return { error: 'Bot comunitario no disponible', status: 503 };
-    const guild = botClient.guilds.cache.get(COMMUNITY_GUILD_ID);
+    if (!getBotClient() || !COMMUNITY_GUILD_ID) return { error: 'Bot comunitario no disponible', status: 503 };
+    const guild = getBotClient().guilds.cache.get(COMMUNITY_GUILD_ID);
     if (!guild) return { error: 'Servidor comunitario no disponible', status: 503 };
     const member = guild.members.cache.get(userId)
         || await guild.members.fetch(userId).catch(() => null);

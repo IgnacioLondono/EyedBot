@@ -41,11 +41,18 @@ import { asArray, asRecord, formatDate, getErrorMessage, toStringValue } from "@
 type OwnerBot = {
   id: string;
   label: string;
+  slug: string;
   enabled: boolean;
+  panelEnabled: boolean;
   status: string;
   username: string;
   displayName: string;
   applicationId: string;
+  clientId: string;
+  hasClientSecret: boolean;
+  assignedDiscordUserId: string;
+  brand: { name: string; logoUrl: string; primaryColor: string };
+  panelPath: string;
   avatar: string | null;
   avatarUrl: string | null;
   guildCount: number;
@@ -72,14 +79,26 @@ function parseBot(raw: unknown): OwnerBot {
   const row = asRecord(raw);
   const appId = toStringValue(row.applicationId);
   const avatar = toStringValue(row.avatar) || null;
+  const brandRow = asRecord(row.brand);
   return {
     id: toStringValue(row.id),
     label: toStringValue(row.label, "Bot auxiliar"),
+    slug: toStringValue(row.slug),
     enabled: row.enabled !== false,
+    panelEnabled: row.panelEnabled === true,
     status: toStringValue(row.status, "offline"),
     username: toStringValue(row.username),
     displayName: toStringValue(row.displayName || row.username || row.label, "Bot"),
     applicationId: appId,
+    clientId: toStringValue(row.clientId || appId),
+    hasClientSecret: row.hasClientSecret === true,
+    assignedDiscordUserId: toStringValue(row.assignedDiscordUserId),
+    brand: {
+      name: toStringValue(brandRow.name || row.label),
+      logoUrl: toStringValue(brandRow.logoUrl),
+      primaryColor: toStringValue(brandRow.primaryColor),
+    },
+    panelPath: toStringValue(row.panelPath),
     avatar,
     avatarUrl: toStringValue(row.avatarUrl) || discordAvatarUrl(appId, avatar),
     guildCount: Number(row.guildCount) || 0,
@@ -153,9 +172,25 @@ export function OwnerBotsTab() {
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
+  const [newClientId, setNewClientId] = useState("");
+  const [newClientSecret, setNewClientSecret] = useState("");
+  const [newAssignee, setNewAssignee] = useState("");
+  const [newSlug, setNewSlug] = useState("");
+  const [newBrandName, setNewBrandName] = useState("");
+  const [newBrandLogo, setNewBrandLogo] = useState("");
+  const [newBrandColor, setNewBrandColor] = useState("");
+  const [newPanelEnabled, setNewPanelEnabled] = useState(true);
 
   const [editLabel, setEditLabel] = useState("");
   const [editUsername, setEditUsername] = useState("");
+  const [editClientId, setEditClientId] = useState("");
+  const [editClientSecret, setEditClientSecret] = useState("");
+  const [editAssignee, setEditAssignee] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editBrandName, setEditBrandName] = useState("");
+  const [editBrandLogo, setEditBrandLogo] = useState("");
+  const [editBrandColor, setEditBrandColor] = useState("");
+  const [editPanelEnabled, setEditPanelEnabled] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [guilds, setGuilds] = useState<BotGuild[]>([]);
@@ -192,6 +227,14 @@ export function OwnerBotsTab() {
     if (!selected) return;
     setEditLabel(selected.label);
     setEditUsername(selected.username);
+    setEditClientId(selected.clientId);
+    setEditClientSecret("");
+    setEditAssignee(selected.assignedDiscordUserId);
+    setEditSlug(selected.slug);
+    setEditBrandName(selected.brand.name);
+    setEditBrandLogo(selected.brand.logoUrl);
+    setEditBrandColor(selected.brand.primaryColor);
+    setEditPanelEnabled(selected.panelEnabled);
   }, [selected]);
 
   useEffect(() => {
@@ -283,17 +326,68 @@ export function OwnerBotsTab() {
     }
     setBusy("create");
     try {
-      const data = asRecord(await createOwnerBot({ label: newLabel.trim() || "Bot auxiliar", token: newToken.trim() }));
+      const data = asRecord(
+        await createOwnerBot({
+          label: newLabel.trim() || "Bot auxiliar",
+          token: newToken.trim(),
+          clientId: newClientId.trim() || undefined,
+          clientSecret: newClientSecret.trim() || undefined,
+          assignedDiscordUserId: newAssignee.trim() || undefined,
+          slug: newSlug.trim() || undefined,
+          brand: {
+            name: newBrandName.trim() || newLabel.trim() || undefined,
+            logoUrl: newBrandLogo.trim() || undefined,
+            primaryColor: newBrandColor.trim() || undefined,
+          },
+          panelEnabled: newPanelEnabled,
+        })
+      );
       const bot = parseBot(data.bot);
       setBots((prev) => [...prev, bot]);
       setSelectedId(bot.id);
       setNewLabel("");
       setNewToken("");
+      setNewClientId("");
+      setNewClientSecret("");
+      setNewAssignee("");
+      setNewSlug("");
+      setNewBrandName("");
+      setNewBrandLogo("");
+      setNewBrandColor("");
+      setNewPanelEnabled(true);
       toast({ title: "Bot creado", description: `${bot.displayName} está conectándose.`, tone: "success" });
       setTimeout(() => void loadBots(), 3000);
     } catch (err) {
       toast({ title: "No se pudo crear", description: getErrorMessage(err), tone: "danger" });
       await loadBots();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSavePanelSettings() {
+    if (!selectedId) return;
+    setBusy("panel");
+    try {
+      const body: Record<string, unknown> = {
+        label: editLabel.trim() || undefined,
+        slug: editSlug.trim() || undefined,
+        clientId: editClientId.trim() || undefined,
+        assignedDiscordUserId: editAssignee.trim(),
+        panelEnabled: editPanelEnabled,
+        brand: {
+          name: editBrandName.trim(),
+          logoUrl: editBrandLogo.trim(),
+          primaryColor: editBrandColor.trim(),
+        },
+      };
+      if (editClientSecret.trim()) body.clientSecret = editClientSecret.trim();
+      const data = asRecord(await updateOwnerBot(selectedId, body));
+      setBots((prev) => prev.map((b) => (b.id === selectedId ? parseBot(data.bot) : b)));
+      setEditClientSecret("");
+      toast({ title: "Panel / OAuth guardado", tone: "success" });
+    } catch (err) {
+      toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
     } finally {
       setBusy(null);
     }
@@ -407,12 +501,15 @@ export function OwnerBotsTab() {
   return (
     <div className="space-y-5">
       <SectionCard
-        title="Crear bot auxiliar"
-        description="Bot de identidad propia para chatear desde el panel. EyedBot sigue manejando voz temporal, bienvenidas, niveles y el resto de automatizaciones. Activa los comandos solo si este bot va en servidores sin EyedBot."
+        title="Crear bot asignable"
+        description="Pegá Token + Client ID + Client Secret de la app en Discord Developer Portal. Asignalo a un Discord user ID y activá el panel branded en /t/{slug}."
       >
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Nombre interno">
-            <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. Bot de pruebas" />
+            <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. Lazarus Bot" />
+          </Field>
+          <Field label="Slug del panel">
+            <Input value={newSlug} onChange={(e) => setNewSlug(e.target.value)} placeholder="lazarus" />
           </Field>
           <Field label="Token del bot">
             <Input
@@ -422,12 +519,44 @@ export function OwnerBotsTab() {
               placeholder="Token desde Discord Developer Portal"
             />
           </Field>
-          <div className="flex items-end">
-            <Button onClick={() => void handleCreate()} disabled={busy === "create"}>
-              {busy === "create" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-              Crear y conectar
-            </Button>
-          </div>
+          <Field label="Client ID (Application ID)">
+            <Input value={newClientId} onChange={(e) => setNewClientId(e.target.value)} placeholder="Opcional si coincide con el token" />
+          </Field>
+          <Field label="Client Secret (OAuth2)">
+            <Input
+              type="password"
+              value={newClientSecret}
+              onChange={(e) => setNewClientSecret(e.target.value)}
+              placeholder="Requerido para login del panel"
+            />
+          </Field>
+          <Field label="Asignar a Discord user ID">
+            <Input value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)} placeholder="123456789012345678" />
+          </Field>
+          <Field label="Marca · nombre">
+            <Input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Lazarus" />
+          </Field>
+          <Field label="Marca · logo URL">
+            <Input value={newBrandLogo} onChange={(e) => setNewBrandLogo(e.target.value)} placeholder="https://..." />
+          </Field>
+          <Field label="Marca · color (#hex)">
+            <Input value={newBrandColor} onChange={(e) => setNewBrandColor(e.target.value)} placeholder="f59e0b" />
+          </Field>
+        </div>
+        <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={newPanelEnabled}
+            onChange={(e) => setNewPanelEnabled(e.target.checked)}
+            className="rounded border-white/20"
+          />
+          Habilitar panel completo (módulos + OAuth en /t/slug)
+        </label>
+        <div className="mt-4 flex items-end">
+          <Button onClick={() => void handleCreate()} disabled={busy === "create"}>
+            {busy === "create" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+            Crear y conectar
+          </Button>
         </div>
         <div className="mt-4">
           <IntentsSetupHelp />
@@ -542,6 +671,15 @@ export function OwnerBotsTab() {
                     Invitar con admin
                   </Button>
                 ) : null}
+                {selected.panelPath ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => window.open(selected.panelPath, "_blank", "noopener,noreferrer")}
+                  >
+                    Abrir /t/{selected.slug || "…"}
+                  </Button>
+                ) : null}
                 <Button size="sm" disabled={busy === "profile"} onClick={() => void handleSaveProfile()}>
                   Guardar perfil
                 </Button>
@@ -576,6 +714,60 @@ export function OwnerBotsTab() {
                 <Button size="sm" variant="ghost" onClick={() => void loadBots()}>
                   <RefreshCw className="mr-1 h-3.5 w-3.5" />
                   Actualizar
+                </Button>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Panel asignable / OAuth"
+              description="Redirect a registrar en Discord: /t/{slug}/callback. El usuario asignado entra por /t/{slug}."
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Slug">
+                  <Input value={editSlug} onChange={(e) => setEditSlug(e.target.value)} />
+                </Field>
+                <Field label="Discord user ID asignado">
+                  <Input value={editAssignee} onChange={(e) => setEditAssignee(e.target.value)} />
+                </Field>
+                <Field label="Client ID">
+                  <Input value={editClientId} onChange={(e) => setEditClientId(e.target.value)} />
+                </Field>
+                <Field label={selected.hasClientSecret ? "Client Secret (dejar vacío para no cambiar)" : "Client Secret"}>
+                  <Input
+                    type="password"
+                    value={editClientSecret}
+                    onChange={(e) => setEditClientSecret(e.target.value)}
+                    placeholder={selected.hasClientSecret ? "••••••••" : "Pegar secret"}
+                  />
+                </Field>
+                <Field label="Marca · nombre">
+                  <Input value={editBrandName} onChange={(e) => setEditBrandName(e.target.value)} />
+                </Field>
+                <Field label="Marca · logo URL">
+                  <Input value={editBrandLogo} onChange={(e) => setEditBrandLogo(e.target.value)} />
+                </Field>
+                <Field label="Marca · color hex">
+                  <Input value={editBrandColor} onChange={(e) => setEditBrandColor(e.target.value)} placeholder="f59e0b" />
+                </Field>
+              </div>
+              <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={editPanelEnabled}
+                  onChange={(e) => setEditPanelEnabled(e.target.checked)}
+                  className="rounded border-white/20"
+                />
+                Panel completo habilitado
+              </label>
+              {selected.panelPath ? (
+                <p className="mt-2 text-xs text-zinc-500">
+                  Landing: {selected.panelPath} · OAuth callback: {selected.panelPath}/callback
+                </p>
+              ) : null}
+              <div className="mt-4">
+                <Button size="sm" disabled={busy === "panel"} onClick={() => void handleSavePanelSettings()}>
+                  {busy === "panel" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Guardar OAuth / marca / assignee
                 </Button>
               </div>
             </SectionCard>

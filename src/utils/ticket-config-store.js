@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'ticket-configs.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -57,6 +58,7 @@ function ensureGuildBucket(store, guildId) {
 }
 
 async function getTicketConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `ticketConfig_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -78,6 +80,7 @@ async function getTicketConfig(guildId) {
 }
 
 async function setTicketConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`ticket_config_${guildId}`, config);
     } catch {

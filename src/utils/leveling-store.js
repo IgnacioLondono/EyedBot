@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'leveling-store.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '120000', 10));
@@ -118,6 +119,7 @@ async function persistToDatabase(key, value) {
 }
 
 function mirrorConfigToFile(guildId, config) {
+    guildId = scopeKey(guildId);
     if (!FILE_MIRROR) return;
     const store = readStore();
     const bucket = ensureGuildBucket(store, guildId);
@@ -126,6 +128,7 @@ function mirrorConfigToFile(guildId, config) {
 }
 
 function mirrorUserToFile(guildId, userId, normalized) {
+    guildId = scopeKey(guildId);
     if (!FILE_MIRROR) return;
     const store = readStore();
     const bucket = ensureGuildBucket(store, guildId);
@@ -171,6 +174,7 @@ function normalizeUserState(raw = {}) {
 }
 
 async function getLevelingConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `leveling_cfg_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -192,6 +196,7 @@ async function getLevelingConfig(guildId) {
 }
 
 async function setLevelingConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     const dbOk = await persistToDatabase(`leveling_config_${guildId}`, config);
     cacheSet(`leveling_cfg_${guildId}`, config);
 
@@ -205,6 +210,7 @@ async function setLevelingConfig(guildId, config) {
 }
 
 async function getUserState(guildId, userId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `leveling_user_${guildId}_${userId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -228,6 +234,7 @@ async function getUserState(guildId, userId) {
 }
 
 async function setUserState(guildId, userId, userState) {
+    guildId = scopeKey(guildId);
     const normalized = normalizeUserState(userState);
     const dbOk = await persistToDatabase(`leveling_user_${guildId}_${userId}`, normalized);
     cacheSet(`leveling_user_${guildId}_${userId}`, normalized);
@@ -243,6 +250,7 @@ async function setUserState(guildId, userId, userState) {
 }
 
 async function incrementUserStats(guildId, userId, changes = {}) {
+    guildId = scopeKey(guildId);
     const current = await getUserState(guildId, userId);
     const next = normalizeUserState({
         ...current,
@@ -255,6 +263,7 @@ async function incrementUserStats(guildId, userId, changes = {}) {
 }
 
 function listGuildUsers(guildId) {
+    guildId = scopeKey(guildId);
     const store = readStore();
     const gid = String(guildId);
     const users = store.guilds[guildId]?.users || store.guilds[gid]?.users || {};
@@ -290,6 +299,7 @@ function mergeLevelingRows(a, b) {
 
 /** Usuarios con datos de nivelación en archivo local + MySQL (unión por userId). */
 async function loadGuildUsersMerged(guildId) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId);
     const map = new Map();
     const fromFile = listGuildUsers(gid);
@@ -323,6 +333,7 @@ async function loadGuildUsersMerged(guildId) {
 }
 
 async function listGuildUsersMerged(guildId) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId);
     const cached = mergedGuildCache.get(gid);
     if (cached && cached.expiresAt > Date.now()) return cached.value;

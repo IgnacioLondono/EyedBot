@@ -64,30 +64,102 @@ function maskToken(token) {
     return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
+function slugify(input, fallback = 'bot') {
+    const base = String(input || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 32);
+    return base || fallback;
+}
+
+function uniqueSlug(store, desired, excludeId = null) {
+    let slug = slugify(desired);
+    if (!slug) slug = 'bot';
+    let candidate = slug;
+    let n = 2;
+    while (store.bots.some((bot) => bot.slug === candidate && bot.id !== excludeId)) {
+        candidate = `${slug}-${n}`.slice(0, 40);
+        n += 1;
+    }
+    return candidate;
+}
+
+function sanitizeBrand(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const name = String(src.name || '').trim().slice(0, 64);
+    const logoUrl = String(src.logoUrl || src.logo || '').trim().slice(0, 500);
+    let primaryColor = String(src.primaryColor || src.color || '').trim().replace('#', '').slice(0, 6);
+    if (primaryColor && !/^[0-9a-fA-F]{6}$/.test(primaryColor)) primaryColor = '';
+    return {
+        name,
+        logoUrl,
+        primaryColor: primaryColor ? primaryColor.toLowerCase() : ''
+    };
+}
+
 function sanitizePublicRecord(record) {
     const rt = runtime.get(record.id);
     const client = rt?.client;
     const user = client?.user;
+    const brand = sanitizeBrand(record.brand);
+    const clientId = String(record.clientId || user?.id || record.applicationId || '').trim();
     return {
         id: record.id,
         label: record.label || 'Bot auxiliar',
+        slug: record.slug || '',
         enabled: record.enabled !== false,
+        panelEnabled: record.panelEnabled === true,
         status: rt?.status || (record.enabled === false ? 'stopped' : 'offline'),
         username: user?.username || record.username || '',
         discriminator: user?.discriminator || record.discriminator || '0',
         displayName: user?.globalName || user?.username || record.label || '',
         applicationId: user?.id || record.applicationId || '',
+        clientId,
+        hasClientSecret: Boolean(String(record.clientSecret || '').trim()),
+        assignedDiscordUserId: String(record.assignedDiscordUserId || '').trim(),
+        brand,
+        panelPath: record.slug ? `/t/${record.slug}` : '',
+        panelAuthPath: record.slug ? `/t/${record.slug}/auth` : '',
         avatar: user?.avatar || record.avatar || null,
         avatarUrl: user?.displayAvatarURL?.({ size: 128 }) || record.avatarUrl || null,
         guildCount: client?.guilds?.cache?.size ?? record.guildCount ?? 0,
         ping: client?.ws?.ping ?? null,
         commandsEnabled: record.commandsEnabled !== false,
         tokenHint: maskToken(record.token),
-        inviteUrl: buildBotInviteUrl(client?.user?.id || record.applicationId),
+        inviteUrl: buildBotInviteUrl(clientId || client?.user?.id || record.applicationId),
         createdAt: record.createdAt,
         updatedAt: record.updatedAt,
         lastError: rt?.lastError || record.lastError || null
     };
+}
+
+function getRecordById(id) {
+    return findRecord(readStore(), id);
+}
+
+function getRecordBySlug(slug) {
+    const clean = String(slug || '').trim().toLowerCase();
+    if (!clean) return null;
+    return readStore().bots.find((bot) => String(bot.slug || '').toLowerCase() === clean) || null;
+}
+
+function listBotsForAssignee(discordUserId) {
+    const uid = String(discordUserId || '').trim();
+    if (!uid) return [];
+    return readStore().bots
+        .filter((bot) => String(bot.assignedDiscordUserId || '') === uid && bot.panelEnabled === true)
+        .map(sanitizePublicRecord);
+}
+
+function userCanAccessTenant(record, discordUserId, { isOwner = false } = {}) {
+    if (!record) return false;
+    if (isOwner) return true;
+    if (record.panelEnabled !== true) return false;
+    const assigned = String(record.assignedDiscordUserId || '').trim();
+    return Boolean(assigned && assigned === String(discordUserId || '').trim());
 }
 
 async function validateBotToken(token) {
@@ -130,7 +202,10 @@ async function startBotRuntime(record) {
 
     bootstrapAuxiliaryClient(client, record.token, {
         label: record.label,
-        commandsEnabled: record.commandsEnabled !== false
+        commandsEnabled: record.commandsEnabled !== false,
+        // Panel asignable: mismos handlers de módulos que el bot principal.
+        fullFeatures: record.panelEnabled === true,
+        tenantBotId: record.id
     });
 
     client.once('clientReady', () => {
@@ -186,10 +261,35 @@ async function shutdownOwnerBots() {
 
 function listBotsPublic() {
     const store = readStore();
+    let dirty = false;
+    for (const record of store.bots) {
+        if (!record.slug) {
+            record.slug = uniqueSlug(store, record.label || record.id, record.id);
+            dirty = true;
+        }
+        if (!record.brand) {
+            record.brand = sanitizeBrand({ name: record.label });
+            dirty = true;
+        }
+        if (record.clientId == null && record.applicationId) {
+            record.clientId = record.applicationId;
+            dirty = true;
+        }
+    }
+    if (dirty) writeStore(store);
     return store.bots.map(sanitizePublicRecord);
 }
 
-async function createBot({ label, token }) {
+async function createBot({
+    label,
+    token,
+    clientId,
+    clientSecret,
+    assignedDiscordUserId,
+    slug,
+    brand,
+    panelEnabled
+} = {}) {
     const cleanToken = String(token || '').trim();
     const cleanLabel = String(label || '').trim() || 'Bot auxiliar';
     if (!cleanToken) throw Object.assign(new Error('Falta el token del bot'), { statusCode: 400 });
@@ -200,11 +300,25 @@ async function createBot({ label, token }) {
         throw Object.assign(new Error('Ese bot ya está registrado'), { statusCode: 409 });
     }
 
+    const cleanClientId = String(clientId || user.id || '').trim();
+    if (cleanClientId && cleanClientId !== user.id) {
+        throw Object.assign(
+            new Error('El Client ID no coincide con la aplicación del token (debe ser el Application ID del bot)'),
+            { statusCode: 400 }
+        );
+    }
+
     const now = new Date().toISOString();
     const record = {
         id: newBotId(),
         label: cleanLabel,
+        slug: uniqueSlug(store, slug || cleanLabel, null),
         token: cleanToken,
+        clientId: cleanClientId || user.id,
+        clientSecret: String(clientSecret || '').trim(),
+        assignedDiscordUserId: String(assignedDiscordUserId || '').replace(/\D/g, '').slice(0, 32),
+        brand: sanitizeBrand(brand || { name: cleanLabel }),
+        panelEnabled: panelEnabled === true,
         enabled: true,
         commandsEnabled: true,
         username: user.username,
@@ -250,8 +364,48 @@ async function updateBot(id, patch = {}) {
     const record = findRecord(store, id);
     if (!record) throw Object.assign(new Error('Bot no encontrado'), { statusCode: 404 });
 
+    let needsRestart = false;
+
     if (patch.label != null) {
         record.label = String(patch.label).trim() || record.label;
+    }
+
+    if (patch.slug != null) {
+        record.slug = uniqueSlug(store, patch.slug || record.label, record.id);
+    } else if (!record.slug) {
+        record.slug = uniqueSlug(store, record.label, record.id);
+    }
+
+    if (patch.clientId != null) {
+        const cleanClientId = String(patch.clientId).trim();
+        if (cleanClientId && record.applicationId && cleanClientId !== record.applicationId) {
+            throw Object.assign(
+                new Error('El Client ID debe coincidir con el Application ID del bot'),
+                { statusCode: 400 }
+            );
+        }
+        record.clientId = cleanClientId || record.applicationId || record.clientId;
+    }
+
+    if (patch.clientSecret != null) {
+        const secret = String(patch.clientSecret).trim();
+        if (secret) record.clientSecret = secret;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, 'assignedDiscordUserId')) {
+        record.assignedDiscordUserId = String(patch.assignedDiscordUserId || '').replace(/\D/g, '').slice(0, 32);
+    }
+
+    if (patch.brand != null) {
+        record.brand = sanitizeBrand({ ...sanitizeBrand(record.brand), ...patch.brand });
+    }
+
+    if (patch.panelEnabled != null) {
+        const next = patch.panelEnabled === true;
+        if (next !== (record.panelEnabled === true)) {
+            record.panelEnabled = next;
+            needsRestart = true;
+        }
     }
 
     if (patch.token != null) {
@@ -260,59 +414,42 @@ async function updateBot(id, patch = {}) {
         const user = await validateBotToken(cleanToken);
         record.token = cleanToken;
         record.applicationId = user.id;
+        record.clientId = record.clientId || user.id;
         record.username = user.username;
         record.discriminator = user.discriminator;
         record.avatar = user.avatar;
-        await stopBotRuntime(id);
-        if (record.enabled !== false) {
-            try {
-                await startBotRuntime(record);
-                record.lastError = null;
-            } catch (error) {
-                record.enabled = false;
-                record.lastError = formatBotLoginError(error?.message || error);
-                record.updatedAt = new Date().toISOString();
-                writeStore(store);
-                throw asBotError(error);
-            }
-        }
+        needsRestart = true;
     }
 
     if (patch.commandsEnabled != null) {
         const nextCommandsEnabled = patch.commandsEnabled === true;
         if (nextCommandsEnabled !== (record.commandsEnabled !== false)) {
             record.commandsEnabled = nextCommandsEnabled;
-            // Reiniciar para (re)registrar o limpiar los slash commands del bot.
-            if (record.enabled !== false && runtime.has(id)) {
-                try {
-                    await startBotRuntime(record);
-                    record.lastError = null;
-                } catch (error) {
-                    record.lastError = formatBotLoginError(error?.message || error);
-                    record.updatedAt = new Date().toISOString();
-                    writeStore(store);
-                    throw asBotError(error);
-                }
-            }
+            needsRestart = true;
         }
     }
 
     if (patch.enabled != null) {
         record.enabled = patch.enabled === true;
         if (record.enabled) {
-            try {
-                await startBotRuntime(record);
-                record.lastError = null;
-            } catch (error) {
-                record.enabled = false;
-                record.lastError = formatBotLoginError(error?.message || error);
-                record.updatedAt = new Date().toISOString();
-                writeStore(store);
-                throw asBotError(error);
-            }
+            needsRestart = true;
         } else {
             await stopBotRuntime(id);
             record.lastError = null;
+            needsRestart = false;
+        }
+    }
+
+    if (needsRestart && record.enabled !== false) {
+        try {
+            await startBotRuntime(record);
+            record.lastError = null;
+        } catch (error) {
+            record.enabled = false;
+            record.lastError = formatBotLoginError(error?.message || error);
+            record.updatedAt = new Date().toISOString();
+            writeStore(store);
+            throw asBotError(error);
         }
     }
 
@@ -499,6 +636,7 @@ module.exports = {
     initOwnerBots,
     shutdownOwnerBots,
     listBotsPublic,
+    listBotsForAssignee,
     createBot,
     deleteBot,
     updateBot,
@@ -508,5 +646,10 @@ module.exports = {
     listBotGuildChannels,
     fetchBotChatMessages,
     sendBotChatMessage,
-    getRuntimeClient
+    getRuntimeClient,
+    getRecordById,
+    getRecordBySlug,
+    userCanAccessTenant,
+    sanitizeBrand,
+    sanitizePublicRecord
 };

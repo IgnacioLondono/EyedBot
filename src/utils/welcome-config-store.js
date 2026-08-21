@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'welcome-configs.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -68,6 +69,7 @@ function ensureGuildBucket(store, guildId) {
 }
 
 async function getWelcomeChannelId(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `welcomeChannel_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -89,6 +91,7 @@ async function getWelcomeChannelId(guildId) {
 }
 
 async function setWelcomeChannelId(guildId, channelId) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`welcome_${guildId}`, channelId);
     } catch {
@@ -104,6 +107,7 @@ async function setWelcomeChannelId(guildId, channelId) {
 }
 
 async function getWelcomeConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `welcomeConfig_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -125,6 +129,7 @@ async function getWelcomeConfig(guildId) {
 }
 
 function invalidateConfigCache(guildId) {
+    guildId = scopeKey(guildId);
     cache.delete(`welcomeConfig_${guildId}`);
     cache.delete(`goodbyeConfig_${guildId}`);
     cache.delete(`welcomeChannel_${guildId}`);
@@ -132,6 +137,7 @@ function invalidateConfigCache(guildId) {
 }
 
 async function setWelcomeConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`welcome_config_${guildId}`, config);
     } catch (error) {
@@ -149,6 +155,7 @@ async function setWelcomeConfig(guildId, config) {
 }
 
 async function getGoodbyeChannelId(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `goodbyeChannel_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -170,6 +177,7 @@ async function getGoodbyeChannelId(guildId) {
 }
 
 async function setGoodbyeChannelId(guildId, channelId) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`goodbye_${guildId}`, channelId);
     } catch {
@@ -185,6 +193,7 @@ async function setGoodbyeChannelId(guildId, channelId) {
 }
 
 async function getGoodbyeConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `goodbyeConfig_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -206,6 +215,7 @@ async function getGoodbyeConfig(guildId) {
 }
 
 async function setGoodbyeConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     try {
         await db.set(`goodbye_config_${guildId}`, config);
     } catch (error) {

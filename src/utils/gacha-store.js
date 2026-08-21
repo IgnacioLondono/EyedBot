@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'gacha-store.json');
 const CHARACTERS_PATH = path.join(__dirname, '..', '..', 'data', 'gacha-characters.json');
@@ -26,6 +27,7 @@ function shopCatalogDiskSafePart(raw = '', max = 80) {
 }
 
 function shopCatalogDiskFilePath(guildId, characterId, ext = 'png') {
+    guildId = scopeKey(guildId);
     const gid = shopCatalogDiskSafePart(guildId, 32);
     const cidEnc = encodeURIComponent(String(characterId || '').trim().slice(0, 128));
     const e = String(ext || 'png').replace(/^\./, '').toLowerCase();
@@ -33,10 +35,12 @@ function shopCatalogDiskFilePath(guildId, characterId, ext = 'png') {
 }
 
 function shopCatalogDiskPrefix(guildId) {
+    guildId = scopeKey(guildId);
     return `${shopCatalogDiskSafePart(guildId, 32)}__`;
 }
 
 function characterIdFromShopDiskFile(guildId, fileName) {
+    guildId = scopeKey(guildId);
     const prefix = shopCatalogDiskPrefix(guildId);
     if (!String(fileName || '').startsWith(prefix)) return '';
     const rest = String(fileName).slice(prefix.length);
@@ -99,6 +103,7 @@ function cacheSet(key, value) {
 }
 
 function scheduleCommunityEvaluation(guildId, userId) {
+    guildId = scopeKey(guildId);
     setImmediate(() => {
         require('./community-challenges-achievements').evaluateUser(guildId, userId).catch(() => null);
     });
@@ -497,6 +502,7 @@ function buildInventoryEntry(character = {}) {
 }
 
 async function getConfig(guildId) {
+    guildId = scopeKey(guildId);
     const key = `gacha_config_${guildId}`;
     const fromCache = cacheGet(key);
     if (fromCache !== null) return fromCache;
@@ -517,6 +523,7 @@ async function getConfig(guildId) {
 }
 
 async function setConfig(guildId, config) {
+    guildId = scopeKey(guildId);
     const normalized = normalizeConfig(config);
     const key = `gacha_config_${guildId}`;
 
@@ -531,6 +538,7 @@ async function setConfig(guildId, config) {
 }
 
 async function getProfile(guildId, userId) {
+    guildId = scopeKey(guildId);
     const key = `gacha_profile_${guildId}_${userId}`;
     const fromCache = cacheGet(key);
     if (fromCache !== null) return fromCache;
@@ -552,6 +560,7 @@ async function getProfile(guildId, userId) {
 }
 
 async function setProfile(guildId, userId, profile) {
+    guildId = scopeKey(guildId);
     const key = `gacha_profile_${guildId}_${userId}`;
     const normalized = normalizeProfile(profile, userId);
     normalized.updatedAt = new Date().toISOString();
@@ -569,6 +578,7 @@ async function setProfile(guildId, userId, profile) {
 }
 
 async function getPending(guildId, userId) {
+    guildId = scopeKey(guildId);
     const key = `gacha_pending_${guildId}_${userId}`;
     const fromCache = cacheGet(key);
     if (fromCache !== null) return fromCache;
@@ -590,6 +600,7 @@ async function getPending(guildId, userId) {
 }
 
 async function setPending(guildId, userId, pending) {
+    guildId = scopeKey(guildId);
     const key = `gacha_pending_${guildId}_${userId}`;
     const normalized = normalizePending(pending);
 
@@ -605,6 +616,7 @@ async function setPending(guildId, userId, pending) {
 }
 
 async function clearPending(guildId, userId) {
+    guildId = scopeKey(guildId);
     const key = `gacha_pending_${guildId}_${userId}`;
     try { await db.delete(key); } catch {}
 
@@ -617,6 +629,7 @@ async function clearPending(guildId, userId) {
 }
 
 async function createRoll(guildId, userId, channelId) {
+    guildId = scopeKey(guildId);
     const config = await getConfig(guildId);
     const profile = await getProfile(guildId, userId);
     const rarity = pickRarityWithPity(profile.pityCounter || 0, config.pityThreshold || 30);
@@ -646,6 +659,7 @@ async function createRoll(guildId, userId, channelId) {
 }
 
 async function claimPendingRoll(guildId, userId, token = '') {
+    guildId = scopeKey(guildId);
     const pending = await getPending(guildId, userId);
     if (!pending || !pending.token) return { ok: false, reason: 'missing' };
     if (token && pending.token !== token) return { ok: false, reason: 'mismatch' };
@@ -673,6 +687,7 @@ async function claimPendingRoll(guildId, userId, token = '') {
 }
 
 async function listGuildProfiles(guildId) {
+    guildId = scopeKey(guildId);
     const rowsFromDb = [];
     try {
         const rows = await db.query(
@@ -701,6 +716,7 @@ async function listGuildProfiles(guildId) {
 }
 
 async function getGuildMarket(guildId) {
+    guildId = scopeKey(guildId);
     const key = `gacha_market_${guildId}`;
     const fromCache = cacheGet(key);
     if (fromCache !== null) return fromCache;
@@ -732,6 +748,7 @@ async function getGuildMarket(guildId) {
 }
 
 async function setGuildMarket(guildId, market = []) {
+    guildId = scopeKey(guildId);
     const key = `gacha_market_${guildId}`;
     const normalized = (Array.isArray(market) ? market : []).slice(0, 500);
     try { await db.set(key, normalized); } catch {}
@@ -745,6 +762,7 @@ async function setGuildMarket(guildId, market = []) {
 }
 
 async function addWishlistItem(guildId, userId, query = '') {
+    guildId = scopeKey(guildId);
     const profile = await getProfile(guildId, userId);
     const value = String(query || '').trim().toLowerCase();
     if (!value) return profile;
@@ -754,6 +772,7 @@ async function addWishlistItem(guildId, userId, query = '') {
 }
 
 async function removeWishlistItem(guildId, userId, query = '') {
+    guildId = scopeKey(guildId);
     const profile = await getProfile(guildId, userId);
     const value = String(query || '').trim().toLowerCase();
     profile.wishlist = (profile.wishlist || []).filter((x) => x !== value);
@@ -777,6 +796,7 @@ function filterInventoryItems(items = [], filters = {}) {
 }
 
 async function listInventory(guildId, userId, filters = {}) {
+    guildId = scopeKey(guildId);
     const profile = await getProfile(guildId, userId);
     const filtered = filterInventoryItems(profile.inventory || [], filters);
     return {
@@ -788,6 +808,7 @@ async function listInventory(guildId, userId, filters = {}) {
 }
 
 async function createMarketListing(guildId, sellerId, itemUid, price) {
+    guildId = scopeKey(guildId);
     const numericPrice = Math.max(1, Number.parseInt(`${price || 1}`, 10) || 1);
     const seller = await getProfile(guildId, sellerId);
     const index = (seller.inventory || []).findIndex((x) => x.uid === itemUid);
@@ -811,6 +832,7 @@ async function createMarketListing(guildId, sellerId, itemUid, price) {
 }
 
 async function buyMarketListing(guildId, buyerId, listingId) {
+    guildId = scopeKey(guildId);
     const market = await getGuildMarket(guildId);
     const idx = market.findIndex((x) => x.id === listingId);
     if (idx < 0) return { ok: false, reason: 'listing_not_found' };
@@ -859,6 +881,7 @@ function resolveShopPrice(character = {}, config = {}, overrideEntry = null) {
 }
 
 async function getGuildCatalogOverrides(guildId) {
+    guildId = scopeKey(guildId);
     const key = `gacha_catalog_${guildId}`;
     const fromCache = cacheGet(key);
     if (fromCache !== null) return fromCache;
@@ -884,6 +907,7 @@ async function getGuildCatalogOverrides(guildId) {
 }
 
 async function setGuildCatalogOverrides(guildId, overrides = {}) {
+    guildId = scopeKey(guildId);
     const key = `gacha_catalog_${guildId}`;
     const normalized = overrides && typeof overrides === 'object' && !Array.isArray(overrides) ? overrides : {};
     try { await db.set(key, normalized); } catch {}
@@ -899,10 +923,12 @@ async function setGuildCatalogOverrides(guildId, overrides = {}) {
 }
 
 function catalogBannedKey(guildId) {
+    guildId = scopeKey(guildId);
     return `gacha_catalog_banned_${guildId}`;
 }
 
 async function getGuildCatalogBannedIds(guildId) {
+    guildId = scopeKey(guildId);
     const key = catalogBannedKey(guildId);
     const fromCache = cacheGet(key);
     if (fromCache !== null) return Array.isArray(fromCache) ? fromCache : [];
@@ -920,6 +946,7 @@ async function getGuildCatalogBannedIds(guildId) {
 }
 
 async function setGuildCatalogBannedIds(guildId, bannedIds = []) {
+    guildId = scopeKey(guildId);
     const key = catalogBannedKey(guildId);
     const banned = [...new Set((Array.isArray(bannedIds) ? bannedIds : [])
         .map((id) => String(id || '').trim())
@@ -931,6 +958,7 @@ async function setGuildCatalogBannedIds(guildId, bannedIds = []) {
 
 /** Mueve stubs legacy `removedFromGuildCatalog` a la lista de baneados y limpia overrides. */
 async function migrateLegacyCatalogRemovals(guildId) {
+    guildId = scopeKey(guildId);
     const overrides = await getGuildCatalogOverrides(guildId);
     const legacyIds = Object.entries(overrides)
         .filter(([, entry]) => entry && entry.removedFromGuildCatalog === true)
@@ -958,6 +986,7 @@ async function migrateLegacyCatalogRemovals(guildId) {
 }
 
 async function getGuildCatalogExclusionState(guildId) {
+    guildId = scopeKey(guildId);
     return migrateLegacyCatalogRemovals(guildId);
 }
 
@@ -969,6 +998,7 @@ function isCatalogExcluded(characterId, bannedSet, overrides = {}) {
 }
 
 async function getGuildCharacterPool(guildId) {
+    guildId = scopeKey(guildId);
     const base = getCharacterPool();
     if (!guildId) return base;
 
@@ -979,6 +1009,7 @@ async function getGuildCharacterPool(guildId) {
 }
 
 async function getShopCatalog(guildId, config = {}) {
+    guildId = scopeKey(guildId);
     const { overrides } = await getGuildCatalogExclusionState(guildId);
     const pool = await getGuildCharacterPool(guildId);
     return pool
@@ -995,6 +1026,7 @@ async function getShopCatalog(guildId, config = {}) {
 
 /** Catálogo para el panel. Por defecto no incluye los excluidos del servidor. */
 async function listShopCatalogForAdmin(guildId, config = {}, options = {}) {
+    guildId = scopeKey(guildId);
     const includeRemoved = options.includeRemoved === true;
     const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
     const base = getCharacterPool();
@@ -1027,6 +1059,7 @@ async function listShopCatalogForAdmin(guildId, config = {}, options = {}) {
 }
 
 async function pruneHiddenSystemListings(guildId) {
+    guildId = scopeKey(guildId);
     const { overrides, banned } = await getGuildCatalogExclusionState(guildId);
     const blockedIds = new Set([
         ...banned,
@@ -1088,6 +1121,7 @@ function shopCatalogMimeToExt(mime = '') {
 }
 
 async function deleteGuildCatalogShopImageBlob(guildId, characterId) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim().slice(0, 32);
     const cid = String(characterId || '').trim().slice(0, 128);
     if (!gid || !cid) return false;
@@ -1104,6 +1138,7 @@ async function deleteGuildCatalogShopImageBlob(guildId, characterId) {
 }
 
 async function listGuildCatalogShopBlobIds(guildId) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim().slice(0, 32);
     if (!gid) return new Set();
     try {
@@ -1118,6 +1153,7 @@ async function listGuildCatalogShopBlobIds(guildId) {
 }
 
 async function getGuildCatalogShopImageBlob(guildId, characterId) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim().slice(0, 32);
     const cid = String(characterId || '').trim().slice(0, 128);
     if (!gid || !cid) return null;
@@ -1137,6 +1173,7 @@ async function getGuildCatalogShopImageBlob(guildId, characterId) {
 }
 
 function readGuildCatalogShopDiskImage(guildId, characterId) {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim();
     const cid = String(characterId || '').trim();
     if (!gid || !cid) return null;
@@ -1162,6 +1199,7 @@ function readGuildCatalogShopDiskImage(guildId, characterId) {
 }
 
 function writeGuildCatalogShopDiskImage(guildId, characterId, buffer, mimeType = '') {
+    guildId = scopeKey(guildId);
     if (!Buffer.isBuffer(buffer) || !buffer.length) return null;
     const ext = shopCatalogMimeToExt(mimeType);
     const target = shopCatalogDiskFilePath(guildId, characterId, ext);
@@ -1183,6 +1221,7 @@ function writeGuildCatalogShopDiskImage(guildId, characterId, buffer, mimeType =
 }
 
 async function listGuildCatalogShopImageIds(guildId) {
+    guildId = scopeKey(guildId);
     const ids = await listGuildCatalogShopBlobIds(guildId);
     const gid = String(guildId || '').trim();
     if (!gid) return ids;
@@ -1201,6 +1240,7 @@ async function listGuildCatalogShopImageIds(guildId) {
 }
 
 function deleteGuildCatalogShopDiskImage(guildId, characterId) {
+    guildId = scopeKey(guildId);
     let removed = false;
     for (const ext of ['png', 'jpg', 'jpeg', 'webp', 'gif']) {
         const abs = shopCatalogDiskFilePath(guildId, characterId, ext);
@@ -1218,17 +1258,20 @@ function deleteGuildCatalogShopDiskImage(guildId, characterId) {
 
 /** MySQL primero; si falla, copia en web/uploads/gacha-catalog */
 async function resolveGuildCatalogShopImage(guildId, characterId) {
+    guildId = scopeKey(guildId);
     const blob = await getGuildCatalogShopImageBlob(guildId, characterId);
     if (blob?.data?.length) return blob;
     return readGuildCatalogShopDiskImage(guildId, characterId);
 }
 
 async function guildHasCatalogShopImage(guildId, characterId) {
+    guildId = scopeKey(guildId);
     const img = await resolveGuildCatalogShopImage(guildId, characterId);
     return !!(img?.data?.length);
 }
 
 async function setGuildCatalogShopImageBlob(guildId, characterId, buffer, mimeType = '') {
+    guildId = scopeKey(guildId);
     const gid = String(guildId || '').trim().slice(0, 32);
     const cid = String(characterId || '').trim().slice(0, 128);
     if (!gid || !cid || !Buffer.isBuffer(buffer) || buffer.length === 0) return false;
@@ -1249,6 +1292,7 @@ async function setGuildCatalogShopImageBlob(guildId, characterId, buffer, mimeTy
 }
 
 async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, updatedBy = 'system') {
+    guildId = scopeKey(guildId);
     const base = getCharacterPool().find((item) => item.id === String(characterId || ''));
     if (!base) return { ok: false, reason: 'item_not_found' };
 
@@ -1324,6 +1368,7 @@ async function setGuildCatalogItem(guildId, characterId = '', rawPatch = {}, upd
 }
 
 async function deleteGuildCatalogItem(guildId, characterId = '', updatedBy = 'system') {
+    guildId = scopeKey(guildId);
     const id = String(characterId || '').trim();
     if (!id) return { ok: false, reason: 'invalid_id' };
 
@@ -1356,6 +1401,7 @@ async function deleteGuildCatalogItem(guildId, characterId = '', updatedBy = 'sy
  * (imagen MySQL/disco, precio custom, nombre, etc.). Solo deja el id excluido.
  */
 async function banGuildCatalogItem(guildId, characterId = '', updatedBy = 'system') {
+    guildId = scopeKey(guildId);
     const id = String(characterId || '').trim();
     if (!id) return { ok: false, reason: 'invalid_id' };
 
@@ -1385,6 +1431,7 @@ async function banGuildCatalogItem(guildId, characterId = '', updatedBy = 'syste
 }
 
 async function ensureGuildEconomyContent(guildId) {
+    guildId = scopeKey(guildId);
     const config = await getConfig(guildId);
     const catalog = await getShopCatalog(guildId, config);
     const market = await getGuildMarket(guildId);
@@ -1512,6 +1559,7 @@ async function addCoinsInTransaction(tx, guildId, userId, delta, options = {}) {
 }
 
 async function addCoins(guildId, userId, amount = 0, options = {}) {
+    guildId = scopeKey(guildId);
     const delta = Math.max(0, Number.parseInt(`${amount || 0}`, 10) || 0);
     if (!delta) return getProfile(guildId, userId);
 
@@ -1526,10 +1574,12 @@ async function addCoins(guildId, userId, amount = 0, options = {}) {
 }
 
 function invalidateProfileCache(guildId, userId) {
+    guildId = scopeKey(guildId);
     cache.delete(`gacha_profile_${guildId}_${userId}`);
 }
 
 async function trySpendCoins(guildId, userId, amount = 0) {
+    guildId = scopeKey(guildId);
     const cost = Math.max(0, Number.parseInt(`${amount || 0}`, 10) || 0);
     const profile = await getProfile(guildId, userId);
     if ((profile.coins || 0) < cost) {
@@ -1542,6 +1592,7 @@ async function trySpendCoins(guildId, userId, amount = 0) {
 }
 
 async function purchaseShopCharacter(guildId, userId, characterId = '') {
+    guildId = scopeKey(guildId);
     const config = await getConfig(guildId);
     if (!config.economyEnabled || config.shopEnabled === false) {
         return { ok: false, reason: 'shop_disabled' };
@@ -1571,6 +1622,7 @@ async function purchaseShopCharacter(guildId, userId, characterId = '') {
 }
 
 async function getGuildStats(guildId) {
+    guildId = scopeKey(guildId);
     const profiles = await listGuildProfiles(guildId);
     const sorted = profiles.slice().sort((a, b) => (b.totalClaims || 0) - (a.totalClaims || 0));
     const totalRolls = profiles.reduce((sum, x) => sum + (x.totalRolls || 0), 0);

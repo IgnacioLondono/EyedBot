@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'weekly-summary.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -95,6 +96,7 @@ function normalizeBucket(raw) {
 }
 
 async function getBucket(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `weekly_summary_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -117,6 +119,7 @@ async function getBucket(guildId) {
 }
 
 async function setBucket(guildId, bucket) {
+    guildId = scopeKey(guildId);
     const normalized = normalizeBucket(bucket);
 
     try {
@@ -133,10 +136,12 @@ async function setBucket(guildId, bucket) {
 }
 
 async function getConfig(guildId) {
+    guildId = scopeKey(guildId);
     return (await getBucket(guildId)).config;
 }
 
 async function setConfig(guildId, patch = {}) {
+    guildId = scopeKey(guildId);
     const bucket = await getBucket(guildId);
     const nextConfig = sanitizeConfig({
         ...bucket.config,
@@ -148,16 +153,19 @@ async function setConfig(guildId, patch = {}) {
 }
 
 async function getSnapshot(guildId) {
+    guildId = scopeKey(guildId);
     return (await getBucket(guildId)).snapshot;
 }
 
 async function setSnapshot(guildId, snapshot) {
+    guildId = scopeKey(guildId);
     const bucket = await getBucket(guildId);
     const next = await setBucket(guildId, { ...bucket, snapshot });
     return next.snapshot;
 }
 
 async function markPosted(guildId, localDateKey) {
+    guildId = scopeKey(guildId);
     return setConfig(guildId, { lastPostedDate: localDateKey, updatedBy: 'scheduler' });
 }
 

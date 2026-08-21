@@ -75,6 +75,21 @@ export type DashboardSummary = {
   generatedAt: string;
 };
 
+export type TenantBrand = {
+  name: string;
+  logoUrl: string;
+  primaryColor: string;
+};
+
+export type TenantSummary = {
+  id: string;
+  slug: string;
+  label: string;
+  brand: TenantBrand;
+  panelPath: string;
+  inviteUrl?: string;
+};
+
 export type PanelBootstrap = {
   user: PanelUser;
   sessionGuilds: GuildSummary[];
@@ -89,6 +104,8 @@ export type PanelBootstrap = {
   guildsSyncedAt: number;
   welcomeCardStyleEnabled?: boolean;
   webConfig?: WebPanelConfig;
+  tenant?: TenantSummary | null;
+  assignedTenants?: TenantSummary[];
 };
 
 export type WebPanelConfig = {

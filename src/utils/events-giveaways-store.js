@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'events-giveaways.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -126,6 +127,7 @@ function ensureGuildBucket(store, guildId) {
 }
 
 async function readGuildBucket(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `eventsGiveaways_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache) return fromCache;
@@ -157,6 +159,7 @@ async function readGuildBucket(guildId) {
 }
 
 async function writeGuildBucket(guildId, bucket) {
+    guildId = scopeKey(guildId);
     const normalized = {
         config: normalizeConfig(bucket.config),
         giveaways: (bucket.giveaways || []).map(normalizeGiveaway),
@@ -177,33 +180,39 @@ async function writeGuildBucket(guildId, bucket) {
 }
 
 async function getConfig(guildId) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     return bucket.config;
 }
 
 async function setConfig(guildId, config, updatedBy = 'system') {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     bucket.config = normalizeConfig({ ...config, updatedAt: new Date().toISOString(), updatedBy });
     return writeGuildBucket(guildId, bucket);
 }
 
 async function listGiveaways(guildId, status = null) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     if (!status) return bucket.giveaways;
     return bucket.giveaways.filter((row) => row.status === status);
 }
 
 async function getGiveaway(guildId, giveawayId) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     return bucket.giveaways.find((row) => row.id === giveawayId) || null;
 }
 
 async function getGiveawayByMessage(guildId, messageId) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     return bucket.giveaways.find((row) => row.messageId === messageId) || null;
 }
 
 async function saveGiveaway(guildId, giveaway) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     const normalized = normalizeGiveaway({ ...giveaway, guildId });
     const index = bucket.giveaways.findIndex((row) => row.id === normalized.id);
@@ -215,17 +224,20 @@ async function saveGiveaway(guildId, giveaway) {
 }
 
 async function listServerEvents(guildId, status = null) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     if (!status) return bucket.events;
     return bucket.events.filter((row) => row.status === status);
 }
 
 async function getServerEvent(guildId, eventId) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     return bucket.events.find((row) => row.id === eventId) || null;
 }
 
 async function saveServerEvent(guildId, eventRow) {
+    guildId = scopeKey(guildId);
     const bucket = await readGuildBucket(guildId);
     const normalized = normalizeServerEvent({ ...eventRow, guildId });
     const index = bucket.events.findIndex((row) => row.id === normalized.id);

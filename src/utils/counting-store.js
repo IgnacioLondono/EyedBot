@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
+const { scopeKey } = require('./config-scope');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'counting-configs.json');
 const CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.CONFIG_CACHE_TTL_MS || '60000', 10));
@@ -72,6 +73,7 @@ function nowIso() {
 }
 
 async function getGuildConfig(guildId) {
+    guildId = scopeKey(guildId);
     const cacheKey = `counting_${guildId}`;
     const fromCache = cacheGet(cacheKey);
     if (fromCache !== null) return fromCache;
@@ -94,6 +96,7 @@ async function getGuildConfig(guildId) {
 }
 
 async function setGuildConfig(guildId, nextConfig) {
+    guildId = scopeKey(guildId);
     const normalized = normalizeConfig({
         ...nextConfig,
         updatedAt: nowIso()
@@ -113,6 +116,7 @@ async function setGuildConfig(guildId, nextConfig) {
 }
 
 async function setChannel(guildId, channelId) {
+    guildId = scopeKey(guildId);
     const current = await getGuildConfig(guildId);
     return setGuildConfig(guildId, {
         ...current,
@@ -123,6 +127,7 @@ async function setChannel(guildId, channelId) {
 }
 
 async function disable(guildId) {
+    guildId = scopeKey(guildId);
     const current = await getGuildConfig(guildId);
     return setGuildConfig(guildId, {
         ...current,
@@ -132,6 +137,7 @@ async function disable(guildId) {
 }
 
 async function resetProgress(guildId) {
+    guildId = scopeKey(guildId);
     const current = await getGuildConfig(guildId);
     return setGuildConfig(guildId, {
         ...current,
@@ -141,6 +147,7 @@ async function resetProgress(guildId) {
 }
 
 async function setProgress(guildId, progress) {
+    guildId = scopeKey(guildId);
     const current = await getGuildConfig(guildId);
     const next = {
         ...current,
