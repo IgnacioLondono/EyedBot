@@ -31,8 +31,8 @@ const { sanitizeBrand } = (() => {
   };
 })();
 
-assert.deepStrictEqual(sanitizeBrand({ name: 'Lazarus', primaryColor: '#F59E0B', logoUrl: 'https://x' }), {
-  name: 'Lazarus',
+assert.deepStrictEqual(sanitizeBrand({ name: 'Mi Bot', primaryColor: '#F59E0B', logoUrl: 'https://x' }), {
+  name: 'Mi Bot',
   logoUrl: 'https://x',
   primaryColor: 'f59e0b'
 });
