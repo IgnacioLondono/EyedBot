@@ -200,7 +200,8 @@ export function OwnerBotsTab() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const stickChatToBottomRef = useRef(true);
 
   const selected = useMemo(
     () => bots.find((bot) => bot.id === selectedId) || null,
@@ -310,14 +311,25 @@ export function OwnerBotsTab() {
       setMessages([]);
       return;
     }
+    stickChatToBottomRef.current = true;
     void refreshChat();
     const timer = setInterval(() => void refreshChat(), 8000);
     return () => clearInterval(timer);
   }, [channelId, refreshChat]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const box = chatScrollRef.current;
+    if (!box || !stickChatToBottomRef.current) return;
+    // Solo mueve el contenedor del chat, nunca el scroll de la página.
+    box.scrollTop = box.scrollHeight;
   }, [messages]);
+
+  function onChatScroll() {
+    const box = chatScrollRef.current;
+    if (!box) return;
+    const distanceFromBottom = box.scrollHeight - box.scrollTop - box.clientHeight;
+    stickChatToBottomRef.current = distanceFromBottom < 64;
+  }
 
   async function handleCreate() {
     if (!newToken.trim()) {
@@ -486,6 +498,7 @@ export function OwnerBotsTab() {
     try {
       await sendOwnerBotChat(selectedId, { guildId, channelId, content: chatInput.trim() });
       setChatInput("");
+      stickChatToBottomRef.current = true;
       await refreshChat();
     } catch (err) {
       toast({ title: "No se pudo enviar", description: getErrorMessage(err), tone: "danger" });
@@ -813,7 +826,11 @@ export function OwnerBotsTab() {
                     </Button>
                   </div>
 
-                  <div className="max-h-80 space-y-2 overflow-y-auto rounded-2xl border border-white/8 bg-black/30 p-3">
+                  <div
+                    ref={chatScrollRef}
+                    onScroll={onChatScroll}
+                    className="max-h-80 space-y-2 overflow-y-auto rounded-2xl border border-white/8 bg-black/30 p-3"
+                  >
                     {messages.length ? (
                       messages.map((msg) => (
                         <div
@@ -842,7 +859,6 @@ export function OwnerBotsTab() {
                         {channelId ? "Sin mensajes recientes en este canal." : "Elige un canal para ver la conversación."}
                       </p>
                     )}
-                    <div ref={chatEndRef} />
                   </div>
 
                   <div className="mt-3 flex gap-2">
