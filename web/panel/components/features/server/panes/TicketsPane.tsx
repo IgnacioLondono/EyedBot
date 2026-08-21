@@ -245,8 +245,7 @@ function TitleCategoryEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-white">Categorías de título</h4>
+      <div className="flex justify-end">
         <Button
           size="sm"
           variant="secondary"
@@ -399,9 +398,10 @@ export function TicketsPane({ guildId }: { guildId: string }) {
       ...config,
       adminRoleIds: config.adminRoleIds,
       caseRoleMap: config.caseRoleMap,
-      // Áreas Eyed.bio retiradas del panel: siempre vacías.
+      // Áreas Eyed.bio y casos globales retirados del panel.
       supportAreas: [],
       minecraftServers: [],
+      commonProblems: [],
     };
   }
 
@@ -660,20 +660,9 @@ export function TicketsPane({ guildId }: { guildId: string }) {
 
           {tab === "categories" ? (
             <div className="space-y-8">
-              <Alert
-                title="Categorías de título"
-                description="Crea cada categoría de título y, dentro, los casos que verá el usuario en Discord al elegirla. Si una categoría no tiene casos, se usan los globales de abajo (opcional)."
-              />
               <TitleCategoryEditor
                 categories={config.ticketCategories}
                 onChange={(ticketCategories) => setConfig((c) => ({ ...c, ticketCategories }))}
-              />
-              <OptionEditor
-                title="Casos globales (fallback)"
-                primaryLabel="Título"
-                autoValueFromTitle
-                options={config.commonProblems}
-                onChange={(commonProblems) => setConfig((c) => ({ ...c, commonProblems }))}
               />
               <FormActions onSave={handleSaveConfig} saving={saving} />
             </div>
@@ -758,7 +747,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
       <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
         <div className="mb-2 flex items-center gap-2 font-medium text-zinc-200">
           <Layers className="h-4 w-4" />
-          Categorías de título activas
+          Activas
         </div>
         {config.ticketCategories.length
           ? config.ticketCategories
@@ -767,7 +756,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                 return `${cat.label || cat.value}${n ? ` (${n})` : ""}`;
               })
               .join(" · ")
-          : "Sin categorías de título cargadas."}
+          : "Sin categorías cargadas."}
         <div className="mt-3 flex items-center gap-2">
           <FlaskConical className="h-4 w-4" />
           Labs: DM recibo {config.sendDmReceipt ? "on" : "off"} · pendiente DM{" "}
