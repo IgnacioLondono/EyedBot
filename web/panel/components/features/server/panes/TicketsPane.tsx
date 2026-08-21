@@ -46,7 +46,7 @@ const TICKET_TABS = [
   { id: "templates", label: "Plantillas" },
   { id: "roles", label: "Roles" },
   { id: "preview", label: "Preview" },
-  { id: "categories", label: "Categorías" },
+  { id: "categories", label: "Títulos" },
   { id: "labs", label: "Labs" },
   { id: "manage", label: "Gestión" },
   { id: "guide", label: "Guía" },
@@ -107,14 +107,30 @@ function normalizeOptions(value: unknown): TicketOption[] {
   });
 }
 
+function slugFromTitle(title: string, fallback: string) {
+  const slug = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return slug || fallback;
+}
+
 function OptionEditor({
   title,
   options,
   onChange,
+  primaryLabel = "Etiqueta",
+  autoValueFromTitle = false,
 }: {
   title: string;
   options: TicketOption[];
   onChange: (next: TicketOption[]) => void;
+  primaryLabel?: string;
+  /** Si el valor está vacío, se genera desde el título al escribir. */
+  autoValueFromTitle?: boolean;
 }) {
   return (
     <div className="space-y-3">
@@ -133,12 +149,23 @@ function OptionEditor({
       {options.map((option, index) => (
         <div key={`${title}-${index}`} className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-3">
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Etiqueta">
+            <Field label={primaryLabel}>
               <Input
                 value={option.label}
                 onChange={(event) => {
+                  const label = event.target.value;
                   const next = [...options];
-                  next[index] = { ...next[index], label: event.target.value };
+                  const prev = next[index];
+                  const shouldSyncValue =
+                    autoValueFromTitle &&
+                    (!prev.value || prev.value === slugFromTitle(prev.label, ""));
+                  next[index] = {
+                    ...prev,
+                    label,
+                    ...(shouldSyncValue
+                      ? { value: slugFromTitle(label, `option-${index + 1}`) }
+                      : {}),
+                  };
                   onChange(next);
                 }}
               />
@@ -253,6 +280,9 @@ export function TicketsPane({ guildId }: { guildId: string }) {
       ...config,
       adminRoleIds: config.adminRoleIds,
       caseRoleMap: config.caseRoleMap,
+      // Áreas Eyed.bio retiradas del panel: siempre vacías.
+      supportAreas: [],
+      minecraftServers: [],
     };
   }
 
@@ -397,8 +427,8 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           {tab === "templates" ? (
             <div className="space-y-5">
               <Alert
-                title="Plantillas de tickets"
-                description="Elige un tema listo para usar. Se aplican título, mensaje, color, categorías, áreas Eyed.bio y opciones de labs. Los canales y roles no se modifican."
+                title="Plantillas (vista owner)"
+                description="Elige un tema listo: título del panel, mensaje, color, categorías de título, problemas comunes y labs. Los canales y roles no se modifican. No incluyen Áreas Eyed.bio."
               />
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {TICKET_PRESETS.map((preset) => {
@@ -412,7 +442,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                         setConfig((current) => applyTicketPreset(preset, current));
                         toast({
                           title: "Plantilla aplicada",
-                          description: `"${preset.name}" rellenó el panel y las categorías. Guarda y publica cuando estés listo.`,
+                          description: `"${preset.name}" rellenó el panel y las categorías de título. Guarda y publica cuando estés listo.`,
                           tone: "success",
                         });
                       }}
@@ -430,8 +460,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                       </div>
                       <p className="text-sm text-zinc-400">{preset.description}</p>
                       <p className="mt-3 text-xs text-zinc-500">
-                        {preset.ticketCategories.length} categorías · {preset.commonProblems.length} casos
-                        {preset.supportAreas?.length ? ` · ${preset.supportAreas.length} áreas Eyed.bio` : ""}
+                        {preset.ticketCategories.length} categorías de título · {preset.commonProblems.length} casos
                       </p>
                     </button>
                   );
@@ -491,23 +520,22 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           {tab === "categories" ? (
             <div className="space-y-8">
               <Alert
-                title="Categorías 100% tuyas"
-                description="No hay categorías de fábrica. Añade solo las que quieras (etiqueta + valor). Lo mismo para problemas comunes. Vacío = no se muestra ese menú en Discord."
+                title="Categorías de título"
+                description="Son los títulos del menú principal en Discord. Escribe el título (el valor se genera solo si está vacío). Añade problemas comunes aparte. Vacío = ese menú no se muestra."
               />
               <OptionEditor
-                title="Categorías de ticket"
+                title="Categorías de título"
+                primaryLabel="Título"
+                autoValueFromTitle
                 options={config.ticketCategories}
                 onChange={(ticketCategories) => setConfig((c) => ({ ...c, ticketCategories }))}
               />
               <OptionEditor
                 title="Problemas comunes"
+                primaryLabel="Título"
+                autoValueFromTitle
                 options={config.commonProblems}
                 onChange={(commonProblems) => setConfig((c) => ({ ...c, commonProblems }))}
-              />
-              <OptionEditor
-                title="Áreas Eyed.bio"
-                options={config.supportAreas}
-                onChange={(supportAreas) => setConfig((c) => ({ ...c, supportAreas }))}
               />
               <FormActions onSave={handleSaveConfig} saving={saving} />
             </div>
@@ -592,11 +620,11 @@ export function TicketsPane({ guildId }: { guildId: string }) {
       <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
         <div className="mb-2 flex items-center gap-2 font-medium text-zinc-200">
           <Layers className="h-4 w-4" />
-          Categorías activas
+          Categorías de título activas
         </div>
         {config.ticketCategories.length
-          ? config.ticketCategories.map((cat) => cat.label).join(" · ")
-          : "Sin categorías personalizadas cargadas."}
+          ? config.ticketCategories.map((cat) => cat.label || cat.value).join(" · ")
+          : "Sin categorías de título cargadas."}
         <div className="mt-3 flex items-center gap-2">
           <FlaskConical className="h-4 w-4" />
           Labs: DM recibo {config.sendDmReceipt ? "on" : "off"} · pendiente DM{" "}

@@ -456,9 +456,8 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
                         })
                       }
                     >
-                      <option value="categories">Categorías del panel</option>
+                      <option value="categories">Categorías de título</option>
                       <option value="problems">Problemas comunes</option>
-                      <option value="supportAreas">Áreas Eyed.bio</option>
                       <option value="custom">Opciones custom</option>
                     </select>
                   </Field>

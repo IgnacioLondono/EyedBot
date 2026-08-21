@@ -46,9 +46,6 @@ const {
 const eventsGiveawaysStore = require('../src/utils/events-giveaways-store');
 const giveawayService = require('../src/utils/giveaway-service');
 const ticketStore = require('../src/utils/ticket-config-store');
-const {
-    DEFAULT_SUPPORT_AREAS
-} = require('../src/utils/ticket-defaults');
 const levelingStore = require('../src/utils/leveling-store');
 const guildActivityStore = require('../src/utils/guild-activity-store');
 const communityStatsStore = require('../src/utils/community-stats-store');
@@ -4528,8 +4525,6 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const defaultSupportAreas = DEFAULT_SUPPORT_AREAS;
-
         const cfg = await ticketStore.getTicketConfig(guildId);
         if (!cfg) {
             return res.json({
@@ -4548,8 +4543,8 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
                 messageId: '',
                 ticketCategories: [],
                 commonProblems: [],
-                supportAreas: defaultSupportAreas,
-                minecraftServers: defaultSupportAreas,
+                supportAreas: [],
+                minecraftServers: [],
                 caseRoleMap: {},
                 customFlow: require('../src/utils/ticket-flow').createDefaultTicketFlow()
             });
@@ -4563,18 +4558,12 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
             sendDmPendingStatus: cfg.sendDmPendingStatus === true,
             ticketCategories: Array.isArray(cfg.ticketCategories) ? cfg.ticketCategories : [],
             commonProblems: Array.isArray(cfg.commonProblems) ? cfg.commonProblems : [],
-            supportAreas: (() => {
-                const fromCfg = Array.isArray(cfg.supportAreas) && cfg.supportAreas.length
-                    ? cfg.supportAreas
-                    : (Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultSupportAreas);
-                return fromCfg;
-            })(),
-            minecraftServers: (() => {
-                const fromCfg = Array.isArray(cfg.supportAreas) && cfg.supportAreas.length
-                    ? cfg.supportAreas
-                    : (Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultSupportAreas);
-                return fromCfg;
-            })(),
+            supportAreas: Array.isArray(cfg.supportAreas)
+                ? cfg.supportAreas
+                : (Array.isArray(cfg.minecraftServers) ? cfg.minecraftServers : []),
+            minecraftServers: Array.isArray(cfg.supportAreas)
+                ? cfg.supportAreas
+                : (Array.isArray(cfg.minecraftServers) ? cfg.minecraftServers : []),
             caseRoleMap: cfg.caseRoleMap && typeof cfg.caseRoleMap === 'object' ? cfg.caseRoleMap : {},
             customFlow: normalizeTicketFlow(cfg.customFlow)
         });
@@ -4592,8 +4581,6 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
 
         const body = req.body || {};
         const currentCfg = await ticketStore.getTicketConfig(guildId);
-
-        const defaultSupportAreas = DEFAULT_SUPPORT_AREAS;
 
         const toOptionValue = (text, fallback) => {
             const safe = String(text || '')
@@ -4657,8 +4644,11 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
 
         const supportAreas = normalizeTicketOptions(
             body.supportAreas ?? body.minecraftServers,
-            currentCfg?.supportAreas || currentCfg?.minecraftServers || defaultSupportAreas,
-            'area'
+            Array.isArray(currentCfg?.supportAreas)
+                ? currentCfg.supportAreas
+                : (Array.isArray(currentCfg?.minecraftServers) ? currentCfg.minecraftServers : []),
+            'area',
+            { allowEmpty: true }
         );
 
         const normalizeRoleMap = (raw) => {
@@ -4680,10 +4670,6 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
         };
 
         const caseRoleMap = normalizeRoleMap(body.caseRoleMap || currentCfg?.caseRoleMap || {});
-
-        if (!supportAreas.some((item) => item.value === 'no-aplica')) {
-            supportAreas.unshift(defaultSupportAreas[0]);
-        }
 
         const incomingMessageId = String(body.messageId || '').trim();
         const preservedMessageId = incomingMessageId || String(currentCfg?.messageId || '').trim();
