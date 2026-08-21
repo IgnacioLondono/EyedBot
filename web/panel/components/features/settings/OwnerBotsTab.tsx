@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { Field, SectionCard } from "@/components/features/shared";
+import { ColorInput, Field, SectionCard } from "@/components/features/shared";
 import { discordAvatarUrl } from "@/lib/discord-media";
 import { asArray, asRecord, formatDate, getErrorMessage, toStringValue } from "@/lib/utils";
 
@@ -552,8 +552,8 @@ export function OwnerBotsTab() {
           <Field label="Marca · logo URL">
             <Input value={newBrandLogo} onChange={(e) => setNewBrandLogo(e.target.value)} placeholder="https://..." />
           </Field>
-          <Field label="Marca · color (#hex)">
-            <Input value={newBrandColor} onChange={(e) => setNewBrandColor(e.target.value)} placeholder="f59e0b" />
+          <Field label="Marca · color">
+            <ColorInput value={newBrandColor} onChange={setNewBrandColor} placeholder="f59e0b" />
           </Field>
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
@@ -759,8 +759,8 @@ export function OwnerBotsTab() {
                 <Field label="Marca · logo URL">
                   <Input value={editBrandLogo} onChange={(e) => setEditBrandLogo(e.target.value)} />
                 </Field>
-                <Field label="Marca · color hex">
-                  <Input value={editBrandColor} onChange={(e) => setEditBrandColor(e.target.value)} placeholder="f59e0b" />
+                <Field label="Marca · color">
+                  <ColorInput value={editBrandColor} onChange={setEditBrandColor} placeholder="f59e0b" />
                 </Field>
               </div>
               <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
