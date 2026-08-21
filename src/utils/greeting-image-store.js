@@ -1,11 +1,12 @@
 const db = require('./database');
-const { scopeKey } = require('./config-scope');
+const { scopeKey, parseScopedGuildKey } = require('./config-scope');
 
 const MAX_GREETING_IMAGE_BYTES = 8 * 1024 * 1024;
+const GUILD_ID_DB_MAX = 64;
 const VALID_SLOTS = new Set(['welcome', 'goodbye', 'welcome_thumb', 'goodbye_thumb']);
 
 const SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS greeting_embed_image (
-    guild_id VARCHAR(32) NOT NULL,
+    guild_id VARCHAR(64) NOT NULL,
     slot VARCHAR(32) NOT NULL,
     mime_type VARCHAR(80) NOT NULL,
     image LONGBLOB NOT NULL,
@@ -36,9 +37,30 @@ function normalizeSlot(slot = 'welcome') {
     return VALID_SLOTS.has(s) ? s : 'welcome';
 }
 
+/** Snowflake de Discord sin prefijo de bot (para URLs del panel). */
+function rawDiscordGuildId(guildId = '') {
+    const parsed = parseScopedGuildKey(guildId);
+    const gid = String(parsed.guildId || guildId || '').trim();
+    return /^\d{17,20}$/.test(gid) ? gid : String(guildId || '').trim();
+}
+
+function storageKeyCandidates(guildId = '') {
+    const scoped = String(scopeKey(guildId) || '').trim();
+    const plain = rawDiscordGuildId(guildId);
+    return [...new Set([
+        scoped.slice(0, GUILD_ID_DB_MAX),
+        scoped.slice(0, 32), // legacy VARCHAR(32) truncate
+        plain.slice(0, GUILD_ID_DB_MAX),
+        plain.slice(0, 32)
+    ].filter(Boolean))];
+}
+
+/**
+ * Ruta pública del panel. Siempre usa el snowflake crudo para que
+ * Express + sesión + <img src> funcionen (sin botId: en el path).
+ */
 function buildApiPath(guildId, slot = 'welcome') {
-    guildId = scopeKey(guildId);
-    const gid = String(guildId || '').trim();
+    const gid = rawDiscordGuildId(guildId);
     const s = normalizeSlot(slot);
     return `/api/guild/${gid}/greeting-image/${s}`;
 }
@@ -47,14 +69,25 @@ function parseGreetingImageApiUrl(rawUrl = '') {
     const raw = String(rawUrl || '').trim();
     if (!raw) return null;
 
-    const apiMatch = raw.match(/\/api\/guild\/(\d{17,20})\/greeting-image\/(welcome|goodbye|welcome_thumb|goodbye_thumb)/i);
+    const scoped = raw.match(
+        /\/api\/guild\/([a-f0-9]{8,32}):(\d{17,20})\/greeting-image\/(welcome|goodbye|welcome_thumb|goodbye_thumb)/i
+    );
+    if (scoped) {
+        return { guildId: scoped[2], slot: normalizeSlot(scoped[3]), botId: scoped[1] };
+    }
+
+    const apiMatch = raw.match(
+        /\/api\/guild\/(\d{17,20})\/greeting-image\/(welcome|goodbye|welcome_thumb|goodbye_thumb)/i
+    );
     if (apiMatch) {
         return { guildId: apiMatch[1], slot: normalizeSlot(apiMatch[2]) };
     }
 
-    const dbMatch = raw.match(/^greeting-db:(\d{17,20}):(welcome|goodbye|welcome_thumb|goodbye_thumb)$/i);
+    const dbMatch = raw.match(
+        /^greeting-db:(?:([a-f0-9]{8,32}):)?(\d{17,20}):(welcome|goodbye|welcome_thumb|goodbye_thumb)$/i
+    );
     if (dbMatch) {
-        return { guildId: dbMatch[1], slot: normalizeSlot(dbMatch[2]) };
+        return { guildId: dbMatch[2], slot: normalizeSlot(dbMatch[3]), botId: dbMatch[1] || undefined };
     }
 
     return null;
@@ -64,6 +97,11 @@ async function ensureSchema() {
     if (schemaReady) return true;
     try {
         await db.query(SCHEMA_SQL);
+        try {
+            await db.query('ALTER TABLE greeting_embed_image MODIFY guild_id VARCHAR(64) NOT NULL');
+        } catch {
+            // columna ya ampliada o sin permisos ALTER
+        }
         schemaReady = true;
         return true;
     } catch (error) {
@@ -88,8 +126,7 @@ function bufferFromDbImageField(raw) {
 }
 
 async function setImage(guildId, slot, buffer, mimeType = 'image/jpeg') {
-    guildId = scopeKey(guildId);
-    const gid = String(guildId || '').trim().slice(0, 32);
+    const gid = String(scopeKey(guildId) || '').trim().slice(0, GUILD_ID_DB_MAX);
     const s = normalizeSlot(slot);
     if (!gid || !Buffer.isBuffer(buffer) || buffer.length === 0) return false;
     if (buffer.length > MAX_GREETING_IMAGE_BYTES) return false;
@@ -111,21 +148,23 @@ async function setImage(guildId, slot, buffer, mimeType = 'image/jpeg') {
 }
 
 async function getImage(guildId, slot) {
-    guildId = scopeKey(guildId);
-    const gid = String(guildId || '').trim().slice(0, 32);
     const s = normalizeSlot(slot);
-    if (!gid) return null;
+    const candidates = storageKeyCandidates(guildId);
+    if (!candidates.length) return null;
 
     await ensureSchema();
     try {
-        const rows = await db.query(
-            'SELECT mime_type AS mime, image AS data FROM greeting_embed_image WHERE guild_id = ? AND slot = ? LIMIT 1',
-            [gid, s]
-        );
-        const row = rows?.[0];
-        const data = bufferFromDbImageField(row?.data);
-        if (!data?.length) return null;
-        return { mime: sanitizeMime(row?.mime), data, ext: extFromMime(sanitizeMime(row?.mime)) };
+        for (const gid of candidates) {
+            const rows = await db.query(
+                'SELECT mime_type AS mime, image AS data FROM greeting_embed_image WHERE guild_id = ? AND slot = ? LIMIT 1',
+                [gid, s]
+            );
+            const row = rows?.[0];
+            const data = bufferFromDbImageField(row?.data);
+            if (!data?.length) continue;
+            return { mime: sanitizeMime(row?.mime), data, ext: extFromMime(sanitizeMime(row?.mime)) };
+        }
+        return null;
     } catch (error) {
         console.warn(`⚠️ No se pudo leer imagen greeting (${s}) desde MySQL:`, error.message);
         return null;
@@ -133,21 +172,23 @@ async function getImage(guildId, slot) {
 }
 
 async function deleteImage(guildId, slot) {
-    guildId = scopeKey(guildId);
-    const gid = String(guildId || '').trim().slice(0, 32);
     const s = normalizeSlot(slot);
-    if (!gid) return false;
+    const candidates = storageKeyCandidates(guildId);
+    if (!candidates.length) return false;
     await ensureSchema();
+    let removed = false;
     try {
-        await db.query('DELETE FROM greeting_embed_image WHERE guild_id = ? AND slot = ?', [gid, s]);
-        return true;
+        for (const gid of candidates) {
+            await db.query('DELETE FROM greeting_embed_image WHERE guild_id = ? AND slot = ?', [gid, s]);
+            removed = true;
+        }
+        return removed;
     } catch {
         return false;
     }
 }
 
 async function hasImage(guildId, slot) {
-    guildId = scopeKey(guildId);
     const img = await getImage(guildId, slot);
     return !!(img?.data?.length);
 }
@@ -158,6 +199,7 @@ module.exports = {
     buildApiPath,
     parseGreetingImageApiUrl,
     normalizeSlot,
+    rawDiscordGuildId,
     setImage,
     getImage,
     deleteImage,

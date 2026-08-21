@@ -1245,7 +1245,7 @@ function deleteUploadDiskFile(publicPath = '') {
 
 function deleteWelcomeDiskImagesForSlot(guildId, slot) {
     const uploadsDir = ensureWelcomeUploadsDir();
-    const safeGuildId = String(guildId || '').trim();
+    const safeGuildId = greetingImageStore.rawDiscordGuildId(guildId) || String(guildId || '').trim();
     const safeSlot = greetingImageStore.normalizeSlot(slot);
     const prefix = `${safeGuildId}_${safeSlot}_`;
     let removed = 0;
@@ -7157,11 +7157,36 @@ app.post('/api/guild/:guildId/verify-image', requireAuth, upload.single('imageFi
 
 app.get('/api/guild/:guildId/greeting-image/:slot', requireAuth, async (req, res) => {
     try {
-        const { guildId, slot } = req.params;
+        const rawGuildParam = String(req.params.guildId || '').trim();
+        const guildId = greetingImageStore.rawDiscordGuildId(rawGuildParam) || rawGuildParam;
+        const slot = greetingImageStore.normalizeSlot(req.params.slot);
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const image = await greetingImageStore.getImage(guildId, slot);
+        let image = await greetingImageStore.getImage(guildId, slot);
+        if (!image?.data?.length) {
+            // Fallback: archivo en disco subido junto al API path
+            const uploadsDir = ensureWelcomeUploadsDir();
+            const prefix = `${guildId}_${slot}_`;
+            try {
+                const match = fs.readdirSync(uploadsDir)
+                    .filter((name) => name.startsWith(prefix))
+                    .sort()
+                    .reverse()[0];
+                if (match) {
+                    const abs = path.join(uploadsDir, match);
+                    const data = fs.readFileSync(abs);
+                    const ext = path.extname(match).toLowerCase();
+                    const mime = ext === '.png' ? 'image/png'
+                        : ext === '.webp' ? 'image/webp'
+                        : ext === '.gif' ? 'image/gif'
+                        : 'image/jpeg';
+                    image = { data, mime };
+                }
+            } catch {
+                // noop
+            }
+        }
         if (!image?.data?.length) {
             return res.status(404).json({ error: 'Imagen no encontrada' });
         }
@@ -7199,8 +7224,11 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
         fs.writeFileSync(outputPath, file.buffer);
 
         const apiPath = greetingImageStore.buildApiPath(guildId, slot);
-        const panelUrl = `${req.protocol}://${req.get('host')}${apiPath}?t=${Date.now()}`;
-        const publicUrl = buildPublicUploadUrl(req, apiPath);
+        const diskPublicPath = `/uploads/welcome/${fileName}`;
+        // Si MySQL falla, el panel/Discord pueden usar el archivo en disco vía /uploads.
+        const mediaPath = storedDb ? apiPath : diskPublicPath;
+        const panelUrl = `${req.protocol}://${req.get('host')}${mediaPath}?t=${Date.now()}`;
+        const publicUrl = buildPublicUploadUrl(req, mediaPath);
 
         const isGoodbye = slot === 'goodbye' || slot === 'goodbye_thumb';
         const getCfg = isGoodbye ? welcomeStore.getGoodbyeConfig : welcomeStore.getWelcomeConfig;
@@ -7212,28 +7240,31 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
             updatedBy: req.session.user?.id || 'unknown'
         };
         if (slot.endsWith('_thumb')) {
-            nextCfg.thumbnailUrl = apiPath;
+            nextCfg.thumbnailUrl = mediaPath;
             nextCfg.thumbnailMode = 'url';
         } else {
-            nextCfg.imageUrl = apiPath;
+            nextCfg.imageUrl = mediaPath;
         }
         await setCfg(guildId, nextCfg);
         welcomeStore.invalidateConfigCache(guildId);
 
         if (!storedDb) {
-            return res.status(500).json({
-                error: 'La imagen se guardó en disco pero no en MySQL. Revisa DB_HOST, DB_USER y DB_PASSWORD.',
-                path: apiPath,
+            return res.status(200).json({
+                success: true,
+                warning: 'La imagen quedó en disco (/uploads) porque MySQL no la guardó. Revisa la DB cuando puedas.',
+                path: mediaPath,
                 url: panelUrl,
+                publicUrl,
                 storedInDb: false,
-                storedOnDisk: true
+                storedOnDisk: true,
+                config: nextCfg
             });
         }
 
         res.json({
             success: true,
             url: panelUrl,
-            path: apiPath,
+            path: mediaPath,
             publicUrl,
             storedInDb: true,
             storedOnDisk: true,

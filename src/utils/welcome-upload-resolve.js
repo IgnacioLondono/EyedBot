@@ -139,9 +139,12 @@ async function resolveWelcomeMediaForDiscord(rawUrl = '', options = {}) {
     if (!raw) return null;
 
     const parsed = greetingImageStore.parseGreetingImageApiUrl(raw);
-    if (guild && parsed && parsed.guildId === guild.id) {
-        const imageSlot = slotForMediaKind(slot, parsed.slot, raw);
-        const blob = await greetingImageStore.getImage(guild.id, imageSlot);
+    const lookupGuildId = (guild && parsed && parsed.guildId === guild.id)
+        ? guild.id
+        : (parsed?.guildId || guild?.id || '');
+    if (lookupGuildId) {
+        const imageSlot = slotForMediaKind(slot, parsed?.slot, raw);
+        const blob = await greetingImageStore.getImage(lookupGuildId, imageSlot);
         if (blob?.data?.length) {
             const attachmentName = slot === 'thumbnail'
                 ? `thumb_greeting.${blob.ext}`
@@ -163,8 +166,17 @@ async function resolveWelcomeMediaForDiscord(rawUrl = '', options = {}) {
         return { mode: 'url', url: `${origin}${uploadPath}` };
     }
 
-    if (/^https?:\/\//i.test(raw)) {
-        return { mode: 'url', url: raw };
+    // Rutas /api/... no son alcanzables por Discord (requieren sesión).
+    // Si llegamos acá sin buffer, no devolver la URL relativa/API.
+    if (/^https?:\/\//i.test(raw) && !/\/api\/guild\/[^/]+\/greeting-image\//i.test(raw)) {
+        try {
+            const host = new URL(raw).hostname;
+            if (!isLocalNetworkHostname(host)) {
+                return { mode: 'url', url: raw };
+            }
+        } catch {
+            return { mode: 'url', url: raw };
+        }
     }
 
     return null;
