@@ -53,7 +53,13 @@ const TICKET_TABS = [
 ];
 const TICKET_TAB_IDS = TICKET_TABS.map((item) => item.id);
 
-type TicketOption = { value: string; label: string; description: string };
+type TicketOption = {
+  value: string;
+  label: string;
+  description: string;
+  /** Casos dentro de esta categoría de título. */
+  problems?: TicketOption[];
+};
 
 type TicketConfigState = {
   enabled: boolean;
@@ -107,6 +113,18 @@ function normalizeOptions(value: unknown): TicketOption[] {
   });
 }
 
+function normalizeTitleCategories(value: unknown): TicketOption[] {
+  return asArray(value).map((entry, index) => {
+    const item = asRecord(entry);
+    return {
+      value: toStringValue(item.value, `cat-${index + 1}`),
+      label: toStringValue(item.label || item.name, `Categoría ${index + 1}`),
+      description: toStringValue(item.description),
+      problems: normalizeOptions(item.problems ?? item.items),
+    };
+  });
+}
+
 function slugFromTitle(title: string, fallback: string) {
   const slug = title
     .normalize("NFD")
@@ -124,6 +142,7 @@ function OptionEditor({
   onChange,
   primaryLabel = "Etiqueta",
   autoValueFromTitle = false,
+  compact = false,
 }: {
   title: string;
   options: TicketOption[];
@@ -131,11 +150,12 @@ function OptionEditor({
   primaryLabel?: string;
   /** Si el valor está vacío, se genera desde el título al escribir. */
   autoValueFromTitle?: boolean;
+  compact?: boolean;
 }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-white">{title}</h4>
+        <h4 className={`font-medium text-white ${compact ? "text-xs text-zinc-300" : "text-sm"}`}>{title}</h4>
         <Button
           size="sm"
           variant="secondary"
@@ -147,7 +167,10 @@ function OptionEditor({
         </Button>
       </div>
       {options.map((option, index) => (
-        <div key={`${title}-${index}`} className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-3">
+        <div
+          key={`${title}-${index}`}
+          className={`space-y-3 rounded-2xl border border-white/8 p-4 ${compact ? "bg-black/30" : "bg-black/20"}`}
+        >
           <div className="grid gap-3 md:grid-cols-2">
             <Field label={primaryLabel}>
               <Input
@@ -200,6 +223,102 @@ function OptionEditor({
           </Button>
         </div>
       ))}
+      {!options.length ? (
+        <p className="text-xs text-zinc-500">Sin ítems. Pulsa Añadir para crear el primero.</p>
+      ) : null}
+    </div>
+  );
+}
+
+function TitleCategoryEditor({
+  categories,
+  onChange,
+}: {
+  categories: TicketOption[];
+  onChange: (next: TicketOption[]) => void;
+}) {
+  function updateCategory(index: number, patch: Partial<TicketOption>) {
+    const next = [...categories];
+    next[index] = { ...next[index], ...patch };
+    onChange(next);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-white">Categorías de título</h4>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            onChange([
+              ...categories,
+              { value: "", label: "", description: "", problems: [] },
+            ])
+          }
+        >
+          Añadir categoría
+        </Button>
+      </div>
+      {categories.map((category, index) => (
+        <div
+          key={`title-cat-${index}`}
+          className="space-y-4 rounded-2xl border border-violet-500/25 bg-violet-500/5 p-4"
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Título">
+              <Input
+                value={category.label}
+                onChange={(event) => {
+                  const label = event.target.value;
+                  const shouldSyncValue =
+                    !category.value || category.value === slugFromTitle(category.label, "");
+                  updateCategory(index, {
+                    label,
+                    ...(shouldSyncValue
+                      ? { value: slugFromTitle(label, `cat-${index + 1}`) }
+                      : {}),
+                  });
+                }}
+              />
+            </Field>
+            <Field label="Valor">
+              <Input
+                value={category.value}
+                onChange={(event) => updateCategory(index, { value: event.target.value })}
+              />
+            </Field>
+          </div>
+          <Field label="Descripción">
+            <Input
+              value={category.description}
+              onChange={(event) => updateCategory(index, { description: event.target.value })}
+            />
+          </Field>
+          <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+            <OptionEditor
+              title={`Casos dentro de «${category.label || "sin título"}»`}
+              primaryLabel="Título del caso"
+              autoValueFromTitle
+              compact
+              options={category.problems || []}
+              onChange={(problems) => updateCategory(index, { problems })}
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => onChange(categories.filter((_, i) => i !== index))}
+          >
+            Eliminar categoría
+          </Button>
+        </div>
+      ))}
+      {!categories.length ? (
+        <p className="text-sm text-zinc-500">
+          Aún no hay categorías de título. Añade una y crea los casos dentro.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -256,7 +375,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           color: toStringValue(cfg.color, "7c4dff").replace("#", ""),
           footer: toStringValue(cfg.footer, "Sistema de Tickets"),
           adminRoleIds: normalizeRoleIds(cfg.adminRoleIds),
-          ticketCategories: normalizeOptions(cfg.ticketCategories),
+          ticketCategories: normalizeTitleCategories(cfg.ticketCategories),
           commonProblems: normalizeOptions(cfg.commonProblems),
           supportAreas: normalizeOptions(cfg.supportAreas ?? cfg.minecraftServers),
           caseRoleMap: normalizeCaseRoleMap(cfg.caseRoleMap),
@@ -287,10 +406,28 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   }
 
   const caseEntries = [
-    ...config.ticketCategories.map((item) => ({ key: item.value || item.label, label: item.label || item.value })),
-    ...config.commonProblems.map((item) => ({ key: item.value || item.label, label: item.label || item.value })),
+    ...config.ticketCategories.map((item) => ({
+      key: item.value || item.label,
+      label: `Título · ${item.label || item.value}`,
+    })),
+    ...config.ticketCategories.flatMap((cat) =>
+      (cat.problems || []).map((item) => ({
+        key: item.value || item.label,
+        label: `${cat.label || cat.value} → ${item.label || item.value}`,
+      }))
+    ),
+    ...config.commonProblems.map((item) => ({
+      key: item.value || item.label,
+      label: `Global · ${item.label || item.value}`,
+    })),
     ...Object.keys(config.caseRoleMap)
       .filter((key) => !config.ticketCategories.some((item) => (item.value || item.label) === key))
+      .filter(
+        (key) =>
+          !config.ticketCategories.some((cat) =>
+            (cat.problems || []).some((item) => (item.value || item.label) === key)
+          )
+      )
       .filter((key) => !config.commonProblems.some((item) => (item.value || item.label) === key))
       .map((key) => ({ key, label: key })),
   ].filter((entry) => entry.key);
@@ -428,11 +565,15 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             <div className="space-y-5">
               <Alert
                 title="Plantillas (vista owner)"
-                description="Elige un tema listo: título del panel, mensaje, color, categorías de título, problemas comunes y labs. Los canales y roles no se modifican. No incluyen Áreas Eyed.bio."
+                description="Elige un tema listo: título del panel, mensaje, color y categorías de título con casos dentro. Los canales y roles no se modifican."
               />
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {TICKET_PRESETS.map((preset) => {
                   const active = selectedTemplateId === preset.id;
+                  const nestedCases = preset.ticketCategories.reduce(
+                    (sum, cat) => sum + (cat.problems?.length || 0),
+                    0
+                  );
                   return (
                     <button
                       key={preset.id}
@@ -442,7 +583,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                         setConfig((current) => applyTicketPreset(preset, current));
                         toast({
                           title: "Plantilla aplicada",
-                          description: `"${preset.name}" rellenó el panel y las categorías de título. Guarda y publica cuando estés listo.`,
+                          description: `"${preset.name}" rellenó categorías de título y los casos de dentro. Guarda y publica cuando estés listo.`,
                           tone: "success",
                         });
                       }}
@@ -460,7 +601,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                       </div>
                       <p className="text-sm text-zinc-400">{preset.description}</p>
                       <p className="mt-3 text-xs text-zinc-500">
-                        {preset.ticketCategories.length} categorías de título · {preset.commonProblems.length} casos
+                        {preset.ticketCategories.length} títulos · {nestedCases} casos dentro
                       </p>
                     </button>
                   );
@@ -521,17 +662,14 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             <div className="space-y-8">
               <Alert
                 title="Categorías de título"
-                description="Son los títulos del menú principal en Discord. Escribe el título (el valor se genera solo si está vacío). Añade problemas comunes aparte. Vacío = ese menú no se muestra."
+                description="Crea cada categoría de título y, dentro, los casos que verá el usuario en Discord al elegirla. Si una categoría no tiene casos, se usan los globales de abajo (opcional)."
               />
-              <OptionEditor
-                title="Categorías de título"
-                primaryLabel="Título"
-                autoValueFromTitle
-                options={config.ticketCategories}
+              <TitleCategoryEditor
+                categories={config.ticketCategories}
                 onChange={(ticketCategories) => setConfig((c) => ({ ...c, ticketCategories }))}
               />
               <OptionEditor
-                title="Problemas comunes"
+                title="Casos globales (fallback)"
                 primaryLabel="Título"
                 autoValueFromTitle
                 options={config.commonProblems}
@@ -623,7 +761,12 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           Categorías de título activas
         </div>
         {config.ticketCategories.length
-          ? config.ticketCategories.map((cat) => cat.label || cat.value).join(" · ")
+          ? config.ticketCategories
+              .map((cat) => {
+                const n = cat.problems?.length || 0;
+                return `${cat.label || cat.value}${n ? ` (${n})` : ""}`;
+              })
+              .join(" · ")
           : "Sin categorías de título cargadas."}
         <div className="mt-3 flex items-center gap-2">
           <FlaskConical className="h-4 w-4" />

@@ -2,6 +2,8 @@ export type TicketOptionPreset = {
   value: string;
   label: string;
   description: string;
+  /** Casos / problemas dentro de esta categoría de título. */
+  problems?: TicketOptionPreset[];
 };
 
 export type TicketPreset = {
@@ -13,19 +15,31 @@ export type TicketPreset = {
   message: string;
   buttonLabel: string;
   footer: string;
-  /** Categorías de título (menú principal del ticket). */
+  /** Categorías de título con casos anidados. */
   ticketCategories: TicketOptionPreset[];
+  /** Fallback global si alguna categoría no trae casos propios. */
   commonProblems: TicketOptionPreset[];
   sendDmReceipt?: boolean;
   sendDmPendingStatus?: boolean;
 };
 
-/** Plantillas listas para el owner: categorías de título + problemas, sin Áreas Eyed.bio. */
+function cloneOption(item: TicketOptionPreset): TicketOptionPreset {
+  return {
+    value: item.value,
+    label: item.label,
+    description: item.description,
+    ...(item.problems?.length
+      ? { problems: item.problems.map((p) => ({ ...p })) }
+      : {}),
+  };
+}
+
+/** Plantillas owner: categoría de título → casos dentro. */
 export const TICKET_PRESETS: TicketPreset[] = [
   {
     id: "owner-comunidad",
     name: "Comunidad (owner)",
-    description: "Plantilla base del owner: categorías de título claras para soporte, reportes y sugerencias.",
+    description: "Categorías de título con casos listos dentro de cada una.",
     color: "7c4dff",
     title: "Centro de Soporte",
     message:
@@ -37,26 +51,65 @@ export const TICKET_PRESETS: TicketPreset[] = [
     buttonLabel: "Abrir ticket",
     footer: "Sistema de Tickets",
     ticketCategories: [
-      { value: "soporte", label: "Soporte general", description: "Dudas sobre el servidor y la comunidad" },
-      { value: "tecnico", label: "Problema técnico", description: "Errores, bugs o fallos del bot" },
-      { value: "reportes", label: "Reportes", description: "Denuncias, spam o apelaciones" },
-      { value: "sugerencias", label: "Sugerencias", description: "Ideas para mejorar la comunidad" },
-      { value: "colaboraciones", label: "Colaboraciones", description: "Alianzas, creadores o marcas" },
+      {
+        value: "soporte",
+        label: "Soporte general",
+        description: "Dudas sobre el servidor y la comunidad",
+        problems: [
+          { value: "permisos", label: "Permisos o acceso", description: "Canales, roles o verificación" },
+          { value: "dudas", label: "Duda general", description: "Pregunta sobre normas o canales" },
+          { value: "otro-soporte", label: "Otro", description: "Describe tu caso con detalle" },
+        ],
+      },
+      {
+        value: "tecnico",
+        label: "Problema técnico",
+        description: "Errores, bugs o fallos del bot",
+        problems: [
+          { value: "errores-bot", label: "Error del bot", description: "Comandos o panel no responden" },
+          { value: "lag", label: "Lentitud / fallos", description: "El servidor o el bot va mal" },
+          { value: "otro-tecnico", label: "Otro técnico", description: "Adjunta capturas si puedes" },
+        ],
+      },
+      {
+        value: "reportes",
+        label: "Reportes",
+        description: "Denuncias, spam o apelaciones",
+        problems: [
+          { value: "usuario", label: "Reportar usuario", description: "Incumplimiento de normas" },
+          { value: "spam", label: "Spam o scam", description: "Mensajes o enlaces sospechosos" },
+          { value: "sanciones", label: "Apelación", description: "Mute, kick o ban" },
+        ],
+      },
+      {
+        value: "sugerencias",
+        label: "Sugerencias",
+        description: "Ideas para mejorar la comunidad",
+        problems: [
+          { value: "idea-canal", label: "Nuevo canal / rol", description: "Propuesta de estructura" },
+          { value: "idea-evento", label: "Evento o actividad", description: "Idea de comunidad" },
+          { value: "otra-idea", label: "Otra idea", description: "Cuéntanos con detalle" },
+        ],
+      },
+      {
+        value: "colaboraciones",
+        label: "Colaboraciones",
+        description: "Alianzas, creadores o marcas",
+        problems: [
+          { value: "partnership", label: "Alianza / partnership", description: "Propuesta formal" },
+          { value: "creador", label: "Creador de contenido", description: "Colaboración con creators" },
+          { value: "otra-colab", label: "Otra colaboración", description: "Describe la propuesta" },
+        ],
+      },
     ],
-    commonProblems: [
-      { value: "permisos", label: "Permisos o acceso", description: "Canales, roles o verificación" },
-      { value: "verificacion", label: "Verificación", description: "Rol de miembro verificado" },
-      { value: "errores-bot", label: "Error del bot", description: "Comandos o panel no responden" },
-      { value: "sanciones", label: "Sanción o apelación", description: "Mute, kick o ban" },
-      { value: "otro", label: "Otro motivo", description: "Describe tu caso con detalle" },
-    ],
+    commonProblems: [],
     sendDmReceipt: true,
     sendDmPendingStatus: true,
   },
   {
     id: "support-general",
     name: "Soporte general",
-    description: "Panel clásico ampliado para consultas, permisos y orientación.",
+    description: "Consultas, permisos y orientación con casos por categoría.",
     color: "5865f2",
     title: "Centro de Soporte",
     message:
@@ -66,56 +119,133 @@ export const TICKET_PRESETS: TicketPreset[] = [
     buttonLabel: "Abrir ticket",
     footer: "EyedBot · Soporte",
     ticketCategories: [
-      { value: "consulta", label: "Consulta general", description: "Dudas sobre el servidor o normas" },
-      { value: "tecnico", label: "Problema técnico", description: "Errores, bugs o fallos de Discord/bot" },
-      { value: "verificacion", label: "Verificación", description: "Acceso, rol verificado o onboarding" },
-      { value: "roles", label: "Roles y permisos", description: "Canales bloqueados o roles incorrectos" },
-      { value: "sugerencia", label: "Sugerencia", description: "Ideas para mejorar la comunidad" },
+      {
+        value: "consulta",
+        label: "Consulta general",
+        description: "Dudas sobre el servidor o normas",
+        problems: [
+          { value: "normas", label: "Normas", description: "Cómo funciona el servidor" },
+          { value: "canales", label: "Canales", description: "Dónde publicar o preguntar" },
+          { value: "otro-consulta", label: "Otra consulta", description: "Describe tu duda" },
+        ],
+      },
+      {
+        value: "tecnico",
+        label: "Problema técnico",
+        description: "Errores, bugs o fallos de Discord/bot",
+        problems: [
+          { value: "bot-caido", label: "El bot no responde", description: "Comandos sin respuesta" },
+          { value: "error-discord", label: "Error de Discord", description: "Fallos de la app o cliente" },
+          { value: "otro-tecnico", label: "Otro", description: "Adjunta capturas" },
+        ],
+      },
+      {
+        value: "verificacion",
+        label: "Verificación",
+        description: "Acceso, rol verificado o onboarding",
+        problems: [
+          { value: "sin-rol", label: "No recibí el rol", description: "Verificación pendiente" },
+          { value: "acceso", label: "No puedo acceder", description: "Canales bloqueados" },
+          { value: "otro-verif", label: "Otro", description: "Explica qué falta" },
+        ],
+      },
+      {
+        value: "roles",
+        label: "Roles y permisos",
+        description: "Canales bloqueados o roles incorrectos",
+        problems: [
+          { value: "rol-mal", label: "Rol incorrecto", description: "Tengo un rol que no debería" },
+          { value: "sin-permiso", label: "Sin permiso", description: "No puedo hablar o ver un canal" },
+          { value: "otro-roles", label: "Otro", description: "Describe el problema" },
+        ],
+      },
+      {
+        value: "sugerencia",
+        label: "Sugerencia",
+        description: "Ideas para mejorar la comunidad",
+        problems: [
+          { value: "mejora", label: "Mejora general", description: "Idea para el servidor" },
+          { value: "evento", label: "Evento", description: "Propuesta de actividad" },
+          { value: "otra-sug", label: "Otra", description: "Cuéntanos tu idea" },
+        ],
+      },
     ],
-    commonProblems: [
-      { value: "acceso", label: "No puedo acceder", description: "Canales o secciones bloqueadas" },
-      { value: "verificacion", label: "Verificación pendiente", description: "No recibí el rol esperado" },
-      { value: "cuenta", label: "Problema de cuenta", description: "Nick, perfil o configuración" },
-      { value: "bot-caido", label: "El bot no responde", description: "Comandos sin respuesta" },
-      { value: "otro", label: "Otro motivo", description: "Describe tu caso con detalle" },
-    ],
+    commonProblems: [],
     sendDmReceipt: true,
     sendDmPendingStatus: true,
   },
   {
     id: "eyedbot",
     name: "EyedBot / Panel",
-    description: "Soporte del bot, panel web, módulos y EyedPlus+.",
+    description: "Soporte del bot y panel con casos por módulo.",
     color: "9b59b6",
     title: "Soporte EyedBot",
     message:
       "¿Necesitas ayuda con **EyedBot** o el **panel web**?\n\n" +
-      "Indica el **servidor**, el **módulo** (tickets, welcome, música, etc.) y qué esperabas que ocurriera.\n" +
+      "Indica el **servidor**, el **módulo** y qué esperabas que ocurriera.\n" +
       "Si es sobre **EyedPlus+**, adjunta comprobante de pago si aplica.",
     buttonLabel: "Soporte EyedBot",
     footer: "EyedBot · Panel",
     ticketCategories: [
-      { value: "comandos", label: "Comandos", description: "Slash, prefijo o permisos" },
-      { value: "panel-web", label: "Panel web", description: "Login, configuración o publicación" },
-      { value: "musica", label: "Música", description: "Reproducción, cola o Lavalink" },
-      { value: "modulos", label: "Módulos", description: "Tickets, niveles, gacha, welcome, etc." },
-      { value: "eyedplus", label: "EyedPlus+", description: "Suscripción y funciones premium" },
+      {
+        value: "comandos",
+        label: "Comandos",
+        description: "Slash, prefijo o permisos",
+        problems: [
+          { value: "no-responde", label: "No responde", description: "Sin respuesta a comandos" },
+          { value: "sin-permisos", label: "Sin permisos", description: "El bot no puede actuar" },
+          { value: "otro-cmd", label: "Otro", description: "Describe el comando" },
+        ],
+      },
+      {
+        value: "panel-web",
+        label: "Panel web",
+        description: "Login, configuración o publicación",
+        problems: [
+          { value: "panel-login", label: "No puedo entrar", description: "OAuth o sesión" },
+          { value: "config-no-guarda", label: "No guarda", description: "Cambios que no persisten" },
+          { value: "otro-panel", label: "Otro", description: "Describe el fallo" },
+        ],
+      },
+      {
+        value: "musica",
+        label: "Música",
+        description: "Reproducción, cola o Lavalink",
+        problems: [
+          { value: "no-suena", label: "No suena", description: "Sin audio en el canal" },
+          { value: "cola", label: "Cola / skip", description: "Problemas con la cola" },
+          { value: "otro-musica", label: "Otro", description: "Describe el fallo" },
+        ],
+      },
+      {
+        value: "modulos",
+        label: "Módulos",
+        description: "Tickets, niveles, gacha, welcome, etc.",
+        problems: [
+          { value: "tickets", label: "Tickets", description: "Panel o flujo de tickets" },
+          { value: "niveles", label: "Niveles / XP", description: "Sistema de leveling" },
+          { value: "otro-mod", label: "Otro módulo", description: "Indica cuál" },
+        ],
+      },
+      {
+        value: "eyedplus",
+        label: "EyedPlus+",
+        description: "Suscripción y funciones premium",
+        problems: [
+          { value: "premium", label: "No activo", description: "Pagaste pero sin acceso Pro" },
+          { value: "cobro", label: "Cobro / factura", description: "Problema de pago" },
+          { value: "otro-plus", label: "Otro", description: "Describe el caso" },
+        ],
+      },
     ],
-    commonProblems: [
-      { value: "no-responde", label: "El bot no responde", description: "Sin respuesta a comandos" },
-      { value: "sin-permisos", label: "Sin permisos", description: "El bot no puede actuar en un canal" },
-      { value: "panel-login", label: "No puedo entrar al panel", description: "OAuth o sesión del dashboard" },
-      { value: "config-no-guarda", label: "La config no se guarda", description: "Cambios que no persisten" },
-      { value: "premium", label: "EyedPlus+ no activo", description: "Pagaste pero sin acceso Pro" },
-      { value: "otro", label: "Otro", description: "Describe el problema" },
-    ],
+    commonProblems: [],
     sendDmReceipt: true,
     sendDmPendingStatus: true,
   },
   {
     id: "shop",
     name: "Tienda / Pagos",
-    description: "Compras, entregas, reembolsos y facturación.",
+    description: "Compras y suscripciones con casos por categoría.",
     color: "f5a623",
     title: "Soporte de Pagos",
     message:
@@ -125,26 +255,54 @@ export const TICKET_PRESETS: TicketPreset[] = [
     buttonLabel: "Soporte de pagos",
     footer: "EyedBot · Pagos",
     ticketCategories: [
-      { value: "compra", label: "Compra / pago", description: "Error al pagar o confirmar" },
-      { value: "entrega", label: "Entrega pendiente", description: "Producto o rol no recibido" },
-      { value: "reembolso", label: "Reembolso", description: "Devolución o cancelación" },
-      { value: "facturacion", label: "Facturación", description: "Cargo duplicado o monto incorrecto" },
-      { value: "suscripcion", label: "Suscripción", description: "Renovación, baja o cambio de plan" },
+      {
+        value: "compra",
+        label: "Compra / pago",
+        description: "Error al pagar o confirmar",
+        problems: [
+          { value: "pago-fallido", label: "Pago fallido", description: "No se confirmó el cobro" },
+          { value: "cargo-duplicado", label: "Cargo duplicado", description: "Cobro repetido" },
+          { value: "otro-compra", label: "Otro", description: "Adjunta comprobante" },
+        ],
+      },
+      {
+        value: "entrega",
+        label: "Entrega pendiente",
+        description: "Producto o rol no recibido",
+        problems: [
+          { value: "no-llego", label: "No recibí el producto", description: "Entrega retrasada" },
+          { value: "producto-incorrecto", label: "Producto incorrecto", description: "Recibiste otra cosa" },
+          { value: "otro-entrega", label: "Otro", description: "Describe qué falta" },
+        ],
+      },
+      {
+        value: "reembolso",
+        label: "Reembolso",
+        description: "Devolución o cancelación",
+        problems: [
+          { value: "pedir-reembolso", label: "Pedir reembolso", description: "Solicitud de devolución" },
+          { value: "estado-reembolso", label: "Estado del reembolso", description: "Ya lo pedí y no llega" },
+        ],
+      },
+      {
+        value: "suscripcion",
+        label: "Suscripción",
+        description: "Renovación, baja o cambio de plan",
+        problems: [
+          { value: "cancelar", label: "Cancelar suscripción", description: "Baja de plan" },
+          { value: "renovar", label: "Renovación", description: "Problema al renovar" },
+          { value: "otro-sub", label: "Otro", description: "Describe el caso" },
+        ],
+      },
     ],
-    commonProblems: [
-      { value: "no-llego", label: "No recibí mi producto", description: "Entrega retrasada o fallida" },
-      { value: "cargo-duplicado", label: "Cargo duplicado", description: "Cobro repetido en el mismo periodo" },
-      { value: "producto-incorrecto", label: "Producto incorrecto", description: "Recibiste otra cosa" },
-      { value: "cancelar", label: "Cancelar suscripción", description: "Baja de plan recurrente" },
-      { value: "otro", label: "Otro", description: "Consulta general de pagos" },
-    ],
+    commonProblems: [],
     sendDmReceipt: true,
     sendDmPendingStatus: false,
   },
   {
     id: "staff-apply",
     name: "Postulación staff",
-    description: "Formulario de solicitud para unirse al equipo.",
+    description: "Áreas de staff con tipo de postulación dentro.",
     color: "2ecc71",
     title: "Postulación al Staff",
     message:
@@ -154,18 +312,53 @@ export const TICKET_PRESETS: TicketPreset[] = [
     buttonLabel: "Postularme",
     footer: "EyedBot · Staff",
     ticketCategories: [
-      { value: "moderacion", label: "Moderación", description: "Chat, reglas y convivencia" },
-      { value: "soporte", label: "Soporte", description: "Atención a usuarios y tickets" },
-      { value: "eventos", label: "Eventos", description: "Organización de actividades" },
-      { value: "staff-contenido", label: "Contenido", description: "Redes, anuncios o creatividad" },
-      { value: "staff-tecnico", label: "Técnico / bot", description: "Ayuda con EyedBot o integraciones" },
+      {
+        value: "moderacion",
+        label: "Moderación",
+        description: "Chat, reglas y convivencia",
+        problems: [
+          { value: "primera-vez", label: "Primera vez", description: "Nunca fui staff" },
+          { value: "experiencia", label: "Con experiencia", description: "Ya moderé otros servers" },
+        ],
+      },
+      {
+        value: "soporte",
+        label: "Soporte",
+        description: "Atención a usuarios y tickets",
+        problems: [
+          { value: "primera-vez", label: "Primera vez", description: "Nunca atendí tickets" },
+          { value: "experiencia", label: "Con experiencia", description: "Ya di soporte antes" },
+        ],
+      },
+      {
+        value: "eventos",
+        label: "Eventos",
+        description: "Organización de actividades",
+        problems: [
+          { value: "primera-vez", label: "Primera vez", description: "Quiero aprender" },
+          { value: "experiencia", label: "Con experiencia", description: "Ya organicé eventos" },
+        ],
+      },
+      {
+        value: "staff-contenido",
+        label: "Contenido",
+        description: "Redes, anuncios o creatividad",
+        problems: [
+          { value: "redes", label: "Redes / diseño", description: "Creatividad y posts" },
+          { value: "anuncios", label: "Anuncios", description: "Comunicación del server" },
+        ],
+      },
+      {
+        value: "staff-tecnico",
+        label: "Técnico / bot",
+        description: "Ayuda con EyedBot o integraciones",
+        problems: [
+          { value: "bot", label: "EyedBot", description: "Config y módulos" },
+          { value: "integraciones", label: "Integraciones", description: "APIs u otras tools" },
+        ],
+      },
     ],
-    commonProblems: [
-      { value: "primera-vez", label: "Primera postulación", description: "Nunca fuiste staff" },
-      { value: "experiencia", label: "Con experiencia previa", description: "Ya moderaste otros servidores" },
-      { value: "bilingue", label: "Staff bilingüe", description: "Inglés u otros idiomas" },
-      { value: "otro", label: "Otra área", description: "Especifica en el ticket" },
-    ],
+    commonProblems: [],
     sendDmReceipt: true,
     sendDmPendingStatus: true,
   },
@@ -196,8 +389,8 @@ export function applyTicketPreset<T extends TicketConfigLike>(
     buttonLabel: preset.buttonLabel,
     color: preset.color.replace("#", ""),
     footer: preset.footer,
-    ticketCategories: preset.ticketCategories.map((item) => ({ ...item })),
-    commonProblems: preset.commonProblems.map((item) => ({ ...item })),
+    ticketCategories: preset.ticketCategories.map(cloneOption),
+    commonProblems: (preset.commonProblems || []).map((item) => ({ ...item })),
     supportAreas: [],
     sendDmReceipt: preset.sendDmReceipt ?? current.sendDmReceipt,
     sendDmPendingStatus: preset.sendDmPendingStatus ?? current.sendDmPendingStatus,

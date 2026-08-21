@@ -4624,15 +4624,49 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             return allowEmpty ? [] : fallbackList;
         };
 
+        const normalizeTitleCategories = (input, fallback) => {
+            const fallbackList = Array.isArray(fallback) ? fallback : [];
+            const source = Array.isArray(input) ? input : (fallbackList.length ? fallbackList : []);
+            const used = new Set();
+            const normalized = [];
+
+            source.slice(0, 25).forEach((entry, index) => {
+                const asObject = entry && typeof entry === 'object' && !Array.isArray(entry)
+                    ? entry
+                    : { label: String(entry || '').trim() };
+
+                const label = String(asObject.label || asObject.name || '').trim().slice(0, 100);
+                if (!label) return;
+
+                let value = toOptionValue(asObject.value || label, `cat-${index + 1}`).slice(0, 100);
+                if (used.has(value)) value = `${value}-${index + 1}`.slice(0, 100);
+                used.add(value);
+
+                const problems = normalizeTicketOptions(
+                    asObject.problems ?? asObject.items,
+                    [],
+                    'issue',
+                    { allowEmpty: true }
+                );
+
+                normalized.push({
+                    value,
+                    label,
+                    description: String(asObject.description || '').trim().slice(0, 100),
+                    problems
+                });
+            });
+
+            return normalized;
+        };
+
         const adminRoleIds = Array.isArray(body.adminRoleIds)
             ? body.adminRoleIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 20)
             : [];
 
-        const ticketCategories = normalizeTicketOptions(
+        const ticketCategories = normalizeTitleCategories(
             body.ticketCategories,
-            Array.isArray(currentCfg?.ticketCategories) ? currentCfg.ticketCategories : [],
-            'cat',
-            { allowEmpty: true }
+            Array.isArray(currentCfg?.ticketCategories) ? currentCfg.ticketCategories : []
         );
 
         const commonProblems = normalizeTicketOptions(

@@ -465,22 +465,13 @@ function normalizeLegacyCategory(item = {}) {
     const rawLabel = String(item?.label || '').trim();
     const rawValue = String(item?.value || '').trim();
 
-    if (
-        rawValue === 'minecraft'
-        || rawValue === 'solicitud-ingreso-minecraft'
-        || /minecraft/i.test(rawLabel)
-    ) {
-        return {
-            value: 'eyedbio',
-            label: 'Eyed.bio',
-            description: 'Soporte de perfil link-in-bio, widgets y cuenta'
-        };
-    }
-
     return {
         value: rawValue,
         label: rawLabel,
-        description: String(item?.description || '').trim()
+        description: String(item?.description || '').trim(),
+        problems: Array.isArray(item?.problems)
+            ? item.problems
+            : (Array.isArray(item?.items) ? item.items : [])
     };
 }
 
@@ -490,13 +481,25 @@ function sanitizeCategories(categories = []) {
 
     categories.forEach((item) => {
         const mapped = normalizeLegacyCategory(item);
-        const { value, label, description } = mapped;
+        let { value, label, description } = mapped;
+
+        if (!value && label) {
+            value = toOptionValue(label, 'cat');
+        }
 
         if (value === 'compras-y-rangos' || /compras\s*y\s*rangos/i.test(label)) return;
 
         if (!value || !label || used.has(value)) return;
         used.add(value);
-        normalized.push({ value, label, description: description.slice(0, 100) });
+
+        const problems = normalizeConfiguredOptions(mapped.problems || [], [], 'issue');
+
+        normalized.push({
+            value,
+            label,
+            description: description.slice(0, 100),
+            problems
+        });
     });
 
     return normalized.slice(0, 25);
@@ -511,15 +514,20 @@ function safeGetField(interaction, fieldId, fallback = '') {
 }
 
 function buildSelectionConfig(cfg) {
-    // Solo lo configurado en el panel; sin categorías/problemas de fábrica.
-    const categories = sanitizeCategories(normalizeConfiguredOptions(cfg?.ticketCategories, [], 'cat'));
+    // Categorías de título con casos anidados; sin defaults de fábrica.
+    const categories = sanitizeCategories(
+        Array.isArray(cfg?.ticketCategories) ? cfg.ticketCategories : []
+    );
     const commonIssues = normalizeConfiguredOptions(cfg?.commonProblems, [], 'issue');
     return { categories, commonIssues };
 }
 
 function getCommonIssuesForCategory(optionsConfig, categoryValue) {
-    // Las categorías son 100% custom: no se inyectan casos por valor de fábrica.
-    void categoryValue;
+    const categories = Array.isArray(optionsConfig?.categories) ? optionsConfig.categories : [];
+    const category = categories.find((item) => item.value === categoryValue);
+    if (Array.isArray(category?.problems) && category.problems.length) {
+        return category.problems;
+    }
     return Array.isArray(optionsConfig?.commonIssues) ? optionsConfig.commonIssues : [];
 }
 
