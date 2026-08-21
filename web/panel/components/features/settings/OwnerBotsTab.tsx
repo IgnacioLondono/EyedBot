@@ -506,10 +506,10 @@ export function OwnerBotsTab() {
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Nombre interno">
-            <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. Lazarus Bot" />
+            <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. Bot del servidor" />
           </Field>
           <Field label="Slug del panel">
-            <Input value={newSlug} onChange={(e) => setNewSlug(e.target.value)} placeholder="lazarus" />
+            <Input value={newSlug} onChange={(e) => setNewSlug(e.target.value)} placeholder="mi-bot" />
           </Field>
           <Field label="Token del bot">
             <Input
@@ -534,7 +534,7 @@ export function OwnerBotsTab() {
             <Input value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)} placeholder="123456789012345678" />
           </Field>
           <Field label="Marca · nombre">
-            <Input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Lazarus" />
+            <Input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Nombre visible" />
           </Field>
           <Field label="Marca · logo URL">
             <Input value={newBrandLogo} onChange={(e) => setNewBrandLogo(e.target.value)} placeholder="https://..." />
