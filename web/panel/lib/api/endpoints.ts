@@ -22,6 +22,12 @@ export const getUser = () => apiFetch<{ user: PanelUser }>("/api/user");
 export const getPanelBootstrap = (refresh = false) =>
   apiFetch<PanelBootstrap>(`/api/panel/bootstrap${refresh ? "?refresh=1" : ""}`);
 
+export const selectPanelTenant = (botId: string | null) =>
+  apiFetch<{ success: boolean; tenant: unknown }>(`/api/panel/tenant/select`, {
+    method: "POST",
+    body: { botId: botId || "" },
+  });
+
 export const getDashboardSummary = (refresh = false) =>
   apiFetch<DashboardSummary>(`/api/panel/dashboard-summary${refresh ? "?refresh=1" : ""}`);
 

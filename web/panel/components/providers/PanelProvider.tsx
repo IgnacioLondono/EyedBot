@@ -22,6 +22,7 @@ type PanelContextValue = {
   loading: boolean;
   error: string | null;
   refresh: (forceGuilds?: boolean) => Promise<void>;
+  selectTenant: (botId: string | null) => Promise<void>;
   hasPremium: boolean;
   premiumRequired: boolean;
   premiumLocked: boolean;
@@ -57,6 +58,29 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }, [pathname]);
+
+  const selectTenant = useCallback(
+    async (botId: string | null) => {
+      setLoading(true);
+      setError(null);
+      try {
+        await api.selectPanelTenant(botId);
+        const [boot, bill] = await Promise.all([
+          api.getPanelBootstrap(true),
+          api.getBillingStatus().catch(() => null),
+        ]);
+        setBootstrap(boot);
+        setBilling(bill);
+      } catch (err) {
+        const message = err instanceof ApiRequestError ? err.message : "No se pudo cambiar de panel";
+        setError(message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let active = true;
@@ -99,11 +123,12 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       refresh,
+      selectTenant,
       hasPremium,
       premiumRequired,
       premiumLocked: isPremiumFeatureLocked(premiumRequired, hasPremium),
     };
-  }, [bootstrap, billing, loading, error, refresh]);
+  }, [bootstrap, billing, loading, error, refresh, selectTenant]);
 
   return <PanelContext.Provider value={value}>{children}</PanelContext.Provider>;
 }

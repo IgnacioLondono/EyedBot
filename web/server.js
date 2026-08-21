@@ -2621,20 +2621,31 @@ app.get('/t/:slug/callback', async (req, res) => {
     }
 });
 
-app.post('/api/panel/tenant/select', requireAuth, (req, res) => {
+app.post('/api/panel/tenant/select', requireAuth, async (req, res) => {
     try {
         const ownerBotManager = require('../src/utils/owner-bot-manager');
         const botId = String(req.body?.botId || '').trim();
+        const userId = String(req.session?.user?.id || '').trim();
+
         if (!botId) {
             delete req.session.tenantBotId;
+            if (userId) invalidateGuildsApiCache(userId);
+            await saveSession(req).catch(() => null);
             return res.json({ success: true, tenant: null });
         }
+
         const record = ownerBotManager.getRecordById(botId);
         const isOwner = isOwnerUser(req.session.user);
         if (!ownerBotManager.userCanAccessTenant(record, req.session.user?.id, { isOwner })) {
             return res.status(403).json({ error: 'Sin acceso a este panel' });
         }
+
         req.session.tenantBotId = record.id;
+        if (userId) {
+            invalidateGuildsApiCache(userId);
+            invalidateGuildsApiCache(`tenant:${record.id}:${userId}`);
+        }
+        await saveSession(req).catch(() => null);
         return res.json({ success: true, tenant: ownerBotManager.sanitizePublicRecord(record) });
     } catch (error) {
         console.error('Error seleccionando tenant:', error);
@@ -2696,11 +2707,16 @@ const guildsApiResponseCache = new Map();
 
 function invalidateGuildsApiCache(userId = '') {
     const key = String(userId || '').trim();
-    if (key) {
-        guildsApiResponseCache.delete(key);
+    if (!key) {
+        guildsApiResponseCache.clear();
         return;
     }
-    guildsApiResponseCache.clear();
+    guildsApiResponseCache.delete(key);
+    for (const cacheKey of Array.from(guildsApiResponseCache.keys())) {
+        if (String(cacheKey) === key || String(cacheKey).endsWith(`:${key}`)) {
+            guildsApiResponseCache.delete(cacheKey);
+        }
+    }
 }
 
 function buildBotGuildsPayload(guilds = [], client = getBotClient()) {

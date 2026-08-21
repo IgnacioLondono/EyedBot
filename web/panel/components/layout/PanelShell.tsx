@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { WallpaperLayer } from "@/components/layout/WallpaperLayer";
 import { useThemeSettings } from "@/components/providers/ThemeProvider";
 import { resolvePanelBrand } from "@/lib/brand";
+import { PanelTenantSwitcher } from "@/components/layout/PanelTenantSwitcher";
 
 export function PanelShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -94,6 +95,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {!isGuest ? <PanelTenantSwitcher /> : null}
             <div className="md:hidden">
               <EyedBioNavLink showLabel="never" />
             </div>
