@@ -95,7 +95,8 @@ function canonicalWelcomeMediaUrl(raw) {
 }
 
 /**
- * Resuelve archivo local para adjuntar al embed. Varios candidatos por cwd / despliegue.
+ * Resuelve archivo local para adjuntar al embed.
+ * El panel sirve estáticos desde `web/uploads` (no `web/public/uploads`).
  */
 function resolveWelcomeUploadFile(rawUrl = '') {
     const uploadPath = extractUploadPath(rawUrl);
@@ -103,19 +104,32 @@ function resolveWelcomeUploadFile(rawUrl = '') {
 
     const cleaned = uploadPath.replace(/^\/+/, '');
     const fileName = path.basename(cleaned);
+    const projectRoot = path.join(__dirname, '..', '..');
+    const cwd = process.cwd();
 
     const candidates = [
-        path.join(__dirname, '..', '..', 'web', 'public', cleaned),
-        path.join(__dirname, '..', '..', 'web', 'public', 'uploads', 'welcome', fileName),
-        path.join(__dirname, '..', '..', 'web', 'public', 'uploads', 'verify', fileName),
-        path.join(process.cwd(), 'web', 'public', cleaned),
-        path.join(process.cwd(), 'web', 'public', 'uploads', 'welcome', fileName),
-        path.join(process.cwd(), 'public', cleaned),
-        path.join(process.cwd(), 'uploads', 'welcome', fileName)
+        // Ruta real del panel (express.static web/uploads)
+        path.join(projectRoot, 'web', cleaned),
+        path.join(cwd, 'web', cleaned),
+        path.join(projectRoot, cleaned),
+        path.join(cwd, cleaned),
+        // Compat layouts antiguos
+        path.join(projectRoot, 'web', 'public', cleaned),
+        path.join(cwd, 'web', 'public', cleaned),
+        path.join(projectRoot, 'web', 'public', 'uploads', 'welcome', fileName),
+        path.join(projectRoot, 'web', 'public', 'uploads', 'verify', fileName),
+        path.join(projectRoot, 'web', 'uploads', 'welcome', fileName),
+        path.join(projectRoot, 'web', 'uploads', 'verify', fileName),
+        path.join(cwd, 'uploads', 'welcome', fileName),
+        path.join(cwd, 'web', 'uploads', 'welcome', fileName)
     ];
 
     for (const absolute of candidates) {
-        if (fs.existsSync(absolute)) return absolute;
+        try {
+            if (fs.existsSync(absolute)) return absolute;
+        } catch {
+            // noop
+        }
     }
 
     return null;

@@ -1185,8 +1185,8 @@ function persistEmbedTemplateAsset(req, guildId, file, kind = 'image') {
     const fileName = `${kind}_${Date.now()}_${baseName}${extension}`;
     const outputPath = path.join(uploadsDir, fileName);
     fs.writeFileSync(outputPath, file.buffer);
-    const publicPath = `/uploads/embed-templates/${safeGuildId}/${fileName}`;
-    return buildPublicUploadUrl(req, publicPath);
+    // Guardar ruta relativa: el panel y Discord la resuelven (adjunto local).
+    return `/uploads/embed-templates/${safeGuildId}/${fileName}`;
 }
 
 function embedTemplateAssetUrl(value = '') {
@@ -6321,11 +6321,13 @@ app.post('/api/guild/:guildId/community-shop-upload', requireAuth, requirePremiu
         const outputPath = path.join(uploadsDir, fileName);
         fs.writeFileSync(outputPath, file.buffer);
         const publicPath = `/uploads/community-shop/${safeGuildId}/${fileName}`;
-        const imageUrl = buildPublicUploadUrl(req, publicPath);
-        if (previousUrl && previousUrl !== imageUrl) {
+        // Ruta relativa para panel + Discord (adjunto); publicUrl solo como hint.
+        const imageUrl = publicPath;
+        const publicUrl = buildPublicUploadUrl(req, publicPath);
+        if (previousUrl && previousUrl !== imageUrl && previousUrl !== publicUrl) {
             deleteCommunityShopUploadIfOwned(previousUrl);
         }
-        return res.json({ success: true, imageUrl, path: publicPath });
+        return res.json({ success: true, imageUrl, path: publicPath, publicUrl });
     } catch (error) {
         console.error('Error subiendo imagen de tienda comunitaria:', error);
         return res.status(500).json({ error: 'No se pudo subir la imagen' });

@@ -52,6 +52,8 @@ function collectWebPublicRoots() {
 
     add(path.join(__dirname, '..', '..', 'web'));
     add(path.join(__dirname, '..', '..', 'web', 'public'));
+    // Panel real: express.static sirve desde web/uploads → root = web
+    // (segments empiezan con "uploads/...")
 
     const seeds = [];
     try {
@@ -75,6 +77,8 @@ function collectWebPublicRoots() {
             add(path.join(cur, 'EyedBot-main', 'web'));
             add(path.join(cur, 'EyedBot-main', 'web', 'public'));
             add(path.join(cur, 'public'));
+            // Si el proceso corre con cwd=/app/web
+            add(cur);
 
             const parent = path.dirname(cur);
             if (parent === cur) break;
@@ -261,6 +265,21 @@ async function resolveEmbedImageForDiscord(imageUrl, fileBase) {
     const raw = String(imageUrl || '').trim();
     if (!raw) return null;
 
+    // Imágenes de bienvenida en MySQL (/api/.../greeting-image/...)
+    try {
+        const greetingImageStore = require('./greeting-image-store');
+        const parsed = greetingImageStore.parseGreetingImageApiUrl(raw);
+        if (parsed?.guildId) {
+            const blob = await greetingImageStore.getImage(parsed.guildId, parsed.slot);
+            if (blob?.data?.length) {
+                const safeBase = String(fileBase || 'img').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'img';
+                return { mode: 'attachment', name: `${safeBase}.${blob.ext || 'png'}`, data: blob.data };
+            }
+        }
+    } catch {
+        /* noop */
+    }
+
     let absoluteUrl = raw;
     if (raw.startsWith('/')) {
         const origin = String(process.env.WEB_PUBLIC_ORIGIN || process.env.PUBLIC_ORIGIN || '')
@@ -275,6 +294,13 @@ async function resolveEmbedImageForDiscord(imageUrl, fileBase) {
     try {
         pathname = new URL(absoluteUrl).pathname;
     } catch {
+        return null;
+    }
+
+    // Rutas /api/... privadas: Discord no puede autenticarse
+    if (/\/api\/guild\/[^/]+\/(greeting-image|gacha-catalog)\//i.test(pathname)) {
+        const fetched = await fetchImageBufferForDiscordAttachment(absoluteUrl, fileBase);
+        if (fetched) return { mode: 'attachment', name: fetched.name, data: fetched.data };
         return null;
     }
 
