@@ -17,6 +17,13 @@ const {
     DEFAULT_COMMON_PROBLEMS,
     DEFAULT_COMMON_ISSUES_BY_CATEGORY
 } = require('../utils/ticket-defaults');
+const {
+    normalizeTicketFlow,
+    isCustomFlowActive,
+    getNode,
+    getStartNode,
+    pickNextEdge
+} = require('../utils/ticket-flow');
 const db = require('../utils/database');
 
 const OPEN_PREFIX = 'ticket_open_';
@@ -31,14 +38,19 @@ const PANEL_CATEGORY_SELECT_PREFIX = 'ticket_panel_cat_';
 const PANEL_COMMON_SELECT_PREFIX = 'ticket_panel_common_';
 const PANEL_CONTINUE_PREFIX = 'ticket_panel_continue_';
 const PANEL_CANCEL_PREFIX = 'ticket_panel_cancel_';
+const FLOW_SELECT_PREFIX = 'tf_s_';
+const FLOW_MODAL_PREFIX = 'tf_m_';
+const FLOW_CANCEL_PREFIX = 'tf_x_';
 const DRAFT_TTL_MS = 15 * 60 * 1000;
 const PENDING_TTL_MS = 30 * 60 * 1000;
+const FLOW_TTL_MS = 20 * 60 * 1000;
 
 const DEFAULT_CATEGORIES = DEFAULT_TICKET_CATEGORIES;
 
 const DEFAULT_COMMON_ISSUES = DEFAULT_COMMON_PROBLEMS;
 
 const ticketDrafts = new Map();
+const flowSessions = new Map();
 const pendingRequestsMemory = new Map();
 const pendingUsersMemory = new Map();
 const pendingSubmitLocks = new Map();
@@ -652,6 +664,239 @@ function buildTicketPanelComponents(guildId, cfg, presetDraft = null) {
     ];
 }
 
+function flowSessionKey(guildId, userId) {
+    return `${guildId}:${userId}`;
+}
+
+function cleanupFlowSessions() {
+    const now = Date.now();
+    for (const [key, value] of flowSessions.entries()) {
+        if (!value || now - Number(value.updatedAt || 0) > FLOW_TTL_MS) {
+            flowSessions.delete(key);
+        }
+    }
+}
+
+function getFlowSession(guildId, userId) {
+    cleanupFlowSessions();
+    return flowSessions.get(flowSessionKey(guildId, userId)) || null;
+}
+
+function saveFlowSession(guildId, userId, session) {
+    flowSessions.set(flowSessionKey(guildId, userId), {
+        ...session,
+        updatedAt: Date.now()
+    });
+}
+
+function clearFlowSession(guildId, userId) {
+    flowSessions.delete(flowSessionKey(guildId, userId));
+}
+
+function resolveFlowSelectOptions(cfg, node, sessionData = {}) {
+    const source = String(node?.data?.selectSource || 'categories');
+    const optionsConfig = buildSelectionConfig(cfg);
+    if (source === 'categories') return optionsConfig.categories;
+    if (source === 'supportAreas') {
+        const areas = Array.isArray(cfg?.supportAreas) && cfg.supportAreas.length
+            ? cfg.supportAreas
+            : (Array.isArray(cfg?.minecraftServers) ? cfg.minecraftServers : []);
+        return normalizeConfiguredOptions(areas, [], 'area');
+    }
+    if (source === 'custom') {
+        return (Array.isArray(node?.data?.customOptions) ? node.data.customOptions : [])
+            .map((item, index) => ({
+                value: String(item.value || `opt-${index + 1}`).slice(0, 100),
+                label: String(item.label || `Opcion ${index + 1}`).slice(0, 100),
+                description: String(item.description || '').slice(0, 100)
+            }))
+            .filter((item) => item.label);
+    }
+    // problems (default)
+    const categoryValue = sessionData.category || optionsConfig.categories[0]?.value;
+    return getCommonIssuesForCategory(optionsConfig, categoryValue);
+}
+
+function parseFlowSelectCustomId(customId = '') {
+    if (!String(customId).startsWith(FLOW_SELECT_PREFIX)) return null;
+    const payload = String(customId).slice(FLOW_SELECT_PREFIX.length);
+    const parts = payload.split('_');
+    if (parts.length < 2) return null;
+    const guildId = parts[0];
+    const nodeId = parts.slice(1).join('_');
+    return { guildId, nodeId };
+}
+
+function parseFlowModalCustomId(customId = '') {
+    if (!String(customId).startsWith(FLOW_MODAL_PREFIX)) return null;
+    const payload = String(customId).slice(FLOW_MODAL_PREFIX.length);
+    const parts = payload.split('_');
+    if (parts.length < 2) return null;
+    const guildId = parts[0];
+    const nodeId = parts.slice(1).join('_');
+    return { guildId, nodeId };
+}
+
+async function presentFlowNode(interaction, guildId, cfg, session, mode = 'reply') {
+    const flow = normalizeTicketFlow(cfg.customFlow);
+    const node = getNode(flow, session.nodeId);
+    if (!node) {
+        clearFlowSession(guildId, interaction.user.id);
+        await sendEphemeral(interaction, 'El flujo de tickets esta incompleto.');
+        return;
+    }
+
+    if (node.type === 'select') {
+        const options = resolveFlowSelectOptions(cfg, node, session.data).slice(0, 25);
+        if (!options.length) {
+            await sendEphemeral(interaction, 'Este paso no tiene opciones configuradas.');
+            return;
+        }
+        const menu = buildSelectMenu(
+            `${FLOW_SELECT_PREFIX}${guildId}_${node.id}`,
+            String(node.data.selectPlaceholder || 'Selecciona una opcion').slice(0, 100),
+            options,
+            options[0].value
+        );
+        const cancel = new ButtonBuilder()
+            .setCustomId(`${FLOW_CANCEL_PREFIX}${guildId}`)
+            .setLabel('Cancelar')
+            .setStyle(ButtonStyle.Secondary);
+        const payload = {
+            content: `**${node.data.label || 'Seleccion'}**\nElige una opcion para continuar.`,
+            components: [
+                new ActionRowBuilder().addComponents(menu),
+                new ActionRowBuilder().addComponents(cancel)
+            ],
+            flags: 64
+        };
+        if (mode === 'update' && interaction.isMessageComponent()) {
+            await interaction.update({ content: payload.content, components: payload.components }).catch(() => null);
+        } else if (interaction.deferred || interaction.replied) {
+            await interaction.followUp(payload).catch(() => null);
+        } else {
+            await interaction.reply(payload).catch(() => null);
+        }
+        return;
+    }
+
+    if (node.type === 'modal') {
+        const fields = Array.isArray(node.data.modalFields) ? node.data.modalFields.slice(0, 5) : [];
+        if (!fields.length) {
+            await sendEphemeral(interaction, 'El formulario del flujo no tiene campos.');
+            return;
+        }
+        const modal = new ModalBuilder()
+            .setCustomId(`${FLOW_MODAL_PREFIX}${guildId}_${node.id}`)
+            .setTitle(String(node.data.modalTitle || node.data.label || 'Formulario').slice(0, 45));
+        for (const field of fields) {
+            const input = new TextInputBuilder()
+                .setCustomId(String(field.id || 'field').slice(0, 40))
+                .setLabel(String(field.label || 'Campo').slice(0, 45))
+                .setStyle(field.style === 'paragraph' ? TextInputStyle.Paragraph : TextInputStyle.Short)
+                .setRequired(field.required !== false)
+                .setMaxLength(Math.min(1000, Math.max(1, Number(field.maxLength) || 300)));
+            if (field.placeholder) input.setPlaceholder(String(field.placeholder).slice(0, 100));
+            modal.addComponents(new ActionRowBuilder().addComponents(input));
+        }
+        await interaction.showModal(modal);
+        return;
+    }
+
+    if (node.type === 'message') {
+        const text = String(node.data.messageText || node.data.label || 'Continua el flujo.').slice(0, 500);
+        if (mode === 'update' && interaction.isMessageComponent()) {
+            await interaction.update({ content: text, components: [] }).catch(() => null);
+        } else {
+            await sendEphemeral(interaction, text);
+        }
+        const edge = pickNextEdge(flow, node.id);
+        if (!edge) return;
+        session.nodeId = edge.target;
+        saveFlowSession(guildId, interaction.user.id, session);
+        await advanceFlowAuto(interaction, guildId, cfg, session);
+        return;
+    }
+
+    if (node.type === 'create_pending') {
+        if (!interaction.deferred && !interaction.replied) {
+            if (interaction.isMessageComponent()) {
+                await interaction.update({
+                    content: 'Registrando solicitud…',
+                    components: []
+                }).catch(() => null);
+            } else {
+                await interaction.deferReply({ flags: 64 }).catch(() => null);
+            }
+        }
+        const data = session.data || {};
+        const reason = String(
+            data.reason
+            || data.fields?.reason
+            || Object.values(data.fields || {}).find((v) => String(v || '').trim())
+            || 'Sin motivo'
+        );
+        await submitPendingTicketRequest(interaction, guildId, {
+            category: String(data.categoryLabel || data.category || 'Soporte general'),
+            commonIssue: String(data.commonIssueLabel || data.commonIssue || 'No especificado'),
+            categoryValue: String(data.category || ''),
+            commonIssueValue: String(data.commonIssue || ''),
+            noMatchIssue: reason,
+            reason
+        });
+        clearFlowSession(guildId, interaction.user.id);
+        return;
+    }
+
+    if (node.type === 'end') {
+        clearFlowSession(guildId, interaction.user.id);
+        const msg = node.data.endKind === 'cancel'
+            ? 'Flujo cancelado.'
+            : 'Listo. Tu solicitud fue registrada.';
+        await sendEphemeral(interaction, msg);
+    }
+}
+
+async function advanceFlowAuto(interaction, guildId, cfg, session) {
+    const flow = normalizeTicketFlow(cfg.customFlow);
+    let guard = 0;
+    while (guard++ < 8) {
+        const node = getNode(flow, session.nodeId);
+        if (!node) return;
+        if (node.type === 'select' || node.type === 'modal') {
+            await presentFlowNode(interaction, guildId, cfg, session, interaction.isMessageComponent() ? 'update' : 'reply');
+            return;
+        }
+        if (node.type === 'message' || node.type === 'create_pending' || node.type === 'end') {
+            await presentFlowNode(interaction, guildId, cfg, session, interaction.isMessageComponent() ? 'update' : 'reply');
+            return;
+        }
+        if (node.type === 'start') {
+            const edge = pickNextEdge(flow, node.id);
+            if (!edge) {
+                await sendEphemeral(interaction, 'El flujo no tiene pasos despues del inicio.');
+                return;
+            }
+            session.nodeId = edge.target;
+            saveFlowSession(guildId, interaction.user.id, session);
+            continue;
+        }
+        return;
+    }
+}
+
+async function startCustomTicketFlow(interaction, guildId, cfg) {
+    const flow = normalizeTicketFlow(cfg.customFlow);
+    const start = getStartNode(flow);
+    if (!start) {
+        await sendEphemeral(interaction, 'El flujo personalizado no tiene nodo de inicio.');
+        return;
+    }
+    const session = { nodeId: start.id, data: {}, updatedAt: Date.now() };
+    saveFlowSession(guildId, interaction.user.id, session);
+    await advanceFlowAuto(interaction, guildId, cfg, session);
+}
+
 async function showTicketPresetSelector(interaction, guildId) {
     const cfg = await resolveConfig(guildId);
     if (!cfg) {
@@ -1216,7 +1461,28 @@ async function handleTicketButton(interaction) {
 
     if (interaction.customId.startsWith(OPEN_PREFIX)) {
         const guildId = interaction.customId.slice(OPEN_PREFIX.length);
+        const cfg = await resolveConfig(guildId);
+        if (!cfg) {
+            await sendEphemeral(interaction, 'El sistema de tickets no esta activo.');
+            return true;
+        }
+        if (isCustomFlowActive(cfg)) {
+            await startCustomTicketFlow(interaction, guildId, cfg);
+            return true;
+        }
         await showTicketPresetSelector(interaction, guildId);
+        return true;
+    }
+
+    if (interaction.customId.startsWith(FLOW_CANCEL_PREFIX)) {
+        const guildId = interaction.customId.slice(FLOW_CANCEL_PREFIX.length);
+        clearFlowSession(guildId, interaction.user.id);
+        await interaction.update({
+            content: 'Flujo de ticket cancelado.',
+            components: []
+        }).catch(async () => {
+            await sendEphemeral(interaction, 'Flujo de ticket cancelado.');
+        });
         return true;
     }
 
@@ -1334,6 +1600,46 @@ async function handleTicketButton(interaction) {
 async function handleTicketSelectMenu(interaction) {
     if (!interaction?.isStringSelectMenu()) return false;
 
+    if (interaction.customId.startsWith(FLOW_SELECT_PREFIX)) {
+        const parsed = parseFlowSelectCustomId(interaction.customId);
+        if (!parsed) return true;
+        const { guildId, nodeId } = parsed;
+        const cfg = await resolveConfig(guildId);
+        if (!cfg || !isCustomFlowActive(cfg)) {
+            await sendEphemeral(interaction, 'El flujo personalizado no esta activo.');
+            return true;
+        }
+        const flow = normalizeTicketFlow(cfg.customFlow);
+        const node = getNode(flow, nodeId);
+        const session = getFlowSession(guildId, interaction.user.id) || { nodeId, data: {} };
+        const selected = String(interaction.values?.[0] || '');
+        const options = resolveFlowSelectOptions(cfg, node, session.data);
+        const option = options.find((item) => item.value === selected) || options[0];
+        if (!option) {
+            await sendEphemeral(interaction, 'Opcion invalida.');
+            return true;
+        }
+        const saveAs = String(node?.data?.saveAs || 'choice').trim() || 'choice';
+        session.data = {
+            ...(session.data || {}),
+            [saveAs]: option.value,
+            [`${saveAs}Label`]: option.label
+        };
+        const edge = pickNextEdge(flow, nodeId, option.value);
+        if (!edge) {
+            await interaction.update({
+                content: 'No hay un siguiente paso configurado para esta opcion.',
+                components: []
+            }).catch(() => null);
+            clearFlowSession(guildId, interaction.user.id);
+            return true;
+        }
+        session.nodeId = edge.target;
+        saveFlowSession(guildId, interaction.user.id, session);
+        await advanceFlowAuto(interaction, guildId, cfg, session);
+        return true;
+    }
+
     if (interaction.customId.startsWith(CATEGORY_SELECT_PREFIX)) {
         const guildId = interaction.customId.slice(CATEGORY_SELECT_PREFIX.length);
         await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
@@ -1412,6 +1718,43 @@ async function handleTicketSelectMenu(interaction) {
 
 async function handleTicketModal(interaction) {
     if (!interaction?.isModalSubmit()) return false;
+
+    if (interaction.customId.startsWith(FLOW_MODAL_PREFIX)) {
+        const parsed = parseFlowModalCustomId(interaction.customId);
+        if (!parsed) return true;
+        const { guildId, nodeId } = parsed;
+        await interaction.deferReply({ flags: 64 }).catch(() => null);
+
+        const cfg = await resolveConfig(guildId);
+        if (!cfg || !isCustomFlowActive(cfg)) {
+            await sendEphemeral(interaction, 'El flujo personalizado no esta activo.');
+            return true;
+        }
+        const flow = normalizeTicketFlow(cfg.customFlow);
+        const node = getNode(flow, nodeId);
+        const session = getFlowSession(guildId, interaction.user.id) || { nodeId, data: {} };
+        const fields = Array.isArray(node?.data?.modalFields) ? node.data.modalFields : [];
+        const collected = {};
+        for (const field of fields) {
+            collected[field.id] = safeGetField(interaction, field.id, '');
+        }
+        session.data = {
+            ...(session.data || {}),
+            fields: { ...(session.data?.fields || {}), ...collected },
+            reason: collected.reason || Object.values(collected).find((v) => String(v || '').trim()) || session.data?.reason || ''
+        };
+        const edge = pickNextEdge(flow, nodeId);
+        if (!edge) {
+            await sendEphemeral(interaction, 'No hay un siguiente paso despues del formulario.');
+            clearFlowSession(guildId, interaction.user.id);
+            return true;
+        }
+        session.nodeId = edge.target;
+        saveFlowSession(guildId, interaction.user.id, session);
+        await advanceFlowAuto(interaction, guildId, cfg, session);
+        return true;
+    }
+
     if (!interaction.customId.startsWith(MODAL_PREFIX)) return false;
 
     await interaction.deferReply({ flags: 64 }).catch(() => null);

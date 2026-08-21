@@ -9,6 +9,7 @@ import {
   updateTicketEmbed,
 } from "@/lib/api/endpoints";
 import { TicketsManagePanel } from "@/components/features/server/panes/TicketsManagePanel";
+import { TicketFlowBuilder } from "@/components/features/server/panes/TicketFlowBuilder";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -32,10 +33,16 @@ import {
 import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { applyTicketPreset, TICKET_PRESETS } from "@/lib/ticket-presets";
+import {
+  createDefaultTicketFlow,
+  normalizeTicketFlow,
+  type TicketFlowGraph,
+} from "@/lib/ticket-flow";
 import { asArray, asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 
 const TICKET_TABS = [
   { id: "panel", label: "Panel" },
+  { id: "flow", label: "Flujo" },
   { id: "templates", label: "Plantillas" },
   { id: "roles", label: "Roles" },
   { id: "preview", label: "Preview" },
@@ -67,6 +74,7 @@ type TicketConfigState = {
   /** @deprecated Usar supportAreas */
   minecraftServers?: TicketOption[];
   caseRoleMap: Record<string, string[]>;
+  customFlow: TicketFlowGraph;
 };
 
 function normalizeRoleIds(value: unknown): string[] {
@@ -192,6 +200,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
     commonProblems: [],
     supportAreas: [],
     caseRoleMap: {},
+    customFlow: createDefaultTicketFlow(),
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -224,6 +233,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           commonProblems: normalizeOptions(cfg.commonProblems),
           supportAreas: normalizeOptions(cfg.supportAreas ?? cfg.minecraftServers),
           caseRoleMap: normalizeCaseRoleMap(cfg.caseRoleMap),
+          customFlow: normalizeTicketFlow(cfg.customFlow),
         });
       })
       .catch((err) => {
@@ -366,6 +376,20 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                     {updatingEmbed ? "Actualizando..." : "Actualizar embed"}
                   </Button>
                 </div>
+              </div>
+            )
+          ) : null}
+
+          {tab === "flow" ? (
+            loading ? (
+              <Alert title="Cargando flujo" description="Consultando grafo de tickets." />
+            ) : (
+              <div className="space-y-5">
+                <TicketFlowBuilder
+                  value={config.customFlow}
+                  onChange={(customFlow) => setConfig((c) => ({ ...c, customFlow }))}
+                />
+                <FormActions onSave={handleSaveConfig} saving={saving} />
               </div>
             )
           ) : null}
@@ -547,7 +571,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             <div className="space-y-4">
               <Alert
                 title="Flujo recomendado"
-                description="1) Elige una plantilla o configura el panel manualmente. 2) Asigna roles de staff. 3) Revisa preview y publica. 4) Ajusta labs si necesitas DMs o historial. 5) Gestiona pendientes y activos."
+                description="1) Configura el panel. 2) En Flujo arma el recorrido con nodos y líneas (activa «Usar este flujo»). 3) Roles de staff. 4) Preview y publica. 5) Gestiona pendientes."
               />
               <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
                 <div className="mb-2 flex items-center gap-2 font-medium text-zinc-200">

@@ -4554,10 +4554,12 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
                 commonProblems: defaultCommonProblems,
                 supportAreas: defaultSupportAreas,
                 minecraftServers: defaultSupportAreas,
-                caseRoleMap: {}
+                caseRoleMap: {},
+                customFlow: require('../src/utils/ticket-flow').createDefaultTicketFlow()
             });
         }
 
+        const { normalizeTicketFlow } = require('../src/utils/ticket-flow');
         res.json({
             ...cfg,
             receiptHistoryChannelId: String(cfg.receiptHistoryChannelId || '').trim(),
@@ -4577,7 +4579,8 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
                     : (Array.isArray(cfg.minecraftServers) && cfg.minecraftServers.length ? cfg.minecraftServers : defaultSupportAreas);
                 return fromCfg;
             })(),
-            caseRoleMap: cfg.caseRoleMap && typeof cfg.caseRoleMap === 'object' ? cfg.caseRoleMap : {}
+            caseRoleMap: cfg.caseRoleMap && typeof cfg.caseRoleMap === 'object' ? cfg.caseRoleMap : {},
+            customFlow: normalizeTicketFlow(cfg.customFlow)
         });
     } catch (error) {
         console.error('Error obteniendo ticket config:', error);
@@ -4687,6 +4690,12 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
         const incomingMessageId = String(body.messageId || '').trim();
         const preservedMessageId = incomingMessageId || String(currentCfg?.messageId || '').trim();
 
+        const { normalizeTicketFlow } = require('../src/utils/ticket-flow');
+        const customFlow = normalizeTicketFlow(
+            body.customFlow !== undefined ? body.customFlow : currentCfg?.customFlow
+        );
+        customFlow.updatedAt = new Date().toISOString();
+
         const config = {
             enabled: body.enabled === true,
             panelChannelId: String(body.panelChannelId || '').trim(),
@@ -4711,6 +4720,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             supportAreas,
             minecraftServers: supportAreas,
             caseRoleMap,
+            customFlow,
             messageId: preservedMessageId,
             updatedAt: new Date().toISOString(),
             updatedBy: req.session.user?.id || 'unknown'
