@@ -47,8 +47,6 @@ const eventsGiveawaysStore = require('../src/utils/events-giveaways-store');
 const giveawayService = require('../src/utils/giveaway-service');
 const ticketStore = require('../src/utils/ticket-config-store');
 const {
-    DEFAULT_TICKET_CATEGORIES,
-    DEFAULT_COMMON_PROBLEMS,
     DEFAULT_SUPPORT_AREAS
 } = require('../src/utils/ticket-defaults');
 const levelingStore = require('../src/utils/leveling-store');
@@ -4530,8 +4528,6 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
         if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
 
-        const defaultTicketCategories = DEFAULT_TICKET_CATEGORIES;
-        const defaultCommonProblems = DEFAULT_COMMON_PROBLEMS;
         const defaultSupportAreas = DEFAULT_SUPPORT_AREAS;
 
         const cfg = await ticketStore.getTicketConfig(guildId);
@@ -4550,8 +4546,8 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
                 footer: 'Sistema de Tickets',
                 buttonLabel: 'Solicitar ticket',
                 messageId: '',
-                ticketCategories: defaultTicketCategories,
-                commonProblems: defaultCommonProblems,
+                ticketCategories: [],
+                commonProblems: [],
                 supportAreas: defaultSupportAreas,
                 minecraftServers: defaultSupportAreas,
                 caseRoleMap: {},
@@ -4565,8 +4561,8 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
             receiptHistoryChannelId: String(cfg.receiptHistoryChannelId || '').trim(),
             sendDmReceipt: cfg.sendDmReceipt !== false,
             sendDmPendingStatus: cfg.sendDmPendingStatus === true,
-            ticketCategories: Array.isArray(cfg.ticketCategories) && cfg.ticketCategories.length ? cfg.ticketCategories : defaultTicketCategories,
-            commonProblems: Array.isArray(cfg.commonProblems) && cfg.commonProblems.length ? cfg.commonProblems : defaultCommonProblems,
+            ticketCategories: Array.isArray(cfg.ticketCategories) ? cfg.ticketCategories : [],
+            commonProblems: Array.isArray(cfg.commonProblems) ? cfg.commonProblems : [],
             supportAreas: (() => {
                 const fromCfg = Array.isArray(cfg.supportAreas) && cfg.supportAreas.length
                     ? cfg.supportAreas
@@ -4597,8 +4593,6 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
         const body = req.body || {};
         const currentCfg = await ticketStore.getTicketConfig(guildId);
 
-        const defaultTicketCategories = DEFAULT_TICKET_CATEGORIES;
-        const defaultCommonProblems = DEFAULT_COMMON_PROBLEMS;
         const defaultSupportAreas = DEFAULT_SUPPORT_AREAS;
 
         const toOptionValue = (text, fallback) => {
@@ -4611,10 +4605,11 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             return safe || fallback;
         };
 
-        const normalizeTicketOptions = (input, fallback, prefix) => {
-            const source = Array.isArray(input) && input.length
+        const normalizeTicketOptions = (input, fallback, prefix, { allowEmpty = false } = {}) => {
+            const fallbackList = Array.isArray(fallback) ? fallback : [];
+            const source = Array.isArray(input)
                 ? input
-                : (Array.isArray(fallback) && fallback.length ? fallback : []);
+                : (fallbackList.length ? fallbackList : []);
 
             const used = new Set();
             const normalized = [];
@@ -4638,7 +4633,8 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
                 });
             });
 
-            return normalized.length ? normalized : fallback;
+            if (normalized.length) return normalized;
+            return allowEmpty ? [] : fallbackList;
         };
 
         const adminRoleIds = Array.isArray(body.adminRoleIds)
@@ -4647,14 +4643,16 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
 
         const ticketCategories = normalizeTicketOptions(
             body.ticketCategories,
-            currentCfg?.ticketCategories || defaultTicketCategories,
-            'cat'
+            Array.isArray(currentCfg?.ticketCategories) ? currentCfg.ticketCategories : [],
+            'cat',
+            { allowEmpty: true }
         );
 
         const commonProblems = normalizeTicketOptions(
             body.commonProblems,
-            currentCfg?.commonProblems || defaultCommonProblems,
-            'issue'
+            Array.isArray(currentCfg?.commonProblems) ? currentCfg.commonProblems : [],
+            'issue',
+            { allowEmpty: true }
         );
 
         const supportAreas = normalizeTicketOptions(

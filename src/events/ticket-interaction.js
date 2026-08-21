@@ -13,11 +13,6 @@ const {
 } = require('discord.js');
 const ticketStore = require('../utils/ticket-config-store');
 const {
-    DEFAULT_TICKET_CATEGORIES,
-    DEFAULT_COMMON_PROBLEMS,
-    DEFAULT_COMMON_ISSUES_BY_CATEGORY
-} = require('../utils/ticket-defaults');
-const {
     normalizeTicketFlow,
     isCustomFlowActive,
     getNode,
@@ -44,10 +39,6 @@ const FLOW_CANCEL_PREFIX = 'tf_x_';
 const DRAFT_TTL_MS = 15 * 60 * 1000;
 const PENDING_TTL_MS = 30 * 60 * 1000;
 const FLOW_TTL_MS = 20 * 60 * 1000;
-
-const DEFAULT_CATEGORIES = DEFAULT_TICKET_CATEGORIES;
-
-const DEFAULT_COMMON_ISSUES = DEFAULT_COMMON_PROBLEMS;
 
 const ticketDrafts = new Map();
 const flowSessions = new Map();
@@ -442,7 +433,8 @@ function toOptionValue(text, fallback) {
 }
 
 function normalizeConfiguredOptions(raw, defaults, prefix) {
-    const source = Array.isArray(raw) && raw.length ? raw : defaults;
+    const fallback = Array.isArray(defaults) ? defaults : [];
+    const source = Array.isArray(raw) && raw.length ? raw : fallback;
     const usedValues = new Set();
     const built = [];
 
@@ -466,7 +458,7 @@ function normalizeConfiguredOptions(raw, defaults, prefix) {
         built.push({ value, label, description });
     });
 
-    return built.length ? built : defaults;
+    return built.length ? built : fallback;
 }
 
 function normalizeLegacyCategory(item = {}) {
@@ -507,7 +499,7 @@ function sanitizeCategories(categories = []) {
         normalized.push({ value, label, description: description.slice(0, 100) });
     });
 
-    return normalized.length ? normalized.slice(0, 25) : DEFAULT_CATEGORIES;
+    return normalized.slice(0, 25);
 }
 
 function safeGetField(interaction, fieldId, fallback = '') {
@@ -519,15 +511,16 @@ function safeGetField(interaction, fieldId, fallback = '') {
 }
 
 function buildSelectionConfig(cfg) {
-    const categories = sanitizeCategories(normalizeConfiguredOptions(cfg?.ticketCategories, DEFAULT_CATEGORIES, 'cat'));
-    const commonIssues = normalizeConfiguredOptions(cfg?.commonProblems, DEFAULT_COMMON_ISSUES, 'issue');
+    // Solo lo configurado en el panel; sin categorías/problemas de fábrica.
+    const categories = sanitizeCategories(normalizeConfiguredOptions(cfg?.ticketCategories, [], 'cat'));
+    const commonIssues = normalizeConfiguredOptions(cfg?.commonProblems, [], 'issue');
     return { categories, commonIssues };
 }
 
 function getCommonIssuesForCategory(optionsConfig, categoryValue) {
-    const mapped = DEFAULT_COMMON_ISSUES_BY_CATEGORY[String(categoryValue || '')];
-    if (Array.isArray(mapped) && mapped.length) return mapped;
-    return optionsConfig.commonIssues;
+    // Las categorías son 100% custom: no se inyectan casos por valor de fábrica.
+    void categoryValue;
+    return Array.isArray(optionsConfig?.commonIssues) ? optionsConfig.commonIssues : [];
 }
 
 function cleanupDrafts() {
@@ -544,17 +537,20 @@ function getDraftForUser(guildId, userId, optionsConfig) {
     const key = draftKey(guildId, userId);
     const existing = ticketDrafts.get(key);
 
-    const categoryValues = new Set(optionsConfig.categories.map((item) => item.value));
+    const categories = Array.isArray(optionsConfig?.categories) ? optionsConfig.categories : [];
+    const categoryValues = new Set(categories.map((item) => item.value));
 
     const draft = {
-        category: categoryValues.has(existing?.category) ? existing.category : optionsConfig.categories[0].value,
+        category: categoryValues.has(existing?.category) ? existing.category : (categories[0]?.value || ''),
         commonIssue: '',
         updatedAt: Date.now()
     };
 
     const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
     const issueValues = new Set(categoryIssues.map((item) => item.value));
-    draft.commonIssue = issueValues.has(existing?.commonIssue) ? existing.commonIssue : categoryIssues[0].value;
+    draft.commonIssue = issueValues.has(existing?.commonIssue)
+        ? existing.commonIssue
+        : (categoryIssues[0]?.value || '');
 
     ticketDrafts.set(key, draft);
     return draft;
@@ -592,20 +588,32 @@ function buildSelectMenu(customId, placeholder, options, selectedValue) {
 }
 
 function buildSetupComponents(guildId, optionsConfig, draft) {
+    const rows = [];
+    const categories = Array.isArray(optionsConfig?.categories) ? optionsConfig.categories : [];
     const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
 
-    const categorySelect = buildSelectMenu(
-        `${CATEGORY_SELECT_PREFIX}${guildId}`,
-        'Selecciona una categoria',
-        optionsConfig.categories,
-        draft.category
-    );
-    const issueSelect = buildSelectMenu(
-        `${COMMON_SELECT_PREFIX}${guildId}`,
-        'Selecciona un problema frecuente',
-        categoryIssues,
-        draft.commonIssue
-    );
+    if (categories.length) {
+        rows.push(new ActionRowBuilder().addComponents(
+            buildSelectMenu(
+                `${CATEGORY_SELECT_PREFIX}${guildId}`,
+                'Selecciona una categoria',
+                categories,
+                draft.category || categories[0].value
+            )
+        ));
+    }
+
+    if (categoryIssues.length) {
+        rows.push(new ActionRowBuilder().addComponents(
+            buildSelectMenu(
+                `${COMMON_SELECT_PREFIX}${guildId}`,
+                'Selecciona un problema frecuente',
+                categoryIssues,
+                draft.commonIssue || categoryIssues[0].value
+            )
+        ));
+    }
+
     const continueButton = new ButtonBuilder()
         .setCustomId(`${CONTINUE_PREFIX}${guildId}`)
         .setLabel('Continuar')
@@ -616,37 +624,45 @@ function buildSetupComponents(guildId, optionsConfig, draft) {
         .setLabel('Cancelar')
         .setStyle(ButtonStyle.Secondary);
 
-    return [
-        new ActionRowBuilder().addComponents(categorySelect),
-        new ActionRowBuilder().addComponents(issueSelect),
-        new ActionRowBuilder().addComponents(cancelButton, continueButton)
-    ];
+    rows.push(new ActionRowBuilder().addComponents(cancelButton, continueButton));
+    return rows;
 }
 
 function buildTicketPanelComponents(guildId, cfg, presetDraft = null) {
     const optionsConfig = buildSelectionConfig(cfg || {});
-    const firstCategoryValue = optionsConfig.categories[0]?.value || 'soporte-general';
-    const category = (presetDraft && optionsConfig.categories.some((item) => item.value === presetDraft.category))
+    const categories = optionsConfig.categories;
+    const firstCategoryValue = categories[0]?.value || '';
+    const category = (presetDraft && categories.some((item) => item.value === presetDraft.category))
         ? presetDraft.category
         : firstCategoryValue;
 
     const categoryIssues = getCommonIssuesForCategory(optionsConfig, category);
     const commonIssue = (presetDraft && categoryIssues.some((item) => item.value === presetDraft.commonIssue))
         ? presetDraft.commonIssue
-        : (categoryIssues[0]?.value || 'otro');
+        : (categoryIssues[0]?.value || '');
 
-    const categorySelect = buildSelectMenu(
-        `${PANEL_CATEGORY_SELECT_PREFIX}${guildId}`,
-        'Selecciona una categoria',
-        optionsConfig.categories,
-        category
-    );
-    const issueSelect = buildSelectMenu(
-        `${PANEL_COMMON_SELECT_PREFIX}${guildId}`,
-        'Selecciona un problema frecuente',
-        categoryIssues,
-        commonIssue
-    );
+    const rows = [];
+    if (categories.length) {
+        rows.push(new ActionRowBuilder().addComponents(
+            buildSelectMenu(
+                `${PANEL_CATEGORY_SELECT_PREFIX}${guildId}`,
+                'Selecciona una categoria',
+                categories,
+                category || categories[0].value
+            )
+        ));
+    }
+    if (categoryIssues.length) {
+        rows.push(new ActionRowBuilder().addComponents(
+            buildSelectMenu(
+                `${PANEL_COMMON_SELECT_PREFIX}${guildId}`,
+                'Selecciona un problema frecuente',
+                categoryIssues,
+                commonIssue || categoryIssues[0].value
+            )
+        ));
+    }
+
     const continueButton = new ButtonBuilder()
         .setCustomId(`${PANEL_CONTINUE_PREFIX}${guildId}`)
         .setLabel('Continuar')
@@ -657,11 +673,8 @@ function buildTicketPanelComponents(guildId, cfg, presetDraft = null) {
         .setLabel('Cancelar')
         .setStyle(ButtonStyle.Secondary);
 
-    return [
-        new ActionRowBuilder().addComponents(categorySelect),
-        new ActionRowBuilder().addComponents(issueSelect),
-        new ActionRowBuilder().addComponents(cancelButton, continueButton)
-    ];
+    rows.push(new ActionRowBuilder().addComponents(cancelButton, continueButton));
+    return rows;
 }
 
 function flowSessionKey(guildId, userId) {
@@ -1643,12 +1656,18 @@ async function handleTicketSelectMenu(interaction) {
     if (interaction.customId.startsWith(CATEGORY_SELECT_PREFIX)) {
         const guildId = interaction.customId.slice(CATEGORY_SELECT_PREFIX.length);
         await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
-            const selected = interaction.values?.[0] || optionsConfig.categories[0].value;
-            const valid = optionsConfig.categories.some((item) => item.value === selected);
-            draft.category = valid ? selected : optionsConfig.categories[0].value;
+            const categories = optionsConfig.categories || [];
+            if (!categories.length) {
+                draft.category = '';
+                draft.commonIssue = '';
+                return;
+            }
+            const selected = interaction.values?.[0] || categories[0].value;
+            const valid = categories.some((item) => item.value === selected);
+            draft.category = valid ? selected : categories[0].value;
 
             const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
-            draft.commonIssue = categoryIssues[0].value;
+            draft.commonIssue = categoryIssues[0]?.value || '';
         });
         return true;
     }
@@ -1657,6 +1676,10 @@ async function handleTicketSelectMenu(interaction) {
         const guildId = interaction.customId.slice(COMMON_SELECT_PREFIX.length);
         await updateTicketPresetSelector(interaction, guildId, (draft, optionsConfig) => {
             const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+            if (!categoryIssues.length) {
+                draft.commonIssue = '';
+                return;
+            }
             const selected = interaction.values?.[0] || categoryIssues[0].value;
             const valid = categoryIssues.some((item) => item.value === selected);
             draft.commonIssue = valid ? selected : categoryIssues[0].value;
@@ -1674,17 +1697,20 @@ async function handleTicketSelectMenu(interaction) {
 
         const optionsConfig = buildSelectionConfig(cfg);
         const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
-        const selected = interaction.values?.[0] || optionsConfig.categories[0].value;
-        const valid = optionsConfig.categories.some((item) => item.value === selected);
-        draft.category = valid ? selected : optionsConfig.categories[0].value;
+        const categories = optionsConfig.categories || [];
+        if (!categories.length) {
+            await interaction.deferUpdate().catch(() => null);
+            return true;
+        }
+        const selected = interaction.values?.[0] || categories[0].value;
+        const valid = categories.some((item) => item.value === selected);
+        draft.category = valid ? selected : categories[0].value;
         const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
-        draft.commonIssue = categoryIssues[0].value;
+        draft.commonIssue = categoryIssues[0]?.value || '';
         draft.updatedAt = Date.now();
 
-        await interaction.reply({
-            content: buildSetupContent(optionsConfig, draft),
-            components: buildSetupComponents(guildId, optionsConfig, draft),
-            flags: 64
+        await interaction.update({
+            components: buildTicketPanelComponents(guildId, cfg, draft)
         }).catch(() => null);
         return true;
     }
@@ -1700,15 +1726,17 @@ async function handleTicketSelectMenu(interaction) {
         const optionsConfig = buildSelectionConfig(cfg);
         const draft = getDraftForUser(guildId, interaction.user.id, optionsConfig);
         const categoryIssues = getCommonIssuesForCategory(optionsConfig, draft.category);
+        if (!categoryIssues.length) {
+            await interaction.deferUpdate().catch(() => null);
+            return true;
+        }
         const selected = interaction.values?.[0] || categoryIssues[0].value;
         const valid = categoryIssues.some((item) => item.value === selected);
         draft.commonIssue = valid ? selected : categoryIssues[0].value;
         draft.updatedAt = Date.now();
 
-        await interaction.reply({
-            content: buildSetupContent(optionsConfig, draft),
-            components: buildSetupComponents(guildId, optionsConfig, draft),
-            flags: 64
+        await interaction.update({
+            components: buildTicketPanelComponents(guildId, cfg, draft)
         }).catch(() => null);
         return true;
     }

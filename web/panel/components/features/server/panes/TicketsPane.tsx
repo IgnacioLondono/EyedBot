@@ -490,6 +490,10 @@ export function TicketsPane({ guildId }: { guildId: string }) {
 
           {tab === "categories" ? (
             <div className="space-y-8">
+              <Alert
+                title="Categorías 100% tuyas"
+                description="No hay categorías de fábrica. Añade solo las que quieras (etiqueta + valor). Lo mismo para problemas comunes. Vacío = no se muestra ese menú en Discord."
+              />
               <OptionEditor
                 title="Categorías de ticket"
                 options={config.ticketCategories}
