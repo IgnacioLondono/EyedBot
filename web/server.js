@@ -1272,6 +1272,12 @@ function ensureVerifyUploadsDir() {
     return uploadsDir;
 }
 
+function ensureTicketUploadsDir() {
+    const uploadsDir = path.join(uploadsRoot, 'tickets');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    return uploadsDir;
+}
+
 function ensureGachaCatalogUploadsDir() {
     const uploadsDir = path.join(uploadsRoot, 'gacha-catalog');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -3878,18 +3884,23 @@ async function buildVerifyPanelPayload(guildId, cfg, guild) {
     return { embed, files, components };
 }
 
-function buildTicketPanelPayload(guildId, cfg, guild) {
+async function buildTicketPanelPayload(guildId, cfg, guild) {
     const embed = new EmbedBuilder()
         .setColor((cfg.color || '7c4dff').replace('#', ''))
         .setTitle(applyGuildEmbedText(cfg.title || 'Soporte', { guild }))
         .setDescription(applyGuildEmbedText(cfg.message || 'Presiona el boton para abrir un ticket y explica el motivo de tu solicitud.', { guild }));
     if (cfg.footer) embed.setFooter({ text: applyGuildEmbedText(cfg.footer, { guild }) });
+    const files = [];
+    const imageUrl = canonicalPanelMediaUrl(cfg.imageUrl || cfg.image_url || '');
+    if (imageUrl) {
+        await applyWelcomeMediaToEmbed(embed, imageUrl, files, guild, 'image');
+    }
     const openTicketBtn = new ButtonBuilder()
         .setCustomId(ticketButtonCustomIdForGuild(guildId))
         .setStyle(ButtonStyle.Primary)
         .setLabel(applyGuildEmbedText(cfg.buttonLabel || 'Solicitar ticket', { guild }));
     const components = [new ActionRowBuilder().addComponents(openTicketBtn)];
-    return { embed, components };
+    return { embed, files, components };
 }
 
 async function syncVerifyPanelReaction(message, cfg) {
@@ -4049,8 +4060,12 @@ async function refreshTicketPanelMessage(guildId, updatedByUserId) {
         throw e;
     }
 
-    const { embed, components } = buildTicketPanelPayload(guildId, cfg, guild);
-    await message.edit({ embeds: [embed], components });
+    const { embed, files, components } = await buildTicketPanelPayload(guildId, cfg, guild);
+    await message.edit({
+        embeds: [embed],
+        files: files.length ? files : [],
+        components
+    });
 
     const updatedCfg = {
         ...cfg,
@@ -4541,6 +4556,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
                 footer: 'Sistema de Tickets',
                 buttonLabel: 'Solicitar ticket',
                 messageId: '',
+                imageUrl: '',
                 ticketCategories: [],
                 commonProblems: [],
                 supportAreas: [],
@@ -4556,6 +4572,7 @@ app.get('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async 
             receiptHistoryChannelId: String(cfg.receiptHistoryChannelId || '').trim(),
             sendDmReceipt: cfg.sendDmReceipt !== false,
             sendDmPendingStatus: cfg.sendDmPendingStatus === true,
+            imageUrl: canonicalPanelMediaUrl(cfg.imageUrl || cfg.image_url || ''),
             ticketCategories: Array.isArray(cfg.ticketCategories) ? cfg.ticketCategories : [],
             commonProblems: Array.isArray(cfg.commonProblems) ? cfg.commonProblems : [],
             supportAreas: Array.isArray(cfg.supportAreas)
@@ -4733,6 +4750,11 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             color: String(body.color || '7c4dff').replace('#', '').slice(0, 6),
             footer: String(body.footer || '').slice(0, 300),
             buttonLabel: String(body.buttonLabel || 'Solicitar ticket').slice(0, 80),
+            imageUrl: canonicalPanelMediaUrl(
+                body.imageUrl !== undefined || body.image_url !== undefined
+                    ? (body.imageUrl || body.image_url || '')
+                    : (currentCfg?.imageUrl || currentCfg?.image_url || '')
+            ),
             ticketCategories,
             commonProblems,
             supportAreas,
@@ -4743,6 +4765,7 @@ app.post('/api/guild/:guildId/ticket-config', requireAuth, requirePremium, async
             updatedAt: new Date().toISOString(),
             updatedBy: req.session.user?.id || 'unknown'
         };
+        config.image_url = config.imageUrl;
 
         await ticketStore.setTicketConfig(guildId, config);
         res.json({ success: true, config });
@@ -4779,10 +4802,11 @@ app.post('/api/guild/:guildId/ticket-publish', requireAuth, requirePremium, asyn
             return res.status(403).json({ error: 'Faltan permisos: Enviar mensajes o Insertar enlaces' });
         }
 
-        const { embed, components } = buildTicketPanelPayload(guildId, cfg, guild);
+        const { embed, files, components } = await buildTicketPanelPayload(guildId, cfg, guild);
 
         const posted = await channel.send({
             embeds: [embed],
+            files: files.length ? files : [],
             components
         });
 
@@ -4816,6 +4840,76 @@ app.post('/api/guild/:guildId/ticket-embed-update', requireAuth, requirePremium,
         const code = Number(error.statusCode);
         const status = code >= 400 && code < 600 ? code : 500;
         res.status(status).json({ error: error.message || 'Error al actualizar el panel de tickets' });
+    }
+});
+
+app.post('/api/guild/:guildId/ticket-image', requireAuth, requirePremium, upload.single('imageFile'), async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const file = req.file;
+        if (!file?.buffer) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+        if (!String(file.mimetype || '').startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
+
+        const uploadsDir = ensureTicketUploadsDir();
+        const currentCfg = (await ticketStore.getTicketConfig(guildId)) || {};
+        const previousUrl = String(currentCfg.imageUrl || currentCfg.image_url || '').trim();
+        deleteUploadDiskFile(previousUrl);
+
+        const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `ticket-${guildId}`);
+        const extension = extFromMimeOrName(file.mimetype, file.originalname);
+        const fileName = `${guildId}_${Date.now()}_${baseName}${extension}`;
+        const outputPath = path.join(uploadsDir, fileName);
+        fs.writeFileSync(outputPath, file.buffer);
+
+        const publicPath = `/uploads/tickets/${fileName}`;
+        const nextCfg = {
+            ...currentCfg,
+            imageUrl: publicPath,
+            image_url: publicPath,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+        await ticketStore.setTicketConfig(guildId, nextCfg);
+
+        res.json({
+            success: true,
+            url: buildPublicUploadUrl(req, publicPath),
+            path: publicPath,
+            config: nextCfg
+        });
+    } catch (error) {
+        console.error('Error subiendo imagen de tickets:', error);
+        res.status(500).json({ error: 'Error al subir imagen del panel de tickets' });
+    }
+});
+
+app.delete('/api/guild/:guildId/ticket-image', requireAuth, requirePremium, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const currentCfg = (await ticketStore.getTicketConfig(guildId)) || {};
+        const previousUrl = String(currentCfg.imageUrl || currentCfg.image_url || '').trim();
+        deleteUploadDiskFile(previousUrl);
+
+        const nextCfg = {
+            ...currentCfg,
+            imageUrl: '',
+            image_url: '',
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        };
+        await ticketStore.setTicketConfig(guildId, nextCfg);
+        res.json({ success: true, config: nextCfg });
+    } catch (error) {
+        console.error('Error eliminando imagen de tickets:', error);
+        res.status(500).json({ error: 'Error al eliminar imagen del panel de tickets' });
     }
 });
 

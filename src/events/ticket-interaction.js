@@ -139,10 +139,10 @@ function buildCaseRoleIds(config, details = {}) {
     return Array.from(mapped);
 }
 
-function buildCaseRoleSet(config, details = {}) {
-    const adminRoleSet = buildAdminRoleSet(config);
-    const caseRoleIds = buildCaseRoleIds(config, details);
-    return new Set([...adminRoleSet, ...caseRoleIds.map((id) => String(id))]);
+function buildCaseRoleSet(config, _details = {}) {
+    // Solo los roles de staff del panel (adminRoleIds) administran tickets.
+    void _details;
+    return buildAdminRoleSet(config);
 }
 
 function makePendingRequestId() {
@@ -1179,11 +1179,6 @@ async function createTicketChannel(interaction, guildId, reason, details = {}, o
     const validAdminRoles = adminRoleIds
         .map((id) => guild.roles.cache.get(id))
         .filter(Boolean);
-    const caseRoleIds = buildCaseRoleIds(cfg, details);
-    const validCaseRoles = caseRoleIds
-        .filter((id) => !adminRoleIds.includes(id))
-        .map((id) => guild.roles.cache.get(id))
-        .filter(Boolean);
 
     const categoryLabel = String(details?.category || 'Soporte general').trim().slice(0, 80) || 'Soporte general';
     const commonIssueLabel = String(details?.commonIssue || 'No especificado').trim().slice(0, 120) || 'No especificado';
@@ -1227,23 +1222,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}, o
         });
     });
 
-    validCaseRoles.forEach((role) => {
-        permissionOverwrites.push({
-            id: role.id,
-            allow: [
-                PermissionsBitField.Flags.ViewChannel,
-                PermissionsBitField.Flags.SendMessages,
-                PermissionsBitField.Flags.ReadMessageHistory,
-                PermissionsBitField.Flags.ManageMessages,
-                PermissionsBitField.Flags.ManageChannels
-            ]
-        });
-    });
-
-    const closerRoleIds = Array.from(new Set([
-        ...validAdminRoles.map((role) => String(role.id)),
-        ...validCaseRoles.map((role) => String(role.id))
-    ]));
+    const closerRoleIds = Array.from(new Set(validAdminRoles.map((role) => String(role.id))));
 
     const topic = [
         `owner:${ownerUserId}`,
@@ -1291,7 +1270,7 @@ async function createTicketChannel(interaction, guildId, reason, details = {}, o
         .setStyle(ButtonStyle.Danger);
 
     await created.send({
-        content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
+        content: `${validAdminRoles.map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
         embeds: [infoEmbed],
         components: [new ActionRowBuilder().addComponents(closeBtn)]
     }).catch(() => null);
@@ -1343,9 +1322,7 @@ async function closeTicket(interaction) {
 
     const ownerId = parseTicketOwner(channel.topic);
     const cfg = await ticketStore.getTicketConfig(guild.id);
-    const adminRoleSet = buildAdminRoleSet(cfg);
-    const staffRoleSet = new Set(parseTopicRoleIds(channel.topic, 'staff'));
-    const closerRoleSet = new Set([...adminRoleSet, ...staffRoleSet]);
+    const closerRoleSet = buildAdminRoleSet(cfg);
 
     const member = interaction.member;
     const canClose = memberCanCloseTicket(member, closerRoleSet);
@@ -1405,10 +1382,7 @@ async function handleTicketButton(interaction) {
             return true;
         }
 
-        const closerRoleSet = buildCaseRoleSet(cfg, {
-            categoryValue: pendingPreview.categoryValue,
-            commonIssueValue: pendingPreview.commonIssueValue
-        });
+        const closerRoleSet = buildAdminRoleSet(cfg);
 
         if (!memberCanCloseTicket(interaction.member, closerRoleSet)) {
             await interaction.reply({ content: 'No tienes permisos para aceptar esta solicitud.', flags: 64 }).catch(() => null);
@@ -1899,11 +1873,6 @@ async function acceptPendingFromWeb(botClient, guildId, requestId, acceptedByUse
             const validAdminRoles = adminRoleIds
                 .map((id) => guild.roles.cache.get(id))
                 .filter(Boolean);
-            const caseRoleIds = buildCaseRoleIds(cfg, details);
-            const validCaseRoles = caseRoleIds
-                .filter((id) => !adminRoleIds.includes(id))
-                .map((id) => guild.roles.cache.get(id))
-                .filter(Boolean);
 
             const categoryLabel = details.category.slice(0, 80);
             const commonIssueLabel = details.commonIssue.slice(0, 120);
@@ -1947,23 +1916,7 @@ async function acceptPendingFromWeb(botClient, guildId, requestId, acceptedByUse
                 });
             });
 
-            validCaseRoles.forEach((role) => {
-                permissionOverwrites.push({
-                    id: role.id,
-                    allow: [
-                        PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.SendMessages,
-                        PermissionsBitField.Flags.ReadMessageHistory,
-                        PermissionsBitField.Flags.ManageMessages,
-                        PermissionsBitField.Flags.ManageChannels
-                    ]
-                });
-            });
-
-            const closerRoleIds = Array.from(new Set([
-                ...validAdminRoles.map((role) => String(role.id)),
-                ...validCaseRoles.map((role) => String(role.id))
-            ]));
+            const closerRoleIds = Array.from(new Set(validAdminRoles.map((role) => String(role.id))));
 
             const topic = [
                 `owner:${ownerUserId}`,
@@ -2016,7 +1969,7 @@ async function acceptPendingFromWeb(botClient, guildId, requestId, acceptedByUse
                 .setStyle(ButtonStyle.Danger);
 
             await created.send({
-                content: `${[...validAdminRoles, ...validCaseRoles].map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
+                content: `${validAdminRoles.map((r) => `<@&${r.id}>`).join(' ')} <@${ownerUserId}>`.trim() || undefined,
                 embeds: [infoEmbed],
                 components: [new ActionRowBuilder().addComponents(closeBtn)]
             }).catch(() => null);
@@ -2383,9 +2336,7 @@ async function closeTicketFromWeb(botClient, guildId, channelId, closerUserId) {
     }
 
     const cfg = await ticketStore.getTicketConfig(guild.id);
-    const adminRoleSet = buildAdminRoleSet(cfg);
-    const staffRoleSet = new Set(parseTopicRoleIds(channel.topic, 'staff'));
-    const closerRoleSet = new Set([...adminRoleSet, ...staffRoleSet]);
+    const closerRoleSet = buildAdminRoleSet(cfg);
 
     const member = await guild.members.fetch(String(closerUserId)).catch(() => null);
     if (!member) {

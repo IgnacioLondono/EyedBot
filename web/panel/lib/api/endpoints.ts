@@ -315,6 +315,18 @@ export const saveTicketConfig = (guildId: string, body: Record<string, unknown>)
 export const publishTickets = (guildId: string, body?: Record<string, unknown>) =>
   apiFetch(`/api/guild/${g(guildId)}/ticket-publish`, { method: "POST", body });
 
+export const updateTicketEmbed = (guildId: string, body?: Record<string, unknown>) =>
+  apiFetch(`/api/guild/${g(guildId)}/ticket-embed-update`, { method: "POST", body });
+
+export const uploadTicketImage = (guildId: string, file: File) => {
+  const form = new FormData();
+  form.append("imageFile", file);
+  return apiForm(`/api/guild/${g(guildId)}/ticket-image`, form);
+};
+
+export const deleteTicketImage = (guildId: string) =>
+  apiFetch(`/api/guild/${g(guildId)}/ticket-image`, { method: "DELETE" });
+
 export const getTicketsOverview = (guildId: string, params?: { historyLimit?: number }) => {
   const search = new URLSearchParams();
   if (params?.historyLimit) search.set("historyLimit", String(params.historyLimit));
@@ -359,9 +371,6 @@ export const deleteTicketReport = (guildId: string, reportId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/tickets/reports/${encodeURIComponent(reportId)}`, {
     method: "DELETE",
   });
-
-export const updateTicketEmbed = (guildId: string, body?: Record<string, unknown>) =>
-  apiFetch(`/api/guild/${g(guildId)}/ticket-embed-update`, { method: "POST", body });
 
 // ─── Leveling ───────────────────────────────────────────────────────
 

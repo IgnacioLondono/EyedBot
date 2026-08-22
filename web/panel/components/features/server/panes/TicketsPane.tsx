@@ -7,6 +7,8 @@ import {
   publishTickets,
   saveTicketConfig,
   updateTicketEmbed,
+  uploadTicketImage,
+  deleteTicketImage,
 } from "@/lib/api/endpoints";
 import { TicketsManagePanel } from "@/components/features/server/panes/TicketsManagePanel";
 import { TicketFlowBuilder } from "@/components/features/server/panes/TicketFlowBuilder";
@@ -30,7 +32,8 @@ import {
   SectionCard,
   Textarea,
 } from "@/components/features/shared";
-import { DiscordEmbedShell } from "@/components/features/embed/EmbedPreview";
+import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
+import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { applyTicketPreset, TICKET_PRESETS } from "@/lib/ticket-presets";
 import {
@@ -73,6 +76,7 @@ type TicketConfigState = {
   buttonLabel: string;
   color: string;
   footer: string;
+  imageUrl: string;
   adminRoleIds: string[];
   ticketCategories: TicketOption[];
   commonProblems: TicketOption[];
@@ -340,6 +344,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
     buttonLabel: "Solicitar ticket",
     color: "7c4dff",
     footer: "Sistema de Tickets",
+    imageUrl: "",
     adminRoleIds: [],
     ticketCategories: [],
     commonProblems: [],
@@ -351,6 +356,8 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [updatingEmbed, setUpdatingEmbed] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingImage, setDeletingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
@@ -373,6 +380,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
           buttonLabel: toStringValue(cfg.buttonLabel, "Solicitar ticket"),
           color: toStringValue(cfg.color, "7c4dff").replace("#", ""),
           footer: toStringValue(cfg.footer, "Sistema de Tickets"),
+          imageUrl: toStringValue(cfg.imageUrl || cfg.image_url),
           adminRoleIds: normalizeRoleIds(cfg.adminRoleIds),
           ticketCategories: normalizeTitleCategories(cfg.ticketCategories),
           commonProblems: normalizeOptions(cfg.commonProblems),
@@ -534,6 +542,39 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                     <Input value={config.footer} onChange={(event) => setConfig((c) => ({ ...c, footer: event.target.value }))} />
                   </Field>
                 </div>
+                <EmbedImageField
+                  label="Imagen del embed"
+                  description="URL o archivo. Se muestra en el panel de tickets de Discord."
+                  value={config.imageUrl}
+                  onChange={(imageUrl) => setConfig((c) => ({ ...c, imageUrl }))}
+                  uploading={uploadingImage}
+                  deleting={deletingImage}
+                  onUpload={async (file) => {
+                    setUploadingImage(true);
+                    try {
+                      const result = asRecord(await uploadTicketImage(guildId, file));
+                      const imageUrl = toStringValue(result.path || result.url);
+                      setConfig((c) => ({ ...c, imageUrl }));
+                      toast({ title: "Imagen subida", description: "Guarda o actualiza el embed para publicarla.", tone: "success" });
+                    } catch (err) {
+                      toast({ title: "No se pudo subir", description: getErrorMessage(err), tone: "danger" });
+                    } finally {
+                      setUploadingImage(false);
+                    }
+                  }}
+                  onDelete={async () => {
+                    setDeletingImage(true);
+                    try {
+                      await deleteTicketImage(guildId);
+                      setConfig((c) => ({ ...c, imageUrl: "" }));
+                      toast({ title: "Imagen eliminada", description: "Se quitó la imagen del panel.", tone: "success" });
+                    } catch (err) {
+                      toast({ title: "No se pudo eliminar", description: getErrorMessage(err), tone: "danger" });
+                    } finally {
+                      setDeletingImage(false);
+                    }
+                  }}
+                />
                 <div className="flex flex-wrap gap-3">
                   <FormActions onSave={handleSaveConfig} saving={saving} />
                   <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing}>
@@ -618,7 +659,10 @@ export function TicketsPane({ guildId }: { guildId: string }) {
 
           {tab === "roles" ? (
             <div className="space-y-5">
-              <Field label="Roles de staff" description="Selecciona los roles que pueden gestionar tickets.">
+              <Field
+                label="Roles de staff"
+                description="Estos roles del panel son los que ven, aceptan y cierran tickets. Los roles por categoría en Labs no administran."
+              >
                 <MultiRoleSelect
                   value={config.adminRoleIds}
                   onChange={(adminRoleIds) => setConfig((c) => ({ ...c, adminRoleIds }))}
@@ -636,20 +680,18 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                   <Eye className="h-4 w-4" />
                   Vista previa del embed
                 </div>
-                <DiscordEmbedShell color={previewColor}>
-                  <div className="p-4">
-                    <p className="font-semibold text-white">{config.title || "Soporte"}</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-[#dcddde]">
-                      {config.message || "Presiona el botón para abrir un ticket."}
-                    </p>
-                    <p className="mt-4 text-xs text-[#949ba4]">{config.footer || "Sistema de Tickets"}</p>
-                    <div className="mt-4">
-                      <span className="inline-flex rounded-lg bg-[#5865f2] px-4 py-2 text-sm font-medium text-white">
-                        {config.buttonLabel || "Solicitar ticket"}
-                      </span>
-                    </div>
-                  </div>
-                </DiscordEmbedShell>
+                <DiscordEmbedPreview
+                  color={previewColor}
+                  title={config.title || "Soporte"}
+                  description={config.message || "Presiona el botón para abrir un ticket."}
+                  footer={config.footer || "Sistema de Tickets"}
+                  imageUrl={config.imageUrl}
+                />
+                <div className="mt-4">
+                  <span className="inline-flex rounded-lg bg-[#5865f2] px-4 py-2 text-sm font-medium text-white">
+                    {config.buttonLabel || "Solicitar ticket"}
+                  </span>
+                </div>
               </div>
               <Alert
                 title="Publicación"
@@ -699,7 +741,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
               </Field>
               <div className="space-y-4">
                 <p className="text-sm text-zinc-400">
-                  Asigna roles de staff por categoría o caso. Las claves coinciden con el valor de cada opción del panel.
+                  Los tickets los administran solo los roles de la pestaña Roles. Este mapa es opcional y ya no otorga permisos de gestión.
                 </p>
                 {caseEntries.length ? (
                   caseEntries.map((entry) => (
