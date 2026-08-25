@@ -5593,6 +5593,24 @@ function normalizeAntiRaidConfigInput(body = {}, current = null, userId = 'unkno
         actionWindowSec: Math.max(10, Math.min(300, Number.parseInt(body.actionWindowSec ?? base.actionWindowSec ?? 60, 10) || 60)),
         trustedRoleIds,
         alertChannelId: String(body.alertChannelId ?? base.alertChannelId ?? '').trim(),
+        botFilterEnabled: body.botFilterEnabled === true,
+        botFilterMode: ['verified_only', 'allowlist_only', 'log_only'].includes(
+            String(body.botFilterMode || base.botFilterMode || 'verified_only')
+        )
+            ? String(body.botFilterMode || base.botFilterMode || 'verified_only')
+            : 'verified_only',
+        botFilterAction: ['kick', 'ban', 'log'].includes(
+            String(body.botFilterAction || base.botFilterAction || 'kick')
+        )
+            ? String(body.botFilterAction || base.botFilterAction || 'kick')
+            : 'kick',
+        botAllowlistIds: Array.isArray(body.botAllowlistIds)
+            ? body.botAllowlistIds
+                .map((id) => String(id || '').trim())
+                .filter((id) => /^\d{10,25}$/.test(id))
+                .slice(0, 100)
+            : (Array.isArray(base.botAllowlistIds) ? base.botAllowlistIds : []),
+        botRoleId: String(body.botRoleId ?? base.botRoleId ?? '').trim().slice(0, 25),
         updatedAt: new Date().toISOString(),
         updatedBy: userId
     };

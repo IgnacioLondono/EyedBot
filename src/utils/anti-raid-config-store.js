@@ -76,6 +76,16 @@ function defaultConfig() {
         actionWindowSec: 60,
         trustedRoleIds: [],
         alertChannelId: '',
+        /** Filtro de bots al unirse */
+        botFilterEnabled: false,
+        /** verified_only | allowlist_only | log_only */
+        botFilterMode: 'verified_only',
+        /** kick | ban | log */
+        botFilterAction: 'kick',
+        /** IDs de bots siempre permitidos (aunque no estén verificados) */
+        botAllowlistIds: [],
+        /** Rol opcional para bots permitidos (ej. «Bots») */
+        botRoleId: '',
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
     };

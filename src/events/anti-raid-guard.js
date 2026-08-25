@@ -1,4 +1,4 @@
-const { AuditLogEvent, ChannelType, PermissionFlagsBits } = require('discord.js');
+const { AuditLogEvent, ChannelType, PermissionFlagsBits, UserFlags } = require('discord.js');
 const antiRaidStore = require('../utils/anti-raid-config-store');
 
 const messageWindowMap = new Map();
@@ -123,10 +123,128 @@ async function handleMessageCreate(message) {
     }
 }
 
+async function isDiscordVerifiedBot(user) {
+    if (!user?.bot) return false;
+    let flags = user.flags;
+    if (!flags) {
+        try {
+            const fetched = await user.fetch(true);
+            flags = fetched.flags;
+        } catch {
+            flags = null;
+        }
+    }
+    if (!flags) return false;
+    try {
+        return flags.has(UserFlags.VerifiedBot);
+    } catch {
+        return false;
+    }
+}
+
+async function applyBotFilterAction(member, action, reason) {
+    const guild = member.guild;
+    const me = guild.members.me;
+    if (!me || member.id === me.id) return false;
+    if (member.id === guild.ownerId) return false;
+    if (member.roles.highest.position >= me.roles.highest.position) return false;
+
+    const mode = String(action || 'kick');
+    if (mode === 'ban' && me.permissions.has(PermissionFlagsBits.BanMembers)) {
+        await member.ban({ reason }).catch(() => null);
+        return true;
+    }
+    if ((mode === 'kick' || mode === 'ban') && me.permissions.has(PermissionFlagsBits.KickMembers)) {
+        await member.kick(reason).catch(() => null);
+        return true;
+    }
+    return false;
+}
+
+async function assignBotRole(member, botRoleId) {
+    const roleId = String(botRoleId || '').trim();
+    if (!roleId || !member?.guild) return;
+    const me = member.guild.members.me;
+    if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) return;
+    const role = member.guild.roles.cache.get(roleId)
+        || await member.guild.roles.fetch(roleId).catch(() => null);
+    if (!role || role.position >= me.roles.highest.position) return;
+    if (member.roles.cache.has(role.id)) return;
+    await member.roles.add(role, 'Bot permitido: rol de bots').catch(() => null);
+}
+
+/**
+ * Decide si un bot puede quedarse en el servidor.
+ * - verified_only: verificados por Discord + allowlist
+ * - allowlist_only: solo IDs en allowlist
+ * - log_only: nunca echa; solo registra
+ */
+async function handleBotJoinFilter(member, config) {
+    if (!config || config.botFilterEnabled !== true) return false;
+    if (!member?.user?.bot) return false;
+
+    const me = member.guild.members.me;
+    if (me && member.id === me.id) return true;
+
+    const allowlist = new Set(
+        (Array.isArray(config.botAllowlistIds) ? config.botAllowlistIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean)
+    );
+    const onAllowlist = allowlist.has(String(member.id));
+    const verified = await isDiscordVerifiedBot(member.user);
+    const mode = String(config.botFilterMode || 'verified_only');
+    const action = String(config.botFilterAction || 'kick');
+
+    let allowed = false;
+    if (mode === 'allowlist_only') {
+        allowed = onAllowlist;
+    } else if (mode === 'log_only') {
+        allowed = true;
+    } else {
+        // verified_only (default)
+        allowed = verified || onAllowlist;
+    }
+
+    const statusLabel = verified ? 'verificado' : 'no verificado';
+    const allowLabel = onAllowlist ? ' · allowlist' : '';
+
+    if (allowed) {
+        await assignBotRole(member, config.botRoleId);
+        await sendAlert(
+            member.guild,
+            config,
+            `Bot permitido (${statusLabel}${allowLabel}): **${member.user.tag}** (\`${member.id}\`).`
+        );
+        return true;
+    }
+
+    await sendAlert(
+        member.guild,
+        config,
+        `Bot bloqueado (${statusLabel}): **${member.user.tag}** (\`${member.id}\`). Acción: ${action}.`
+    );
+
+    if (action === 'log') return true;
+
+    await applyBotFilterAction(
+        member,
+        action,
+        `Filtro de bots: ${statusLabel} no permitido (modo ${mode})`
+    );
+    return true;
+}
+
 async function handleGuildMemberAdd(member) {
-    if (!member || !member.guild || member.user?.bot) return;
+    if (!member || !member.guild) return;
 
     const config = await antiRaidStore.getAntiRaidConfig(member.guild.id);
+
+    if (member.user?.bot) {
+        await handleBotJoinFilter(member, config).catch(() => null);
+        return;
+    }
+
     if (!config || config.enabled !== true) return;
 
     const joinLimit = Math.max(2, Number.parseInt(config.joinRateThreshold || 8, 10) || 8);

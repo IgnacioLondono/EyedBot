@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { getAntiRaidConfig, saveAntiRaidConfig } from "@/lib/api/endpoints";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
+import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
@@ -17,17 +18,23 @@ import {
   Input,
   LockedOverlay,
   PremiumLock,
+  RoleSelect,
   SectionCard,
   Select,
+  Textarea,
 } from "@/components/features/shared";
 import { asRecord, getErrorMessage, toBooleanValue, toNumberValue, toStringValue } from "@/lib/utils";
 
 const SECURITY_TABS = [
   { id: "raid", label: "Anti-raid" },
+  { id: "bots", label: "Bots" },
   { id: "antispam", label: "Anti-spam" },
   { id: "content", label: "Contenido" },
 ];
 const SECURITY_TAB_IDS = SECURITY_TABS.map((item) => item.id);
+
+type BotFilterMode = "verified_only" | "allowlist_only" | "log_only";
+type BotFilterAction = "kick" | "ban" | "log";
 
 type AntiRaidState = {
   enabled: boolean;
@@ -47,6 +54,11 @@ type AntiRaidState = {
   timeoutMinutes: number;
   actionCooldownSec: number;
   alertChannelId: string;
+  botFilterEnabled: boolean;
+  botFilterMode: BotFilterMode;
+  botFilterAction: BotFilterAction;
+  botAllowlistIds: string[];
+  botRoleId: string;
 };
 
 const defaultAntiRaid: AntiRaidState = {
@@ -67,7 +79,22 @@ const defaultAntiRaid: AntiRaidState = {
   timeoutMinutes: 30,
   actionCooldownSec: 30,
   alertChannelId: "",
+  botFilterEnabled: false,
+  botFilterMode: "verified_only",
+  botFilterAction: "kick",
+  botAllowlistIds: [],
+  botRoleId: "",
 };
+
+function normalizeIdList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((id) => String(id || "").trim()).filter((id) => /^\d{10,25}$/.test(id));
+  }
+  return String(value || "")
+    .split(/[\s,]+/)
+    .map((id) => id.trim())
+    .filter((id) => /^\d{10,25}$/.test(id));
+}
 
 function normalizeAntiRaid(value: unknown): AntiRaidState {
   const data = asRecord(value);
@@ -75,6 +102,16 @@ function normalizeAntiRaid(value: unknown): AntiRaidState {
   const actionMode = (["timeout", "kick", "ban"] as const).includes(actionModeRaw as AntiRaidState["actionMode"])
     ? (actionModeRaw as AntiRaidState["actionMode"])
     : "timeout";
+  const botModeRaw = toStringValue(data.botFilterMode, "verified_only");
+  const botFilterMode = (["verified_only", "allowlist_only", "log_only"] as const).includes(
+    botModeRaw as BotFilterMode
+  )
+    ? (botModeRaw as BotFilterMode)
+    : "verified_only";
+  const botActionRaw = toStringValue(data.botFilterAction, "kick");
+  const botFilterAction = (["kick", "ban", "log"] as const).includes(botActionRaw as BotFilterAction)
+    ? (botActionRaw as BotFilterAction)
+    : "kick";
 
   return {
     enabled: toBooleanValue(data.enabled, true),
@@ -103,15 +140,22 @@ function normalizeAntiRaid(value: unknown): AntiRaidState {
     timeoutMinutes: toNumberValue(data.timeoutMinutes, defaultAntiRaid.timeoutMinutes),
     actionCooldownSec: toNumberValue(data.actionCooldownSec, defaultAntiRaid.actionCooldownSec),
     alertChannelId: toStringValue(data.alertChannelId || data.channelId),
+    botFilterEnabled: toBooleanValue(data.botFilterEnabled),
+    botFilterMode,
+    botFilterAction,
+    botAllowlistIds: normalizeIdList(data.botAllowlistIds),
+    botRoleId: toStringValue(data.botRoleId),
   };
 }
 
 export function SecurityPane({ guildId }: { guildId: string }) {
   const { premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
+  const { roles } = useGuildRoles(guildId);
   const { toast } = useToast();
   const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "security"), "raid", SECURITY_TAB_IDS);
   const [antiRaid, setAntiRaid] = useState<AntiRaidState>(defaultAntiRaid);
+  const [allowlistText, setAllowlistText] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +165,9 @@ export function SecurityPane({ guildId }: { guildId: string }) {
     void getAntiRaidConfig(guildId)
       .then((antiRaidData) => {
         if (!active) return;
-        setAntiRaid(normalizeAntiRaid(antiRaidData));
+        const next = normalizeAntiRaid(antiRaidData);
+        setAntiRaid(next);
+        setAllowlistText(next.botAllowlistIds.join("\n"));
       })
       .catch((err) => {
         if (active) setError(getErrorMessage(err));
@@ -138,7 +184,11 @@ export function SecurityPane({ guildId }: { guildId: string }) {
   async function saveAntiRaid() {
     setSaving(true);
     try {
-      await saveAntiRaidConfig(guildId, antiRaid);
+      const botAllowlistIds = normalizeIdList(allowlistText);
+      const payload = { ...antiRaid, botAllowlistIds };
+      await saveAntiRaidConfig(guildId, payload);
+      setAntiRaid(payload);
+      setAllowlistText(botAllowlistIds.join("\n"));
       toast({ title: "Seguridad guardada", description: "La configuración anti-raid fue actualizada.", tone: "success" });
     } catch (err) {
       toast({ title: "No se pudo guardar", description: getErrorMessage(err), tone: "danger" });
@@ -247,6 +297,87 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                   />
                 </Field>
               </div>
+              <FormActions onSave={saveAntiRaid} saving={saving} />
+            </div>
+          ) : null}
+
+          {tab === "bots" ? (
+            <div className="space-y-5">
+              <Alert
+                title="Filtro de bots"
+                description="Detecta si un bot está verificado por Discord (badge oficial). Los no verificados se pueden expulsar; los verificados o en allowlist entran."
+              />
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                <div>
+                  <p className="font-medium text-white">Activar filtro de bots</p>
+                  <p className="text-sm text-zinc-400">Se aplica al instante cuando un bot entra al servidor.</p>
+                </div>
+                <Switch
+                  checked={antiRaid.botFilterEnabled}
+                  onCheckedChange={(checked) => setAntiRaid((c) => ({ ...c, botFilterEnabled: checked }))}
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Política">
+                  <Select
+                    value={antiRaid.botFilterMode}
+                    onChange={(event) =>
+                      setAntiRaid((c) => ({
+                        ...c,
+                        botFilterMode: event.target.value as BotFilterMode,
+                      }))
+                    }
+                  >
+                    <option value="verified_only">Solo verificados (+ allowlist)</option>
+                    <option value="allowlist_only">Solo allowlist (IDs)</option>
+                    <option value="log_only">Solo registrar (no expulsar)</option>
+                  </Select>
+                </Field>
+                <Field label="Acción si no pasa">
+                  <Select
+                    value={antiRaid.botFilterAction}
+                    onChange={(event) =>
+                      setAntiRaid((c) => ({
+                        ...c,
+                        botFilterAction: event.target.value as BotFilterAction,
+                      }))
+                    }
+                  >
+                    <option value="kick">Expulsar</option>
+                    <option value="ban">Ban</option>
+                    <option value="log">Solo log</option>
+                  </Select>
+                </Field>
+              </div>
+              <Field
+                label="Allowlist de bots (IDs)"
+                description="Un ID por línea. Estos bots entran aunque no estén verificados (útil para EyedBot auxiliares, Mudae, etc.)."
+              >
+                <Textarea
+                  value={allowlistText}
+                  onChange={(event) => setAllowlistText(event.target.value)}
+                  placeholder={"1495268496823681095\n…"}
+                  rows={5}
+                />
+              </Field>
+              <Field
+                label="Rol para bots permitidos"
+                description="Opcional. Si eliges el rol «Bots», se lo asigna a los que pasan el filtro."
+              >
+                <RoleSelect
+                  value={antiRaid.botRoleId}
+                  onChange={(botRoleId) => setAntiRaid((c) => ({ ...c, botRoleId }))}
+                  options={roles}
+                  placeholder="Sin rol automático"
+                />
+              </Field>
+              <Field label="Canal de alerta" description="Usa el mismo canal de anti-raid si ya lo configuraste.">
+                <ChannelSelect
+                  value={antiRaid.alertChannelId}
+                  onChange={(alertChannelId) => setAntiRaid((c) => ({ ...c, alertChannelId }))}
+                  options={channels}
+                />
+              </Field>
               <FormActions onSave={saveAntiRaid} saving={saving} />
             </div>
           ) : null}
