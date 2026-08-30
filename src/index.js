@@ -402,25 +402,6 @@ client.once('clientReady', async () => {
         }
     }
 
-    console.log('🔄 Registrando comandos slash en Discord...');
-    const slashOk = await registerSlashCommands().catch((error) => {
-        console.error('❌ Error registrando slash al arrancar:', error?.message || error);
-        return false;
-    });
-    if (!slashOk) {
-        console.warn('⚠️ El registro inicial de slash no terminó bien; se reintentará en unos segundos.');
-    }
-
-    if (COMMAND_REGISTER_POST_READY_DELAY_MS > 0) {
-        setTimeout(async () => {
-            const retryOk = await registerSlashCommands().catch((error) => {
-                console.error('❌ Error en re-sincronización automática de slash:', error?.message || error);
-                return false;
-            });
-            if (retryOk) console.log('✅ Re-sincronización de slash completada.');
-        }, COMMAND_REGISTER_POST_READY_DELAY_MS);
-    }
-
     startBackupScheduler();
     await seedVoiceAnalyticsSessions(client);
     startVoiceXpLoop(client);
@@ -440,6 +421,28 @@ client.once('clientReady', async () => {
     startEventsGiveawaysScheduler(client);
     startWeeklySummaryScheduler(client);
     seedPresencesFromClient(client);
+
+    console.log('🔄 Registrando comandos slash en segundo plano (el bot sigue operativo)...');
+    void registerSlashCommands()
+        .then((ok) => {
+            if (ok) console.log('✅ Registro de slash completado.');
+            else console.warn('⚠️ Registro de slash incompleto; se reintentará automáticamente.');
+        })
+        .catch((error) => {
+            console.error('❌ Error registrando slash:', error?.message || error);
+        });
+
+    if (COMMAND_REGISTER_POST_READY_DELAY_MS > 0) {
+        setTimeout(() => {
+            void registerSlashCommands()
+                .then((retryOk) => {
+                    if (retryOk) console.log('✅ Re-sincronización de slash completada.');
+                })
+                .catch((error) => {
+                    console.error('❌ Error en re-sincronización automática de slash:', error?.message || error);
+                });
+        }, COMMAND_REGISTER_POST_READY_DELAY_MS);
+    }
 });
 
 client.on('guildCreate', (guild) => {
@@ -822,5 +825,8 @@ async function gracefulShutdown(signal) {
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('unhandledRejection', (reason) => {
+    console.error('⚠️ unhandledRejection:', reason?.message || reason);
+});
 
 main();
