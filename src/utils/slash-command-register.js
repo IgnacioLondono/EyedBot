@@ -1,7 +1,7 @@
 const { Routes } = require('discord.js');
 
 const DEFAULT_POST_DELAY_MS = Math.max(300, Number.parseInt(process.env.SLASH_POST_DELAY_MS || '800', 10));
-const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '120000', 10));
+const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '50000', 10));
 
 function parseGuildIdList(raw = '') {
     return String(raw)
@@ -99,11 +99,12 @@ async function registerGuildCommandsIncremental(rest, appId, guildId, commandPay
 
                 const timedOut = /timeout/i.test(error.message || '');
                 if (timedOut) {
+                    await sleep(2000);
                     existing = await getGuildCommands(rest, appId, guildId);
                     existingByName.clear();
                     for (const cmd of existing) existingByName.set(cmd.name, cmd);
                     const after = existingByName.get(payload.name);
-                    if (after && (!current || commandPayloadsEqual(after, payload) || after.id !== current?.id)) {
+                    if (after) {
                         if (!current) created += 1;
                         else if (!commandPayloadsEqual(current, payload)) updated += 1;
                         else skipped += 1;
