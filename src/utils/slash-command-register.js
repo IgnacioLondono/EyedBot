@@ -3,7 +3,7 @@ const { Routes } = require('discord.js');
 const DEFAULT_POST_DELAY_MS = Math.max(200, Number.parseInt(process.env.SLASH_POST_DELAY_MS || '350', 10));
 const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(1500, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '3000', 10));
 const DEFAULT_BULK_TIMEOUT_MS = Math.max(15000, Number.parseInt(process.env.SLASH_BULK_TIMEOUT_MS || '90000', 10));
-const DEFAULT_SETTLE_MS = Math.max(5000, Number.parseInt(process.env.SLASH_SETTLE_MS || '12000', 10));
+const DEFAULT_SETTLE_MS = Math.max(5000, Number.parseInt(process.env.SLASH_SETTLE_MS || '20000', 10));
 const DEFAULT_INCREMENTAL_ROUNDS = Math.max(1, Number.parseInt(process.env.SLASH_INCREMENTAL_ROUNDS || '8', 10));
 
 function parseGuildIdList(raw = '') {
@@ -56,24 +56,17 @@ async function patchGuildCommand(rest, appId, guildId, commandId, body, timeoutM
     );
 }
 
-async function fireUpsertCommand(rest, appId, guildId, payload, current, timeoutMs) {
+function fireUpsertCommand(rest, appId, guildId, payload, current) {
     const op = current
         ? rest.patch(Routes.applicationGuildCommand(appId, guildId, current.id), { body: payload })
         : rest.post(Routes.applicationGuildCommands(appId, guildId), { body: payload });
 
-    try {
-        await Promise.race([
-            op,
-            sleep(timeoutMs).then(() => Promise.reject(new Error('timeout')))
-        ]);
-    } catch (error) {
-        if (error.status === 429) {
+    op.catch((error) => {
+        if (error?.status === 429) {
             const wait = Math.ceil((error.rawError?.retry_after || 3) * 1000) + 300;
-            await sleep(wait);
-            return fireUpsertCommand(rest, appId, guildId, payload, current, timeoutMs);
+            setTimeout(() => fireUpsertCommand(rest, appId, guildId, payload, current), wait);
         }
-        /* timeout u otro: se confirma con GET al cerrar la ronda */
-    }
+    });
 }
 
 /**
@@ -103,10 +96,12 @@ async function registerGuildCommandsIncremental(rest, appId, guildId, commandPay
 
         if (onProgress) onProgress('round', round, `${pending.length} pendientes`);
 
+        console.log(`🔄 Slash guild ${guildId}: ronda ${round}/${maxRounds}, ${pending.length} pendientes...`);
+
         for (let i = 0; i < pending.length; i++) {
             const payload = pending[i];
             const current = existingByName.get(payload.name);
-            await fireUpsertCommand(rest, appId, guildId, payload, current, timeoutMs);
+            await fireUpsertCommand(rest, appId, guildId, payload, current);
             if (onProgress) onProgress(current ? 'update' : 'create', payload.name);
 
             if ((i + 1) % batchSize === 0) await sleep(1500);
@@ -116,6 +111,7 @@ async function registerGuildCommandsIncremental(rest, appId, guildId, commandPay
         await sleep(settleMs);
         if (onProgress) {
             const mid = await getGuildCommands(rest, appId, guildId);
+            console.log(`   → ${mid.length}/${commandPayloads.length} comandos en API`);
             onProgress('round', round, `${mid.length}/${commandPayloads.length} en API`);
         }
     }
