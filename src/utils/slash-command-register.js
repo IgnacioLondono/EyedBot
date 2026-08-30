@@ -2,6 +2,9 @@ const { Routes } = require('discord.js');
 
 const DEFAULT_POST_DELAY_MS = Math.max(200, Number.parseInt(process.env.SLASH_POST_DELAY_MS || '350', 10));
 const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '10000', 10));
+const DEFAULT_BULK_TIMEOUT_MS = Math.max(15000, Number.parseInt(process.env.SLASH_BULK_TIMEOUT_MS || '90000', 10));
+const DEFAULT_SETTLE_MS = Math.max(5000, Number.parseInt(process.env.SLASH_SETTLE_MS || '12000', 10));
+const DEFAULT_INCREMENTAL_ROUNDS = Math.max(1, Number.parseInt(process.env.SLASH_INCREMENTAL_ROUNDS || '8', 10));
 
 function parseGuildIdList(raw = '') {
     return String(raw)
@@ -10,11 +13,9 @@ function parseGuildIdList(raw = '') {
         .filter(Boolean);
 }
 
+/** Solo guilds listados en env; GUILD_ID ya no fuerza modo lento (se intenta PUT normal primero). */
 function getIncrementalGuildIds() {
-    const fromEnv = parseGuildIdList(process.env.SLASH_INCREMENTAL_GUILD_IDS || '');
-    const guildId = String(process.env.GUILD_ID || '').trim();
-    const forced = parseGuildIdList(process.env.FORCED_SLASH_GUILD_IDS || '');
-    return Array.from(new Set([...fromEnv, guildId, ...forced].filter(Boolean)));
+    return parseGuildIdList(process.env.SLASH_INCREMENTAL_GUILD_IDS || '');
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,82 +56,85 @@ async function patchGuildCommand(rest, appId, guildId, commandId, body, timeoutM
     );
 }
 
+async function upsertOneCommand(rest, appId, guildId, payload, current, timeoutMs) {
+    if (current) {
+        await patchGuildCommand(rest, appId, guildId, current.id, payload, timeoutMs);
+        return 'update';
+    }
+    await postGuildCommand(rest, appId, guildId, payload, timeoutMs);
+    return 'create';
+}
+
 /**
- * Registra comandos uno a uno (POST/PATCH). Tras timeout verifica con GET por si Discord aplicó el cambio sin responder.
+ * Completa comandos faltantes en rondas (POST/PATCH corto + pausa + GET).
+ * Usado al arrancar cuando el PUT masivo no responde (p. ej. EyedComun).
  */
 async function registerGuildCommandsIncremental(rest, appId, guildId, commandPayloads, options = {}) {
     const delayMs = options.delayMs ?? DEFAULT_POST_DELAY_MS;
     const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    const settleMs = options.settleMs ?? DEFAULT_SETTLE_MS;
+    const maxRounds = options.maxRounds ?? DEFAULT_INCREMENTAL_ROUNDS;
+    const batchSize = Math.max(1, options.batchSize ?? 8);
     const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
-
-    let existing = await getGuildCommands(rest, appId, guildId);
-    const existingByName = new Map(existing.map((cmd) => [cmd.name, cmd]));
 
     let created = 0;
     let updated = 0;
     let skipped = 0;
-    let failed = 0;
 
-    for (const payload of commandPayloads) {
-        const current = existingByName.get(payload.name);
+    for (let round = 1; round <= maxRounds; round++) {
+        const existing = await getGuildCommands(rest, appId, guildId);
+        const existingByName = new Map(existing.map((cmd) => [cmd.name, cmd]));
 
-        if (current && commandPayloadsEqual(current, payload)) {
-            skipped += 1;
-            continue;
+        const pending = commandPayloads.filter((payload) => {
+            const current = existingByName.get(payload.name);
+            return !current || !commandPayloadsEqual(current, payload);
+        });
+
+        if (!pending.length) {
+            skipped = commandPayloads.length - created - updated;
+            return { created, updated, skipped, failed: 0, total: existing.length, mode: 'incremental' };
         }
 
-        let success = false;
-        for (let attempt = 1; attempt <= 4 && !success; attempt++) {
+        if (onProgress) onProgress('round', round, `${pending.length} pendientes`);
+
+        for (let i = 0; i < pending.length; i++) {
+            const payload = pending[i];
+            const current = existingByName.get(payload.name);
             try {
-                if (current) {
-                    await patchGuildCommand(rest, appId, guildId, current.id, payload, timeoutMs);
-                    updated += 1;
-                } else {
-                    await postGuildCommand(rest, appId, guildId, payload, timeoutMs);
-                    created += 1;
-                }
-                success = true;
+                const action = await upsertOneCommand(rest, appId, guildId, payload, current, timeoutMs);
+                if (action === 'create') created += 1;
+                else updated += 1;
+                if (onProgress) onProgress(action, payload.name);
             } catch (error) {
                 if (error.status === 429) {
-                    const wait = Math.ceil((error.rawError?.retry_after || 5) * 1000) + 500;
+                    const wait = Math.ceil((error.rawError?.retry_after || 3) * 1000) + 300;
                     await sleep(wait);
+                    i -= 1;
                     continue;
                 }
-
-                const timedOut = /timeout/i.test(error.message || '');
-                if (timedOut) {
-                    await sleep(2000);
-                    existing = await getGuildCommands(rest, appId, guildId);
-                    existingByName.clear();
-                    for (const cmd of existing) existingByName.set(cmd.name, cmd);
-                    const after = existingByName.get(payload.name);
-                    if (after) {
-                        if (!current) created += 1;
-                        else if (!commandPayloadsEqual(current, payload)) updated += 1;
-                        else skipped += 1;
-                        success = true;
-                        break;
-                    }
-                }
-
-                if (attempt === 4) {
-                    failed += 1;
-                    if (onProgress) onProgress('error', payload.name, error.message || error);
-                } else {
-                    await sleep(1500);
-                }
+                /* Timeout u otro error: se verifica al final de la ronda con GET */
             }
+
+            if ((i + 1) % batchSize === 0) await sleep(1500);
+            else await sleep(delayMs);
         }
 
-        if (success && onProgress) {
-            onProgress(current ? 'update' : 'create', payload.name);
-        }
-
-        if (success) await sleep(delayMs);
+        await sleep(settleMs);
     }
 
     const finalList = await getGuildCommands(rest, appId, guildId);
-    return { created, updated, skipped, failed, total: finalList.length };
+    const finalNames = new Set(finalList.map((c) => c.name));
+    const missing = commandPayloads.filter((p) => !finalNames.has(p.name));
+    const failed = missing.length;
+
+    if (failed > 0) {
+        const err = new Error(`Faltan ${failed} comandos en guild ${guildId}: ${missing.map((c) => c.name).join(', ')}`);
+        err.partialStats = { created, updated, skipped: commandPayloads.length - created - updated - failed, failed, total: finalList.length, mode: 'incremental' };
+        throw err;
+    }
+
+    skipped = commandPayloads.length - created - updated;
+    return { created, updated, skipped, failed: 0, total: finalList.length, mode: 'incremental' };
 }
 
 async function registerGuildCommandsBulk(rest, appId, guildId, commandPayloads, timeoutMs) {
@@ -139,40 +143,39 @@ async function registerGuildCommandsBulk(rest, appId, guildId, commandPayloads, 
         timeoutMs,
         'PUT'
     );
-    return { mode: 'bulk', total: Array.isArray(result) ? result.length : commandPayloads.length };
+    const total = Array.isArray(result) ? result.length : commandPayloads.length;
+    return { mode: 'bulk', total };
 }
 
 /**
- * PUT masivo por defecto; guilds lentos (GUILD_ID / SLASH_INCREMENTAL_GUILD_IDS) usan POST incremental.
- * Si PUT falla o hace timeout, reintenta incremental en ese guild.
+ * Flujo normal al arrancar: PUT masivo (como otros servidores). Si hace timeout, completa en rondas hasta tener todos.
  */
 async function registerGuildCommands(rest, appId, guildId, commandPayloads, options = {}) {
-    const incrementalGuildIds = options.incrementalGuildIds ?? getIncrementalGuildIds();
-    const perGuildTimeoutMs = options.perGuildTimeoutMs ?? 0;
-    const forceIncremental = options.forceIncremental === true || incrementalGuildIds.includes(guildId);
+    const forceIncremental = options.forceIncremental === true
+        || getIncrementalGuildIds().includes(guildId);
+    const bulkTimeoutMs = options.bulkTimeoutMs ?? DEFAULT_BULK_TIMEOUT_MS;
     const onProgress = options.onProgress;
 
-    if (!forceIncremental && perGuildTimeoutMs !== 0) {
+    if (!forceIncremental) {
         try {
-            return await registerGuildCommandsBulk(rest, appId, guildId, commandPayloads, perGuildTimeoutMs);
+            const bulk = await registerGuildCommandsBulk(rest, appId, guildId, commandPayloads, bulkTimeoutMs);
+            if (bulk.total >= commandPayloads.length) {
+                return bulk;
+            }
+            console.warn(`⚠️ PUT slash devolvió ${bulk.total}/${commandPayloads.length} en guild ${guildId}. Completando...`);
         } catch (error) {
-            console.warn(`⚠️ PUT slash falló en guild ${guildId} (${error.message || error}). Usando registro incremental...`);
-        }
-    } else if (!forceIncremental) {
-        try {
-            return await registerGuildCommandsBulk(rest, appId, guildId, commandPayloads, 0);
-        } catch (error) {
-            console.warn(`⚠️ PUT slash falló en guild ${guildId} (${error.message || error}). Usando registro incremental...`);
+            console.warn(`⚠️ PUT slash falló en guild ${guildId} (${error.message || error}). Completando en rondas...`);
         }
     }
 
-    const stats = await registerGuildCommandsIncremental(rest, appId, guildId, commandPayloads, {
+    return registerGuildCommandsIncremental(rest, appId, guildId, commandPayloads, {
         delayMs: options.delayMs,
         timeoutMs: options.timeoutMs,
+        settleMs: options.settleMs,
+        maxRounds: options.maxRounds,
+        batchSize: options.batchSize,
         onProgress
     });
-
-    return { mode: 'incremental', ...stats };
 }
 
 function prioritizeGuildIds(guildIds, primaryGuildId) {
@@ -184,6 +187,7 @@ function prioritizeGuildIds(guildIds, primaryGuildId) {
 module.exports = {
     DEFAULT_POST_DELAY_MS,
     DEFAULT_REQUEST_TIMEOUT_MS,
+    DEFAULT_BULK_TIMEOUT_MS,
     getIncrementalGuildIds,
     registerGuildCommands,
     registerGuildCommandsBulk,

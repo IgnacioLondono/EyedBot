@@ -194,10 +194,13 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                     try {
                         const result = await syncGuildSlashCommands(rest, appId, guildId, commands, {
                             perGuildTimeoutMs,
-                            onProgress: (action, name) => verboseLog(`  ${action} /${name} en ${guildName}`)
+                            bulkTimeoutMs: guildId === GUILD_ID ? 120000 : 90000,
+                            onProgress: (action, name, extra) => {
+                                if (action === 'round') verboseLog(`  ronda ${name}: ${extra}`);
+                                else verboseLog(`  ${action} /${name} en ${guildName}`);
+                            }
                         });
-                        const incomplete = result.mode === 'incremental'
-                            && (result.failed > 0 || result.total < commands.length);
+                        const incomplete = result.total < commands.length || result.failed > 0;
                         if (incomplete) {
                             failedGuilds.push(guildId);
                             console.warn(
@@ -206,6 +209,9 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                             );
                         } else {
                             okCount += 1;
+                            if (guildId === GUILD_ID) {
+                                console.log(`✅ EyedComun: ${result.total} comandos slash registrados (${result.mode}).`);
+                            }
                         }
                         const detail = result.mode === 'incremental'
                             ? `incremental: ${result.total} cmds (+${result.created} ~${result.updated} =${result.skipped} x${result.failed})`
@@ -213,7 +219,9 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                         verboseLog(`✅ Slash registrados en guild ${guildName} (${guildId}) [${detail}].`);
                     } catch (guildError) {
                         failedGuilds.push(guildId);
-                        console.warn(`⚠️ No se pudieron registrar slash en guild ${guildName} (${guildId}):`, guildError?.message || guildError);
+                        const partial = guildError.partialStats;
+                        const partialMsg = partial ? ` (${partial.total}/${commands.length} en API)` : '';
+                        console.warn(`⚠️ No se pudieron registrar slash en guild ${guildName} (${guildId})${partialMsg}:`, guildError?.message || guildError);
                     }
                 }
 
@@ -234,6 +242,9 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                         return `${guildName} (${guildId})`;
                     });
                     console.warn(`⚠️ Guilds con fallo de registro: ${failedDetails.join(', ')}`);
+                    if (GUILD_ID && failedGuilds.includes(GUILD_ID)) {
+                        throw new Error(`Registro incompleto en EyedComun (${GUILD_ID})`);
+                    }
                 }
                 return true;
             } catch (error) {
@@ -375,15 +386,22 @@ client.once('clientReady', async () => {
         }
     }
 
-    registerSlashCommands().catch((error) => {
-        console.error('❌ Error inesperado registrando slash:', error?.message || error);
+    console.log('🔄 Registrando comandos slash en Discord...');
+    const slashOk = await registerSlashCommands().catch((error) => {
+        console.error('❌ Error registrando slash al arrancar:', error?.message || error);
+        return false;
     });
+    if (!slashOk) {
+        console.warn('⚠️ El registro inicial de slash no terminó bien; se reintentará en unos segundos.');
+    }
 
     if (COMMAND_REGISTER_POST_READY_DELAY_MS > 0) {
-        setTimeout(() => {
-            registerSlashCommands().catch((error) => {
+        setTimeout(async () => {
+            const retryOk = await registerSlashCommands().catch((error) => {
                 console.error('❌ Error en re-sincronización automática de slash:', error?.message || error);
+                return false;
             });
+            if (retryOk) console.log('✅ Re-sincronización de slash completada.');
         }, COMMAND_REGISTER_POST_READY_DELAY_MS);
     }
 
