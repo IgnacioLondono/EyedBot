@@ -196,7 +196,17 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                             perGuildTimeoutMs,
                             onProgress: (action, name) => verboseLog(`  ${action} /${name} en ${guildName}`)
                         });
-                        okCount += 1;
+                        const incomplete = result.mode === 'incremental'
+                            && (result.failed > 0 || result.total < commands.length);
+                        if (incomplete) {
+                            failedGuilds.push(guildId);
+                            console.warn(
+                                `⚠️ Slash incompletos en ${guildName} (${guildId}): ${result.total}/${commands.length} en API` +
+                                (result.failed ? `, ${result.failed} fallidos` : '')
+                            );
+                        } else {
+                            okCount += 1;
+                        }
                         const detail = result.mode === 'incremental'
                             ? `incremental: ${result.total} cmds (+${result.created} ~${result.updated} =${result.skipped} x${result.failed})`
                             : `bulk: ${result.total} cmds`;

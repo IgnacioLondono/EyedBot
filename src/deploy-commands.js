@@ -76,23 +76,18 @@ const rest = new REST({ version: '10' }).setToken(token);
     try {
         console.log(`🔄 Registrando ${commands.length} comandos en guild ${guildId}...`);
 
-        await rest.put(
-            Routes.applicationGuildCommands(clientId, guildId),
-            { body: [] }
-        );
-
-        await rest.put(
-            Routes.applicationCommands(clientId),
-            { body: [] }
-        );
-
+        // PUT reemplaza todos los comandos del guild de una vez (no vaciar antes).
         const guildData = await rest.put(
             Routes.applicationGuildCommands(clientId, guildId),
             { body: commands }
         );
         console.log(`✅ Guild actualizado: ${guildData.length} comandos.`);
 
-        console.log('🧹 Limpieza de comandos obsoletos completada (guild/global).');
+        await rest.put(Routes.applicationCommands(clientId), { body: [] }).catch((err) => {
+            console.warn('⚠️ No se pudieron limpiar comandos globales:', err?.message || err);
+        });
+
+        console.log('🧹 Comandos globales limpiados (guild intacto).');
     } catch (error) {
         if (error?.status === 401) {
             console.error('❌ 401 Unauthorized: token invalido o regenerado.');
