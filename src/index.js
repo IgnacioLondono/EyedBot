@@ -181,47 +181,64 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
     }
 
     for (const appId of appIds) {
+        const registerOneGuild = async (guildId) => {
+            const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
+            verboseLog(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
+            const result = await syncGuildSlashCommands(rest, appId, guildId, commands, {
+                perGuildTimeoutMs,
+                bulkTimeoutMs: guildId === GUILD_ID ? 60000 : 120000,
+                maxRounds: guildId === GUILD_ID ? 20 : 8,
+                settleMs: guildId === GUILD_ID ? 25000 : 15000,
+                timeoutMs: guildId === GUILD_ID ? 20000 : 15000,
+                onProgress: (action, name, extra) => {
+                    if (action === 'round') verboseLog(`  ronda ${name}: ${extra}`);
+                    else verboseLog(`  ${action} /${name} en ${guildName}`);
+                }
+            });
+            const incomplete = result.total < commands.length || result.failed > 0;
+            if (incomplete) {
+                console.warn(
+                    `⚠️ Slash incompletos en ${guildName} (${guildId}): ${result.total}/${commands.length} en API` +
+                    (result.failed ? `, ${result.failed} fallidos` : '')
+                );
+                return { guildId, ok: false, result };
+            }
+            if (guildId === GUILD_ID) {
+                console.log(`✅ EyedComun: ${result.total} comandos slash registrados (${result.mode}).`);
+            }
+            verboseLog(`✅ Slash registrados en guild ${guildName} (${guildId}) [${result.mode}: ${result.total} cmds].`);
+            return { guildId, ok: true, result };
+        };
+
         for (let attempt = 1; attempt <= retries; attempt++) {
             try {
                 verboseLog(`🔄 Registrando comandos en Discord (app ${appId}, intento ${attempt}/${retries})...`);
 
                 let okCount = 0;
                 const failedGuilds = [];
-                for (const guildId of resolvedTargetGuildIds) {
-                    const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
-                    verboseLog(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
+                const primaryId = GUILD_ID && resolvedTargetGuildIds.includes(GUILD_ID) ? GUILD_ID : null;
+                const otherGuildIds = resolvedTargetGuildIds.filter((id) => id !== primaryId);
 
+                const otherResults = await Promise.allSettled(
+                    otherGuildIds.map((guildId) => registerOneGuild(guildId))
+                );
+                for (const settled of otherResults) {
+                    if (settled.status === 'fulfilled') {
+                        if (settled.value.ok) okCount += 1;
+                        else failedGuilds.push(settled.value.guildId);
+                    } else {
+                        console.warn('⚠️ Error registrando slash en un servidor:', settled.reason?.message || settled.reason);
+                    }
+                }
+
+                if (primaryId) {
                     try {
-                        const result = await syncGuildSlashCommands(rest, appId, guildId, commands, {
-                            perGuildTimeoutMs,
-                            bulkTimeoutMs: guildId === GUILD_ID ? 45000 : 90000,
-                            onProgress: (action, name, extra) => {
-                                if (action === 'round') verboseLog(`  ronda ${name}: ${extra}`);
-                                else verboseLog(`  ${action} /${name} en ${guildName}`);
-                            }
-                        });
-                        const incomplete = result.total < commands.length || result.failed > 0;
-                        if (incomplete) {
-                            failedGuilds.push(guildId);
-                            console.warn(
-                                `⚠️ Slash incompletos en ${guildName} (${guildId}): ${result.total}/${commands.length} en API` +
-                                (result.failed ? `, ${result.failed} fallidos` : '')
-                            );
-                        } else {
-                            okCount += 1;
-                            if (guildId === GUILD_ID) {
-                                console.log(`✅ EyedComun: ${result.total} comandos slash registrados (${result.mode}).`);
-                            }
-                        }
-                        const detail = result.mode === 'incremental'
-                            ? `incremental: ${result.total} cmds (+${result.created} ~${result.updated} =${result.skipped} x${result.failed})`
-                            : `bulk: ${result.total} cmds`;
-                        verboseLog(`✅ Slash registrados en guild ${guildName} (${guildId}) [${detail}].`);
+                        const primary = await registerOneGuild(primaryId);
+                        if (primary.ok) okCount += 1;
+                        else failedGuilds.push(primary.guildId);
                     } catch (guildError) {
-                        failedGuilds.push(guildId);
-                        const partial = guildError.partialStats;
-                        const partialMsg = partial ? ` (${partial.total}/${commands.length} en API)` : '';
-                        console.warn(`⚠️ No se pudieron registrar slash en guild ${guildName} (${guildId})${partialMsg}:`, guildError?.message || guildError);
+                        failedGuilds.push(primaryId);
+                        console.warn(`⚠️ No se pudieron registrar slash en EyedComun (${primaryId}):`, guildError?.message || guildError);
                     }
                 }
 
