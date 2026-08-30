@@ -1,7 +1,7 @@
 const { Routes } = require('discord.js');
 
-const DEFAULT_POST_DELAY_MS = Math.max(300, Number.parseInt(process.env.SLASH_POST_DELAY_MS || '800', 10));
-const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '50000', 10));
+const DEFAULT_POST_DELAY_MS = Math.max(200, Number.parseInt(process.env.SLASH_POST_DELAY_MS || '350', 10));
+const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '10000', 10));
 
 function parseGuildIdList(raw = '') {
     return String(raw)
