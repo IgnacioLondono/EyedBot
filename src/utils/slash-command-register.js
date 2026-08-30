@@ -20,10 +20,13 @@ function getIncrementalGuildIds() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function commandPayloadsEqual(a, b) {
-    if (!a || !b) return false;
-    if (a.name !== b.name) return false;
-    return JSON.stringify(a) === JSON.stringify(b);
+function commandNeedsSync(current, payload) {
+    if (!current) return true;
+    const stripMeta = (cmd) => {
+        const { id, application_id, version, nsfw, ...rest } = cmd;
+        return rest;
+    };
+    return JSON.stringify(stripMeta(current)) !== JSON.stringify(payload);
 }
 
 async function withTimeout(promise, timeoutMs, label = 'request') {
@@ -87,7 +90,7 @@ async function registerGuildCommandsIncremental(rest, appId, guildId, commandPay
 
         const pending = commandPayloads.filter((payload) => {
             const current = existingByName.get(payload.name);
-            return !current || !commandPayloadsEqual(current, payload);
+            return commandNeedsSync(current, payload);
         });
 
         if (!pending.length) {
