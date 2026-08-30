@@ -4,7 +4,6 @@ const DEFAULT_POST_DELAY_MS = Math.max(500, Number.parseInt(process.env.SLASH_PO
 const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '20000', 10));
 const DEFAULT_BULK_TIMEOUT_MS = Math.max(15000, Number.parseInt(process.env.SLASH_BULK_TIMEOUT_MS || '120000', 10));
 const DEFAULT_SETTLE_MS = Math.max(8000, Number.parseInt(process.env.SLASH_SETTLE_MS || '25000', 10));
-const DEFAULT_INCREMENTAL_ROUNDS = Math.max(1, Number.parseInt(process.env.SLASH_INCREMENTAL_ROUNDS || '15', 10));
 
 function parseGuildIdList(raw = '') {
     return String(raw)
@@ -64,24 +63,26 @@ async function postMissingCommand(rest, appId, guildId, payload, timeoutMs) {
 }
 
 /**
- * Completa comandos faltantes uno a uno. Tras timeout verifica con GET.
+ * Registra comandos faltantes uno a uno hasta que todos estén en la API.
  */
 async function registerGuildCommandsIncremental(rest, appId, guildId, commandPayloads, options = {}) {
     const delayMs = options.delayMs ?? DEFAULT_POST_DELAY_MS;
     const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     const settleMs = options.settleMs ?? DEFAULT_SETTLE_MS;
-    const maxRounds = options.maxRounds ?? DEFAULT_INCREMENTAL_ROUNDS;
     const batchSize = Math.max(1, options.batchSize ?? 5);
     const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
 
     let posted = 0;
+    let lastApiCount = 0;
+    let stallPasses = 0;
 
-    for (let round = 1; round <= maxRounds; round++) {
+    while (true) {
         const existing = await getGuildCommands(rest, appId, guildId);
         const existingNames = new Set(existing.map((cmd) => cmd.name));
         const pending = commandPayloads.filter((payload) => !existingNames.has(payload.name));
 
         if (!pending.length) {
+            console.log(`✅ Slash guild ${guildId}: ${existing.length}/${commandPayloads.length} comandos listos.`);
             return {
                 created: posted,
                 updated: 0,
@@ -92,8 +93,8 @@ async function registerGuildCommandsIncremental(rest, appId, guildId, commandPay
             };
         }
 
-        console.log(`🔄 Slash guild ${guildId}: ronda ${round}/${maxRounds}, ${pending.length} pendientes...`);
-        if (onProgress) onProgress('round', round, `${pending.length} pendientes`);
+        console.log(`🔄 Slash guild ${guildId}: ${pending.length} pendientes (${existing.length}/${commandPayloads.length} en API)...`);
+        if (onProgress) onProgress('progress', pending.length, `${existing.length}/${commandPayloads.length}`);
 
         for (let i = 0; i < pending.length; i++) {
             const ok = await postMissingCommand(rest, appId, guildId, pending[i], timeoutMs);
@@ -107,21 +108,19 @@ async function registerGuildCommandsIncremental(rest, appId, guildId, commandPay
         await sleep(settleMs);
         const mid = await getGuildCommands(rest, appId, guildId);
         console.log(`   → ${mid.length}/${commandPayloads.length} comandos en API`);
-        if (onProgress) onProgress('round', round, `${mid.length}/${commandPayloads.length} en API`);
+
+        if (mid.length === lastApiCount) {
+            stallPasses += 1;
+            if (stallPasses >= 2) {
+                console.log(`   ⏳ Sin avance; esperando un poco más antes de reintentar...`);
+                await sleep(settleMs);
+                stallPasses = 0;
+            }
+        } else {
+            stallPasses = 0;
+            lastApiCount = mid.length;
+        }
     }
-
-    const finalList = await getGuildCommands(rest, appId, guildId);
-    const finalNames = new Set(finalList.map((c) => c.name));
-    const failed = commandPayloads.filter((p) => !finalNames.has(p.name)).length;
-
-    return {
-        created: posted,
-        updated: 0,
-        skipped: Math.max(0, commandPayloads.length - failed),
-        failed,
-        total: finalList.length,
-        mode: 'incremental'
-    };
 }
 
 async function registerGuildCommandsBulk(rest, appId, guildId, commandPayloads, timeoutMs) {

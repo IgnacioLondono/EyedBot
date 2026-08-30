@@ -187,11 +187,10 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
             const result = await syncGuildSlashCommands(rest, appId, guildId, commands, {
                 perGuildTimeoutMs,
                 bulkTimeoutMs: guildId === GUILD_ID ? 60000 : 120000,
-                maxRounds: guildId === GUILD_ID ? 20 : 8,
                 settleMs: guildId === GUILD_ID ? 25000 : 15000,
                 timeoutMs: guildId === GUILD_ID ? 20000 : 15000,
                 onProgress: (action, name, extra) => {
-                    if (action === 'round') verboseLog(`  ronda ${name}: ${extra}`);
+                    if (action === 'progress') verboseLog(`  ${name} pendientes (${extra})`);
                     else verboseLog(`  ${action} /${name} en ${guildName}`);
                 }
             });
