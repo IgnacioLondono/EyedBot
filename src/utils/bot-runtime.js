@@ -18,9 +18,11 @@ const { handleCountingMessage } = require('../events/counting-game');
 const { handleVoiceStateUpdate } = require('../events/temp-voice');
 const { handleTempVoiceButton, handleTempVoiceModal } = require('../events/temp-voice-interaction');
 const { handleAFKAuthorReturn, handleAFKMentions } = require('../events/messageCreate');
+const { handleStarboardReaction } = require('../events/starboard');
 const guildActivityStore = require('./guild-activity-store');
 const { handleDisboardBumpMessage } = require('./bump-reminder-scheduler');
 const { handleGiveawayButton } = require('./giveaway-service');
+const { registerGuildCommands: syncGuildSlashCommands } = require('./slash-command-register');
 
 const MUSIC_ENABLED = (process.env.MUSIC_ENABLED || 'false').toLowerCase() === 'true';
 const SLOW_COMMAND_WARN_MS = Math.max(250, Number.parseInt(process.env.SLOW_COMMAND_WARN_MS || '1200', 10));
@@ -125,19 +127,8 @@ async function registerSlashCommandsForClient(client, token, commandPayloads, op
         try {
             let okCount = 0;
             for (const guildId of guildIds) {
-                const registerOne = rest.put(
-                    Routes.applicationGuildCommands(appId, guildId),
-                    { body: commandPayloads }
-                );
                 try {
-                    if (perGuildTimeoutMs > 0) {
-                        await Promise.race([
-                            registerOne,
-                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), perGuildTimeoutMs))
-                        ]);
-                    } else {
-                        await registerOne;
-                    }
+                    await syncGuildSlashCommands(rest, appId, guildId, commandPayloads, { perGuildTimeoutMs });
                     okCount += 1;
                 } catch (guildError) {
                     console.warn(`⚠️ Slash auxiliar falló en guild ${guildId}:`, guildError?.message || guildError);
@@ -450,7 +441,10 @@ function attachGuildEventHandlers(client, options = {}) {
     });
 
     client.on('messageReactionAdd', async (reaction, user) => {
-        try { await handleReactionAdd(reaction, user); } catch (error) {
+        try {
+            await handleReactionAdd(reaction, user);
+            await handleStarboardReaction(reaction, user);
+        } catch (error) {
             console.error('Error en messageReactionAdd:', error);
         }
     });

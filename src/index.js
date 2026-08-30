@@ -22,6 +22,7 @@ const { handleCountingMessage } = require('./events/counting-game');
 const { handleVoiceStateUpdate, sweepOrphanTempChannels } = require('./events/temp-voice');
 const { handleTempVoiceButton, handleTempVoiceModal } = require('./events/temp-voice-interaction');
 const { handleAFKAuthorReturn, handleAFKMentions } = require('./events/messageCreate');
+const { handleStarboardReaction } = require('./events/starboard');
 const guildActivityStore = require('./utils/guild-activity-store');
 const db = require('./utils/database');
 const {
@@ -37,6 +38,10 @@ const { startEventsGiveawaysScheduler, stopEventsGiveawaysScheduler, handleGivea
 const { startWeeklySummaryScheduler, stopWeeklySummaryScheduler } = require('./utils/weekly-summary-service');
 const presenceStore = require('./utils/presence-store');
 const { attachPresenceTracking, seedPresencesFromClient } = require('./events/presence-tracker');
+const {
+    registerGuildCommands: syncGuildSlashCommands,
+    prioritizeGuildIds
+} = require('./utils/slash-command-register');
 require('dotenv').config();
 
 let webPanel = null;
@@ -164,10 +169,11 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
         }
     }
 
-    resolvedTargetGuildIds = Array.from(new Set([
+    resolvedTargetGuildIds = prioritizeGuildIds(Array.from(new Set([
         ...resolvedTargetGuildIds,
-        ...FORCED_SLASH_GUILD_IDS
-    ].filter(Boolean)));
+        ...FORCED_SLASH_GUILD_IDS,
+        GUILD_ID
+    ].filter(Boolean))), GUILD_ID);
 
     if (!resolvedTargetGuildIds.length) {
         console.error('❌ No se puede registrar slash: el bot no tiene servidores disponibles.');
@@ -185,24 +191,16 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                     const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
                     verboseLog(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
 
-                    const registerOneGuild = rest.put(
-                        Routes.applicationGuildCommands(appId, guildId),
-                        { body: commands }
-                    );
-
                     try {
-                        if (perGuildTimeoutMs > 0) {
-                            const timeoutOneGuild = new Promise((_, reject) => {
-                                setTimeout(() => {
-                                    reject(new Error(`timeout ${perGuildTimeoutMs}ms`));
-                                }, perGuildTimeoutMs);
-                            });
-                            await Promise.race([registerOneGuild, timeoutOneGuild]);
-                        } else {
-                            await registerOneGuild;
-                        }
+                        const result = await syncGuildSlashCommands(rest, appId, guildId, commands, {
+                            perGuildTimeoutMs,
+                            onProgress: (action, name) => verboseLog(`  ${action} /${name} en ${guildName}`)
+                        });
                         okCount += 1;
-                        verboseLog(`✅ Slash registrados en guild ${guildName} (${guildId}).`);
+                        const detail = result.mode === 'incremental'
+                            ? `incremental: ${result.total} cmds (+${result.created} ~${result.updated} =${result.skipped} x${result.failed})`
+                            : `bulk: ${result.total} cmds`;
+                        verboseLog(`✅ Slash registrados en guild ${guildName} (${guildId}) [${detail}].`);
                     } catch (guildError) {
                         failedGuilds.push(guildId);
                         console.warn(`⚠️ No se pudieron registrar slash en guild ${guildName} (${guildId}):`, guildError?.message || guildError);
@@ -490,6 +488,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 client.on('messageReactionAdd', async (reaction, user) => {
     try {
         await handleReactionAdd(reaction, user);
+        await handleStarboardReaction(reaction, user);
     } catch (error) {
         console.error('Error en messageReactionAdd (verify):', error);
     }
