@@ -194,7 +194,7 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
                     try {
                         const result = await syncGuildSlashCommands(rest, appId, guildId, commands, {
                             perGuildTimeoutMs,
-                            bulkTimeoutMs: guildId === GUILD_ID ? 120000 : 90000,
+                            bulkTimeoutMs: guildId === GUILD_ID ? 45000 : 90000,
                             onProgress: (action, name, extra) => {
                                 if (action === 'round') verboseLog(`  ronda ${name}: ${extra}`);
                                 else verboseLog(`  ${action} /${name} en ${guildName}`);

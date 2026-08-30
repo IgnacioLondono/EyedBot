@@ -1,9 +1,9 @@
 const { Routes } = require('discord.js');
 
-const DEFAULT_POST_DELAY_MS = Math.max(200, Number.parseInt(process.env.SLASH_POST_DELAY_MS || '350', 10));
+const DEFAULT_POST_DELAY_MS = Math.max(400, Number.parseInt(process.env.SLASH_POST_DELAY_MS || '600', 10));
 const DEFAULT_REQUEST_TIMEOUT_MS = Math.max(1500, Number.parseInt(process.env.SLASH_REQUEST_TIMEOUT_MS || '3000', 10));
 const DEFAULT_BULK_TIMEOUT_MS = Math.max(15000, Number.parseInt(process.env.SLASH_BULK_TIMEOUT_MS || '90000', 10));
-const DEFAULT_SETTLE_MS = Math.max(5000, Number.parseInt(process.env.SLASH_SETTLE_MS || '20000', 10));
+const DEFAULT_SETTLE_MS = Math.max(10000, Number.parseInt(process.env.SLASH_SETTLE_MS || '45000', 10));
 const DEFAULT_INCREMENTAL_ROUNDS = Math.max(1, Number.parseInt(process.env.SLASH_INCREMENTAL_ROUNDS || '8', 10));
 
 function parseGuildIdList(raw = '') {
@@ -68,6 +68,10 @@ function fireUpsertCommand(rest, appId, guildId, payload, current) {
         if (error?.status === 429) {
             const wait = Math.ceil((error.rawError?.retry_after || 3) * 1000) + 300;
             setTimeout(() => fireUpsertCommand(rest, appId, guildId, payload, current), wait);
+            return;
+        }
+        if (error?.status) {
+            console.warn(`⚠️ Slash ${payload.name} en ${guildId}: HTTP ${error.status} — ${error.message || 'error'}`);
         }
     });
 }
