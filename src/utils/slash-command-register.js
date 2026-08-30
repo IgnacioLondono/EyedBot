@@ -88,10 +88,7 @@ async function registerGuildCommandsIncremental(rest, appId, guildId, commandPay
         const existing = await getGuildCommands(rest, appId, guildId);
         const existingByName = new Map(existing.map((cmd) => [cmd.name, cmd]));
 
-        const pending = commandPayloads.filter((payload) => {
-            const current = existingByName.get(payload.name);
-            return commandNeedsSync(current, payload);
-        });
+        const pending = commandPayloads.filter((payload) => !existingByName.has(payload.name));
 
         if (!pending.length) {
             return { created: 0, updated: 0, skipped: commandPayloads.length, failed: 0, total: existing.length, mode: 'incremental' };
