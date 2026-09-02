@@ -93,7 +93,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                 <span className="truncate">{brandLabel}</span>
               </Link>
             ) : (
-              <EyedBotLogo href={homeHref} label={brandLabel} showText="always" className="min-w-0 flex-1 font-semibold" />
+              <EyedBotLogo href={homeHref} label={brandLabel} showText="desktop" className="min-w-0 flex-1 font-semibold" />
             )}
 
             <div className="flex items-center gap-2">
