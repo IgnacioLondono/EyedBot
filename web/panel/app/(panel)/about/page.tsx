@@ -67,13 +67,21 @@ export default function AboutPage() {
         title={overview?.botName ? `Conoce ${overview.botName}` : "Conoce EyedBot"}
         description="Bot y panel web para moderar, automatizar y hacer crecer tu comunidad de Discord."
         actions={
-          <Link
-            href="/premium"
-            className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-accent)]/30 bg-[color:var(--color-accent)]/10 px-3 py-2 text-sm text-[color:var(--color-brand-light)]"
-          >
-            <Sparkles className="h-4 w-4" />
-            EyedPlus+
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/docs"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-zinc-300 hover:bg-white/[0.07]"
+            >
+              Documentación completa
+            </Link>
+            <Link
+              href="/premium"
+              className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-accent)]/30 bg-[color:var(--color-accent)]/10 px-3 py-2 text-sm text-[color:var(--color-brand-light)]"
+            >
+              <Sparkles className="h-4 w-4" />
+              EyedPlus+
+            </Link>
+          </div>
         }
       />
 

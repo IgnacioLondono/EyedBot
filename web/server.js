@@ -96,7 +96,7 @@ const {
     extractTwitchLoginFromUrlOrName,
     cacheBustPreviewUrl
 } = require('../src/utils/twitch-stream-api');
-const { buildStreamAlertEmbed } = require('../src/utils/stream-alert-scheduler');
+const { buildRichStreamEmbed, buildWatchButtonRow } = require('../src/utils/stream-alert-embed');
 const weeklySummaryStore = require('../src/utils/weekly-summary-store');
 const weeklySummaryService = require('../src/utils/weekly-summary-service');
 const paymentReceiptStore = require('../src/utils/payment-receipt-store');
@@ -5629,7 +5629,7 @@ function normalizeStreamAlertConfigInput(body = {}, current = null, userId = 'un
             return {
                 id: fallbackId.slice(0, 60),
                 enabled: source?.enabled !== false,
-                platform: ['twitch', 'youtube', 'tiktok', 'custom'].includes(platform) ? platform : 'custom',
+                platform: ['twitch', 'youtube', 'kick', 'rumble', 'tiktok', 'custom'].includes(platform) ? platform : 'custom',
                 name: String(source?.name || 'Fuente').slice(0, 80),
                 url: String(source?.url || '').trim().slice(0, 600),
                 feedUrl: String(source?.feedUrl || '').trim().slice(0, 800),
@@ -5912,11 +5912,13 @@ app.post('/api/guild/:guildId/stream-alert-test', requireAuth, async (req, res) 
             };
         }
 
-        const embed = buildStreamAlertEmbed(config, firstSource, mockItem);
+        const embed = buildRichStreamEmbed(config, firstSource, mockItem);
+        const row = buildWatchButtonRow(firstSource, mockItem);
 
         await channel.send({
             content: String(config.mentionText || '').trim() || undefined,
-            embeds: [embed]
+            embeds: [embed],
+            components: row ? [row] : []
         });
 
         res.json({ success: true });

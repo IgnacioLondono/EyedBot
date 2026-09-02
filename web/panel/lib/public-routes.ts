@@ -1,5 +1,5 @@
 /** Rutas del panel accesibles sin iniciar sesión. */
-export const PUBLIC_PANEL_PATHS = ["/about", "/commands"] as const;
+export const PUBLIC_PANEL_PATHS = ["/about", "/commands", "/docs"] as const;
 
 export function isPublicPanelRoute(pathname: string | null | undefined) {
   if (!pathname) return false;

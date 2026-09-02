@@ -86,7 +86,7 @@ function normalizeSource(raw = {}) {
     return {
         id: String(raw.id || base.id),
         enabled: raw.enabled !== false,
-        platform: ['twitch', 'youtube', 'tiktok', 'custom'].includes(String(raw.platform || '').toLowerCase())
+        platform: ['twitch', 'youtube', 'kick', 'rumble', 'tiktok', 'custom'].includes(String(raw.platform || '').toLowerCase())
             ? String(raw.platform || '').toLowerCase()
             : 'custom',
         name: String(raw.name || base.name).slice(0, 80),

@@ -1,5 +1,13 @@
 const { EmbedBuilder } = require('discord.js');
 const streamAlertStore = require('./stream-alert-store');
+const { buildRichStreamEmbed, buildWatchButtonRow } = require('./stream-alert-embed');
+const {
+    checkTwitchLiveGql,
+    checkYouTubeLiveHtml,
+    checkKickLive,
+    checkRumbleLive,
+    liveStatusToAlertItem
+} = require('./stream-live-checkers');
 const {
     fetchTwitchLiveByLogin,
     extractTwitchLoginFromUrlOrName,
@@ -160,11 +168,33 @@ async function resolveTwitchLiveViaApi(source) {
 }
 
 async function resolveTwitchLive(source) {
+    const login = extractTwitchLoginFromUrlOrName(source);
+    if (!login) return null;
+
     const fromApi = await resolveTwitchLiveViaApi(source);
     if (fromApi) return fromApi;
 
-    const login = extractTwitchLoginFromUrlOrName(source);
-    if (!login) return null;
+    const gql = await checkTwitchLiveGql(login);
+    if (gql.isLive) {
+        const stateKey = `twitch:${login}`;
+        const wasLive = liveState.get(stateKey) === true;
+        liveState.set(stateKey, true);
+        let sessionId = liveSessionState.get(stateKey);
+        if (!sessionId) {
+            sessionId = `twitch-live-${login}-${gql.title || Date.now()}`;
+            liveSessionState.set(stateKey, sessionId);
+        }
+        const item = liveStatusToAlertItem({ ...gql, isLive: true }, source, `twitch-live-${login}`);
+        if (item) {
+            item.itemId = sessionId;
+            item.skipIfAlreadySeen = wasLive;
+            item.imageUrl = gql.thumbnail || item.imageUrl;
+        }
+        return item;
+    }
+
+    liveState.set(`twitch:${login}`, false);
+    liveSessionState.delete(`twitch:${login}`);
 
     try {
         const uptimeRaw = await fetchWithTimeout(`https://decapi.me/twitch/uptime/${encodeURIComponent(login)}`);
@@ -234,8 +264,65 @@ async function resolveLatestItemFromSource(source) {
         if (!isYouTubeHandledByWebSub()) {
             const youtubeLive = await resolveYouTubeLive(source);
             if (youtubeLive) return youtubeLive;
+
+            const handle = String(source.name || source.url || '').replace(/^@/, '').trim();
+            const htmlLive = await checkYouTubeLiveHtml(handle);
+            if (htmlLive.isLive) {
+                const stateKey = `youtube:${handle}`;
+                const wasLive = liveState.get(stateKey) === true;
+                liveState.set(stateKey, true);
+                let sessionId = liveSessionState.get(stateKey) || `youtube-live-${handle}-${Date.now()}`;
+                liveSessionState.set(stateKey, sessionId);
+                const item = liveStatusToAlertItem(htmlLive, source, `youtube-live-${handle}`);
+                if (item) {
+                    item.itemId = sessionId;
+                    item.skipIfAlreadySeen = wasLive;
+                }
+                return item;
+            }
+            liveState.set(`youtube:${handle}`, false);
         }
         return null;
+    }
+
+    if (platform === 'kick') {
+        const slug = String(source.name || source.url || '').replace(/^@/, '').trim();
+        const kick = await checkKickLive(slug);
+        if (!kick.isLive) {
+            liveState.set(`kick:${slug}`, false);
+            return null;
+        }
+        const stateKey = `kick:${slug}`;
+        const wasLive = liveState.get(stateKey) === true;
+        liveState.set(stateKey, true);
+        let sessionId = liveSessionState.get(stateKey) || `kick-live-${slug}-${Date.now()}`;
+        liveSessionState.set(stateKey, sessionId);
+        const item = liveStatusToAlertItem(kick, source, `kick-live-${slug}`);
+        if (item) {
+            item.itemId = sessionId;
+            item.skipIfAlreadySeen = wasLive;
+        }
+        return item;
+    }
+
+    if (platform === 'rumble') {
+        const slug = String(source.name || source.url || '').replace(/^@/, '').trim();
+        const rumble = await checkRumbleLive(slug);
+        if (!rumble.isLive) {
+            liveState.set(`rumble:${slug}`, false);
+            return null;
+        }
+        const stateKey = `rumble:${slug}`;
+        const wasLive = liveState.get(stateKey) === true;
+        liveState.set(stateKey, true);
+        let sessionId = liveSessionState.get(stateKey) || `rumble-live-${slug}-${Date.now()}`;
+        liveSessionState.set(stateKey, sessionId);
+        const item = liveStatusToAlertItem(rumble, source, `rumble-live-${slug}`);
+        if (item) {
+            item.itemId = sessionId;
+            item.skipIfAlreadySeen = wasLive;
+        }
+        return item;
     }
 
     if (platform === 'tiktok') {
@@ -260,6 +347,8 @@ function isLiveStreamSessionItem(source, item) {
     if (plat === 'twitch') return itemId.startsWith('twitch-live-');
     if (plat === 'youtube') return itemId.startsWith('youtube-live-');
     if (plat === 'tiktok') return itemId.startsWith('tiktok-live-');
+    if (plat === 'kick') return itemId.startsWith('kick-live-');
+    if (plat === 'rumble') return itemId.startsWith('rumble-live-');
     return false;
 }
 
@@ -325,12 +414,14 @@ async function postAlert(client, guildId, config, source, item) {
     const channel = guild.channels.cache.get(config.channelId) || await guild.channels.fetch(config.channelId).catch(() => null);
     if (!channel || !channel.isTextBased()) return false;
 
-    const embed = buildEmbed(config, source, item);
+    const embed = buildRichStreamEmbed(config, source, item);
     const mentionText = String(config.mentionText || '').trim();
+    const row = buildWatchButtonRow(source, item);
 
     await channel.send({
         content: mentionText || undefined,
-        embeds: [embed]
+        embeds: [embed],
+        components: row ? [row] : []
     });
 
     return true;
@@ -602,7 +693,7 @@ module.exports = {
     startStreamAlertScheduler,
     stopStreamAlertScheduler,
     runStreamAlertSweep,
-    buildStreamAlertEmbed: buildEmbed,
+    buildStreamAlertEmbed: buildRichStreamEmbed,
     handleTwitchStreamOnlineEvent,
     handleYouTubeLiveEvent,
     handleTikTokLiveEvent,

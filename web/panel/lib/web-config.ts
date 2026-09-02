@@ -5,6 +5,7 @@ const PAGE_ROUTE_MAP: Record<string, keyof WebPanelConfig["pages"]> = {
   "/dashboard": "dashboard",
   "/about": "about",
   "/commands": "commands",
+  "/docs": "about",
   "/premium": "premium",
 };
 

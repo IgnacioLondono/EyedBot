@@ -3,6 +3,7 @@ import {
   Bell,
   Bolt,
   BarChart3,
+  BookOpen,
   DoorOpen,
   FileBadge2,
   Gamepad2,
@@ -32,6 +33,7 @@ export type NavItem = {
 
 export const PRIMARY_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/docs", label: "Documentación", icon: BookOpen },
   { href: "/about", label: "Acerca de", icon: Info },
   { href: "/commands", label: "Comandos", icon: Terminal },
   { href: "/premium", label: "EyedPlus+", icon: Sparkles, premium: true },
@@ -73,3 +75,27 @@ export const SERVER_PANES: ServerPane[] = [
 export function serverPaneHref(guildId: string, slug = "overview") {
   return `/server/${guildId}/${slug}`;
 }
+
+export type ServerPaneGroup = {
+  label: string;
+  slugs: string[];
+};
+
+export const SERVER_PANE_GROUPS: ServerPaneGroup[] = [
+  {
+    label: "General",
+    slugs: ["overview", "welcome", "verify", "embed", "events", "weekly-summary"],
+  },
+  {
+    label: "Comunidad",
+    slugs: ["levels", "voice", "gacha", "notifications", "free-games"],
+  },
+  {
+    label: "Moderación",
+    slugs: ["moderation", "security", "tickets", "automation"],
+  },
+  {
+    label: "Pagos",
+    slugs: ["payments"],
+  },
+];

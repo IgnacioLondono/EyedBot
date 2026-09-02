@@ -171,6 +171,9 @@ function HomeHeader({ loggedIn }: { loggedIn: boolean }) {
         <EyedBotLogo href="/" label="EyedBot" showText="desktop" />
 
         <nav className="hidden items-center gap-1 md:flex">
+          <Link href="/docs" className="rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-white">
+            Documentación
+          </Link>
           <Link href="/commands" className="rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-white">
             Comandos
           </Link>

@@ -64,9 +64,11 @@
   --background: #08070f;
   --foreground: #f4f4f5;
   --color-bg: #08070f;
+  --color-bg-elevated: #0f0d18;
   --color-surface: rgba(167, 139, 250, 0.06);
   --color-surface-strong: rgba(167, 139, 250, 0.1);
   --color-border: rgba(167, 139, 250, 0.14);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
   --color-accent: #a78bfa;
   --color-accent-2: #c4b5fd;
   --color-glow: #7c3aed;
@@ -75,6 +77,10 @@
   --color-brand: #a78bfa;
   --color-brand-light: #c4b5fd;
   --color-brand-deep: #7c3aed;
+  --glass-bg: rgba(12, 10, 20, 0.72);
+  --glass-bg-strong: rgba(8, 7, 15, 0.88);
+  --glass-blur: 20px;
+  --sidebar-width: 17.5rem;
 }
 
 @theme inline {
@@ -188,4 +194,92 @@ html:not([data-wallpaper]) body::before {
 select option {
   background-color: #18181b;
   color: #f4f4f5;
+}
+
+/* ——— Glass & panel surfaces (inspiración AutoMod, paleta EyedBot) ——— */
+
+.glass-panel {
+  border: 1px solid var(--color-border-subtle);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--color-accent) 6%, rgba(255, 255, 255, 0.04)),
+    rgba(255, 255, 255, 0.02)
+  );
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 24px 48px rgba(0, 0, 0, 0.28);
+}
+
+.glass-panel-strong {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.glass-sidebar {
+  border-right: 1px solid var(--color-border-subtle);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #a1a1aa;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fafafa;
+}
+
+.nav-item-active {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
+.nav-section-label {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+
+.server-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  border-radius: 0.875rem;
+  padding: 0.75rem 1rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.server-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stat-tile {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1rem 1.125rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.stat-tile:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: rgba(255, 255, 255, 0.05);
 }

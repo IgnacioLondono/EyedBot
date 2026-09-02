@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Search } from "lucide-react";
 import { getCommands } from "@/lib/api/endpoints";
 import type { CommandCatalogItem } from "@/lib/types";
@@ -39,7 +40,12 @@ export default function CommandsPage() {
       <PageHeader
         kicker="Referencia"
         title="Comandos"
-        description={`${filtered.length} de ${commands.length} comandos disponibles.`}
+        description={`${filtered.length} de ${commands.length} comandos disponibles. Consulta también la documentación completa.`}
+        actions={
+          <Link href="/docs/commands" className="text-sm text-violet-300 hover:text-violet-200">
+            Ver en documentación →
+          </Link>
+        }
       />
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
