@@ -144,7 +144,7 @@ html[data-color-mode="light"]:not([data-wallpaper]) body::after {
 
 html[data-color-mode="light"] .glass-sidebar,
 html[data-color-mode="light"] .docs-sidebar {
-  background: var(--panel-surface-secondary, #ffffff);
+  background: color-mix(in srgb, var(--color-surface-strong) 96%, var(--color-accent) 4%);
   border-right-color: rgba(0, 0, 0, 0.08);
 }
 
@@ -242,9 +242,74 @@ html[data-color-mode="light"] .docs-search-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 1rem;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-strong));
   color: var(--color-accent);
+}
+
+.panel-icon-box-neutral {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--color-surface-strong));
+  color: var(--color-icon);
+}
+
+.panel-alert {
+  color: var(--foreground);
+}
+
+.panel-alert-desc {
+  color: var(--theme-text-secondary);
+}
+
+.panel-alert-info {
+  border-color: color-mix(in srgb, #0891b2 28%, var(--color-border-subtle));
+  background: color-mix(in srgb, #0891b2 10%, var(--color-surface-strong));
+}
+
+.panel-alert-info svg {
+  color: #0891b2;
+}
+
+.panel-alert-success {
+  border-color: color-mix(in srgb, #059669 28%, var(--color-border-subtle));
+  background: color-mix(in srgb, #059669 10%, var(--color-surface-strong));
+}
+
+.panel-alert-success svg {
+  color: #059669;
+}
+
+.panel-alert-warning {
+  border-color: color-mix(in srgb, #d97706 30%, var(--color-border-subtle));
+  background: color-mix(in srgb, #d97706 10%, var(--color-surface-strong));
+}
+
+.panel-alert-warning svg {
+  color: #d97706;
+}
+
+.panel-alert-danger {
+  border-color: color-mix(in srgb, #dc2626 28%, var(--color-border-subtle));
+  background: color-mix(in srgb, #dc2626 10%, var(--color-surface-strong));
+}
+
+.panel-alert-danger svg {
+  color: #dc2626;
+}
+
+html:not([data-color-mode="light"]) .panel-alert-info svg {
+  color: #67e8f9;
+}
+
+html:not([data-color-mode="light"]) .panel-alert-success svg {
+  color: #6ee7b7;
+}
+
+html:not([data-color-mode="light"]) .panel-alert-warning svg {
+  color: #fcd34d;
+}
+
+html:not([data-color-mode="light"]) .panel-alert-danger svg {
+  color: #fca5a5;
 }
 
 .panel-stat-tile {
@@ -460,9 +525,56 @@ select option {
 
 .glass-sidebar {
   border-right: 1px solid var(--color-border-subtle);
-  background: var(--glass-bg-strong);
+  background: color-mix(in srgb, var(--color-surface-strong) 92%, var(--color-accent) 8%);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
+}
+
+@media (max-width: 1023px) {
+  .glass-sidebar,
+  .docs-sidebar {
+    width: min(var(--sidebar-width), 88vw) !important;
+    max-width: 20rem;
+  }
+}
+
+html[data-neutral-ui="1"] .glass-sidebar,
+html[data-neutral-ui="1"] .docs-sidebar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--color-surface-strong);
+}
+
+.panel-line-chart-grid {
+  stroke: color-mix(in srgb, var(--foreground) 8%, transparent);
+  stroke-width: 1;
+}
+
+.panel-line-chart-axis {
+  fill: var(--theme-text-secondary);
+  font-size: 10px;
+}
+
+.panel-line-chart-line {
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--foreground) 12%, transparent));
+}
+
+.panel-line-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 3%, var(--color-surface-strong));
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  color: var(--theme-text-secondary);
+}
+
+.panel-line-chart-legend-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 999px;
 }
 
 .nav-item {
@@ -981,6 +1093,31 @@ html[data-color-mode="light"] .panel-scroll::-webkit-scrollbar-thumb {
   gap: 0.25rem;
   border-bottom: 1px solid var(--color-border-subtle);
   margin-bottom: 1.25rem;
+  overflow-y: hidden;
+}
+
+.panel-tabs-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.panel-tabs-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 6px;
+}
+
+.panel-tabs-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-tabs-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.panel-tabs-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 .panel-tabs-automod-trigger {

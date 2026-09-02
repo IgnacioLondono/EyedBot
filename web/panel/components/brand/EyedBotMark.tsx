@@ -6,19 +6,16 @@ type EyedBotMarkProps = {
   title?: string;
 };
 
-/** Icono de app — robot blanco con detalle sobre fondo morado en degradado. */
+/** Marca EyedBot sin fondo: icono adaptable al tema. */
 export function EyedBotMark({ className, title = "EyedBot" }: EyedBotMarkProps) {
   return (
     <div
       role="img"
       aria-label={title}
       title={title}
-      className={cn(
-        "relative shrink-0 overflow-hidden rounded-[25%] bg-gradient-to-b from-[#b794f6] to-[#6d28d9]",
-        className
-      )}
+      className={cn("shrink-0 text-[color:var(--color-accent)]", className)}
     >
-      <EyedBotIcon className="h-full w-full text-white" detailed />
+      <EyedBotIcon className="h-full w-full" detailed />
     </div>
   );
 }

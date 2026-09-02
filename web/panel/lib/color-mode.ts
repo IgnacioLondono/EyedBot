@@ -87,8 +87,8 @@ export function applyInteractionTokens(
   if (effective === "light") {
     root.style.setProperty("--color-btn-on-accent", onAccent);
     root.style.setProperty("--color-btn-secondary-bg", "#ffffff");
-    root.style.setProperty("--color-btn-secondary-border", "rgba(0, 0, 0, 0.12)");
-    root.style.setProperty("--color-btn-secondary-fg", textPrimary);
+    root.style.setProperty("--color-btn-secondary-border", "rgba(0, 0, 0, 0.14)");
+    root.style.setProperty("--color-btn-secondary-fg", "#18181b");
     root.style.setProperty("--color-btn-accent-bg", accent);
     root.style.setProperty("--color-btn-accent-border", accent);
     root.style.setProperty("--color-btn-accent-fg", onAccent);

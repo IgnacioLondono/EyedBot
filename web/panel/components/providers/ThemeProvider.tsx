@@ -89,6 +89,11 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
     root.style.setProperty("--color-surface", theme.bgCard);
     root.style.setProperty("--color-surface-strong", theme.bgSecondary);
     root.style.setProperty("--theme-text-secondary", theme.textSecondary);
+    root.style.setProperty(
+      "--glass-bg",
+      `color-mix(in srgb, ${theme.bgCard} 78%, transparent)`
+    );
+    root.style.setProperty("--glass-bg-strong", theme.bgSecondary);
   }
 
   root.style.setProperty("--color-border", `${theme.borderColor}${Math.round(40 + borderStrength * 60).toString(16).padStart(2, "0")}`);
@@ -124,9 +129,10 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
   root.dataset.neutralUi = theme.neutralUi ? "1" : "0";
 
   const effective = root.dataset.colorMode === "light" ? "light" : "dark";
+  const uiTextPrimary = effective === "light" ? "#18181b" : theme.textPrimary;
   applyInteractionTokens(effective, theme.accentPrimary, {
     autoContrast: theme.autoContrast !== false,
-    textPrimary: theme.textPrimary,
+    textPrimary: uiTextPrimary,
   });
 }
 

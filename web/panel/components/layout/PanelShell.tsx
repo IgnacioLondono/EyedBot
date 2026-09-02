@@ -81,7 +81,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileNavOpen(false)}
             aria-label="Cerrar menú"
           />
-          <PanelSidebar className="!flex shadow-2xl" />
+          <PanelSidebar className="!flex shadow-2xl animate-in slide-in-from-left duration-200" />
         </div>
       ) : null}
 

@@ -14,7 +14,6 @@ import {
   Trash2,
   UserPlus,
   Upload,
-  AlertTriangle,
 } from "lucide-react";
 import {
   createOwnerBot,
@@ -135,31 +134,35 @@ function botAdminInviteUrl(applicationId: string, inviteUrl?: string) {
 
 function IntentsSetupHelp({ applicationId }: { applicationId?: string }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-amber-50">
-      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-      <div className="min-w-0 text-sm">
-        <p className="font-semibold">Activa los intents en Discord</p>
-        <p className="mt-1 text-sm/6 opacity-90">
+    <Alert variant="warning" title="Activa los intents en Discord">
+      <div className="space-y-2 text-sm">
+        <p>
           Cada bot auxiliar necesita los mismos intents privilegiados que EyedBot en su propia aplicación de Discord.
         </p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 opacity-90">
+        <ol className="list-decimal space-y-1 pl-5">
           <li>
             Abre{" "}
             <a
               href={developerBotUrl(applicationId || "")}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-violet-200 underline hover:text-white"
+              className="font-medium text-[color:var(--color-accent)] underline underline-offset-2"
             >
               Developer Portal → Bot
             </a>
           </li>
-          <li>Activa <strong>SERVER MEMBERS INTENT</strong></li>
-          <li>Activa <strong>MESSAGE CONTENT INTENT</strong></li>
-          <li>Guarda y pulsa <strong>Iniciar</strong> aquí</li>
+          <li>
+            Activa <strong>SERVER MEMBERS INTENT</strong>
+          </li>
+          <li>
+            Activa <strong>MESSAGE CONTENT INTENT</strong>
+          </li>
+          <li>
+            Guarda y pulsa <strong>Iniciar</strong> aquí
+          </li>
         </ol>
       </div>
-    </div>
+    </Alert>
   );
 }
 

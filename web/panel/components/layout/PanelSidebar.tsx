@@ -4,11 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ChevronDown,
   ChevronRight,
   LayoutDashboard,
   Search,
-  Server,
   Settings,
   Sparkles,
   type LucideIcon,
@@ -30,6 +28,7 @@ import {
   DOCS_DEFAULT_SLUG,
 } from "@/lib/docs-content";
 import { DocsSidebarNav } from "@/components/features/docs/DocsSidebarNav";
+import { PanelServerSwitcher } from "@/components/layout/PanelServerSwitcher";
 import { PanelSidebarFooter } from "@/components/layout/PanelSidebarFooter";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
@@ -165,21 +164,7 @@ export function PanelSidebar({ className }: { className?: string }) {
           </div>
         ) : guildId ? (
           <div className="space-y-4">
-            <Link href="/dashboard" className="panel-server-chip">
-              {guildIcon ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={guildIcon} alt="" className="h-9 w-9 rounded-md object-cover" />
-              ) : (
-                <div className="panel-icon-box flex h-9 w-9 rounded-md">
-                  <Server className="h-4 w-4" strokeWidth={1.75} />
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[var(--foreground)]">{guildName}</p>
-                <p className="truncate text-xs text-[var(--theme-text-secondary)]">Cambiar servidor</p>
-              </div>
-              <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--color-icon-muted)]" strokeWidth={1.75} />
-            </Link>
+            <PanelServerSwitcher guildId={guildId} guildName={guildName} guildIcon={guildIcon} />
 
             <div className="relative">
               <Search

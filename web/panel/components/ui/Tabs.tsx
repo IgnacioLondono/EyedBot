@@ -37,7 +37,10 @@ export function Tabs({ items, value, onValueChange, className }: TabsProps) {
   return (
     <div
       ref={stripRef}
-      className={cn("panel-tabs-automod panel-scroll flex w-full max-w-full gap-1 overflow-x-auto", className)}
+      className={cn(
+        "panel-tabs-automod panel-tabs-scroll flex w-full max-w-full gap-1 overflow-x-auto overflow-y-hidden",
+        className
+      )}
       role="tablist"
     >
       {items.map((item) => {
