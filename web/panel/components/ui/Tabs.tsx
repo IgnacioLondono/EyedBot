@@ -27,8 +27,6 @@ export function Tabs({ items, value, onValueChange, className }: TabsProps) {
     savedWindowScrollY.current = window.scrollY;
     savedStripScrollLeft.current = stripRef.current?.scrollLeft ?? 0;
     onValueChange(id);
-    // Evita el salto al top cuando el contenido de la pestaña cambia de altura
-    // o cuando Framer Motion anima el pill.
     requestAnimationFrame(() => {
       window.scrollTo(0, savedWindowScrollY.current);
       if (stripRef.current) {
@@ -40,10 +38,7 @@ export function Tabs({ items, value, onValueChange, className }: TabsProps) {
   return (
     <div
       ref={stripRef}
-      className={cn(
-        "panel-scroll flex w-full max-w-full gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-white/5 p-1",
-        className
-      )}
+      className={cn("panel-tabs panel-scroll flex w-full max-w-full gap-2 overflow-x-auto p-1", className)}
     >
       {items.map((item) => {
         const active = item.id === value;
@@ -53,19 +48,23 @@ export function Tabs({ items, value, onValueChange, className }: TabsProps) {
             type="button"
             onClick={() => handleSelect(item.id)}
             className={cn(
-              "relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-2xl px-4 py-2 text-sm whitespace-nowrap transition",
-              active ? "text-white" : "text-zinc-400 hover:text-white"
+              "panel-tabs-trigger relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-2xl px-4 py-2 text-sm whitespace-nowrap transition",
+              active && "panel-tabs-trigger-active"
             )}
           >
             {active ? (
               <motion.span
                 layoutId={`tabs-pill-${reactId}`}
-                className="absolute inset-0 rounded-2xl bg-[linear-gradient(135deg,rgba(139,92,246,0.35),rgba(217,70,239,0.28))]"
+                className="absolute inset-0 rounded-2xl bg-[color-mix(in_srgb,var(--color-accent)_16%,var(--color-surface-strong))]"
                 transition={{ type: "spring", stiffness: 420, damping: 36 }}
               />
             ) : null}
             <span className="relative z-10">{item.label}</span>
-            {item.badge ? <span className="relative z-10 text-[10px] text-zinc-300">{item.badge}</span> : null}
+            {item.badge ? (
+              <span className="relative z-10 text-[10px] text-[color:var(--theme-text-secondary)]">
+                {item.badge}
+              </span>
+            ) : null}
           </button>
         );
       })}

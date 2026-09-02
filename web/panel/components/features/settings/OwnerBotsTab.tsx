@@ -556,12 +556,12 @@ export function OwnerBotsTab() {
             <ColorInput value={newBrandColor} onChange={setNewBrandColor} placeholder="f59e0b" />
           </Field>
         </div>
-        <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
+        <label className="mt-4 flex items-center gap-2 text-sm text-[var(--foreground)]">
           <input
             type="checkbox"
             checked={newPanelEnabled}
             onChange={(e) => setNewPanelEnabled(e.target.checked)}
-            className="rounded border-white/20"
+            className="rounded border-[color:var(--color-border-subtle)]"
           />
           Habilitar panel completo (módulos + OAuth en /t/slug)
         </label>
@@ -585,21 +585,21 @@ export function OwnerBotsTab() {
                   key={bot.id}
                   type="button"
                   onClick={() => setSelectedId(bot.id)}
-                  className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${
-                    selectedId === bot.id ? "border-violet-400/40 bg-violet-500/10" : "border-white/8 bg-black/20 hover:bg-white/5"
+                  className={`panel-list-item flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ${
+                    selectedId === bot.id ? "panel-list-item-active" : ""
                   }`}
                 >
                   {bot.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={bot.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
                   ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800">
-                      <Bot className="h-5 w-5 text-zinc-400" />
+                    <div className="panel-icon-box flex h-10 w-10 rounded-full">
+                      <Bot className="h-5 w-5" />
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-white">{bot.label}</p>
-                    <p className="truncate text-xs text-zinc-500">
+                    <p className="truncate font-medium text-[var(--foreground)]">{bot.label}</p>
+                    <p className="panel-muted truncate text-xs">
                       {bot.username || "—"} · {bot.guildCount} servidores
                     </p>
                   </div>
@@ -621,8 +621,8 @@ export function OwnerBotsTab() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={selected.avatarUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
                   ) : (
-                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-800">
-                      <Bot className="h-8 w-8 text-zinc-500" />
+                    <div className="panel-icon-box flex h-20 w-20 rounded-2xl">
+                      <Bot className="h-8 w-8" />
                     </div>
                   )}
                   <input
@@ -655,7 +655,7 @@ export function OwnerBotsTab() {
                       placeholder={selected.username || "username"}
                     />
                   </Field>
-                  <div className="sm:col-span-2 flex flex-wrap gap-2 text-xs text-zinc-500">
+                  <div className="panel-muted sm:col-span-2 flex flex-wrap gap-2 text-xs">
                     <span>ID: {selected.applicationId || "—"}</span>
                     <span>Token: {selected.tokenHint}</span>
                     {selected.ping != null ? <span>Ping: {selected.ping} ms</span> : null}
@@ -763,17 +763,17 @@ export function OwnerBotsTab() {
                   <ColorInput value={editBrandColor} onChange={setEditBrandColor} placeholder="f59e0b" />
                 </Field>
               </div>
-              <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
+              <label className="mt-4 flex items-center gap-2 text-sm text-[var(--foreground)]">
                 <input
                   type="checkbox"
                   checked={editPanelEnabled}
                   onChange={(e) => setEditPanelEnabled(e.target.checked)}
-                  className="rounded border-white/20"
+                  className="rounded border-[color:var(--color-border-subtle)]"
                 />
                 Panel completo habilitado
               </label>
               {selected.panelPath ? (
-                <p className="mt-2 text-xs text-zinc-500">
+                <p className="panel-muted mt-2 text-xs">
                   Landing: {selected.panelPath} · OAuth callback: {selected.panelPath}/callback
                 </p>
               ) : null}
@@ -817,7 +817,7 @@ export function OwnerBotsTab() {
                   </div>
 
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-xs text-zinc-500">
+                    <div className="panel-muted flex items-center gap-2 text-xs">
                       <MessageSquare className="h-4 w-4" />
                       {channelId ? "Actualización automática cada 8 s" : "Selecciona un canal"}
                     </div>
@@ -829,13 +829,13 @@ export function OwnerBotsTab() {
                   <div
                     ref={chatScrollRef}
                     onScroll={onChatScroll}
-                    className="max-h-80 space-y-2 overflow-y-auto rounded-2xl border border-white/8 bg-black/30 p-3"
+                    className="panel-inset max-h-80 space-y-2 overflow-y-auto p-3"
                   >
                     {messages.length ? (
                       messages.map((msg) => (
                         <div
                           key={msg.id}
-                          className={`flex gap-2 rounded-xl px-2 py-1.5 ${msg.isSelf ? "bg-violet-500/10" : "bg-white/5"}`}
+                          className={`flex gap-2 rounded-xl px-2 py-1.5 ${msg.isSelf ? "bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface-strong))]" : "bg-[color-mix(in_srgb,var(--foreground)_4%,var(--color-surface-strong))]"}`}
                         >
                           {msg.authorAvatar ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -846,16 +846,16 @@ export function OwnerBotsTab() {
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs text-zinc-400">
+                            <p className="panel-muted text-xs">
                               {msg.authorName}
                               {msg.isSelf ? " (este bot)" : ""} · {formatDate(msg.timestamp)}
                             </p>
-                            <p className="whitespace-pre-wrap break-words text-sm text-zinc-100">{msg.content || "—"}</p>
+                            <p className="whitespace-pre-wrap break-words text-sm text-[var(--foreground)]">{msg.content || "—"}</p>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <p className="py-8 text-center text-sm text-zinc-500">
+                      <p className="panel-muted py-8 text-center text-sm">
                         {channelId ? "Sin mensajes recientes en este canal." : "Elige un canal para ver la conversación."}
                       </p>
                     )}
@@ -878,7 +878,7 @@ export function OwnerBotsTab() {
                       {busy === "chat" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </div>
-                  <p className="mt-2 flex items-center gap-1 text-xs text-zinc-500">
+                  <p className="panel-muted mt-2 flex items-center gap-1 text-xs">
                     <Server className="h-3.5 w-3.5" />
                     Usa <strong>Invitar con admin</strong> arriba para añadir el bot a un servidor con permisos de administrador.
                   </p>

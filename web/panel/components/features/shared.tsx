@@ -185,7 +185,7 @@ export function Field({
   return (
     <div className="space-y-2">
       <Label htmlFor={htmlFor}>{label}</Label>
-      {description ? <p className="text-xs text-zinc-500">{description}</p> : null}
+      {description ? <p className="panel-muted text-xs">{description}</p> : null}
       {children}
     </div>
   );

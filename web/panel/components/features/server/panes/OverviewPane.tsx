@@ -44,18 +44,16 @@ function StatTile({
     <Comp
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`rounded-3xl border border-white/10 bg-white/5 p-4 text-left transition ${
-        onClick ? "hover:border-violet-400/40 hover:bg-white/[0.07]" : ""
+      className={`panel-stat-tile rounded-3xl p-4 text-left transition ${
+        onClick ? "hover:border-[color-mix(in_srgb,var(--color-accent)_35%,var(--color-border-subtle))]" : ""
       }`}
     >
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/8 text-zinc-100">
-        {icon}
-      </div>
-      <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-white">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
+      <div className="panel-icon-box mb-3 h-10 w-10">{icon}</div>
+      <p className="panel-kicker text-xs uppercase tracking-[0.2em]">{label}</p>
+      <p className="mt-2 text-xl font-semibold text-[var(--foreground)]">{value}</p>
+      {hint ? <p className="panel-muted mt-1 text-xs">{hint}</p> : null}
       {onClick ? (
-        <p className="mt-2 inline-flex items-center gap-1 text-xs text-violet-300">
+        <p className="mt-2 inline-flex items-center gap-1 text-xs text-[color:var(--color-link)]">
           Ver detalle <ChevronRight className="h-3 w-3" />
         </p>
       ) : null}
@@ -213,20 +211,20 @@ export function OverviewPane({ guildId }: { guildId: string }) {
       {view === "main" ? (
         <>
           <SectionCard title={toStringValue(info.name, "Servidor")} description="Análisis en vivo del servidor.">
-            <div className="mb-6 flex flex-wrap items-center gap-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(124,77,255,0.22),_rgba(0,0,0,0.15)_58%)] p-5">
+            <div className="mb-6 panel-accent-banner flex flex-wrap items-center gap-4 rounded-[28px] p-5">
               {icon ? (
-                <img src={icon} alt="" className="h-16 w-16 rounded-2xl border border-white/10 object-cover" />
+                <img src={icon} alt="" className="h-16 w-16 rounded-2xl border border-[color:var(--color-border-subtle)] object-cover" />
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-2xl font-semibold text-white">
+                <div className="panel-icon-box flex h-16 w-16 rounded-2xl text-2xl font-semibold">
                   {toStringValue(info.name, "S").slice(0, 1)}
                 </div>
               )}
               <div className="min-w-0 flex-1">
                 <button type="button" onClick={() => setView("members")} className="text-left">
-                  <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Propietario</p>
-                  <p className="font-medium text-white">{toStringValue(derived.owner.tag, "Desconocido")}</p>
+                  <p className="panel-kicker text-xs uppercase tracking-[0.2em]">Propietario</p>
+                  <p className="font-medium text-[var(--foreground)]">{toStringValue(derived.owner.tag, "Desconocido")}</p>
                 </button>
-                <p className="mt-2 text-sm text-zinc-400">
+                <p className="panel-muted mt-2 text-sm">
                   Creado {formatDate(info.createdAt)} · Boost {toNumberValue(info.premiumTier)} ·{" "}
                   {toNumberValue(info.premiumSubscriptionCount)} boosts
                 </p>

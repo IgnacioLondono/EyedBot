@@ -1,4 +1,11 @@
+import { isLightAccent } from "@/lib/theme-contrast";
+
 export type PanelColorMode = "light" | "dark" | "system";
+
+export type InteractionTokenOptions = {
+  autoContrast?: boolean;
+  textPrimary?: string;
+};
 
 const STORAGE_KEY = "eyedbot_panel_color_mode_v1";
 
@@ -66,10 +73,61 @@ function applySurfaceTokens(effective: "light" | "dark") {
   }
 }
 
+export function applyInteractionTokens(
+  effective: "light" | "dark",
+  accent = "#a78bfa",
+  opts: InteractionTokenOptions = {}
+) {
+  const root = document.documentElement;
+  const autoContrast = opts.autoContrast !== false;
+  const textPrimary = opts.textPrimary || (effective === "light" ? "#18181b" : "#f4f4f5");
+  const onAccent =
+    effective === "light" && autoContrast && isLightAccent(accent) ? "#18181b" : "#ffffff";
+
+  if (effective === "light") {
+    root.style.setProperty("--color-btn-on-accent", onAccent);
+    root.style.setProperty("--color-btn-secondary-bg", "#ffffff");
+    root.style.setProperty("--color-btn-secondary-border", "rgba(0, 0, 0, 0.12)");
+    root.style.setProperty("--color-btn-secondary-fg", textPrimary);
+    root.style.setProperty("--color-btn-accent-bg", accent);
+    root.style.setProperty("--color-btn-accent-border", accent);
+    root.style.setProperty("--color-btn-accent-fg", onAccent);
+    root.style.setProperty("--color-icon", "#3f3f46");
+    root.style.setProperty("--color-icon-muted", "#71717a");
+    root.style.setProperty("--color-link", accent);
+    root.style.setProperty("--badge-success-text", "#047857");
+    root.style.setProperty("--badge-warning-text", "#b45309");
+    root.style.setProperty("--badge-danger-text", "#b91c1c");
+  } else {
+    root.style.setProperty("--color-btn-on-accent", onAccent);
+    root.style.setProperty("--color-btn-secondary-bg", "rgba(255,255,255,0.08)");
+    root.style.setProperty("--color-btn-secondary-border", "rgba(255,255,255,0.14)");
+    root.style.setProperty("--color-btn-secondary-fg", textPrimary);
+    root.style.setProperty(
+      "--color-btn-accent-bg",
+      `color-mix(in srgb, ${accent} 24%, transparent)`
+    );
+    root.style.setProperty(
+      "--color-btn-accent-border",
+      `color-mix(in srgb, ${accent} 45%, transparent)`
+    );
+    root.style.setProperty("--color-btn-accent-fg", textPrimary);
+    root.style.setProperty("--color-icon", "#e4e4e7");
+    root.style.setProperty("--color-icon-muted", "#a1a1aa");
+    root.style.setProperty("--color-link", "#c4b5fd");
+    root.style.setProperty("--badge-success-text", "#a7f3d0");
+    root.style.setProperty("--badge-warning-text", "#fde68a");
+    root.style.setProperty("--badge-danger-text", "#fecaca");
+  }
+}
+
 export function applyPanelColorMode(mode: PanelColorMode) {
   const root = document.documentElement;
   const effective = resolveEffectiveColorMode(mode);
   root.dataset.colorMode = effective;
   root.dataset.colorModePref = mode;
   applySurfaceTokens(effective);
+  const accent = root.style.getPropertyValue("--color-accent").trim() || "#a78bfa";
+  applyInteractionTokens(effective, accent);
+  window.dispatchEvent(new CustomEvent("eyedbot:color-mode"));
 }

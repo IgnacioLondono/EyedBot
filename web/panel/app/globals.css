@@ -216,6 +216,84 @@ html[data-color-mode="light"] .docs-search-input {
   color: #18181b !important;
 }
 
+.panel-muted {
+  color: var(--theme-text-secondary);
+}
+
+.panel-kicker {
+  color: var(--theme-text-secondary);
+}
+
+.panel-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-strong));
+  color: var(--color-accent);
+}
+
+.panel-stat-tile {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-strong);
+}
+
+.panel-stat-tile:hover {
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface-strong));
+}
+
+.panel-accent-banner {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-strong));
+}
+
+.panel-subcard {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-strong);
+  border-radius: 1.25rem;
+}
+
+.panel-inset {
+  border: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--foreground) 4%, var(--color-surface-strong));
+  border-radius: 1rem;
+}
+
+.panel-tabs {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-strong);
+  border-radius: 1.5rem;
+}
+
+.panel-tabs-trigger {
+  color: var(--theme-text-secondary);
+}
+
+.panel-tabs-trigger:hover,
+.panel-tabs-trigger-active {
+  color: var(--foreground);
+}
+
+.panel-list-item {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-strong);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.panel-list-item:hover {
+  background: color-mix(in srgb, var(--foreground) 3%, var(--color-surface-strong));
+}
+
+.panel-list-item-active {
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-strong));
+}
+
+html[data-color-mode="light"] ::selection {
+  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  color: var(--foreground);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

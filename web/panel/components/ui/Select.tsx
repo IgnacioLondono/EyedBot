@@ -15,15 +15,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
       <select
         ref={ref}
         className={cn(
-          "h-11 w-full appearance-none rounded-2xl border border-white/10 bg-zinc-900 px-4 pr-10 text-sm text-zinc-100",
-          "outline-none transition focus:border-[color:var(--color-ring)] focus:bg-zinc-900",
+          "h-11 w-full appearance-none rounded-2xl border border-[color:var(--color-border-subtle)] bg-[var(--color-surface-strong)] px-4 pr-10 text-sm text-[var(--foreground)]",
+          "outline-none transition focus:border-[color:var(--color-ring)]",
           className
         )}
         {...props}
       >
         {children}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--color-icon-muted)]" />
     </div>
   );
 });

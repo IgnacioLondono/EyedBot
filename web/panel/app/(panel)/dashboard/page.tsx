@@ -209,21 +209,21 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => setShowInviteSection((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-zinc-300 hover:bg-white/[0.03]"
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-[var(--foreground)] hover:bg-[color-mix(in_srgb,var(--foreground)_4%,transparent)]"
           >
             <span>Añadir EyedBot a más servidores</span>
             <ChevronRight className={cn("h-4 w-4 transition", showInviteSection && "rotate-90")} />
           </button>
           {showInviteSection ? (
-            <div className="border-t border-white/6 px-4 py-4">
-              <p className="text-sm text-zinc-400">
+            <div className="border-t border-[color:var(--color-border-subtle)] px-4 py-4">
+              <p className="panel-muted text-sm">
                 Invita el bot a otro servidor de Discord y vuelve aquí para configurarlo.
               </p>
               <a
                 href={bootstrap.inviteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-accent)]/35 bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-2))] px-4 py-2 text-sm font-semibold text-white"
+                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-btn-accent-border)] bg-[color:var(--color-btn-accent-bg)] px-4 py-2 text-sm font-semibold text-[color:var(--color-btn-on-accent)]"
               >
                 <Plus className="h-4 w-4" />
                 Invitar bot
