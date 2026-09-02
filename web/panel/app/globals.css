@@ -426,7 +426,44 @@ html[data-theme-bubbles="1"] .theme-bubbles {
 }
 
 .eyedbot-mark-glow {
-  box-shadow: 0 0 28px color-mix(in srgb, var(--color-brand) 40%, transparent);
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-strong));
+  color: var(--color-accent);
+}
+
+.eyedbot-mark-glow::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 170%;
+  height: 170%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--color-brand) 36%, transparent) 0%,
+    color-mix(in srgb, var(--color-brand) 14%, transparent) 42%,
+    transparent 72%
+  );
+  z-index: -1;
+  pointer-events: none;
+}
+
+.eyedbot-mark-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-brand) 24%, transparent),
+    0 0 12px color-mix(in srgb, var(--color-brand) 18%, transparent);
+  pointer-events: none;
 }
 
 a {

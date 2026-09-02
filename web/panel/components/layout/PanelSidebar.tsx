@@ -145,7 +145,7 @@ export function PanelSidebar({ className }: { className?: string }) {
           </Link>
         ) : (
           <Link href={homeHref} className="flex min-w-0 items-center gap-2.5">
-            <EyedBotMark className="h-9 w-9 rounded-xl" />
+            <EyedBotMark className="eyedbot-mark-glow h-9 w-9 rounded-xl" />
             <span className="truncate font-semibold text-[var(--foreground)]">EyedBot</span>
           </Link>
         )}
