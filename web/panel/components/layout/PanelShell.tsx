@@ -5,12 +5,8 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { LogIn, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PRIMARY_NAV } from "@/lib/navigation";
-import { filterPrimaryNav } from "@/lib/web-config";
-import { EYEDBIO_URL } from "@/lib/eyedbio";
 import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
-import { isPublicPanelRoute } from "@/lib/public-routes";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { discordAvatarUrl } from "@/lib/discord-media";
 import { cn } from "@/lib/utils";
@@ -29,7 +25,6 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   const user = bootstrap?.user;
   const isGuest = !user;
   const homeHref = isGuest ? "/about" : "/dashboard";
-  const primaryNav = filterPrimaryNav(PRIMARY_NAV, bootstrap?.webConfig);
   const maintenanceMessage = bootstrap?.webConfig?.maintenanceMessage;
   const showMaintenanceNotice = Boolean(bootstrap?.isRealOwner && bootstrap?.webConfig?.maintenanceMode);
   const brand = resolvePanelBrand(bootstrap?.tenant);
@@ -143,7 +138,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
               ? "p-0"
               : isDocs
                 ? "px-4 py-6 lg:px-10 lg:py-8"
-                : "px-4 py-6 pb-24 lg:px-8 lg:pb-8 xl:px-10"
+                : "px-4 py-6 lg:px-8 lg:pb-8 xl:px-10"
           )}
         >
           <div className={cn("mx-auto w-full", isCardStudio ? "max-w-none" : isDocs ? "max-w-3xl xl:max-w-4xl" : "max-w-[88rem]")}>
@@ -151,40 +146,6 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
           </div>
         </motion.main>
 
-        {!isDocs && !isCardStudio ? (
-        <div className="fixed inset-x-3 bottom-3 z-40 lg:hidden">
-          <div className="glass-panel-strong grid grid-cols-6 rounded-lg p-1.5">
-            {primaryNav.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              const Icon = item.icon;
-              const guestLocked = isGuest && !isPublicPanelRoute(item.href);
-              const href = guestLocked ? "/login" : item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={href}
-                  className={cn(
-                    "flex flex-col items-center gap-0.5 rounded-md px-1 py-2 text-[10px] text-[var(--theme-text-secondary)] transition",
-                    active && "bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface-strong))] text-[var(--foreground)]",
-                    guestLocked && !active && "opacity-70"
-                  )}
-                >
-                  <Icon className="h-4 w-4" strokeWidth={1.75} />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
-            <a
-              href={EYEDBIO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[10px] text-cyan-300"
-            >
-              <span className="text-[9px]">Eyed.bio</span>
-            </a>
-          </div>
-        </div>
-        ) : null}
       </div>
     </div>
   );
