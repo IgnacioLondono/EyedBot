@@ -87,6 +87,33 @@ export function ThemeSettings() {
       />
 
       <SectionCard
+        title="Interfaz neutra"
+        description="Desactiva wallpaper, burbujas, gradientes y efectos pesados. Deja un fondo plano para que los temas y el modo claro se apliquen correctamente en toda la web."
+      >
+        <div className={`space-y-4 ${lockedClass}`}>
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+            <div>
+              <p className="font-medium text-white">Desactivar efectos visuales</p>
+              <p className="text-sm text-zinc-400">
+                Fondo liso sin wallpaper ni atmósfera. Recomendado si usas tema claro.
+              </p>
+            </div>
+            <Switch
+              checked={theme.neutralUi}
+              onCheckedChange={(neutralUi) =>
+                setTheme({
+                  neutralUi,
+                  ...(neutralUi
+                    ? { backgroundBubbles: false, atmosphere: 0, wallpaperEnabled: false }
+                    : {}),
+                })
+              }
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
         title="Temas preestablecidos"
         description="Aplica una paleta completa con un clic."
         action={premiumLocked ? <PremiumLock locked /> : null}

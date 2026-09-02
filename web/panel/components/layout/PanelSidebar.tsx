@@ -130,8 +130,8 @@ export function PanelSidebar({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        "panel-scroll fixed bottom-0 left-0 top-0 z-50 flex flex-col border-r border-white/[0.06] lg:top-14",
-        isDocs ? "w-[var(--docs-sidebar-width)] bg-[#0c0c0e]/96 backdrop-blur-xl" : "glass-sidebar w-[var(--sidebar-width)]",
+        "panel-scroll fixed bottom-0 left-0 top-0 z-50 flex flex-col border-r border-[var(--color-border-subtle)]",
+        isDocs ? "docs-sidebar w-[var(--docs-sidebar-width)]" : "glass-sidebar w-[var(--sidebar-width)]",
         className
       )}
     >

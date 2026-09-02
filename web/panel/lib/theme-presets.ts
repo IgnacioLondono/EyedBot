@@ -132,6 +132,7 @@ export type PanelThemeSettings = {
   wallpaperBloom: number;
   wallpaperVeil: number;
   wallpaperBlur: boolean;
+  neutralUi: boolean;
 };
 
 export const DEFAULT_THEME: PanelThemeSettings = {
@@ -147,6 +148,7 @@ export const DEFAULT_THEME: PanelThemeSettings = {
   wallpaperBloom: 42,
   wallpaperVeil: 38,
   wallpaperBlur: true,
+  neutralUi: false,
 };
 
 export function clampThemeNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -187,6 +189,7 @@ export function normalizePanelTheme(input: Partial<PanelThemeSettings> = {}): Pa
     wallpaperBloom: clampThemeNumber(input.wallpaperBloom, 0, 100, DEFAULT_THEME.wallpaperBloom),
     wallpaperVeil: clampThemeNumber(input.wallpaperVeil, 0, 100, DEFAULT_THEME.wallpaperVeil),
     wallpaperBlur: input.wallpaperBlur !== false,
+    neutralUi: input.neutralUi === true,
   };
 }
 

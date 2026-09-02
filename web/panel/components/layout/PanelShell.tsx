@@ -10,7 +10,6 @@ import { filterPrimaryNav } from "@/lib/web-config";
 import { EYEDBIO_URL } from "@/lib/eyedbio";
 import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
-import { PanelTopBar } from "@/components/layout/PanelTopBar";
 import { isPublicPanelRoute } from "@/lib/public-routes";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { discordAvatarUrl } from "@/lib/discord-media";
@@ -23,7 +22,9 @@ import { PanelTenantSwitcher } from "@/components/layout/PanelTenantSwitcher";
 export function PanelShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { bootstrap } = usePanel();
-  const { hasActiveWallpaper } = useThemeSettings();
+  const { hasActiveWallpaper, theme } = useThemeSettings();
+  const showWallpaper = hasActiveWallpaper && !theme.neutralUi;
+  const showBubbles = theme.backgroundBubbles && !theme.neutralUi;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const user = bootstrap?.user;
   const isGuest = !user;
@@ -54,26 +55,21 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   return (
-    <div
-      className={cn(
-        "relative min-h-screen text-zinc-100",
-        !hasActiveWallpaper && (isDocs ? "bg-[#0a0a0c]" : "bg-[var(--color-bg)]")
-      )}
-    >
-      {!isDocs ? <WallpaperLayer /> : null}
-      <div className="theme-bubbles pointer-events-none fixed inset-0 z-[1] overflow-hidden opacity-0 transition-opacity">
+    <div className="relative min-h-screen bg-[var(--color-bg)] text-[var(--foreground)]">
+      {showWallpaper ? <WallpaperLayer /> : null}
+      {showBubbles ? (
+      <div className="theme-bubbles pointer-events-none fixed inset-0 z-[1] overflow-hidden opacity-100 transition-opacity">
         <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-[color:var(--color-accent)]/20 blur-3xl" />
         <div className="absolute right-0 top-32 h-80 w-80 rounded-full bg-[color:var(--color-accent-2)]/15 blur-3xl" />
         <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-[color:var(--color-glow)]/10 blur-3xl" />
       </div>
+      ) : null}
 
       {showMaintenanceNotice ? (
         <div className="relative z-50 border-b border-amber-400/20 bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-100">
           Modo mantenimiento activo para usuarios. {maintenanceMessage}
         </div>
       ) : null}
-
-      <PanelTopBar />
 
       <PanelSidebar className="hidden lg:flex" />
 
@@ -89,8 +85,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="relative z-10 flex min-h-screen flex-col lg:pt-14 lg:pl-[var(--panel-active-sidebar-width)]">
-        <header className="sticky top-0 z-40 border-b border-white/8 bg-[var(--glass-bg)]/90 backdrop-blur-xl lg:hidden">
+      <div className="relative z-10 flex min-h-screen flex-col lg:pl-[var(--panel-active-sidebar-width)]">
+        <header className="sticky top-0 z-40 border-b border-[var(--color-border-subtle)] bg-[var(--glass-bg)]/90 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-3 px-4 py-3">
             <button
               type="button"

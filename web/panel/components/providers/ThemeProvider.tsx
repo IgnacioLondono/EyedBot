@@ -72,20 +72,24 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
   const root = document.documentElement;
   const patternStrength = theme.atmosphere / 100;
   const borderStrength = theme.borderStrength / 100;
+  const isLight = root.dataset.colorMode === "light";
 
   root.style.setProperty("--color-accent", theme.accentPrimary);
   root.style.setProperty("--color-accent-2", theme.accentSecondary);
   root.style.setProperty("--color-glow", theme.accentPrimary);
   root.style.setProperty("--color-ring", theme.accentSecondary);
   root.style.setProperty("--shadow-accent", `${theme.accentPrimary}55`);
-  root.style.setProperty("--color-bg", theme.bgPrimary);
-  root.style.setProperty("--background", theme.bgPrimary);
-  root.style.setProperty("--color-surface", theme.bgCard);
-  root.style.setProperty("--color-surface-strong", theme.bgSecondary);
+
+  if (!isLight) {
+    root.style.setProperty("--color-bg", theme.bgPrimary);
+    root.style.setProperty("--background", theme.bgPrimary);
+    root.style.setProperty("--foreground", theme.textPrimary);
+    root.style.setProperty("--color-surface", theme.bgCard);
+    root.style.setProperty("--color-surface-strong", theme.bgSecondary);
+    root.style.setProperty("--theme-text-secondary", theme.textSecondary);
+  }
+
   root.style.setProperty("--color-border", `${theme.borderColor}${Math.round(40 + borderStrength * 60).toString(16).padStart(2, "0")}`);
-  root.style.setProperty("--foreground", theme.textPrimary);
-  root.style.setProperty("--theme-text-secondary", theme.textSecondary);
-  root.style.setProperty("--theme-atmosphere", String(patternStrength));
   root.style.setProperty("--user-wallpaper-blur", `${28 + (theme.wallpaperBloom / 100) * 76}px`);
   root.style.setProperty("--user-wallpaper-bloom-opacity", String(0.14 + (theme.wallpaperBloom / 100) * 0.52));
   root.style.setProperty("--user-wallpaper-veil-opacity", String(0.35 + (theme.wallpaperVeil / 100) * 0.45));
@@ -120,7 +124,9 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
   );
   root.style.setProperty("--color-btn-accent-fg", theme.textPrimary);
 
-  if (theme.wallpaperEnabled && theme.wallpaperStorage !== "none") {
+  root.style.setProperty("--theme-atmosphere", theme.neutralUi ? "0" : String(patternStrength));
+
+  if (theme.wallpaperEnabled && !theme.neutralUi && theme.wallpaperStorage !== "none") {
     root.dataset.wallpaper = theme.wallpaperKind === "video" ? "video" : "image";
     if (hasWallpaperMedia) {
       const url = theme.wallpaperStorage === "indexeddb" ? wallpaperUrl : theme.wallpaperUrl;
@@ -133,7 +139,8 @@ function applyThemeCss(theme: PanelThemeSettings, wallpaperUrl: string | null) {
     delete root.dataset.wallpaperVideo;
   }
 
-  root.dataset.themeBubbles = theme.backgroundBubbles ? "1" : "0";
+  root.dataset.themeBubbles = theme.backgroundBubbles && !theme.neutralUi ? "1" : "0";
+  root.dataset.neutralUi = theme.neutralUi ? "1" : "0";
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -154,13 +161,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         : null;
 
   const hasActiveWallpaper = Boolean(
-    theme.wallpaperEnabled &&
+    !theme.neutralUi &&
+      theme.wallpaperEnabled &&
       ((theme.wallpaperStorage === "indexeddb" && blobUrl) ||
         (theme.wallpaperStorage === "inline" && theme.wallpaperUrl))
   );
 
   useEffect(() => {
     applyThemeCss(theme, wallpaperUrl);
+  }, [theme, wallpaperUrl]);
+
+  useEffect(() => {
+    const onColorMode = () => applyThemeCss(theme, wallpaperUrl);
+    window.addEventListener("eyedbot:color-mode", onColorMode);
+    return () => window.removeEventListener("eyedbot:color-mode", onColorMode);
   }, [theme, wallpaperUrl]);
 
   const persist = useCallback((next: PanelThemeSettings) => {

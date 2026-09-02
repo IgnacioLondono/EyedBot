@@ -95,12 +95,6 @@ const introBlocks: DocBlock[] = [
     text: "EyedBot es un bot de Discord con panel web para moderar, automatizar y hacer crecer tu comunidad. Combina comandos slash en Discord con configuración visual: bienvenidas, tickets, niveles, alertas de directos, seguridad, gacha y más.",
   },
   {
-    type: "callout",
-    variant: "info",
-    title: "¿Nuevo aquí?",
-    text: "Empieza por Primeros pasos para invitar el bot y configurar tu primer módulo en menos de cinco minutos.",
-  },
-  {
     type: "heading",
     level: 2,
     text: "¿Qué incluye EyedBot?",

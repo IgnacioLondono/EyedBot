@@ -50,6 +50,7 @@ export function PanelSidebarUserCard({
     setColorMode(mode);
     persistPanelColorMode(mode);
     applyPanelColorMode(mode);
+    window.dispatchEvent(new CustomEvent("eyedbot:color-mode"));
   }
 
   if (!user) {
