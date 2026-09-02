@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DoorOpen, ImageIcon, Mail, PartyPopper, Type } from "lucide-react";
+import { DoorOpen, ExternalLink, Mail, Paintbrush, PartyPopper } from "lucide-react";
 import {
   deleteWelcomeImage,
   getGoodbyeConfig,
@@ -19,6 +20,7 @@ import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { Alert } from "@/components/ui/Alert";
 import { Tabs } from "@/components/ui/Tabs";
 import { Switch } from "@/components/ui/Switch";
+import { Button } from "@/components/ui/Button";
 import {
   ChannelSelect,
   ColorInput,
@@ -36,11 +38,10 @@ import { plainColorToHex } from "@/lib/embed-utils";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 import {
   DEFAULT_WELCOME_CARD_LAYOUT,
-  WELCOME_FONT_OPTIONS,
   mergeWelcomeCardLayout,
   type WelcomeCardLayout,
 } from "@/lib/welcome-card";
-import { WelcomeCardPreview } from "./WelcomeCardPreview";
+import { welcomeCardStudioHref } from "@/lib/navigation";
 
 type ConfigState = {
   enabled: boolean;
@@ -137,7 +138,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const [sectionTab, setSectionTab] = usePersistedTab(
     paneTabKey(guildId, "welcome", "section"),
     "general",
-    ["general", "content", "design", "media", "dm", "message"]
+    ["general", "message", "media", "dm"]
   );
   const [welcome, setWelcome] = useState<ConfigState>(defaultState);
   const [goodbye, setGoodbye] = useState<ConfigState>(defaultState);
@@ -182,37 +183,10 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     }
   }, [welcomeCardEnabled, welcome.welcomeStyle]);
 
-  useEffect(() => {
-    if (!isCardWelcome && (sectionTab === "content" || sectionTab === "design")) {
-      setSectionTab("message");
-    }
-  }, [isCardWelcome, sectionTab]);
-
-  const cardPreviewConfig = useMemo(
-    () => ({
-      title: welcome.title,
-      message: welcome.message,
-      imageUrl: welcome.imageUrl,
-      cardNameTemplate: welcome.cardNameTemplate,
-      cardOverlayText: welcome.cardOverlayText,
-      cardAccentColor: welcome.cardAccentColor,
-      cardTitleColor: welcome.cardTitleColor,
-      cardNameColor: welcome.cardNameColor,
-      cardSubtitleColor: welcome.cardSubtitleColor,
-      cardOverlayColor: welcome.cardOverlayColor,
-      cardFontKey: welcome.cardFontKey,
-      cardLayout: welcome.cardLayout,
-    }),
-    [welcome]
-  );
-
   const sectionTabs = useMemo(() => {
     if (isCardWelcome) {
       return [
         { id: "general", label: "General" },
-        { id: "content", label: "Textos" },
-        { id: "design", label: "Diseño" },
-        { id: "media", label: "Fondo" },
         { id: "dm", label: "DM" },
       ];
     }
@@ -248,7 +222,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
       }
       toast({
         title: "Imagen subida",
-        description: isCardWelcome ? "El fondo de la tarjeta fue guardado." : "La imagen del embed fue guardada.",
+        description: "La imagen del embed fue guardada.",
         tone: "success",
       });
     } catch (err) {
@@ -389,188 +363,70 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                   </Select>
                 </Field>
               ) : null}
+
+              {isCardWelcome ? (
+                <div className="rounded-2xl border border-violet-400/25 bg-gradient-to-br from-violet-500/15 to-teal-500/10 p-5">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300">
+                      <Paintbrush className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">Card Studio</p>
+                      <p className="text-sm text-zinc-400">
+                        Edita textos, colores, fondo y posiciones en el editor visual.
+                      </p>
+                    </div>
+                  </div>
+                  <Link href={welcomeCardStudioHref(guildId)}>
+                    <Button className="w-full sm:w-auto">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Abrir Card Studio
+                    </Button>
+                  </Link>
+                </div>
+              ) : null}
             </>
           ) : null}
 
-          {sectionTab === "message" || sectionTab === "content" ? (
+          {sectionTab === "message" && !isCardWelcome ? (
             <>
-              {isCardWelcome ? (
-                <div className="rounded-2xl border border-violet-400/20 bg-violet-500/10 p-4 text-sm text-violet-100">
-                  <div className="mb-2 flex items-center gap-2 font-medium">
-                    <Type className="h-4 w-4" />
-                    Textos de la tarjeta
-                  </div>
-                  <p className="text-violet-200/90">
-                    Variables: {"{user}"}, {"{username}"}, {"{server}"}, {"{memberCount}"}. Para colores en línea usa{" "}
-                    <code className="rounded bg-black/30 px-1">[[#ff6b6b]]texto[[/]]</code>.
-                  </p>
-                </div>
-              ) : null}
-
-              <Field label={isCardWelcome ? "Título (cabecera)" : "Título del embed"}>
+              <Field label="Título del embed">
                 <Input
                   value={active.title}
                   onChange={(event) => setActive((current) => ({ ...current, title: event.target.value }))}
                 />
               </Field>
 
-              {isCardWelcome ? (
-                <Field label="Nombre mostrado" description="Texto grande bajo el avatar. Por defecto el nombre del usuario.">
-                  <Input
-                    value={welcome.cardNameTemplate}
-                    onChange={(event) => setWelcome((current) => ({ ...current, cardNameTemplate: event.target.value }))}
-                    placeholder="{username}"
-                  />
-                </Field>
-              ) : null}
-
-              <Field
-                label={isCardWelcome ? "Subtítulo / mensaje" : "Mensaje"}
-                description={isCardWelcome ? undefined : "Variables: {user}, {username}, {server}, {memberCount}"}
-              >
+              <Field label="Mensaje" description="Variables: {user}, {username}, {server}, {memberCount}">
                 <Textarea
                   value={active.message}
                   onChange={(event) => setActive((current) => ({ ...current, message: event.target.value }))}
-                  placeholder={isCardWelcome ? "Ej. ¡Hola {user}! Bienvenido a {server}" : "Ej. Bienvenido {user} a {server}"}
+                  placeholder="Ej. Bienvenido {user} a {server}"
                 />
               </Field>
 
-              {isCardWelcome ? (
-                <Field label="Texto en esquina" description="Opcional. Aparece abajo a la derecha (p. ej. #{memberCount}).">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Color del embed">
+                  <ColorInput value={active.color} onChange={(color) => setActive((current) => ({ ...current, color }))} />
+                </Field>
+                <Field label="Pie de embed">
                   <Input
-                    value={welcome.cardOverlayText}
-                    onChange={(event) => setWelcome((current) => ({ ...current, cardOverlayText: event.target.value }))}
-                    placeholder="#{memberCount}"
-                  />
-                </Field>
-              ) : null}
-
-              {!isCardWelcome ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Color del embed">
-                    <ColorInput value={active.color} onChange={(color) => setActive((current) => ({ ...current, color }))} />
-                  </Field>
-                  <Field label="Pie de embed">
-                    <Input
-                      value={active.footer}
-                      onChange={(event) => setActive((current) => ({ ...current, footer: event.target.value }))}
-                    />
-                  </Field>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
-          {sectionTab === "design" && isCardWelcome ? (
-            <>
-              <Field label="Fuente de la tarjeta">
-                <Select
-                  value={welcome.cardFontKey}
-                  onChange={(event) => setWelcome((current) => ({ ...current, cardFontKey: event.target.value }))}
-                >
-                  {WELCOME_FONT_OPTIONS.map((font) => (
-                    <option key={font.value} value={font.value}>
-                      {font.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <Field label="Tamaño del avatar" description={`Radio en píxeles (${welcome.cardLayout.avatarR}px).`}>
-                <input
-                  type="range"
-                  min={36}
-                  max={150}
-                  value={welcome.cardLayout.avatarR}
-                  onChange={(event) =>
-                    setWelcome((current) => ({
-                      ...current,
-                      cardLayout: { ...current.cardLayout, avatarR: Number(event.target.value) },
-                    }))
-                  }
-                  className="w-full accent-violet-400"
-                />
-              </Field>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Foco horizontal del fondo">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round(welcome.cardLayout.bgFocalX * 100)}
-                    onChange={(event) =>
-                      setWelcome((current) => ({
-                        ...current,
-                        cardLayout: { ...current.cardLayout, bgFocalX: Number(event.target.value) / 100 },
-                      }))
-                    }
-                    className="w-full accent-sky-400"
-                  />
-                </Field>
-                <Field label="Foco vertical del fondo">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round(welcome.cardLayout.bgFocalY * 100)}
-                    onChange={(event) =>
-                      setWelcome((current) => ({
-                        ...current,
-                        cardLayout: { ...current.cardLayout, bgFocalY: Number(event.target.value) / 100 },
-                      }))
-                    }
-                    className="w-full accent-sky-400"
+                    value={active.footer}
+                    onChange={(event) => setActive((current) => ({ ...current, footer: event.target.value }))}
                   />
                 </Field>
               </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Color del anillo (avatar)">
-                  <ColorInput
-                    value={welcome.cardAccentColor}
-                    onChange={(color) => setWelcome((current) => ({ ...current, cardAccentColor: color }))}
-                  />
-                </Field>
-                <Field label="Color del título">
-                  <ColorInput
-                    value={welcome.cardTitleColor}
-                    onChange={(color) => setWelcome((current) => ({ ...current, cardTitleColor: color }))}
-                  />
-                </Field>
-                <Field label="Color del nombre">
-                  <ColorInput
-                    value={welcome.cardNameColor}
-                    onChange={(color) => setWelcome((current) => ({ ...current, cardNameColor: color }))}
-                  />
-                </Field>
-                <Field label="Color del subtítulo">
-                  <ColorInput
-                    value={welcome.cardSubtitleColor}
-                    onChange={(color) => setWelcome((current) => ({ ...current, cardSubtitleColor: color }))}
-                  />
-                </Field>
-                <Field label="Color texto esquina">
-                  <ColorInput
-                    value={welcome.cardOverlayColor}
-                    onChange={(color) => setWelcome((current) => ({ ...current, cardOverlayColor: color }))}
-                  />
-                </Field>
-              </div>
-
-              <ButtonResetLayout onReset={() => setWelcome((current) => ({ ...current, cardLayout: { ...DEFAULT_WELCOME_CARD_LAYOUT } }))} />
             </>
           ) : null}
 
-          {sectionTab === "media" ? (
+          {sectionTab === "media" && !isCardWelcome ? (
             <>
               <div className="mb-1 flex items-center gap-2 text-sm text-zinc-400">
-                <ImageIcon className="h-4 w-4" />
-                {isCardWelcome ? "Imagen de fondo de la tarjeta" : "Imágenes del embed"}
+                Imágenes del embed
               </div>
               <EmbedImageField
-                label={isCardWelcome ? "Fondo de la tarjeta" : "Imagen principal"}
-                description={isCardWelcome ? "Se recorta a 920×520. Ajusta el foco en Diseño o arrastrando «Foco fondo»." : "URL externa o archivo subido al panel."}
+                label="Imagen principal"
+                description="URL externa o archivo subido al panel."
                 value={active.imageUrl}
                 onChange={(imageUrl) => setActive((current) => ({ ...current, imageUrl }))}
                 uploading={uploadingMainImage}
@@ -578,31 +434,27 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                 onUpload={(file) => handleUploadImage(file, imageSlot, "main")}
                 onDelete={() => handleDeleteImage(imageSlot, "main")}
               />
-              {!isCardWelcome ? (
-                <>
-                  <Field label="Miniatura" description="Avatar del usuario, URL personalizada o sin miniatura.">
-                    <Select
-                      value={active.thumbnailMode}
-                      onChange={(event) => setActive((current) => ({ ...current, thumbnailMode: event.target.value }))}
-                    >
-                      <option value="avatar">Avatar del usuario</option>
-                      <option value="url">URL / imagen subida</option>
-                      <option value="none">Sin miniatura</option>
-                    </Select>
-                  </Field>
-                  {active.thumbnailMode === "url" ? (
-                    <EmbedImageField
-                      label="Miniatura del embed"
-                      description="Se muestra arriba a la derecha en Discord."
-                      value={active.thumbnailUrl}
-                      onChange={(thumbnailUrl) => setActive((current) => ({ ...current, thumbnailUrl }))}
-                      uploading={uploadingThumbImage}
-                      deleting={deletingThumbImage}
-                      onUpload={(file) => handleUploadImage(file, thumbSlot, "thumb")}
-                      onDelete={() => handleDeleteImage(thumbSlot, "thumb")}
-                    />
-                  ) : null}
-                </>
+              <Field label="Miniatura" description="Avatar del usuario, URL personalizada o sin miniatura.">
+                <Select
+                  value={active.thumbnailMode}
+                  onChange={(event) => setActive((current) => ({ ...current, thumbnailMode: event.target.value }))}
+                >
+                  <option value="avatar">Avatar del usuario</option>
+                  <option value="url">URL / imagen subida</option>
+                  <option value="none">Sin miniatura</option>
+                </Select>
+              </Field>
+              {active.thumbnailMode === "url" ? (
+                <EmbedImageField
+                  label="Miniatura del embed"
+                  description="Se muestra arriba a la derecha en Discord."
+                  value={active.thumbnailUrl}
+                  onChange={(thumbnailUrl) => setActive((current) => ({ ...current, thumbnailUrl }))}
+                  uploading={uploadingThumbImage}
+                  deleting={deletingThumbImage}
+                  onUpload={(file) => handleUploadImage(file, thumbSlot, "thumb")}
+                  onDelete={() => handleDeleteImage(thumbSlot, "thumb")}
+                />
               ) : null}
             </>
           ) : null}
@@ -638,10 +490,10 @@ export function WelcomePane({ guildId }: { guildId: string }) {
       </SectionCard>
 
       <SectionCard
-        title={isCardWelcome ? "Editor visual de tarjeta" : tab === "welcome" ? "Vista narrativa" : "Mensaje de salida"}
+        title={isCardWelcome ? "Tarjeta de bienvenida" : tab === "welcome" ? "Vista narrativa" : "Mensaje de salida"}
         description={
           isCardWelcome
-            ? "Arrastra los elementos para colocar avatar, textos y foco del fondo."
+            ? "La tarjeta se edita en el Card Studio. Aquí ves el estado actual."
             : "Resumen rápido del tono y entrega actual."
         }
       >
@@ -663,12 +515,28 @@ export function WelcomePane({ guildId }: { guildId: string }) {
           </div>
 
           {isCardWelcome ? (
-            <WelcomeCardPreview
-              guildId={guildId}
-              config={cardPreviewConfig}
-              layout={welcome.cardLayout}
-              onLayoutChange={(cardLayout) => setWelcome((current) => ({ ...current, cardLayout }))}
-            />
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-900/30 to-teal-900/20">
+                <div className="flex aspect-[920/520] flex-col items-center justify-center gap-3 p-6 text-center">
+                  <Paintbrush className="h-10 w-10 text-violet-300/60" />
+                  <div>
+                    <p className="font-medium text-white">{welcome.title || "¡Bienvenido!"}</p>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      {welcome.cardNameTemplate || "{username}"} · {welcome.message ? "con subtítulo" : "sin subtítulo"}
+                    </p>
+                  </div>
+                  <Link href={welcomeCardStudioHref(guildId)}>
+                    <Button variant="secondary" size="sm">
+                      <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                      Editar en Card Studio
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+              <p className="text-xs text-zinc-500">
+                Tamaño enviado a Discord: 920×520px. Abre el studio para ver la vista previa en vivo.
+              </p>
+            </div>
           ) : (
             <DiscordEmbedPreview
               title={active.title || "Sin título"}
@@ -693,17 +561,5 @@ export function WelcomePane({ guildId }: { guildId: string }) {
         </div>
       </SectionCard>
     </PaneGrid>
-  );
-}
-
-function ButtonResetLayout({ onReset }: { onReset: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onReset}
-      className="text-sm text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline"
-    >
-      Restaurar posiciones por defecto
-    </button>
   );
 }

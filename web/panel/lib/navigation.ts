@@ -76,6 +76,10 @@ export function serverPaneHref(guildId: string, slug = "overview") {
   return `/server/${guildId}/${slug}`;
 }
 
+export function welcomeCardStudioHref(guildId: string) {
+  return `/server/${guildId}/welcome/studio`;
+}
+
 export type ServerPaneGroup = {
   label: string;
   slugs: string[];

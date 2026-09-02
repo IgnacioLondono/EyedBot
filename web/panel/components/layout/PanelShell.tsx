@@ -35,6 +35,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   const brand = resolvePanelBrand(bootstrap?.tenant);
   const brandLabel = brand.isTenant ? `${brand.name} Panel` : "EyedBot Panel";
   const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");
+  const isCardStudio = pathname.includes("/welcome/studio");
 
   useEffect(() => {
     document.documentElement.dataset.layout = isDocs ? "docs" : "";
@@ -71,7 +72,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <PanelSidebar className="hidden lg:flex" />
+      {!isCardStudio ? <PanelSidebar className="hidden lg:flex" /> : null}
 
       {mobileNavOpen ? (
         <div className="fixed inset-0 z-[60] lg:hidden">
@@ -85,7 +86,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="relative z-10 flex min-h-screen flex-col lg:pl-[var(--panel-active-sidebar-width)]">
+      <div className={cn("relative z-10 flex min-h-screen flex-col", !isCardStudio && "lg:pl-[var(--panel-active-sidebar-width)]")}>
+        {!isCardStudio ? (
         <header className="sticky top-0 z-40 border-b border-[var(--color-border-subtle)] bg-[var(--glass-bg)]/90 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-3 px-4 py-3">
             <button
@@ -129,6 +131,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
+        ) : null}
 
         <motion.main
           initial={{ opacity: 0, y: 6 }}
@@ -136,15 +139,19 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.3 }}
           className={cn(
             "relative flex-1",
-            isDocs ? "px-4 py-6 lg:px-10 lg:py-8" : "px-4 py-6 pb-24 lg:px-8 lg:pb-8 xl:px-10"
+            isCardStudio
+              ? "p-0"
+              : isDocs
+                ? "px-4 py-6 lg:px-10 lg:py-8"
+                : "px-4 py-6 pb-24 lg:px-8 lg:pb-8 xl:px-10"
           )}
         >
-          <div className={cn("mx-auto w-full", isDocs ? "max-w-3xl xl:max-w-4xl" : "max-w-[88rem]")}>
+          <div className={cn("mx-auto w-full", isCardStudio ? "max-w-none" : isDocs ? "max-w-3xl xl:max-w-4xl" : "max-w-[88rem]")}>
             {children}
           </div>
         </motion.main>
 
-        {!isDocs ? (
+        {!isDocs && !isCardStudio ? (
         <div className="fixed inset-x-3 bottom-3 z-40 lg:hidden">
           <div className="glass-panel-strong grid grid-cols-6 rounded-lg p-1.5">
             {primaryNav.map((item) => {
