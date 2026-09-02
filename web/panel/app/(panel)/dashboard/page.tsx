@@ -24,7 +24,7 @@ function ServerListRow({
   const activeModules = Object.values(guild.modules).filter(Boolean).length;
 
   return (
-    <div className="server-row group border-b border-white/5 last:border-0">
+    <div className="server-row group border-b border-[var(--color-border-subtle)] last:border-0">
       <Link href={serverPaneHref(guild.id, "overview")} className="flex min-w-0 flex-1 items-center gap-3">
         {guild.icon ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -36,7 +36,7 @@ function ServerListRow({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate font-medium text-white">{guild.name}</p>
+            <p className="truncate font-medium text-[var(--foreground)]">{guild.name}</p>
             {guild.premiumTier > 0 ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-fuchsia-500/15 px-1.5 py-0.5 text-[10px] text-fuchsia-200">
                 <Crown className="h-3 w-3" />
@@ -44,11 +44,11 @@ function ServerListRow({
               </span>
             ) : null}
           </div>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <p className="mt-0.5 text-xs text-[var(--theme-text-secondary)]">
             {guild.memberCount.toLocaleString("es-ES")} miembros · {activeModules} módulos activos
           </p>
         </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-zinc-300" />
+        <ChevronRight className="h-4 w-4 shrink-0 text-[var(--theme-text-secondary)] opacity-60 transition group-hover:opacity-100" />
       </Link>
       <button
         type="button"
@@ -58,7 +58,7 @@ function ServerListRow({
         }}
         className={cn(
           "ml-2 shrink-0 rounded-lg p-2 transition",
-          favorite ? "text-amber-300" : "text-zinc-600 hover:bg-white/5 hover:text-zinc-300"
+          favorite ? "text-amber-500" : "text-[var(--theme-text-secondary)] hover:bg-black/5 hover:text-[var(--foreground)]"
         )}
         aria-label={favorite ? "Quitar de favoritos" : "Fijar servidor"}
       >
@@ -112,11 +112,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300/80">Panel</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-accent)] opacity-80">Panel</p>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Selecciona un servidor</h1>
-            <p className="mt-2 max-w-2xl text-sm text-zinc-400">
+            <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">Selecciona un servidor</h1>
+            <p className="mt-2 max-w-2xl text-sm text-[var(--theme-text-secondary)]">
               Elige una comunidad para configurar módulos, alertas y moderación.
             </p>
           </div>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => void handleRefresh()}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-zinc-300 hover:bg-white/[0.07]"
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-strong)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-surface)]"
             >
               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
               Actualizar
@@ -172,7 +172,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
           {filtered.favs.length ? (
             <section>
-              <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Fijados</h2>
+              <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-text-secondary)]">Fijados</h2>
               <div className="glass-panel overflow-hidden rounded-2xl">
                 {filtered.favs.map((guild) => (
                   <ServerListRow
@@ -187,7 +187,7 @@ export default function DashboardPage() {
           ) : null}
 
           <section>
-            <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-text-secondary)]">
               {filtered.favs.length ? "Todos los servidores" : "Servidores"}
             </h2>
             <div className="glass-panel overflow-hidden rounded-2xl">

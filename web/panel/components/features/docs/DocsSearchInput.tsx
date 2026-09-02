@@ -23,7 +23,7 @@ export function DocsSearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Buscar…"
-        className="docs-search-input h-9 border-white/[0.06] bg-[#141418] pl-9 pr-14 text-sm"
+        className="docs-search-input h-9 border-[var(--color-border-subtle)] bg-[var(--color-surface-strong)] pl-9 pr-14 text-sm text-[var(--foreground)]"
       />
       <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-zinc-500 sm:inline">
         Ctrl K

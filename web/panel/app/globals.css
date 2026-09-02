@@ -116,14 +116,19 @@ html[data-color-mode="light"] {
   --color-surface-strong: var(--panel-surface-secondary, #ffffff);
   --color-surface: var(--panel-surface-card, #ffffff);
   --theme-text-secondary: var(--panel-surface-muted, #52525b);
-  --glass-bg: var(--glass-bg, rgba(255, 255, 255, 0.92));
-  --glass-bg-strong: var(--glass-bg-strong, rgba(255, 255, 255, 0.98));
+  --glass-bg: rgba(255, 255, 255, 0.92);
+  --glass-bg-strong: rgba(255, 255, 255, 0.98);
   --color-border-subtle: rgba(0, 0, 0, 0.08);
 }
 
 html[data-color-mode="light"] body {
   background: var(--color-bg);
   color: var(--foreground);
+}
+
+html[data-color-mode="light"]:not([data-wallpaper]) body::before,
+html[data-color-mode="light"]:not([data-wallpaper]) body::after {
+  display: none !important;
 }
 
 html[data-color-mode="light"] .glass-sidebar,
@@ -133,11 +138,20 @@ html[data-color-mode="light"] .docs-sidebar {
 }
 
 html[data-color-mode="light"] .nav-item {
+  color: #52525b;
+}
+
+html[data-color-mode="light"] .nav-item svg {
   color: #71717a;
 }
 
 html[data-color-mode="light"] .nav-item:hover,
 html[data-color-mode="light"] .nav-item-active {
+  color: #18181b;
+}
+
+html[data-color-mode="light"] .nav-item:hover svg,
+html[data-color-mode="light"] .nav-item-active svg {
   color: #18181b;
 }
 
@@ -149,6 +163,15 @@ html[data-color-mode="light"] .glass-panel {
   background: var(--color-surface-strong);
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+html[data-color-mode="light"] .server-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+html[data-color-mode="light"] .nav-item-docs:hover svg,
+html[data-color-mode="light"] .nav-item-docs-active svg {
+  color: inherit;
 }
 
 html[data-color-mode="light"] .docs-article {
@@ -786,4 +809,26 @@ html[data-color-mode="light"] .sidebar-quick-link:hover {
 
 html[data-color-mode="light"] .sidebar-user-popover-item {
   color: #27272a;
+}
+
+html[data-color-mode="light"] .sidebar-theme-toggle {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+html[data-color-mode="light"] .sidebar-theme-toggle-btn-active {
+  background: rgba(0, 0, 0, 0.08);
+  color: #18181b;
+}
+
+html[data-color-mode="light"] select option {
+  background-color: #ffffff;
+  color: #18181b;
+}
+
+html[data-color-mode="light"] .panel-scroll {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+html[data-color-mode="light"] .panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
 }

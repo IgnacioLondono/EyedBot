@@ -127,7 +127,7 @@ export function PanelSidebarUserCard({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={discordAvatarUrl(user.id, user.avatar, 64)} alt="" className="h-8 w-8 rounded-full" />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{displayName}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--foreground)]">{displayName}</span>
         <MoreHorizontal className="h-4 w-4 shrink-0 text-zinc-500" />
       </button>
     </div>

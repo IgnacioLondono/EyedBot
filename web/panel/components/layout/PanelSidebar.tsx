@@ -177,8 +177,8 @@ export function PanelSidebar({ className }: { className?: string }) {
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">{guildName}</p>
-                <p className="truncate text-xs text-zinc-500">Cambiar servidor</p>
+                <p className="truncate text-sm font-medium text-[var(--foreground)]">{guildName}</p>
+                <p className="truncate text-xs text-[var(--theme-text-secondary)]">Cambiar servidor</p>
               </div>
               <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" />
             </Link>
@@ -282,7 +282,6 @@ export function PanelSidebar({ className }: { className?: string }) {
       <PanelSidebarFooter
         user={user}
         displayName={displayName}
-        dashboardHref={homeHref}
         docsSearch={
           isDocs
             ? {

@@ -122,8 +122,8 @@ export function SectionCard({
     <Card className={cn("rounded-2xl p-6", className)}>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
-          {description ? <p className="mt-1 text-sm text-zinc-400">{description}</p> : null}
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">{title}</h2>
+          {description ? <p className="mt-1 text-sm text-[var(--theme-text-secondary)]">{description}</p> : null}
         </div>
         {action}
       </div>
