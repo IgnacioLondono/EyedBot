@@ -55,7 +55,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   return (
-    <div className="relative min-h-screen bg-[var(--color-bg)] text-[var(--foreground)]">
+    <div className="panel-shell relative min-h-screen bg-[var(--color-bg)] text-[var(--foreground)]">
       {showWallpaper ? <WallpaperLayer /> : null}
       {showBubbles ? (
       <div className="theme-bubbles pointer-events-none fixed inset-0 z-[1] overflow-hidden opacity-100 transition-opacity">
@@ -91,14 +91,14 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setMobileNavOpen((v) => !v)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-strong)] text-[color:var(--color-icon)]"
               aria-label="Abrir menú"
             >
               {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
 
             {brand.logoUrl ? (
-              <Link href={homeHref} className="flex min-w-0 flex-1 items-center gap-2 font-semibold text-white">
+              <Link href={homeHref} className="flex min-w-0 flex-1 items-center gap-2 font-semibold text-[var(--foreground)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={brand.logoUrl} alt="" className="h-8 w-8 rounded-xl object-cover" />
                 <span className="truncate">{brandLabel}</span>
@@ -146,7 +146,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
 
         {!isDocs ? (
         <div className="fixed inset-x-3 bottom-3 z-40 lg:hidden">
-          <div className="glass-panel-strong grid grid-cols-6 rounded-2xl p-1.5">
+          <div className="glass-panel-strong grid grid-cols-6 rounded-lg p-1.5">
             {primaryNav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
@@ -157,12 +157,12 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={href}
                   className={cn(
-                    "flex flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[10px] text-zinc-500 transition",
-                    active && "bg-white/10 text-white",
+                    "flex flex-col items-center gap-0.5 rounded-md px-1 py-2 text-[10px] text-[var(--theme-text-secondary)] transition",
+                    active && "bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface-strong))] text-[var(--foreground)]",
                     guestLocked && !active && "opacity-70"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" strokeWidth={1.75} />
                   <span className="truncate">{item.label}</span>
                 </Link>
               );

@@ -55,27 +55,28 @@ export function PanelTenantSwitcher() {
         type="button"
         disabled={busy}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-zinc-200 hover:bg-white/8 disabled:opacity-60 sm:max-w-[14rem]"
+        className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-strong)] px-2.5 py-2 text-sm text-[var(--foreground)] hover:bg-[color-mix(in_srgb,var(--foreground)_4%,var(--color-surface-strong))] disabled:opacity-60 sm:max-w-[14rem]"
         title="Cambiar de panel"
       >
-        {busy ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <Bot className="h-3.5 w-3.5 shrink-0" />}
+        {busy ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[color:var(--color-icon-muted)]" strokeWidth={1.75} />
+        ) : (
+          <Bot className="h-3.5 w-3.5 shrink-0 text-[color:var(--color-icon-muted)]" strokeWidth={1.75} />
+        )}
         <span className="truncate">{currentLabel}</span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[color:var(--color-icon-muted)]" strokeWidth={1.75} />
       </button>
 
       {open ? (
-        <div className="absolute left-0 z-50 mt-2 w-56 rounded-2xl border border-white/10 bg-[#12101a]/95 p-1 shadow-xl backdrop-blur-xl sm:left-auto sm:right-0">
-          <p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-zinc-500">Panel activo</p>
+        <div className="panel-popover panel-scroll absolute left-0 z-50 mt-2 max-h-72 w-56 overflow-y-auto p-1 sm:left-auto sm:right-0">
+          <p className="panel-muted px-3 py-1.5 text-[10px] uppercase tracking-wide">Panel activo</p>
           <button
             type="button"
-            className={cn(
-              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-white/5",
-              !currentId && "bg-white/8 text-white"
-            )}
+            className={cn("panel-popover-item", !currentId && "panel-popover-item-active")}
             onClick={() => void switchTo(null)}
           >
             <span>EyedBot</span>
-            {!currentId ? <Check className="h-3.5 w-3.5 text-[color:var(--color-accent)]" /> : null}
+            {!currentId ? <Check className="h-3.5 w-3.5 text-[color:var(--color-accent)]" strokeWidth={1.75} /> : null}
           </button>
           {tenants.map((tenant) => {
             const label = tenant.brand?.name || tenant.label || tenant.slug || "Bot";
@@ -84,14 +85,11 @@ export function PanelTenantSwitcher() {
               <button
                 key={tenant.id}
                 type="button"
-                className={cn(
-                  "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-white/5",
-                  active && "bg-white/8 text-white"
-                )}
+                className={cn("panel-popover-item", active && "panel-popover-item-active")}
                 onClick={() => void switchTo(tenant.id)}
               >
                 <span className="truncate">{label}</span>
-                {active ? <Check className="h-3.5 w-3.5 text-[color:var(--color-accent)]" /> : null}
+                {active ? <Check className="h-3.5 w-3.5 text-[color:var(--color-accent)]" strokeWidth={1.75} /> : null}
               </button>
             );
           })}

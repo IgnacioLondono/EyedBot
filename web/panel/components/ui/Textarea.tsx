@@ -13,7 +13,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     <textarea
       ref={ref}
       className={cn(
-        "min-h-28 w-full rounded-2xl border border-[color:var(--color-border-subtle)] bg-[var(--color-surface-strong)] px-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[color:var(--color-icon-muted)]",
+        "min-h-28 w-full rounded-lg border border-[color:var(--color-border-subtle)] bg-[var(--color-surface-strong)] px-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[color:var(--color-icon-muted)]",
         "outline-none transition focus:border-[color:var(--color-ring)]",
         className
       )}

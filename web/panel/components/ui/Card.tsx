@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`glass-panel rounded-2xl p-5 ${className}`}
+      className={`glass-panel rounded-[var(--radius-lg)] p-5 ${className}`}
     >
       {children}
     </div>

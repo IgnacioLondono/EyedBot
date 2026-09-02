@@ -23,14 +23,14 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <div className={cn("rounded-3xl border border-dashed border-white/12 bg-white/4 p-8 text-center", className)}>
-      {icon ? <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/8 text-zinc-200">{icon}</div> : null}
+    <div className={cn("panel-empty", className)}>
+      {icon ? <div className="panel-icon-box mx-auto mb-4 h-14 w-14">{icon}</div> : null}
       <div className="space-y-2">
         <div className="flex items-center justify-center gap-2">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <h3 className="text-base font-semibold text-[var(--foreground)]">{title}</h3>
           {premium ? <Badge variant="premium">Premium</Badge> : null}
         </div>
-        <p className="mx-auto max-w-lg text-sm text-zinc-400">{description}</p>
+        <p className="panel-muted mx-auto max-w-lg text-sm">{description}</p>
       </div>
       {actionLabel && onAction ? (
         <div className="mt-5">

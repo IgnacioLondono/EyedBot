@@ -11,6 +11,7 @@ import {
   Server,
   Settings,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import { EyedBotMark } from "@/components/brand/EyedBotMark";
 import { usePanel } from "@/components/providers/PanelProvider";
@@ -43,14 +44,14 @@ function NavLink({
 }: {
   href: string;
   active: boolean;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   label: string;
   badge?: React.ReactNode;
   className?: string;
 }) {
   return (
     <Link href={href} className={cn("nav-item", active && "nav-item-active", className)}>
-      <Icon className="h-4 w-4 shrink-0 opacity-90" />
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
       <span className="truncate">{label}</span>
       {badge}
     </Link>
@@ -164,27 +165,27 @@ export function PanelSidebar({ className }: { className?: string }) {
           </div>
         ) : guildId ? (
           <div className="space-y-4">
-            <Link
-              href="/dashboard"
-              className="glass-panel flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-white/[0.06]"
-            >
+            <Link href="/dashboard" className="panel-server-chip">
               {guildIcon ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={guildIcon} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                <img src={guildIcon} alt="" className="h-9 w-9 rounded-md object-cover" />
               ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/20 text-violet-200">
-                  <Server className="h-4 w-4" />
+                <div className="panel-icon-box flex h-9 w-9 rounded-md">
+                  <Server className="h-4 w-4" strokeWidth={1.75} />
                 </div>
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--foreground)]">{guildName}</p>
                 <p className="truncate text-xs text-[var(--theme-text-secondary)]">Cambiar servidor</p>
               </div>
-              <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" />
+              <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--color-icon-muted)]" strokeWidth={1.75} />
             </Link>
 
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--color-icon-muted)]"
+                strokeWidth={1.75}
+              />
               <Input
                 value={moduleQuery}
                 onChange={(e) => setModuleQuery(e.target.value)}

@@ -159,13 +159,13 @@ export function LockedOverlay({
 }) {
   if (!visible) return null;
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[28px] border border-fuchsia-400/20 bg-black/55 p-6 backdrop-blur-md">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-lg)] border border-[color:var(--color-accent)]/25 bg-[color-mix(in_srgb,var(--foreground)_55%,transparent)] p-6 backdrop-blur-sm">
       <div className="max-w-md text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-100">
-          <Sparkles className="h-7 w-7" />
+        <div className="panel-icon-box mx-auto mb-4 flex h-14 w-14">
+          <Sparkles className="h-7 w-7" strokeWidth={1.75} />
         </div>
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
-        <p className="mt-2 text-sm text-zinc-300">{description}</p>
+        <h3 className="text-lg font-semibold text-[var(--foreground)]">{title}</h3>
+        <p className="panel-muted mt-2 text-sm">{description}</p>
       </div>
     </div>
   );
@@ -297,7 +297,7 @@ export function MultiRoleSelect({
   emptyLabel?: string;
 }) {
   if (!options.length) {
-    return <p className="text-sm text-zinc-500">{emptyLabel}</p>;
+    return <p className="panel-muted text-sm">{emptyLabel}</p>;
   }
 
   function toggle(roleId: string) {
@@ -309,16 +309,13 @@ export function MultiRoleSelect({
   }
 
   return (
-    <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-white/8 bg-black/20 p-2">
+    <div className="panel-list-picker panel-scroll">
       {options.map((role) => {
         const checked = value.includes(role.id);
         return (
           <label
             key={role.id}
-            className={cn(
-              "flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm transition",
-              checked ? "bg-violet-500/15 text-white" : "text-zinc-300 hover:bg-white/5"
-            )}
+            className={cn("panel-list-picker-item", checked && "panel-list-picker-item-active")}
           >
       <input
         type="checkbox"
@@ -326,10 +323,10 @@ export function MultiRoleSelect({
         id={`role-${role.id}`}
         checked={checked}
         onChange={() => toggle(role.id)}
-        className="accent-violet-500"
+        className="accent-[color:var(--color-accent)]"
       />
             <span
-              className="h-3 w-3 shrink-0 rounded-full border border-white/10"
+              className="h-3 w-3 shrink-0 rounded-full border border-[var(--color-border-subtle)]"
               style={{ backgroundColor: roleColorStyle(role.color) }}
             />
             <span className="truncate">{role.name}</span>
@@ -352,7 +349,7 @@ export function MultiChannelSelect({
   emptyLabel?: string;
 }) {
   if (!options.length) {
-    return <p className="text-sm text-zinc-500">{emptyLabel}</p>;
+    return <p className="panel-muted text-sm">{emptyLabel}</p>;
   }
 
   function toggle(channelId: string) {
@@ -364,17 +361,14 @@ export function MultiChannelSelect({
   }
 
   return (
-    <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-white/8 bg-black/20 p-2">
+    <div className="panel-list-picker panel-scroll">
       {options.map((channel) => {
         const checked = value.includes(channel.id);
         const privateLabel = channel.isPrivate ? " · Privado" : "";
         return (
           <label
             key={channel.id}
-            className={cn(
-              "flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm transition",
-              checked ? "bg-violet-500/15 text-white" : "text-zinc-300 hover:bg-white/5"
-            )}
+            className={cn("panel-list-picker-item", checked && "panel-list-picker-item-active")}
           >
             <input
               type="checkbox"
@@ -382,7 +376,7 @@ export function MultiChannelSelect({
               id={`channel-${channel.id}`}
               checked={checked}
               onChange={() => toggle(channel.id)}
-              className="accent-violet-500"
+              className="accent-[color:var(--color-accent)]"
             />
             <span className="truncate">
               #{channel.name}
