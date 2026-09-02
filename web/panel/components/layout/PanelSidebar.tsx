@@ -6,18 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  LayoutDashboard,
-  LogOut,
   Search,
   Server,
   Settings,
   Sparkles,
-  Terminal,
-  BookOpen,
 } from "lucide-react";
 import { EyedBotMark } from "@/components/brand/EyedBotMark";
 import { usePanel } from "@/components/providers/PanelProvider";
-import { discordAvatarUrl } from "@/lib/discord-media";
 import { resolvePanelBrand } from "@/lib/brand";
 import {
   PRIMARY_NAV,
@@ -29,6 +24,11 @@ import {
 import { filterPrimaryNav, filterServerPanes, filterSettingsNav } from "@/lib/web-config";
 import { isPublicPanelRoute } from "@/lib/public-routes";
 import { getGuildInfo } from "@/lib/api/endpoints";
+import {
+  DOCS_DEFAULT_SLUG,
+} from "@/lib/docs-content";
+import { DocsSidebarNav } from "@/components/features/docs/DocsSidebarNav";
+import { PanelSidebarFooter } from "@/components/layout/PanelSidebarFooter";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 
@@ -69,11 +69,28 @@ export function PanelSidebar({ className }: { className?: string }) {
   const guildId = serverMatch?.[1] ?? null;
   const serverPaneSlug = guildId ? pathname.split("/")[3] || "overview" : null;
   const settingsPane = pathname.startsWith("/settings") ? pathname.split("/")[2] || "account" : null;
+  const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");
+  const docsSlug =
+    pathname === "/docs" || pathname === "/docs/"
+      ? DOCS_DEFAULT_SLUG
+      : pathname.replace(/^\/docs\/?/, "").trim() || DOCS_DEFAULT_SLUG;
 
   const [guildName, setGuildName] = useState("Servidor");
   const [guildIcon, setGuildIcon] = useState<string | null>(null);
   const [moduleQuery, setModuleQuery] = useState("");
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [docsQuery, setDocsQuery] = useState("");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isDocs) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        document.getElementById("panel-docs-search")?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isDocs]);
 
   const primaryNav = filterPrimaryNav(PRIMARY_NAV, bootstrap?.webConfig);
   const enabledPanes = useMemo(
@@ -113,10 +130,12 @@ export function PanelSidebar({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        "glass-sidebar panel-scroll fixed inset-y-0 left-0 z-50 flex w-[var(--sidebar-width)] flex-col",
+        "panel-scroll fixed bottom-0 left-0 top-0 z-50 flex flex-col border-r border-white/[0.06] lg:top-14",
+        isDocs ? "w-[var(--docs-sidebar-width)] bg-[#0c0c0e]/96 backdrop-blur-xl" : "glass-sidebar w-[var(--sidebar-width)]",
         className
       )}
     >
+      {!isDocs ? (
       <div className="flex items-center gap-2.5 border-b border-white/6 px-4 py-4">
         {brand.logoUrl ? (
           <Link href={homeHref} className="flex min-w-0 items-center gap-2.5">
@@ -131,9 +150,12 @@ export function PanelSidebar({ className }: { className?: string }) {
           </Link>
         )}
       </div>
+      ) : null}
 
-      <div className="flex-1 overflow-y-auto px-3 py-4">
-        {guildId ? (
+      <div className={cn("flex-1 overflow-y-auto px-3 py-4", isDocs && "pt-3")}>
+        {isDocs ? (
+          <DocsSidebarNav slug={docsSlug} query={docsQuery} />
+        ) : guildId ? (
           <div className="space-y-4">
             <Link
               href="/dashboard"
@@ -250,91 +272,19 @@ export function PanelSidebar({ className }: { className?: string }) {
         )}
       </div>
 
-      <div className="border-t border-white/6 p-3">
-        <div className="mb-2 flex flex-col gap-0.5">
-          <a
-            href="https://discord.gg/eN6eQdGn87"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="nav-item text-xs"
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-            Soporte Discord
-          </a>
-          <Link href="/docs" className="nav-item text-xs">
-            <BookOpen className="h-3.5 w-3.5" />
-            Documentación
-          </Link>
-          <Link href="/commands" className="nav-item text-xs">
-            <Terminal className="h-3.5 w-3.5" />
-            Comandos
-          </Link>
-        </div>
-
-        {isGuest ? (
-          <Link
-            href="/login"
-            className="nav-item justify-center border border-[color:var(--color-accent)]/25 bg-[color:var(--color-accent)]/10 text-[color:var(--color-brand-light)]"
-          >
-            Iniciar sesión
-          </Link>
-        ) : (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setUserMenuOpen((v) => !v)}
-              className="flex w-full items-center gap-2.5 rounded-xl border border-white/8 bg-white/[0.04] px-2.5 py-2 text-left hover:bg-white/[0.07]"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={discordAvatarUrl(user.id, user.avatar, 64)}
-                alt=""
-                className="h-8 w-8 rounded-full"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">{displayName}</p>
-                <p className="truncate text-xs text-zinc-500">Perfil</p>
-              </div>
-              <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" />
-            </button>
-            {userMenuOpen ? (
-              <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-white/10 bg-[#12101a]/95 shadow-xl backdrop-blur-xl">
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/5"
-                  onClick={() => setUserMenuOpen(false)}
-                >
-                  <LayoutDashboard className="h-4 w-4 text-zinc-400" />
-                  Dashboard
-                </Link>
-                <Link
-                  href="/settings/account"
-                  className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/5"
-                  onClick={() => setUserMenuOpen(false)}
-                >
-                  <Settings className="h-4 w-4 text-zinc-400" />
-                  Perfil
-                </Link>
-                <Link
-                  href="/settings/theme"
-                  className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/5"
-                  onClick={() => setUserMenuOpen(false)}
-                >
-                  <Sparkles className="h-4 w-4 text-zinc-400" />
-                  Tema
-                </Link>
-                <a
-                  href="/logout"
-                  className="flex items-center gap-2 border-t border-white/8 px-3 py-2.5 text-sm text-red-300 hover:bg-red-500/10"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Cerrar sesión
-                </a>
-              </div>
-            ) : null}
-          </div>
-        )}
-      </div>
+      <PanelSidebarFooter
+        user={user}
+        displayName={displayName}
+        docsSearch={
+          isDocs
+            ? {
+                value: docsQuery,
+                onChange: setDocsQuery,
+                inputId: "panel-docs-search",
+              }
+            : undefined
+        }
+      />
     </aside>
   );
 }

@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LogIn, Menu, Plus, X } from "lucide-react";
+import { LogIn, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PRIMARY_NAV } from "@/lib/navigation";
 import { filterPrimaryNav } from "@/lib/web-config";
 import { EYEDBIO_URL } from "@/lib/eyedbio";
-import { EyedBioNavLink } from "@/components/layout/EyedBioNavLink";
 import { EyedBotLogo } from "@/components/brand/EyedBotLogo";
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
+import { PanelTopBar } from "@/components/layout/PanelTopBar";
 import { isPublicPanelRoute } from "@/lib/public-routes";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { discordAvatarUrl } from "@/lib/discord-media";
@@ -33,6 +33,14 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   const showMaintenanceNotice = Boolean(bootstrap?.isRealOwner && bootstrap?.webConfig?.maintenanceMode);
   const brand = resolvePanelBrand(bootstrap?.tenant);
   const brandLabel = brand.isTenant ? `${brand.name} Panel` : "EyedBot Panel";
+  const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");
+
+  useEffect(() => {
+    document.documentElement.dataset.layout = isDocs ? "docs" : "";
+    return () => {
+      delete document.documentElement.dataset.layout;
+    };
+  }, [isDocs]);
 
   useEffect(() => {
     if (!brand.isTenant) return;
@@ -46,8 +54,13 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   return (
-    <div className={cn("relative min-h-screen text-zinc-100", !hasActiveWallpaper && "bg-[var(--color-bg)]")}>
-      <WallpaperLayer />
+    <div
+      className={cn(
+        "relative min-h-screen text-zinc-100",
+        !hasActiveWallpaper && (isDocs ? "bg-[#0a0a0c]" : "bg-[var(--color-bg)]")
+      )}
+    >
+      {!isDocs ? <WallpaperLayer /> : null}
       <div className="theme-bubbles pointer-events-none fixed inset-0 z-[1] overflow-hidden opacity-0 transition-opacity">
         <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-[color:var(--color-accent)]/20 blur-3xl" />
         <div className="absolute right-0 top-32 h-80 w-80 rounded-full bg-[color:var(--color-accent-2)]/15 blur-3xl" />
@@ -59,6 +72,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
           Modo mantenimiento activo para usuarios. {maintenanceMessage}
         </div>
       ) : null}
+
+      <PanelTopBar />
 
       <PanelSidebar className="hidden lg:flex" />
 
@@ -74,7 +89,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="relative z-10 flex min-h-screen flex-col lg:pl-[var(--sidebar-width)]">
+      <div className="relative z-10 flex min-h-screen flex-col lg:pt-14 lg:pl-[var(--panel-active-sidebar-width)]">
         <header className="sticky top-0 z-40 border-b border-white/8 bg-[var(--glass-bg)]/90 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-3 px-4 py-3">
             <button
@@ -119,39 +134,21 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="hidden items-center justify-end gap-2 border-b border-white/6 bg-[var(--glass-bg)]/50 px-6 py-2 backdrop-blur-xl lg:flex">
-          {!isGuest ? <PanelTenantSwitcher /> : null}
-          <EyedBioNavLink showLabel="always" />
-          <a
-            href="https://discord.gg/eN6eQdGn87"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-xl border border-white/10 px-3 py-1.5 text-xs text-zinc-400 hover:bg-white/5 hover:text-white"
-          >
-            Discord
-          </a>
-          {bootstrap?.inviteUrl ? (
-            <a
-              href={bootstrap.inviteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[color:var(--color-accent)]/35 bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-2))] px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_24px_var(--shadow-accent)]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Añadir bot
-            </a>
-          ) : null}
-        </div>
-
         <motion.main
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="relative flex-1 px-4 py-6 pb-24 lg:px-8 lg:pb-8 xl:px-10"
+          className={cn(
+            "relative flex-1",
+            isDocs ? "px-4 py-6 lg:px-10 lg:py-8" : "px-4 py-6 pb-24 lg:px-8 lg:pb-8 xl:px-10"
+          )}
         >
-          <div className="mx-auto w-full max-w-[88rem]">{children}</div>
+          <div className={cn("mx-auto w-full", isDocs ? "max-w-3xl xl:max-w-4xl" : "max-w-[88rem]")}>
+            {children}
+          </div>
         </motion.main>
 
+        {!isDocs ? (
         <div className="fixed inset-x-3 bottom-3 z-40 lg:hidden">
           <div className="glass-panel-strong grid grid-cols-6 rounded-2xl p-1.5">
             {primaryNav.map((item) => {
@@ -184,6 +181,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             </a>
           </div>
         </div>
+        ) : null}
       </div>
     </div>
   );
