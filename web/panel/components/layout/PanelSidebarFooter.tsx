@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, MessagesSquare, Terminal } from "lucide-react";
+import { BookOpen, LayoutDashboard, MessagesSquare, Terminal } from "lucide-react";
 import { PanelSidebarUserCard } from "@/components/layout/PanelSidebarUserCard";
 import { DocsSearchInput } from "@/components/features/docs/DocsSearchInput";
 
@@ -37,9 +37,11 @@ export function PanelSidebarFooter({
   user,
   displayName,
   docsSearch,
+  dashboardHref = "/dashboard",
 }: {
   user?: { id: string; avatar?: string | null; username: string; global_name?: string | null };
   displayName: string;
+  dashboardHref?: string;
   docsSearch?: {
     value: string;
     onChange: (value: string) => void;
@@ -49,6 +51,10 @@ export function PanelSidebarFooter({
   return (
     <div className="sidebar-footer">
       <div className="sidebar-quick-links">
+        <QuickLink href={dashboardHref} icon={LayoutDashboard} label="Dashboard" />
+        <span className="sidebar-quick-dot" aria-hidden>
+          ·
+        </span>
         <QuickLink
           href="https://discord.gg/eN6eQdGn87"
           icon={MessagesSquare}

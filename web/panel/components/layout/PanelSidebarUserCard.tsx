@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { LogOut, Monitor, Moon, MoreHorizontal, Sun, User } from "lucide-react";
+import { LayoutDashboard, LogOut, Monitor, Moon, MoreHorizontal, Sun, User } from "lucide-react";
 import { discordAvatarUrl } from "@/lib/discord-media";
 import {
   applyPanelColorMode,
@@ -65,6 +65,14 @@ export function PanelSidebarUserCard({
     <div className="relative" ref={rootRef}>
       {open ? (
         <div className="sidebar-user-popover">
+          <Link
+            href="/dashboard"
+            className="sidebar-user-popover-item"
+            onClick={() => setOpen(false)}
+          >
+            <LayoutDashboard className="h-4 w-4 text-zinc-400" />
+            Dashboard
+          </Link>
           <Link
             href="/settings/account"
             className="sidebar-user-popover-item"

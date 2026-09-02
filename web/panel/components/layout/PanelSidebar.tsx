@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  LayoutDashboard,
   Search,
   Server,
   Settings,
@@ -135,26 +136,32 @@ export function PanelSidebar({ className }: { className?: string }) {
         className
       )}
     >
-      {!isDocs ? (
-      <div className="flex items-center gap-2.5 border-b border-white/6 px-4 py-4">
+      <div className="flex items-center gap-2.5 border-b border-[var(--color-border-subtle)] px-4 py-4">
         {brand.logoUrl ? (
           <Link href={homeHref} className="flex min-w-0 items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={brand.logoUrl} alt="" className="h-9 w-9 rounded-xl object-cover" />
-            <span className="truncate font-semibold text-white">{brand.name}</span>
+            <span className="truncate font-semibold text-[var(--foreground)]">{brand.name}</span>
           </Link>
         ) : (
           <Link href={homeHref} className="flex min-w-0 items-center gap-2.5">
             <EyedBotMark className="h-9 w-9 rounded-xl" />
-            <span className="truncate font-semibold text-white">EyedBot</span>
+            <span className="truncate font-semibold text-[var(--foreground)]">EyedBot</span>
           </Link>
         )}
       </div>
-      ) : null}
 
       <div className={cn("flex-1 overflow-y-auto px-3 py-4", isDocs && "pt-3")}>
         {isDocs ? (
-          <DocsSidebarNav slug={docsSlug} query={docsQuery} />
+          <div className="space-y-4">
+            <NavLink
+              href={isGuest ? "/login" : "/dashboard"}
+              active={pathname === "/dashboard"}
+              icon={LayoutDashboard}
+              label="Dashboard"
+            />
+            <DocsSidebarNav slug={docsSlug} query={docsQuery} />
+          </div>
         ) : guildId ? (
           <div className="space-y-4">
             <Link
@@ -275,6 +282,7 @@ export function PanelSidebar({ className }: { className?: string }) {
       <PanelSidebarFooter
         user={user}
         displayName={displayName}
+        dashboardHref={homeHref}
         docsSearch={
           isDocs
             ? {
