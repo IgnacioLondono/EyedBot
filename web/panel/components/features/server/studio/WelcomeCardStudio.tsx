@@ -201,26 +201,17 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
     };
   }, [guildId]);
 
+  // Solo campos que afectan el PNG del studio (avatar/anillo). Textos y fondo van en overlays locales.
   const previewBody = useMemo(() => {
     if (!config) return null;
     return buildWelcomeCardPreviewBody({
-      title: config.title,
-      message: config.message,
-      imageUrl: config.imageUrl,
-      cardNameTemplate: config.cardNameTemplate,
-      cardOverlayText: config.cardOverlayText,
       cardAccentColor: config.cardAccentColor,
-      cardTitleColor: config.cardTitleColor,
-      cardNameColor: config.cardNameColor,
-      cardSubtitleColor: config.cardSubtitleColor,
-      cardOverlayColor: config.cardOverlayColor,
-      cardFontKey: config.cardFontKey,
       cardLayout: config.cardLayout,
       omitText: true,
       omitBackground: true,
       previewMode: "layout",
     });
-  }, [config]);
+  }, [config?.cardAccentColor, config?.cardLayout]);
 
   const refreshPreview = useCallback(async () => {
     if (!previewBody) return;
@@ -240,7 +231,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
   }, [guildId, previewBody]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void refreshPreview(), 400);
+    const timer = window.setTimeout(() => void refreshPreview(), 750);
     return () => window.clearTimeout(timer);
   }, [refreshPreview]);
 
@@ -404,8 +395,22 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
 
   if (error || !config) {
     return (
-      <div className="bg-[var(--color-bg)] p-6">
+      <div className="space-y-4 bg-[var(--color-bg)] p-6">
         <Alert title="No se pudo cargar el studio" description={error || "Configuración no disponible."} variant="danger" />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            getWelcomeConfig(guildId)
+              .then((data) => setConfig(normalizeConfig(data)))
+              .catch((err) => setError(getErrorMessage(err)))
+              .finally(() => setLoading(false));
+          }}
+        >
+          Reintentar
+        </Button>
       </div>
     );
   }

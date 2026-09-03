@@ -589,11 +589,26 @@ const authRateLimiter = rateLimit({
 
 const apiRateLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: IS_PRODUCTION ? 180 : 1200,
+    // El panel (Card Studio + previews) es chattery; 180/min se agota al editar.
+    max: IS_PRODUCTION ? 480 : 2000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Límite de solicitudes alcanzado. Espera un momento.' },
-    skip: (req) => String(req.originalUrl || '').startsWith('/api/community')
+    skip: (req) => {
+        const url = String(req.originalUrl || '');
+        if (url.startsWith('/api/community')) return true;
+        // Preview PNG tiene su propio límite; no debe tumbar el resto del panel.
+        if (url.includes('/welcome-card-preview')) return true;
+        return false;
+    }
+});
+
+const welcomeCardPreviewRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: IS_PRODUCTION ? 180 : 800,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Límite de vista previa alcanzado. Espera un momento.' }
 });
 
 function assertProductionSecurityConfig() {
@@ -7663,7 +7678,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/welcome-card-preview', welcomeCardPreviewRateLimiter, requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);
