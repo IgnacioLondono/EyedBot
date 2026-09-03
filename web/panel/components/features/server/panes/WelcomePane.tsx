@@ -42,6 +42,7 @@ import {
   type WelcomeCardLayout,
 } from "@/lib/welcome-card";
 import { welcomeCardStudioHref } from "@/lib/navigation";
+import { WelcomeCardLivePreview } from "./WelcomeCardLivePreview";
 
 type ConfigState = {
   enabled: boolean;
@@ -176,6 +177,24 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const imageSlot = tab === "welcome" ? "welcome" : "goodbye";
   const thumbSlot = tab === "welcome" ? "welcome_thumb" : "goodbye_thumb";
   const isCardWelcome = tab === "welcome" && welcome.welcomeStyle === "card" && welcomeCardEnabled;
+
+  const cardPreviewConfig = useMemo(
+    () => ({
+      title: welcome.title,
+      message: welcome.message,
+      imageUrl: welcome.imageUrl,
+      cardNameTemplate: welcome.cardNameTemplate,
+      cardOverlayText: welcome.cardOverlayText,
+      cardAccentColor: welcome.cardAccentColor,
+      cardTitleColor: welcome.cardTitleColor,
+      cardNameColor: welcome.cardNameColor,
+      cardSubtitleColor: welcome.cardSubtitleColor,
+      cardOverlayColor: welcome.cardOverlayColor,
+      cardFontKey: welcome.cardFontKey,
+      cardLayout: welcome.cardLayout,
+    }),
+    [welcome]
+  );
 
   useEffect(() => {
     if (!welcomeCardEnabled && welcome.welcomeStyle === "card") {
@@ -493,7 +512,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
         title={isCardWelcome ? "Tarjeta de bienvenida" : tab === "welcome" ? "Vista narrativa" : "Mensaje de salida"}
         description={
           isCardWelcome
-            ? "La tarjeta se edita en el Card Studio. Aquí ves el estado actual."
+            ? "Vista previa real de la tarjeta. Edítala en el Card Studio."
             : "Resumen rápido del tono y entrega actual."
         }
       >
@@ -515,28 +534,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
           </div>
 
           {isCardWelcome ? (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-900/30 to-teal-900/20">
-                <div className="flex aspect-[920/520] flex-col items-center justify-center gap-3 p-6 text-center">
-                  <Paintbrush className="h-10 w-10 text-violet-300/60" />
-                  <div>
-                    <p className="font-medium text-white">{welcome.title || "¡Bienvenido!"}</p>
-                    <p className="mt-1 text-sm text-zinc-400">
-                      {welcome.cardNameTemplate || "{username}"} · {welcome.message ? "con subtítulo" : "sin subtítulo"}
-                    </p>
-                  </div>
-                  <Link href={welcomeCardStudioHref(guildId)}>
-                    <Button variant="secondary" size="sm">
-                      <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                      Editar en Card Studio
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-500">
-                Tamaño enviado a Discord: 920×520px. Abre el studio para ver la vista previa en vivo.
-              </p>
-            </div>
+            <WelcomeCardLivePreview guildId={guildId} config={cardPreviewConfig} />
           ) : (
             <DiscordEmbedPreview
               title={active.title || "Sin título"}
