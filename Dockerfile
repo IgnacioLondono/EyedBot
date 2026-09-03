@@ -38,7 +38,15 @@ RUN --mount=type=cache,target=/root/.npm,id=eyedbot-web-npm \
 
 # ── Imagen final (sin toolchain de compilación) ─────────────────────────────
 FROM node:${NODE_VERSION} AS runtime
-RUN apk add --no-cache ffmpeg opus su-exec
+# Fuentes necesarias para @napi-rs/canvas (tarjetas de bienvenida).
+RUN apk add --no-cache \
+    ffmpeg \
+    opus \
+    su-exec \
+    fontconfig \
+    ttf-dejavu \
+    font-noto-cjk \
+    font-noto-emoji
 WORKDIR /app
 
 COPY package.json package-lock.json ./

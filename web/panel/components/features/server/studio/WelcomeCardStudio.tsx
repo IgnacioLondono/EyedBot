@@ -70,16 +70,6 @@ const HANDLES: { id: DragTarget; label: string; color: string; textKey?: keyof C
   { id: "bg", label: "Foco fondo", color: "#38bdf8" },
 ];
 
-const FONT_PREVIEW: Record<string, { title: string; name: string; sub: string; overlay: string }> = {
-  system: { title: "bold", name: "bold", sub: "italic", overlay: "bold" },
-  serif: { title: "bold", name: "bold", sub: "italic", overlay: "bold" },
-  mono: { title: "bold", name: "bold", sub: "italic", overlay: "bold" },
-  rounded: { title: "bold", name: "bold", sub: "italic", overlay: "bold" },
-  elegant: { title: "bold", name: "bold", sub: "italic", overlay: "bold" },
-  impact: { title: "bold", name: "bold", sub: "italic", overlay: "bold" },
-  trebuchet: { title: "bold", name: "bold", sub: "italic", overlay: "bold" },
-};
-
 const FONT_FAMILY: Record<string, string> = {
   system: "system-ui, sans-serif",
   serif: "Georgia, serif",
@@ -225,6 +215,8 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
       cardOverlayColor: config.cardOverlayColor,
       cardFontKey: config.cardFontKey,
       cardLayout: config.cardLayout,
+      omitText: true,
+      previewMode: "layout",
     });
   }, [config]);
 
@@ -298,11 +290,14 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
   useEffect(() => {
     if (!dragging || !config) return;
     const target = dragging;
+    const textTargets = new Set(["title", "name", "subtitle", "overlay"]);
 
     function onMove(event: PointerEvent) {
       const pos = pointerToCard(event.clientX, event.clientY);
       if (!pos) return;
-      const next = applyHandlePosition(target, layoutRef.current, pos.x, pos.y);
+      // Compensa el handle desplazado a la izquierda en textos.
+      const x = textTargets.has(target) ? pos.x + 28 : pos.x;
+      const next = applyHandlePosition(target, layoutRef.current, x, pos.y);
       layoutRef.current = next;
       setConfig((current) => (current ? { ...current, cardLayout: next } : current));
     }
@@ -359,7 +354,14 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
         const nextUrl = toStringValue(root.path || root.url);
         if (nextUrl) setConfig((c) => (c ? { ...c, imageUrl: nextUrl } : c));
       }
+      // Fuerza regenerar la preview con el nuevo fondo.
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = "";
+      }
+      setPreviewUrl("");
       toast({ title: "Fondo subido", description: "La imagen de fondo fue guardada.", tone: "success" });
+      window.setTimeout(() => void refreshPreview(), 100);
     } catch (err) {
       toast({ title: "No se pudo subir", description: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -721,7 +723,28 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
               className="relative overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10"
               style={{ width: cardW, height: cardH }}
             >
-              {/* Server-rendered preview */}
+              {config.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={config.imageUrl}
+                  alt=""
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                  style={{
+                    objectPosition: `${config.cardLayout.bgFocalX * 100}% ${config.cardLayout.bgFocalY * 100}%`,
+                    opacity: previewUrl ? 0 : 1,
+                  }}
+                  draggable={false}
+                />
+              ) : (
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background: "linear-gradient(135deg, #38bdf8 0%, #a78bfa 45%, #34d399 100%)",
+                    opacity: previewUrl ? 0 : 1,
+                  }}
+                />
+              )}
+
               {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -731,33 +754,32 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                   draggable={false}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-violet-900/40 to-teal-900/40">
-                  {previewLoading ? <Spinner className="h-8 w-8" /> : <span className="text-sm text-zinc-500">Generando…</span>}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {previewLoading ? <Spinner className="h-8 w-8" /> : null}
                 </div>
               )}
 
-              {previewLoading ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
-                  <Spinner className="h-6 w-6" />
+              {previewLoading && previewUrl ? (
+                <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-full bg-black/50 px-2 py-1">
+                  <Spinner className="h-4 w-4" />
                 </div>
               ) : null}
 
-              {/* Text overlays for live editing feedback */}
               {config.title ? (
                 <div
                   className={cn(
-                    "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap px-1 transition",
-                    activeTarget === "title" && "ring-2 ring-pink-400/60 ring-offset-1 ring-offset-transparent rounded"
+                    "pointer-events-none absolute z-[5] -translate-x-1/2 whitespace-nowrap px-1 transition",
+                    activeTarget === "title" && "rounded ring-2 ring-pink-400/60"
                   )}
                   style={{
                     left: config.cardLayout.titleX * scale,
                     top: config.cardLayout.titleY * scale,
                     color: hexColor(config.cardTitleColor),
                     fontFamily,
-                    fontSize: 44 * scale,
-                    fontWeight: FONT_PREVIEW[config.cardFontKey]?.title === "bold" ? 700 : 400,
-                    textShadow: "0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.9)",
-                    opacity: previewUrl ? 0 : 1,
+                    fontSize: Math.max(14, 44 * scale),
+                    fontWeight: 700,
+                    textShadow: "0 2px 8px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,1)",
+                    lineHeight: 1.1,
                   }}
                 >
                   {previewText(config.title)}
@@ -767,18 +789,18 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
               {config.cardNameTemplate ? (
                 <div
                   className={cn(
-                    "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap px-1 transition",
-                    activeTarget === "name" && "ring-2 ring-blue-400/60 ring-offset-1 ring-offset-transparent rounded"
+                    "pointer-events-none absolute z-[5] -translate-x-1/2 whitespace-nowrap px-1 transition",
+                    activeTarget === "name" && "rounded ring-2 ring-blue-400/60"
                   )}
                   style={{
                     left: config.cardLayout.nameX * scale,
                     top: config.cardLayout.nameY * scale,
                     color: hexColor(config.cardNameColor),
                     fontFamily,
-                    fontSize: 26 * scale,
+                    fontSize: Math.max(12, 26 * scale),
                     fontWeight: 700,
-                    textShadow: "0 2px 6px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.9)",
-                    opacity: previewUrl ? 0 : 1,
+                    textShadow: "0 2px 6px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,1)",
+                    lineHeight: 1.1,
                   }}
                 >
                   {previewText(config.cardNameTemplate)}
@@ -788,18 +810,18 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
               {config.message ? (
                 <div
                   className={cn(
-                    "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 max-w-[80%] text-center transition",
-                    activeTarget === "subtitle" && "ring-2 ring-purple-400/60 ring-offset-1 ring-offset-transparent rounded"
+                    "pointer-events-none absolute z-[5] max-w-[80%] -translate-x-1/2 text-center transition",
+                    activeTarget === "subtitle" && "rounded ring-2 ring-purple-400/60"
                   )}
                   style={{
                     left: config.cardLayout.subtitleX * scale,
                     top: config.cardLayout.subtitleY * scale,
                     color: hexColor(config.cardSubtitleColor),
                     fontFamily,
-                    fontSize: 20 * scale,
+                    fontSize: Math.max(11, 20 * scale),
                     fontStyle: "italic",
-                    textShadow: "0 2px 6px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.9)",
-                    opacity: previewUrl ? 0 : 1,
+                    textShadow: "0 2px 6px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,1)",
+                    lineHeight: 1.25,
                   }}
                 >
                   {previewText(config.message)}
@@ -809,29 +831,29 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
               {config.cardOverlayText ? (
                 <div
                   className={cn(
-                    "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap px-1 transition",
-                    activeTarget === "overlay" && "ring-2 ring-amber-400/60 ring-offset-1 ring-offset-transparent rounded"
+                    "pointer-events-none absolute z-[5] -translate-x-1/2 -translate-y-full whitespace-nowrap px-1 transition",
+                    activeTarget === "overlay" && "rounded ring-2 ring-amber-400/60"
                   )}
                   style={{
                     left: config.cardLayout.overlayX * scale,
                     top: config.cardLayout.overlayY * scale,
                     color: hexColor(config.cardOverlayColor),
                     fontFamily,
-                    fontSize: 17 * scale,
+                    fontSize: Math.max(10, 17 * scale),
                     fontWeight: 700,
-                    textShadow: "0 1px 4px rgba(0,0,0,0.7)",
-                    opacity: previewUrl ? 0 : 1,
+                    textShadow: "0 1px 4px rgba(0,0,0,0.85)",
+                    lineHeight: 1.1,
                   }}
                 >
                   {previewText(config.cardOverlayText)}
                 </div>
               ) : null}
 
-              {/* Drag handles */}
               {HANDLES.map((handle) => {
                 const pos = getHandlePosition(handle.id, config.cardLayout);
                 const isActive = activeTarget === handle.id || dragging === handle.id;
-                const left = pos.x * scale;
+                const isText = Boolean(handle.textKey);
+                const left = pos.x * scale + (isText ? -28 * scale : 0);
                 const top = pos.y * scale;
                 const radius = "r" in pos && pos.r ? pos.r * scale : 0;
 
@@ -844,7 +866,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                           isActive ? "border-white/80" : "border-white/20"
                         )}
                         style={{
-                          left: left - radius,
+                          left: pos.x * scale - radius,
                           top: top - radius,
                           width: radius * 2,
                           height: radius * 2,
@@ -853,53 +875,31 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                       />
                     ) : null}
 
-                    {handle.id !== "bg" ? (
-                      <button
-                        type="button"
-                        aria-label={`Mover ${handle.label}`}
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          setActiveTarget(handle.id);
-                          setDragging(handle.id);
-                          if (handle.textKey) setSidebarTab("texts");
-                        }}
-                        className={cn(
-                          "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 text-[10px] font-bold shadow-lg transition",
-                          isActive ? "h-8 w-8 scale-110 border-white text-white" : "h-7 w-7 border-white/70 text-white/90"
-                        )}
-                        style={{
-                          left,
-                          top,
-                          backgroundColor: handle.color,
-                          cursor: dragging === handle.id ? "grabbing" : "grab",
-                        }}
-                      >
-                        <Move className="h-3 w-3" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label="Mover foco del fondo"
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          setActiveTarget("bg");
-                          setDragging("bg");
-                          setSidebarTab("design");
-                        }}
-                        className={cn(
-                          "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-lg border-2 shadow-lg transition",
-                          isActive ? "h-8 w-8 scale-110 border-white" : "h-7 w-7 border-white/70"
-                        )}
-                        style={{
-                          left,
-                          top,
-                          backgroundColor: handle.color,
-                          cursor: dragging === "bg" ? "grabbing" : "grab",
-                        }}
-                      >
-                        <Move className="h-3 w-3 text-white" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      aria-label={`Mover ${handle.label}`}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        setActiveTarget(handle.id);
+                        setDragging(handle.id);
+                        if (handle.textKey) setSidebarTab("texts");
+                        if (handle.id === "bg") setSidebarTab("design");
+                      }}
+                      className={cn(
+                        "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 text-[10px] font-bold shadow-lg transition",
+                        isActive
+                          ? "h-8 w-8 scale-110 border-white text-white"
+                          : "h-7 w-7 border-white/70 text-white/90 opacity-90"
+                      )}
+                      style={{
+                        left: handle.id === "avatar" || handle.id === "bg" ? pos.x * scale : left,
+                        top,
+                        backgroundColor: handle.color,
+                        cursor: dragging === handle.id ? "grabbing" : "grab",
+                      }}
+                    >
+                      <Move className="h-3 w-3" />
+                    </button>
                   </div>
                 );
               })}

@@ -1,8 +1,37 @@
 const fs = require('fs');
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 
 const W = 920;
 const H = 520;
+
+/** Registra fuentes del sistema (Alpine / Debian) para que el texto se dibuje en el PNG. */
+function ensureCardFontsRegistered() {
+    if (ensureCardFontsRegistered.done) return;
+    ensureCardFontsRegistered.done = true;
+
+    const candidates = [
+        { family: 'DejaVu Sans', files: ['/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf', '/usr/share/fonts/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'] },
+        { family: 'DejaVu Sans Bold', files: ['/usr/share/fonts/ttf-dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'] },
+        { family: 'DejaVu Serif', files: ['/usr/share/fonts/ttf-dejavu/DejaVuSerif.ttf', '/usr/share/fonts/dejavu/DejaVuSerif.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf'] },
+        { family: 'DejaVu Sans Mono', files: ['/usr/share/fonts/ttf-dejavu/DejaVuSansMono.ttf', '/usr/share/fonts/dejavu/DejaVuSansMono.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf'] },
+        { family: 'Noto Sans', files: ['/usr/share/fonts/noto/NotoSans-Regular.ttf', '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf'] }
+    ];
+
+    for (const entry of candidates) {
+        for (const file of entry.files) {
+            try {
+                if (fs.existsSync(file)) {
+                    GlobalFonts.registerFromPath(file, entry.family);
+                    break;
+                }
+            } catch {
+                // ignore
+            }
+        }
+    }
+}
+
+ensureCardFontsRegistered();
 
 const DEFAULT_CARD_LAYOUT = {
     bgFocalX: 0.5,
@@ -48,15 +77,50 @@ function mergeCardLayout(raw) {
     };
 }
 
-/** Fuentes del sistema (sin comillas internas). */
+/** Fuentes del sistema / DejaVu (sin comillas internas). */
 const FONT_STACKS = {
-    system: { title: 'bold 44px sans-serif', name: 'bold 26px sans-serif', sub: 'italic 20px sans-serif', overlay: 'bold 17px sans-serif' },
-    serif: { title: 'bold 44px Georgia, serif', name: 'bold 26px Georgia, serif', sub: 'italic 20px Georgia, serif', overlay: 'bold 17px Georgia, serif' },
-    mono: { title: 'bold 40px Consolas, monospace', name: 'bold 24px Consolas, monospace', sub: 'italic 18px Consolas, monospace', overlay: 'bold 16px Consolas, monospace' },
-    rounded: { title: 'bold 44px Verdana, sans-serif', name: 'bold 26px Verdana, sans-serif', sub: 'italic 20px Verdana, sans-serif', overlay: 'bold 17px Verdana, sans-serif' },
-    elegant: { title: 'bold 44px "Times New Roman", serif', name: 'bold 26px "Times New Roman", serif', sub: 'italic 20px "Times New Roman", serif', overlay: 'bold 17px "Times New Roman", serif' },
-    impact: { title: 'bold 48px Impact, "Arial Black", sans-serif', name: 'bold 28px Impact, "Arial Black", sans-serif', sub: 'italic 20px Impact, sans-serif', overlay: 'bold 17px Impact, sans-serif' },
-    trebuchet: { title: 'bold 44px "Trebuchet MS", sans-serif', name: 'bold 26px "Trebuchet MS", sans-serif', sub: 'italic 20px "Trebuchet MS", sans-serif', overlay: 'bold 17px "Trebuchet MS", sans-serif' }
+    system: {
+        title: 'bold 44px "DejaVu Sans Bold", "DejaVu Sans", "Noto Sans", sans-serif',
+        name: 'bold 26px "DejaVu Sans Bold", "DejaVu Sans", "Noto Sans", sans-serif',
+        sub: 'italic 20px "DejaVu Sans", "Noto Sans", sans-serif',
+        overlay: 'bold 17px "DejaVu Sans Bold", "DejaVu Sans", sans-serif'
+    },
+    serif: {
+        title: 'bold 44px "DejaVu Serif", Georgia, serif',
+        name: 'bold 26px "DejaVu Serif", Georgia, serif',
+        sub: 'italic 20px "DejaVu Serif", Georgia, serif',
+        overlay: 'bold 17px "DejaVu Serif", Georgia, serif'
+    },
+    mono: {
+        title: 'bold 40px "DejaVu Sans Mono", Consolas, monospace',
+        name: 'bold 24px "DejaVu Sans Mono", Consolas, monospace',
+        sub: 'italic 18px "DejaVu Sans Mono", Consolas, monospace',
+        overlay: 'bold 16px "DejaVu Sans Mono", Consolas, monospace'
+    },
+    rounded: {
+        title: 'bold 44px "DejaVu Sans Bold", Verdana, sans-serif',
+        name: 'bold 26px "DejaVu Sans Bold", Verdana, sans-serif',
+        sub: 'italic 20px "DejaVu Sans", Verdana, sans-serif',
+        overlay: 'bold 17px "DejaVu Sans Bold", Verdana, sans-serif'
+    },
+    elegant: {
+        title: 'bold 44px "DejaVu Serif", "Times New Roman", serif',
+        name: 'bold 26px "DejaVu Serif", "Times New Roman", serif',
+        sub: 'italic 20px "DejaVu Serif", "Times New Roman", serif',
+        overlay: 'bold 17px "DejaVu Serif", "Times New Roman", serif'
+    },
+    impact: {
+        title: 'bold 48px "DejaVu Sans Bold", Impact, "Arial Black", sans-serif',
+        name: 'bold 28px "DejaVu Sans Bold", Impact, "Arial Black", sans-serif',
+        sub: 'italic 20px "DejaVu Sans", Impact, sans-serif',
+        overlay: 'bold 17px "DejaVu Sans Bold", Impact, sans-serif'
+    },
+    trebuchet: {
+        title: 'bold 44px "DejaVu Sans Bold", "Trebuchet MS", sans-serif',
+        name: 'bold 26px "DejaVu Sans Bold", "Trebuchet MS", sans-serif',
+        sub: 'italic 20px "DejaVu Sans", "Trebuchet MS", sans-serif',
+        overlay: 'bold 17px "DejaVu Sans Bold", "Trebuchet MS", sans-serif'
+    }
 };
 
 function resolveFonts(fontKey) {
@@ -389,6 +453,12 @@ async function renderWelcomeCardPng(opts = {}) {
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
+
+    // En modo layout el studio dibuja los textos en el cliente (WYSIWYG).
+    if (opts.omitText) {
+        ctx.shadowColor = 'transparent';
+        return canvas.toBuffer('image/png');
+    }
 
     const headlineSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.headline || 'Bienvenido')), 80);
     const displayNameSegs = truncatePlainSegments(parseColorMarkupSegments(String(opts.displayName || 'Usuario')), 80);
