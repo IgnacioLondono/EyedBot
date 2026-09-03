@@ -7727,7 +7727,8 @@ app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, re
             titleHex: sanitizeHexColor6(body.cardTitleColor, 'ffffff'),
             nameHex: sanitizeHexColor6(body.cardNameColor, 'f8fafc'),
             subtitleHex: sanitizeHexColor6(body.cardSubtitleColor, 'e2e8f0'),
-            omitText: body.omitText === true || body.omitText === 'true' || body.previewMode === 'layout'
+            omitText: body.omitText === true || body.omitText === 'true' || body.previewMode === 'layout',
+            omitBackground: body.omitBackground === true || body.omitBackground === 'true' || body.previewMode === 'layout'
         });
 
         res.setHeader('Content-Type', 'image/png');

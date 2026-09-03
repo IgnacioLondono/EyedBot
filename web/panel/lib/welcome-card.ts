@@ -90,7 +90,7 @@ export type WelcomeCardPreviewInput = {
   cardLayout: WelcomeCardLayout;
 };
 
-export function buildWelcomeCardPreviewBody(config: WelcomeCardPreviewInput & { omitText?: boolean; previewMode?: string }) {
+export function buildWelcomeCardPreviewBody(config: WelcomeCardPreviewInput & { omitText?: boolean; omitBackground?: boolean; previewMode?: string }) {
   return {
     title: config.title,
     message: config.message,
@@ -105,6 +105,7 @@ export function buildWelcomeCardPreviewBody(config: WelcomeCardPreviewInput & { 
     cardFontKey: config.cardFontKey,
     cardLayout: config.cardLayout,
     omitText: config.omitText === true,
+    omitBackground: config.omitBackground === true,
     previewMode: config.previewMode || undefined,
   };
 }

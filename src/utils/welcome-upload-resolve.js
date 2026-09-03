@@ -249,6 +249,7 @@ function greetingImageSlotForCardBackground(parsed) {
 
 /**
  * Resuelve fondo de tarjeta PNG: archivo local, buffer MySQL o URL pública.
+ * Nunca depende de fetch HTTP a /api/... (requiere sesión y falla dentro del contenedor).
  */
 async function resolveWelcomeCardBackground(imageUrl, guildId) {
     const raw = String(imageUrl || '').trim();
@@ -259,23 +260,42 @@ async function resolveWelcomeCardBackground(imageUrl, guildId) {
         return { backgroundFilePath: localPath, backgroundUrl: null, backgroundBuffer: null };
     }
 
-    const gid = String(guildId || '').trim();
     const parsed = greetingImageStore.parseGreetingImageApiUrl(raw);
-    if (gid && parsed && parsed.guildId === gid) {
+    const routeGid = greetingImageStore.rawDiscordGuildId(guildId);
+    const imageGid = parsed?.guildId || routeGid;
+
+    if (imageGid && parsed) {
         const slot = greetingImageSlotForCardBackground(parsed);
-        const blob = await greetingImageStore.getImage(gid, slot);
+        const blob = await greetingImageStore.getImage(imageGid, slot);
         if (blob?.data?.length) {
             return { backgroundFilePath: null, backgroundUrl: null, backgroundBuffer: blob.data };
         }
+
+        // Fallback disco: {guildId}_{slot}_*
+        try {
+            const uploadsDir = path.join(__dirname, '..', '..', 'web', 'uploads', 'welcome');
+            if (fs.existsSync(uploadsDir)) {
+                const prefix = `${imageGid}_${slot}_`;
+                const match = fs
+                    .readdirSync(uploadsDir)
+                    .filter((name) => name.startsWith(prefix))
+                    .sort()
+                    .reverse()[0];
+                if (match) {
+                    return {
+                        backgroundFilePath: path.join(uploadsDir, match),
+                        backgroundUrl: null,
+                        backgroundBuffer: null
+                    };
+                }
+            }
+        } catch {
+            // ignore
+        }
     }
 
-    const origin = getWelcomePublicOrigin();
-    const pathOnly = raw.split('?')[0];
-    if (parsed && origin && pathOnly.startsWith('/api/')) {
-        return { backgroundFilePath: null, backgroundUrl: `${origin}${pathOnly}`, backgroundBuffer: null };
-    }
-
-    if (/^https?:\/\//i.test(raw)) {
+    // Solo URLs http(s) públicas (no /api autenticado).
+    if (/^https?:\/\//i.test(raw) && !/\/api\/guild\//i.test(raw)) {
         return { backgroundFilePath: null, backgroundUrl: raw, backgroundBuffer: null };
     }
 

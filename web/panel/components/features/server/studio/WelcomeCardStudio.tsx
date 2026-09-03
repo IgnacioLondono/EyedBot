@@ -40,6 +40,7 @@ import {
 } from "@/lib/welcome-card";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { resolvePanelMediaUrl } from "@/lib/panel-media";
 
 type DragTarget = "avatar" | "title" | "name" | "subtitle" | "overlay" | "bg";
 
@@ -216,6 +217,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
       cardFontKey: config.cardFontKey,
       cardLayout: config.cardLayout,
       omitText: true,
+      omitBackground: true,
       previewMode: "layout",
     });
   }, [config]);
@@ -390,10 +392,11 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
   const fontFamily = FONT_FAMILY[config?.cardFontKey || "system"] || FONT_FAMILY.system;
   const cardW = WELCOME_CARD_WIDTH * scale;
   const cardH = WELCOME_CARD_HEIGHT * scale;
+  const backgroundPreviewSrc = config ? resolvePanelMediaUrl(config.imageUrl) : "";
 
   if (loading) {
     return (
-      <div className="flex h-[calc(100dvh-4rem)] items-center justify-center">
+      <div className="flex h-[calc(100dvh-4rem)] items-center justify-center bg-[var(--color-bg)]">
         <Spinner className="h-8 w-8" />
       </div>
     );
@@ -401,7 +404,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
 
   if (error || !config) {
     return (
-      <div className="p-6">
+      <div className="bg-[var(--color-bg)] p-6">
         <Alert title="No se pudo cargar el studio" description={error || "Configuración no disponible."} variant="danger" />
       </div>
     );
@@ -410,19 +413,19 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
   const activeHandle = HANDLES.find((h) => h.id === activeTarget);
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden rounded-none border-0 bg-[#0a0812] lg:h-[100dvh] lg:rounded-none">
+    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-[var(--color-bg)] text-[var(--foreground)] lg:h-[100dvh]">
       {/* Toolbar */}
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href={serverPaneHref(guildId, "welcome")}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-strong)] text-[color:var(--color-icon)] transition hover:brightness-110"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold text-white">Card Studio</h1>
-            <p className="truncate text-xs text-zinc-500">
+            <h1 className="truncate text-base font-semibold text-[var(--foreground)]">Card Studio</h1>
+            <p className="truncate text-xs text-[var(--theme-text-secondary)]">
               Tarjeta de bienvenida · {WELCOME_CARD_WIDTH}×{WELCOME_CARD_HEIGHT}px
             </p>
           </div>
@@ -446,7 +449,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar */}
-        <aside className="flex w-80 shrink-0 flex-col border-r border-white/8">
+        <aside className="flex w-80 shrink-0 flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]">
           <Tabs
             items={[
               { id: "texts", label: "Textos" },
@@ -455,15 +458,15 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
             ]}
             value={sidebarTab}
             onValueChange={setSidebarTab}
-            className="shrink-0 border-b border-white/8 px-3 pt-3"
+            className="shrink-0 border-b border-[var(--color-border-subtle)] px-3 pt-3"
           />
 
           <div className="panel-scroll flex-1 space-y-4 overflow-y-auto p-4">
             {sidebarTab === "texts" ? (
               <>
-                <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3 text-xs text-violet-200">
+                <div className="rounded-xl border border-[color:var(--color-accent)]/25 bg-[color:var(--color-accent)]/10 p-3 text-xs text-[var(--foreground)]">
                   Variables: {"{user}"}, {"{username}"}, {"{server}"}, {"{memberCount}"}. Colores en línea:{" "}
-                  <code className="rounded bg-black/30 px-1">[[#ff6b6b]]texto[[/]]</code>
+                  <code className="rounded bg-[var(--color-surface-strong)] px-1">[[#ff6b6b]]texto[[/]]</code>
                 </div>
 
                 <Field label="Título">
@@ -587,7 +590,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                 </div>
 
                 <div className="space-y-3">
-                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[var(--theme-text-secondary)]">
                     <Palette className="h-3.5 w-3.5" />
                     Colores
                   </p>
@@ -628,7 +631,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                   onClick={() =>
                     setConfig((c) => (c ? { ...c, cardLayout: { ...DEFAULT_WELCOME_CARD_LAYOUT } } : c))
                   }
-                  className="flex items-center gap-2 text-sm text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline"
+                  className="flex items-center gap-2 text-sm text-[var(--theme-text-secondary)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restaurar posiciones
@@ -638,7 +641,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
 
             {sidebarTab === "background" ? (
               <>
-                <div className="mb-1 flex items-center gap-2 text-sm text-zinc-400">
+                <div className="mb-1 flex items-center gap-2 text-sm text-[var(--theme-text-secondary)]">
                   <ImageIcon className="h-4 w-4" />
                   Imagen de fondo
                 </div>
@@ -661,8 +664,8 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
           </div>
 
           {/* Element selector */}
-          <div className="shrink-0 border-t border-white/8 p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          <div className="shrink-0 border-t border-[var(--color-border-subtle)] p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--theme-text-secondary)]">
               <Move className="h-3 w-3" />
               Elementos en el lienzo
             </p>
@@ -675,8 +678,8 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                   className={cn(
                     "rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
                     activeTarget === handle.id
-                      ? "border-white/30 bg-white/15 text-white"
-                      : "border-white/10 bg-black/20 text-zinc-400 hover:text-zinc-200"
+                      ? "border-[color:var(--color-accent)]/40 bg-[color:var(--color-accent)]/15 text-[var(--foreground)]"
+                      : "border-[var(--color-border-subtle)] bg-[var(--color-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--foreground)]"
                   )}
                 >
                   <span
@@ -691,14 +694,14 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
         </aside>
 
         {/* Canvas */}
-        <main className="relative flex min-w-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-4 py-2">
-            <p className="flex items-center gap-2 text-xs text-zinc-500">
+        <main className="relative flex min-w-0 flex-1 flex-col bg-[var(--color-bg)]">
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border-subtle)] px-4 py-2">
+            <p className="flex items-center gap-2 text-xs text-[var(--theme-text-secondary)]">
               <Type className="h-3.5 w-3.5" />
               Arrastra los elementos para posicionarlos · Selecciona para editar en el panel
             </p>
             {activeHandle ? (
-              <span className="text-xs text-zinc-400">
+              <span className="text-xs text-[var(--theme-text-secondary)]">
                 Seleccionado:{" "}
                 <span className="font-medium" style={{ color: activeHandle.color }}>
                   {activeHandle.label}
@@ -707,31 +710,32 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
             ) : null}
           </div>
 
-          <div ref={containerRef} className="relative flex flex-1 items-center justify-center overflow-hidden bg-[#06050a] p-6">
-            {/* Checkerboard background */}
+          <div ref={containerRef} className="relative flex flex-1 items-center justify-center overflow-hidden bg-[color-mix(in_srgb,var(--foreground)_4%,var(--color-bg))] p-6">
+            {/* Checkerboard */}
             <div
-              className="pointer-events-none absolute inset-0 opacity-[0.04]"
+              className="pointer-events-none absolute inset-0 opacity-[0.06]"
               style={{
                 backgroundImage:
-                  "linear-gradient(45deg, #fff 25%, transparent 25%), linear-gradient(-45deg, #fff 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #fff 75%), linear-gradient(-45deg, transparent 75%, #fff 75%)",
+                  "linear-gradient(45deg, currentColor 25%, transparent 25%), linear-gradient(-45deg, currentColor 25%, transparent 25%), linear-gradient(45deg, transparent 75%, currentColor 75%), linear-gradient(-45deg, transparent 75%, currentColor 75%)",
                 backgroundSize: "20px 20px",
                 backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
+                color: "var(--foreground)",
               }}
             />
 
             <div
-              className="relative overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10"
+              className="relative overflow-hidden rounded-xl shadow-2xl ring-1 ring-[var(--color-border-subtle)]"
               style={{ width: cardW, height: cardH }}
             >
-              {config.imageUrl ? (
+              {/* Fondo local siempre visible (el PNG del studio solo trae avatar) */}
+              {backgroundPreviewSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={config.imageUrl}
+                  src={backgroundPreviewSrc}
                   alt=""
                   className="pointer-events-none absolute inset-0 h-full w-full object-cover"
                   style={{
                     objectPosition: `${config.cardLayout.bgFocalX * 100}% ${config.cardLayout.bgFocalY * 100}%`,
-                    opacity: previewUrl ? 0 : 1,
                   }}
                   draggable={false}
                 />
@@ -740,11 +744,20 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                   className="pointer-events-none absolute inset-0"
                   style={{
                     background: "linear-gradient(135deg, #38bdf8 0%, #a78bfa 45%, #34d399 100%)",
-                    opacity: previewUrl ? 0 : 1,
                   }}
                 />
               )}
 
+              {/* Vignette para legibilidad del texto */}
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.55) 100%)",
+                }}
+              />
+
+              {/* Avatar (PNG transparente) */}
               {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -753,11 +766,11 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                   className="absolute inset-0 h-full w-full object-cover"
                   draggable={false}
                 />
-              ) : (
+              ) : previewLoading ? (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  {previewLoading ? <Spinner className="h-8 w-8" /> : null}
+                  <Spinner className="h-8 w-8" />
                 </div>
-              )}
+              ) : null}
 
               {previewLoading && previewUrl ? (
                 <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-full bg-black/50 px-2 py-1">

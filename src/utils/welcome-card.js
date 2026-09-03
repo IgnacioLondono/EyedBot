@@ -390,19 +390,21 @@ async function renderWelcomeCardPng(opts = {}) {
     roundRectPath(ctx, 0, 0, W, H, 24);
     ctx.clip();
 
-    const bgImg = await loadBackgroundImage(opts.backgroundUrl, opts.backgroundFilePath, opts.backgroundBuffer);
-    if (!bgImg) {
-        drawBackgroundGradient(ctx);
-    } else {
-        drawBackgroundImage(ctx, bgImg, layout.bgFocalX, layout.bgFocalY);
-    }
+    if (!opts.omitBackground) {
+        const bgImg = await loadBackgroundImage(opts.backgroundUrl, opts.backgroundFilePath, opts.backgroundBuffer);
+        if (!bgImg) {
+            drawBackgroundGradient(ctx);
+        } else {
+            drawBackgroundImage(ctx, bgImg, layout.bgFocalX, layout.bgFocalY);
+        }
 
-    const vignette = ctx.createLinearGradient(0, H * 0.2, 0, H);
-    vignette.addColorStop(0, 'rgba(0,0,0,0.08)');
-    vignette.addColorStop(0.45, 'rgba(0,0,0,0.35)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, W, H);
+        const vignette = ctx.createLinearGradient(0, H * 0.2, 0, H);
+        vignette.addColorStop(0, 'rgba(0,0,0,0.08)');
+        vignette.addColorStop(0.45, 'rgba(0,0,0,0.35)');
+        vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, W, H);
+    }
 
     ctx.restore();
 
