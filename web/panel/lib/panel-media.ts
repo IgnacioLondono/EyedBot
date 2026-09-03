@@ -23,7 +23,11 @@ function extractUploadPath(rawUrl = "") {
   return "";
 }
 
-/** Evita cargar imágenes de red local desde el panel público (Chrome pide permiso PNA). */
+/**
+ * URL estable para <img src>.
+ * No usa Date.now() en cada llamada: eso re-disparaba cientos de GETs y tumba el rate-limit.
+ * Tras una subida, pasá `filePreview` o actualizá `value` con un ?t= puntual.
+ */
 export function resolvePanelMediaUrl(value?: string, filePreview?: string) {
   if (filePreview) return filePreview;
   const raw = String(value || "").trim();
@@ -31,28 +35,17 @@ export function resolvePanelMediaUrl(value?: string, filePreview?: string) {
   if (/^(blob:|data:)/i.test(raw)) return raw;
 
   const uploadPath = extractUploadPath(raw);
-  if (uploadPath) {
-    const joiner = uploadPath.includes("?") ? "&" : "?";
-    return `${uploadPath}${joiner}t=${Date.now()}`;
-  }
+  if (uploadPath) return uploadPath;
 
-  if (raw.startsWith("/")) {
-    const pathOnly = raw.split("?")[0];
-    const joiner = pathOnly.includes("?") ? "&" : "?";
-    return `${pathOnly}${joiner}t=${Date.now()}`;
-  }
+  if (raw.startsWith("/")) return raw.split("?")[0];
 
   if (/^https?:\/\//i.test(raw)) {
     try {
       const url = new URL(raw);
       if (isLocalNetworkHostname(url.hostname)) {
         const localUpload = extractUploadPath(raw);
-        if (localUpload) {
-          return `${localUpload}?t=${Date.now()}`;
-        }
-        if (url.pathname.startsWith("/api/")) {
-          return `${url.pathname.split("?")[0]}?t=${Date.now()}`;
-        }
+        if (localUpload) return localUpload;
+        if (url.pathname.startsWith("/api/")) return url.pathname.split("?")[0];
         return "";
       }
       return raw;

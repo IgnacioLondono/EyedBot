@@ -55,7 +55,7 @@ export function WelcomeCardLivePreview({
   }, [guildId, body]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void refresh(), 800);
+    const timer = window.setTimeout(() => void refresh(), 350);
     return () => window.clearTimeout(timer);
   }, [refresh]);
 

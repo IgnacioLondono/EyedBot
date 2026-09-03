@@ -264,8 +264,8 @@ async function resolveWelcomeCardBackground(imageUrl, guildId) {
     const routeGid = greetingImageStore.rawDiscordGuildId(guildId);
     const imageGid = parsed?.guildId || routeGid;
 
-    if (imageGid && parsed) {
-        const slot = greetingImageSlotForCardBackground(parsed);
+    if (imageGid && (parsed || /greeting-image|greeting-db:/i.test(raw))) {
+        const slot = greetingImageSlotForCardBackground(parsed || { slot: 'welcome' });
         const blob = await greetingImageStore.getImage(imageGid, slot);
         if (blob?.data?.length) {
             return { backgroundFilePath: null, backgroundUrl: null, backgroundBuffer: blob.data };
@@ -275,18 +275,23 @@ async function resolveWelcomeCardBackground(imageUrl, guildId) {
         try {
             const uploadsDir = path.join(__dirname, '..', '..', 'web', 'uploads', 'welcome');
             if (fs.existsSync(uploadsDir)) {
-                const prefix = `${imageGid}_${slot}_`;
-                const match = fs
-                    .readdirSync(uploadsDir)
-                    .filter((name) => name.startsWith(prefix))
-                    .sort()
-                    .reverse()[0];
-                if (match) {
-                    return {
-                        backgroundFilePath: path.join(uploadsDir, match),
-                        backgroundUrl: null,
-                        backgroundBuffer: null
-                    };
+                const prefixes = [
+                    `${imageGid}_${slot}_`,
+                    routeGid && routeGid !== imageGid ? `${routeGid}_${slot}_` : null
+                ].filter(Boolean);
+                const names = fs.readdirSync(uploadsDir);
+                for (const prefix of prefixes) {
+                    const match = names
+                        .filter((name) => name.startsWith(prefix))
+                        .sort()
+                        .reverse()[0];
+                    if (match) {
+                        return {
+                            backgroundFilePath: path.join(uploadsDir, match),
+                            backgroundUrl: null,
+                            backgroundBuffer: null
+                        };
+                    }
                 }
             }
         } catch {
@@ -297,6 +302,14 @@ async function resolveWelcomeCardBackground(imageUrl, guildId) {
     // Solo URLs http(s) públicas (no /api autenticado).
     if (/^https?:\/\//i.test(raw) && !/\/api\/guild\//i.test(raw)) {
         return { backgroundFilePath: null, backgroundUrl: raw, backgroundBuffer: null };
+    }
+
+    // Último recurso: slot welcome del guild aunque la URL no parsee limpia.
+    if (routeGid) {
+        const blob = await greetingImageStore.getImage(routeGid, 'welcome');
+        if (blob?.data?.length) {
+            return { backgroundFilePath: null, backgroundUrl: null, backgroundBuffer: blob.data };
+        }
     }
 
     return {};

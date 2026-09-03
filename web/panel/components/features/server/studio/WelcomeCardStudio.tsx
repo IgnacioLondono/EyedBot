@@ -201,17 +201,26 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
     };
   }, [guildId]);
 
-  // Solo campos que afectan el PNG del studio (avatar/anillo). Textos y fondo van en overlays locales.
   const previewBody = useMemo(() => {
     if (!config) return null;
     return buildWelcomeCardPreviewBody({
+      title: config.title,
+      message: config.message,
+      imageUrl: config.imageUrl,
+      cardNameTemplate: config.cardNameTemplate,
+      cardOverlayText: config.cardOverlayText,
       cardAccentColor: config.cardAccentColor,
+      cardTitleColor: config.cardTitleColor,
+      cardNameColor: config.cardNameColor,
+      cardSubtitleColor: config.cardSubtitleColor,
+      cardOverlayColor: config.cardOverlayColor,
+      cardFontKey: config.cardFontKey,
       cardLayout: config.cardLayout,
+      // Textos en overlays HTML; el PNG sí incluye fondo + avatar (igual que Discord).
       omitText: true,
-      omitBackground: true,
-      previewMode: "layout",
+      omitBackground: false,
     });
-  }, [config?.cardAccentColor, config?.cardLayout]);
+  }, [config]);
 
   const refreshPreview = useCallback(async () => {
     if (!previewBody) return;
@@ -231,7 +240,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
   }, [guildId, previewBody]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void refreshPreview(), 750);
+    const timer = window.setTimeout(() => void refreshPreview(), 400);
     return () => window.clearTimeout(timer);
   }, [refreshPreview]);
 
@@ -395,22 +404,8 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
 
   if (error || !config) {
     return (
-      <div className="space-y-4 bg-[var(--color-bg)] p-6">
+      <div className="bg-[var(--color-bg)] p-6">
         <Alert title="No se pudo cargar el studio" description={error || "Configuración no disponible."} variant="danger" />
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            setLoading(true);
-            setError(null);
-            getWelcomeConfig(guildId)
-              .then((data) => setConfig(normalizeConfig(data)))
-              .catch((err) => setError(getErrorMessage(err)))
-              .finally(() => setLoading(false));
-          }}
-        >
-          Reintentar
-        </Button>
       </div>
     );
   }
@@ -732,37 +727,29 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
               className="relative overflow-hidden rounded-xl shadow-2xl ring-1 ring-[var(--color-border-subtle)]"
               style={{ width: cardW, height: cardH }}
             >
-              {/* Fondo local siempre visible (el PNG del studio solo trae avatar) */}
-              {backgroundPreviewSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={backgroundPreviewSrc}
-                  alt=""
-                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-                  style={{
-                    objectPosition: `${config.cardLayout.bgFocalX * 100}% ${config.cardLayout.bgFocalY * 100}%`,
-                  }}
-                  draggable={false}
-                />
-              ) : (
-                <div
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    background: "linear-gradient(135deg, #38bdf8 0%, #a78bfa 45%, #34d399 100%)",
-                  }}
-                />
-              )}
+              {/* Placeholder mientras llega el PNG (fondo + avatar del servidor) */}
+              {!previewUrl ? (
+                backgroundPreviewSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={backgroundPreviewSrc}
+                    alt=""
+                    className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${config.cardLayout.bgFocalX * 100}% ${config.cardLayout.bgFocalY * 100}%`,
+                    }}
+                    draggable={false}
+                  />
+                ) : (
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background: "linear-gradient(135deg, #38bdf8 0%, #a78bfa 45%, #34d399 100%)",
+                    }}
+                  />
+                )
+              ) : null}
 
-              {/* Vignette para legibilidad del texto */}
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.55) 100%)",
-                }}
-              />
-
-              {/* Avatar (PNG transparente) */}
               {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img

@@ -589,26 +589,21 @@ const authRateLimiter = rateLimit({
 
 const apiRateLimiter = rateLimit({
     windowMs: 60 * 1000,
-    // El panel (Card Studio + previews) es chattery; 180/min se agota al editar.
-    max: IS_PRODUCTION ? 480 : 2000,
+    max: IS_PRODUCTION ? 2000 : 5000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Límite de solicitudes alcanzado. Espera un momento.' },
+    // Panel autenticado + previews de welcome: sin límite (Card Studio dispara muchas peticiones).
     skip: (req) => {
-        const url = String(req.originalUrl || '');
+        const url = String(req.originalUrl || req.url || '');
         if (url.startsWith('/api/community')) return true;
-        // Preview PNG tiene su propio límite; no debe tumbar el resto del panel.
-        if (url.includes('/welcome-card-preview')) return true;
+        if (req.session?.user?.id) return true;
+        if (/\/welcome-card-preview(?:\?|$)/i.test(url)) return true;
+        if (/\/greeting-image\//i.test(url)) return true;
+        if (/\/welcome-image(?:\?|$)/i.test(url)) return true;
+        if (/\/welcome-test(?:\?|$)/i.test(url)) return true;
         return false;
     }
-});
-
-const welcomeCardPreviewRateLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: IS_PRODUCTION ? 180 : 800,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Límite de vista previa alcanzado. Espera un momento.' }
 });
 
 function assertProductionSecurityConfig() {
@@ -1026,7 +1021,6 @@ app.use(cors({
 app.use('/auth/discord', authRateLimiter);
 app.use('/api/link/eyedbio', authRateLimiter);
 app.use('/callback', authRateLimiter);
-app.use('/api/', apiRateLimiter);
 app.use((req, res, next) => {
     const path = String(req.path || '');
     const neverCachePrefixes = ['/login', '/logout', '/auth/discord', '/api/link/eyedbio', '/callback', '/t/', '/api/user', '/api/guilds', '/api/panel/bootstrap'];
@@ -1081,6 +1075,9 @@ app.use(session({
     },
     name: 'tulabot.session'
 }));
+
+// Después de session para poder saltar el límite a usuarios autenticados del panel.
+app.use('/api/', apiRateLimiter);
 
 const panelFaviconIcoPath = path.join(__dirname, 'panel', 'app', 'favicon.ico');
 const panelFaviconPublicPath = path.join(__dirname, 'panel', 'public', 'favicon.ico');
@@ -7678,7 +7675,7 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/guild/:guildId/welcome-card-preview', welcomeCardPreviewRateLimiter, requireAuth, async (req, res) => {
+app.post('/api/guild/:guildId/welcome-card-preview', requireAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const userGuild = req.session.guilds?.find((g) => g.id === guildId);

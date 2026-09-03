@@ -91,10 +91,11 @@ export type WelcomeCardPreviewInput = {
 };
 
 export function buildWelcomeCardPreviewBody(config: WelcomeCardPreviewInput & { omitText?: boolean; omitBackground?: boolean; previewMode?: string }) {
+  const imageUrl = String(config.imageUrl || "").trim().split("?")[0];
   return {
     title: config.title,
     message: config.message,
-    imageUrl: config.imageUrl,
+    imageUrl,
     cardNameTemplate: config.cardNameTemplate,
     cardOverlayText: config.cardOverlayText,
     cardAccentColor: config.cardAccentColor,
