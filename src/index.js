@@ -787,7 +787,9 @@ async function main() {
         require('./utils/lavalink-shoukaku').initShoukaku(client);
     }
 
-    await client.login(TOKEN);
+    const { waitForDns, loginWithRetry } = require('./utils/discord-connect');
+    await waitForDns('discord.com', { attempts: 30, delayMs: 2000 });
+    await loginWithRetry(client, TOKEN, { label: 'EyedBot', attempts: 24, baseDelayMs: 2500 });
 }
 
 async function gracefulShutdown(signal) {
@@ -829,4 +831,7 @@ process.on('unhandledRejection', (reason) => {
     console.error('⚠️ unhandledRejection:', reason?.message || reason);
 });
 
-main();
+main().catch((error) => {
+    console.error('❌ Fallo al arrancar EyedBot:', error?.message || error);
+    process.exit(1);
+});

@@ -7,6 +7,7 @@ const {
     bootstrapAuxiliaryClient
 } = require('./bot-runtime');
 const { buildBotInviteUrl } = require('./bot-invite');
+const { loginWithRetry, isTransientNetworkError } = require('./discord-connect');
 
 const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'owner-bots.json');
 const runtime = new Map();
@@ -227,7 +228,11 @@ async function startBotRuntime(record) {
     });
 
     try {
-        await client.login(record.token);
+        await loginWithRetry(client, record.token, {
+            label: record.label || 'Bot auxiliar',
+            attempts: 24,
+            baseDelayMs: 2500
+        });
     } catch (error) {
         rt.status = 'error';
         rt.lastError = formatBotLoginError(error?.message || error);
@@ -250,8 +255,36 @@ async function initOwnerBots() {
                 store.bots[idx].lastError = formatBotLoginError(error?.message || error);
                 writeStore(store);
             }
+            // Tras cortes de luz: reintentar en background unos minutos más.
+            if (isTransientNetworkError(error)) {
+                scheduleAuxRetry(record);
+            }
         }
     }
+}
+
+function scheduleAuxRetry(record) {
+    const id = record.id;
+    let attempt = 0;
+    const maxAttempts = 12;
+    const timer = setInterval(async () => {
+        attempt += 1;
+        if (runtime.get(id)?.status === 'online') {
+            clearInterval(timer);
+            return;
+        }
+        try {
+            await startBotRuntime(record);
+            console.log(`🤖 Bot auxiliar recuperado tras reintento: ${record.label || id}`);
+            clearInterval(timer);
+        } catch (error) {
+            if (attempt >= maxAttempts) {
+                clearInterval(timer);
+                console.error(`❌ Bot auxiliar ${record.label || id}: se agotaron los reintentos (${error?.message || error})`);
+            }
+        }
+    }, 30000);
+    if (typeof timer.unref === 'function') timer.unref();
 }
 
 async function shutdownOwnerBots() {
