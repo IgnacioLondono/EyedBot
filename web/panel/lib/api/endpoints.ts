@@ -273,21 +273,6 @@ export const deleteWelcomeImage = (guildId: string, slot: string) =>
 export const deleteVerifyImage = (guildId: string) =>
   apiFetch(`/api/guild/${g(guildId)}/verify-image`, { method: "DELETE" });
 
-export const getPlatformsConfig = (guildId: string) =>
-  apiFetch(`/api/guild/${g(guildId)}/platforms-config`);
-
-export const savePlatformsConfig = (guildId: string, body: Record<string, unknown>) =>
-  apiFetch(`/api/guild/${g(guildId)}/platforms-config`, { method: "POST", body });
-
-export const publishPlatforms = (guildId: string, body?: Record<string, unknown>) =>
-  apiFetch(`/api/guild/${g(guildId)}/platforms-publish`, { method: "POST", body });
-
-export const updatePlatformsEmbed = (guildId: string, body?: Record<string, unknown>) =>
-  apiFetch(`/api/guild/${g(guildId)}/platforms-embed-update`, { method: "POST", body });
-
-export const uploadPlatformsEmojis = (guildId: string) =>
-  apiFetch(`/api/guild/${g(guildId)}/platforms-upload-emojis`, { method: "POST", body: {} });
-
 // ─── Eventos y sorteos ──────────────────────────────────────────────
 
 export const getEventsGiveawaysConfig = (guildId: string) =>

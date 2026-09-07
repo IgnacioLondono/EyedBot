@@ -16,7 +16,6 @@ const SETTINGS_ROUTE_MAP: Record<string, keyof WebPanelConfig["modules"]> = {
 const SERVER_MODULE_MAP: Record<string, keyof WebPanelConfig["modules"]> = {
   welcome: "welcome",
   verify: "verify",
-  platforms: "platforms",
   tickets: "tickets",
   levels: "levels",
   voice: "voice",
@@ -70,7 +69,6 @@ export function filterServerPanes(
 export const WEB_MODULE_LABELS: Record<keyof WebPanelConfig["modules"], string> = {
   welcome: "Bienvenida",
   verify: "Verificación",
-  platforms: "Plataformas",
   tickets: "Tickets",
   levels: "Niveles",
   voice: "Voz temporal",

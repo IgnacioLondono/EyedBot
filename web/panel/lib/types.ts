@@ -122,7 +122,6 @@ export type WebPanelConfig = {
   modules: {
     welcome: boolean;
     verify: boolean;
-    platforms: boolean;
     tickets: boolean;
     levels: boolean;
     voice: boolean;

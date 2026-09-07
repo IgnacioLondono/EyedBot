@@ -54,6 +54,7 @@ COPY --from=bot-deps /app/node_modules ./node_modules
 
 COPY src/ ./src/
 COPY assets/server-emojis/discord-ready/ ./assets/server-emojis/discord-ready/
+COPY scripts/setup-onboarding-platforms-games.js ./scripts/setup-onboarding-platforms-games.js
 COPY verificar-*.js ./
 
 COPY web/server.js web/next-panel.js ./web/
