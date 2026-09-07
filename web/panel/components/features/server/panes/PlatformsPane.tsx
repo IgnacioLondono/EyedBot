@@ -20,7 +20,6 @@ import {
   ChannelSelect,
   ColorInput,
   Field,
-  FormActions,
   Input,
   PaneGrid,
   RoleSelect,
@@ -380,7 +379,7 @@ export function PlatformsPane({ guildId }: { guildId: string }) {
         />
       </SectionCard>
 
-      <FormActions>
+      <div className="flex flex-wrap gap-3">
         <Button type="button" variant="secondary" loading={saving} onClick={() => void handleSave()}>
           Guardar
         </Button>
@@ -396,7 +395,7 @@ export function PlatformsPane({ guildId }: { guildId: string }) {
         >
           Actualizar mensaje
         </Button>
-      </FormActions>
+      </div>
     </PaneGrid>
   );
 }
