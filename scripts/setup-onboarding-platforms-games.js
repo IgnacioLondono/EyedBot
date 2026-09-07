@@ -5,11 +5,11 @@
  * (la pantalla de elegir roles al entrar). No es un panel web.
  *
  * Uso (dentro del contenedor):
- *   node scripts/setup-onboarding-platforms-games.js
+ *   GUILD_ID=... node scripts/setup-onboarding-platforms-games.js
  */
 const fs = require('fs');
 const path = require('path');
-const { Client, GatewayIntentBits, GuildOnboardingPromptType } = require('discord.js');
+const { Client, GatewayIntentBits, GuildOnboardingPromptType, Routes } = require('discord.js');
 
 const GUILD_ID = String(process.env.GUILD_ID || process.env.DISCORD_GUILD_ID || '').trim();
 const PACK_DIR = path.join(__dirname, '..', 'assets', 'server-emojis', 'discord-ready');
@@ -67,7 +67,7 @@ async function ensureRole(guild, item) {
     if (!role) {
         role = await guild.roles.create({
             name: item.name,
-            color: item.color,
+            colors: { primaryColor: item.color },
             mentionable: true,
             hoist: false,
             reason: 'EyedBot: rol onboarding plataformas/juegos'
@@ -79,43 +79,56 @@ async function ensureRole(guild, item) {
     return role;
 }
 
-function mapExistingPrompt(prompt) {
+function mapRawPrompt(prompt) {
     return {
         id: prompt.id,
         title: prompt.title,
-        singleSelect: prompt.singleSelect,
-        required: prompt.required,
-        inOnboarding: prompt.inOnboarding,
+        single_select: Boolean(prompt.single_select),
+        required: Boolean(prompt.required),
+        in_onboarding: prompt.in_onboarding !== false,
         type: prompt.type,
-        options: [...prompt.options.values()].map((o) => ({
-            id: o.id,
-            title: o.title,
-            description: o.description || undefined,
-            emoji: o.emoji
-                ? (o.emoji.id
-                    ? { id: o.emoji.id, name: o.emoji.name, animated: Boolean(o.emoji.animated) }
-                    : o.emoji.name)
-                : undefined,
-            roleIds: o.roles ? [...o.roles.keys()] : [],
-            channelIds: o.channels ? [...o.channels.keys()] : []
-        }))
+        options: (prompt.options || []).map((o) => {
+            const out = {
+                id: o.id,
+                title: o.title,
+                description: o.description || undefined,
+                role_ids: Array.isArray(o.role_ids) ? o.role_ids.map(String) : [],
+                channel_ids: Array.isArray(o.channel_ids) ? o.channel_ids.map(String) : []
+            };
+            if (o.emoji_id) {
+                out.emoji = { id: String(o.emoji_id), name: o.emoji_name || 'emoji', animated: Boolean(o.emoji_animated) };
+            } else if (o.emoji_name) {
+                out.emoji = { name: o.emoji_name };
+            }
+            return out;
+        })
     };
 }
 
-function buildOptions(items, roleMap, emojiMap) {
+function fakeSnowflake() {
+    // Discord snowflake-ish id for new onboarding prompts/options
+    const ms = BigInt(Date.now() - 1_420_070_400_000);
+    const rand = BigInt(Math.floor(Math.random() * 0x3fffff));
+    return String((ms << 22n) | rand);
+}
+
+function buildRawOptions(items, roleMap, emojiMap) {
     return items.map((item) => {
         const role = roleMap.get(item.key);
         const emoji = emojiMap.get(item.key);
-        return {
+        if (!role) return null;
+        const out = {
+            id: fakeSnowflake(),
             title: item.name.slice(0, 50),
             description: item.description.slice(0, 50),
-            roleIds: role ? [role.id] : [],
-            channelIds: [],
-            emoji: emoji
-                ? { id: emoji.id, name: emoji.name, animated: Boolean(emoji.animated) }
-                : undefined
+            role_ids: [role.id],
+            channel_ids: []
         };
-    }).filter((o) => o.roleIds.length);
+        if (emoji) {
+            out.emoji = { id: emoji.id, name: emoji.name, animated: Boolean(emoji.animated) };
+        }
+        return out;
+    }).filter(Boolean);
 }
 
 (async () => {
@@ -145,47 +158,59 @@ function buildOptions(items, roleMap, emojiMap) {
         roleMap.set(item.key, role);
     }
 
-    const onboarding = await guild.fetchOnboarding();
-    const existing = [...onboarding.prompts.values()].map(mapExistingPrompt);
+    // Raw API preserves role_ids even when roles aren't in cache
+    const raw = await client.rest.get(Routes.guildOnboarding(guild.id));
+    const existing = (raw.prompts || []).map(mapRawPrompt);
 
-    // Quitar prompts previos de plataformas/juegos si se re-ejecuta
     const filtered = existing.filter((p) => {
         const t = String(p.title || '').toLowerCase();
-        return !t.includes('plataforma') && !t.includes('juegos jug') && t !== 'qué juegos jugás?' && t !== 'que juegos jugas?';
+        return !t.includes('plataforma') && !t.includes('juegos jug') && t !== 'plataformas y juegos';
+    }).map((p) => {
+        // Discord permite max 5 prompts en onboarding; liberamos "intereses" al customize
+        const t = String(p.title || '').toLowerCase();
+        if (t.includes('interes')) {
+            return { ...p, in_onboarding: false };
+        }
+        return p;
     });
 
-    const platformPrompt = {
-        title: 'En qué plataforma jugás?',
-        singleSelect: false,
+    const combinedPrompt = {
+        id: fakeSnowflake(),
+        title: 'Plataformas y juegos',
+        single_select: false,
         required: false,
-        inOnboarding: true,
+        in_onboarding: true,
         type: GuildOnboardingPromptType.MultipleChoice,
-        options: buildOptions(PLATFORM_ROLES, roleMap, emojiMap)
+        options: [
+            ...buildRawOptions(PLATFORM_ROLES, roleMap, emojiMap),
+            ...buildRawOptions(GAME_ROLES, roleMap, emojiMap)
+        ]
     };
 
-    const gamePrompt = {
-        title: 'Qué juegos jugás?',
-        singleSelect: false,
-        required: false,
-        inOnboarding: true,
-        type: GuildOnboardingPromptType.MultipleChoice,
-        options: buildOptions(GAME_ROLES, roleMap, emojiMap)
-    };
-
-    // Insertar antes de "Verificate" si existe
     const verifyIdx = filtered.findIndex((p) => String(p.title).toLowerCase().includes('verific'));
     const nextPrompts = [...filtered];
     if (verifyIdx >= 0) {
-        nextPrompts.splice(verifyIdx, 0, platformPrompt, gamePrompt);
+        nextPrompts.splice(verifyIdx, 0, combinedPrompt);
     } else {
-        nextPrompts.push(platformPrompt, gamePrompt);
+        nextPrompts.push(combinedPrompt);
     }
 
-    await guild.editOnboarding({
-        enabled: true,
-        mode: onboarding.mode,
-        prompts: nextPrompts,
-        defaultChannels: [...onboarding.defaultChannels.keys()]
+    // Validate every option has at least one role or channel
+    for (const p of nextPrompts) {
+        for (const o of p.options) {
+            if (!(o.role_ids || []).length && !(o.channel_ids || []).length) {
+                throw new Error(`Opción sin rol/canal: prompt="${p.title}" option="${o.title}"`);
+            }
+        }
+    }
+
+    await client.rest.put(Routes.guildOnboarding(guild.id), {
+        body: {
+            prompts: nextPrompts,
+            default_channel_ids: raw.default_channel_ids || [],
+            enabled: true,
+            mode: raw.mode
+        }
     });
 
     console.log(JSON.stringify({
@@ -193,6 +218,7 @@ function buildOptions(items, roleMap, emojiMap) {
         guild: guild.name,
         roles: [...roleMap.entries()].map(([k, r]) => ({ key: k, id: r.id, name: r.name })),
         emojis: [...emojiMap.entries()].map(([k, e]) => ({ key: k, id: e.id, name: e.name })),
+        promptTitles: nextPrompts.map((p) => p.title),
         promptCount: nextPrompts.length
     }, null, 2));
 
