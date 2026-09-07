@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { OverviewPane } from "@/components/features/server/panes/OverviewPane";
 import { WelcomePane } from "@/components/features/server/panes/WelcomePane";
 import { VerifyPane } from "@/components/features/server/panes/VerifyPane";
+import { PlatformsPane } from "@/components/features/server/panes/PlatformsPane";
 import { TicketsPane } from "@/components/features/server/panes/TicketsPane";
 import { LevelsPane } from "@/components/features/server/panes/LevelsPane";
 import { VoicePane } from "@/components/features/server/panes/VoicePane";
@@ -28,6 +29,7 @@ const PANE_COMPONENTS = {
   overview: OverviewPane,
   welcome: WelcomePane,
   verify: VerifyPane,
+  platforms: PlatformsPane,
   tickets: TicketsPane,
   levels: LevelsPane,
   voice: VoicePane,
