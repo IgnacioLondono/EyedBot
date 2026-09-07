@@ -9,6 +9,7 @@ const guildMemberRemoveEvent = require('../events/guildMemberRemove');
 const antiRaidGuard = require('../events/anti-raid-guard');
 const { handleReactionAdd, handleReactionRemove } = require('../events/verify-reaction');
 const { handleVerifyButton } = require('./verify-service');
+const { handlePlatformsButton, handlePlatformsSelect } = require('./platforms-service');
 const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = require('../events/ticket-interaction');
 const {
     handleMessageCreate,
@@ -214,6 +215,7 @@ function attachInteractionHandler(client) {
                 if (await handleTicketButton(interaction)) return;
                 if (await handleGiveawayButton(interaction)) return;
                 if (await handleVerifyButton(interaction)) return;
+                if (await handlePlatformsButton(interaction)) return;
                 if (interaction.customId.startsWith('fun_return_')) {
                     if (await handleReturnInteraction(interaction)) return;
                 }
@@ -310,6 +312,7 @@ function attachInteractionHandler(client) {
         if (interaction.isStringSelectMenu()) {
             try {
                 if (await handleTicketSelectMenu(interaction)) return;
+                if (await handlePlatformsSelect(interaction)) return;
             } catch (error) {
                 if (isUnknownInteractionError(error)) return;
                 console.error('Error handling select menu interaction:', error);

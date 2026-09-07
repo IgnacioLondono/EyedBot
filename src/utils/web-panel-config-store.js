@@ -18,6 +18,7 @@ const DEFAULT_CONFIG = {
     modules: {
         welcome: true,
         verify: true,
+        platforms: true,
         tickets: true,
         levels: true,
         voice: true,

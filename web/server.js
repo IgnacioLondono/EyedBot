@@ -43,6 +43,14 @@ const {
     usesReactionVerification,
     syncRestrictedRolePermissions
 } = require('../src/utils/verify-service');
+const platformsStore = require('../src/utils/platforms-config-store');
+const {
+    buildPlatformsEmbed,
+    buildPlatformsComponents,
+    uploadPackEmojisToGuild,
+    canManageRole: canManagePlatformRole,
+    enabledPlatforms
+} = require('../src/utils/platforms-service');
 const eventsGiveawaysStore = require('../src/utils/events-giveaways-store');
 const giveawayService = require('../src/utils/giveaway-service');
 const ticketStore = require('../src/utils/ticket-config-store');
@@ -4361,6 +4369,168 @@ app.post('/api/guild/:guildId/verify-embed-update', requireAuth, async (req, res
         const code = Number(error.statusCode);
         const status = code >= 400 && code < 600 ? code : 500;
         res.status(status).json({ error: error.message || 'Error al actualizar el embed de verificación' });
+    }
+});
+
+app.get('/api/guild/:guildId/platforms-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        const cfg = await platformsStore.getPlatformsConfig(guildId);
+        res.json(cfg || platformsStore.defaultConfig());
+    } catch (error) {
+        console.error('Error leyendo platforms config:', error);
+        res.status(500).json({ error: 'Error al cargar plataformas' });
+    }
+});
+
+app.post('/api/guild/:guildId/platforms-config', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+
+        const existing = (await platformsStore.getPlatformsConfig(guildId)) || platformsStore.defaultConfig();
+        const body = req.body || {};
+        const next = await platformsStore.setPlatformsConfig(guildId, {
+            ...existing,
+            ...body,
+            messageId: body.messageId != null ? body.messageId : existing.messageId,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+        res.json(next);
+    } catch (error) {
+        console.error('Error guardando platforms config:', error);
+        res.status(500).json({ error: 'Error al guardar plataformas' });
+    }
+});
+
+app.post('/api/guild/:guildId/platforms-upload-emojis', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = getBotClient().guilds.cache.get(guildId) || await getBotClient().guilds.fetch(guildId).catch(() => null);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await platformsStore.getPlatformsConfig(guildId);
+        const result = await uploadPackEmojisToGuild(guild, cfg);
+        const next = await platformsStore.setPlatformsConfig(guildId, {
+            ...cfg,
+            platforms: result.platforms,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+        res.json({ success: true, config: next, uploaded: result.uploaded, skipped: result.skipped });
+    } catch (error) {
+        console.error('Error subiendo emojis de plataformas:', error);
+        const code = Number(error.statusCode);
+        const status = code >= 400 && code < 600 ? code : 500;
+        res.status(status).json({ error: error.message || 'Error al subir emojis' });
+    }
+});
+
+app.post('/api/guild/:guildId/platforms-publish', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = getBotClient().guilds.cache.get(guildId);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await platformsStore.getPlatformsConfig(guildId);
+        if (!cfg?.channelId) {
+            return res.status(400).json({ error: 'Configura el canal antes de publicar' });
+        }
+        const active = enabledPlatforms(cfg).filter((p) => p.roleId);
+        if (!active.length) {
+            return res.status(400).json({ error: 'Asigna al menos un rol a una plataforma activa' });
+        }
+
+        const channel = guild.channels.cache.get(cfg.channelId) || await guild.channels.fetch(cfg.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(404).json({ error: 'Canal no encontrado o no es de texto' });
+        }
+
+        const me = guild.members.me || await guild.members.fetch(getBotClient().user.id).catch(() => null);
+        if (!me) return res.status(500).json({ error: 'No pude obtener los permisos del bot' });
+        if (!channel.permissionsFor(me)?.has(['SendMessages', 'EmbedLinks'])) {
+            return res.status(403).json({ error: 'Faltan permisos: Enviar mensajes o Insertar enlaces' });
+        }
+
+        for (const p of active) {
+            const role = guild.roles.cache.get(p.roleId) || await guild.roles.fetch(p.roleId).catch(() => null);
+            if (!role) return res.status(404).json({ error: `Rol no encontrado para ${p.label}` });
+            if (!canManagePlatformRole(guild, role)) {
+                return res.status(403).json({
+                    error: `El bot no puede administrar el rol de ${p.label} (jerarquía / Gestionar roles)`
+                });
+            }
+        }
+
+        const embed = buildPlatformsEmbed(cfg, guild);
+        const components = buildPlatformsComponents(guildId, cfg);
+        const posted = await channel.send({ embeds: [embed], components });
+
+        const updatedCfg = await platformsStore.setPlatformsConfig(guildId, {
+            ...cfg,
+            enabled: true,
+            messageId: posted.id,
+            channelId: channel.id,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+
+        res.json({ success: true, config: updatedCfg, messageId: posted.id, channelId: channel.id });
+    } catch (error) {
+        console.error('Error publicando platforms panel:', error);
+        res.status(500).json({ error: 'Error al publicar el panel de plataformas' });
+    }
+});
+
+app.post('/api/guild/:guildId/platforms-embed-update', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const userGuild = req.session.guilds?.find((g) => g.id === guildId);
+        if (!userGuild) return res.status(403).json({ error: 'No tienes acceso a este servidor' });
+        if (!getBotClient()) return res.status(500).json({ error: 'Bot no disponible' });
+
+        const guild = getBotClient().guilds.cache.get(guildId) || await getBotClient().guilds.fetch(guildId).catch(() => null);
+        if (!guild) return res.status(404).json({ error: 'Servidor no encontrado' });
+
+        const cfg = await platformsStore.getPlatformsConfig(guildId);
+        if (!cfg?.messageId || !cfg?.channelId) {
+            return res.status(400).json({ error: 'No hay panel publicado. Usa «Publicar panel» primero.' });
+        }
+
+        const channel = guild.channels.cache.get(cfg.channelId) || await guild.channels.fetch(cfg.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(404).json({ error: 'Canal del panel no encontrado' });
+        }
+        const message = await channel.messages.fetch(cfg.messageId).catch(() => null);
+        if (!message) {
+            return res.status(404).json({ error: 'Mensaje no encontrado. Volvé a publicar el panel.' });
+        }
+
+        const embed = buildPlatformsEmbed(cfg, guild);
+        const components = buildPlatformsComponents(guildId, cfg);
+        await message.edit({ embeds: [embed], components });
+
+        const updatedCfg = await platformsStore.setPlatformsConfig(guildId, {
+            ...cfg,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.session.user?.id || 'unknown'
+        });
+        res.json({ success: true, config: updatedCfg, messageId: message.id, channelId: channel.id });
+    } catch (error) {
+        console.error('Error actualizando platforms panel:', error);
+        res.status(500).json({ error: 'Error al actualizar el panel de plataformas' });
     }
 });
 

@@ -9,6 +9,7 @@ const guildMemberRemoveEvent = require('./events/guildMemberRemove');
 const antiRaidGuard = require('./events/anti-raid-guard');
 const { handleReactionAdd, handleReactionRemove } = require('./events/verify-reaction');
 const { handleVerifyButton } = require('./utils/verify-service');
+const { handlePlatformsButton, handlePlatformsSelect } = require('./utils/platforms-service');
 const { handleTicketButton, handleTicketSelectMenu, handleTicketModal } = require('./events/ticket-interaction');
 const {
     handleMessageCreate,
@@ -571,6 +572,9 @@ client.on('interactionCreate', async interaction => {
             const verifyHandled = await handleVerifyButton(interaction);
             if (verifyHandled) return;
 
+            const platformsHandled = await handlePlatformsButton(interaction);
+            if (platformsHandled) return;
+
             if (interaction.customId.startsWith('fun_return_')) {
                 const handled = await handleReturnInteraction(interaction);
                 if (handled) return;
@@ -714,6 +718,9 @@ client.on('interactionCreate', async interaction => {
         try {
             const ticketSelectHandled = await handleTicketSelectMenu(interaction);
             if (ticketSelectHandled) return;
+
+            const platformsSelectHandled = await handlePlatformsSelect(interaction);
+            if (platformsSelectHandled) return;
         } catch (error) {
             if (isUnknownInteractionError(error)) return;
             console.error('Error handling select menu interaction:', error);

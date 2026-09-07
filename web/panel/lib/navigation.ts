@@ -57,6 +57,7 @@ export const SERVER_PANES: ServerPane[] = [
   { id: "overview", slug: "overview", label: "Resumen", icon: LayoutGrid },
   { id: "welcome", slug: "welcome", label: "Bienvenida", icon: DoorOpen },
   { id: "verify", slug: "verify", label: "Verificación", icon: Shield },
+  { id: "platforms", slug: "platforms", label: "Plataformas", icon: Gamepad2 },
   { id: "tickets", slug: "tickets", label: "Tickets", icon: Ticket, premium: true },
   { id: "levels", slug: "levels", label: "Niveles", icon: Bolt },
   { id: "voice", slug: "voice", label: "Voz temporal", icon: Mic },
@@ -88,7 +89,7 @@ export type ServerPaneGroup = {
 export const SERVER_PANE_GROUPS: ServerPaneGroup[] = [
   {
     label: "General",
-    slugs: ["overview", "welcome", "verify", "embed", "events", "weekly-summary"],
+    slugs: ["overview", "welcome", "verify", "platforms", "embed", "events", "weekly-summary"],
   },
   {
     label: "Comunidad",
