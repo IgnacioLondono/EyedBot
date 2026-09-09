@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/features/shared";
@@ -34,19 +34,48 @@ export function EmbedImageField({
   deleting?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const previewSrc = resolveEmbedImageSrc(value, filePreview);
+  const fieldId = useId();
+  const [localPreview, setLocalPreview] = useState("");
+  const [inputNonce, setInputNonce] = useState(0);
+  const previewSrc = resolveEmbedImageSrc(value, filePreview || localPreview);
   const busy = uploading || deleting;
+
+  useEffect(() => {
+    return () => {
+      if (localPreview) URL.revokeObjectURL(localPreview);
+    };
+  }, [localPreview]);
+
+  // Si el padre actualizó la URL (subida lista), soltar el blob local.
+  useEffect(() => {
+    if (!localPreview || !value) return;
+    URL.revokeObjectURL(localPreview);
+    setLocalPreview("");
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleFileChange(file: File | null) {
     if (!file) return;
+    if (localPreview) URL.revokeObjectURL(localPreview);
+    const blobUrl = URL.createObjectURL(file);
+    setLocalPreview(blobUrl);
     if (onUpload) {
-      await onUpload(file);
+      try {
+        await onUpload(file);
+      } catch {
+        URL.revokeObjectURL(blobUrl);
+        setLocalPreview("");
+      }
+      setInputNonce((n) => n + 1);
       return;
     }
     onFileSelect?.(file);
   }
 
   async function handleDelete() {
+    if (localPreview) {
+      URL.revokeObjectURL(localPreview);
+      setLocalPreview("");
+    }
     if (onDelete) {
       await onDelete();
       return;
@@ -57,7 +86,7 @@ export function EmbedImageField({
   }
 
   return (
-    <Field label={label} description={description}>
+    <Field label={label} description={description} htmlFor={`${fieldId}-upload`}>
       <div className="space-y-3">
         <Input
           value={value}
@@ -66,10 +95,11 @@ export function EmbedImageField({
         />
         <div className="flex flex-wrap gap-2">
           <input
+            key={inputNonce}
             ref={inputRef}
             type="file"
-            name="embed-image-upload"
-            id="embed-image-upload"
+            name={`${fieldId}-upload`}
+            id={`${fieldId}-upload`}
             accept="image/*"
             className="hidden"
             onChange={(event) => void handleFileChange(event.target.files?.[0] || null)}
@@ -93,7 +123,12 @@ export function EmbedImageField({
         </div>
         {previewSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewSrc} alt="" className="max-h-40 w-full rounded-xl border border-white/10 object-cover" />
+          <img
+            key={previewSrc}
+            src={previewSrc}
+            alt=""
+            className="max-h-40 w-full rounded-xl border border-white/10 object-cover"
+          />
         ) : null}
       </div>
     </Field>

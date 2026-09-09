@@ -96,7 +96,7 @@ export function DiscordEmbedPreview({
 
           {thumbnailSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumbnailSrc} alt="" className="h-20 w-20 shrink-0 rounded object-cover" />
+            <img key={thumbnailSrc} src={thumbnailSrc} alt="" className="h-20 w-20 shrink-0 rounded object-cover" />
           ) : thumbnailLabel ? (
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-[#1e1f22] px-2 text-center text-[10px] leading-tight text-[#949ba4]">
               {thumbnailLabel}
@@ -106,7 +106,7 @@ export function DiscordEmbedPreview({
 
         {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageSrc} alt="" className="mt-3 max-h-52 w-full rounded object-cover" />
+          <img key={imageSrc} src={imageSrc} alt="" className="mt-3 max-h-52 w-full rounded object-cover" />
         ) : null}
 
         {children}

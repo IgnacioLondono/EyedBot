@@ -42,6 +42,7 @@ import {
   type TicketFlowGraph,
 } from "@/lib/ticket-flow";
 import { asArray, asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
+import { withMediaCacheBust } from "@/lib/panel-media";
 
 const TICKET_TABS = [
   { id: "panel", label: "Panel" },
@@ -553,7 +554,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                     setUploadingImage(true);
                     try {
                       const result = asRecord(await uploadTicketImage(guildId, file));
-                      const imageUrl = toStringValue(result.path || result.url);
+                      const imageUrl = withMediaCacheBust(toStringValue(result.path || result.url));
                       setConfig((c) => ({ ...c, imageUrl }));
                       toast({ title: "Imagen subida", description: "Guarda o actualiza el embed para publicarla.", tone: "success" });
                     } catch (err) {

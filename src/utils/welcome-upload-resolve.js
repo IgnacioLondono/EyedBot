@@ -152,18 +152,22 @@ async function resolveWelcomeMediaForDiscord(rawUrl = '', options = {}) {
     const raw = String(rawUrl || '').trim();
     if (!raw) return null;
 
+    // Solo leer greeting_embed_image si la URL es realmente de ese store.
+    // Si no, /uploads/verify|tickets|welcome se pisaban con la imagen de bienvenida.
     const parsed = greetingImageStore.parseGreetingImageApiUrl(raw);
-    const lookupGuildId = (guild && parsed && parsed.guildId === guild.id)
-        ? guild.id
-        : (parsed?.guildId || guild?.id || '');
-    if (lookupGuildId) {
-        const imageSlot = slotForMediaKind(slot, parsed?.slot, raw);
-        const blob = await greetingImageStore.getImage(lookupGuildId, imageSlot);
-        if (blob?.data?.length) {
-            const attachmentName = slot === 'thumbnail'
-                ? `thumb_greeting.${blob.ext}`
-                : `greeting.${blob.ext}`;
-            return { mode: 'buffer', buffer: blob.data, attachmentName, mime: blob.mime };
+    if (parsed) {
+        const lookupGuildId = (guild && parsed.guildId === guild.id)
+            ? guild.id
+            : parsed.guildId;
+        if (lookupGuildId) {
+            const imageSlot = slotForMediaKind(slot, parsed.slot, raw);
+            const blob = await greetingImageStore.getImage(lookupGuildId, imageSlot);
+            if (blob?.data?.length) {
+                const attachmentName = slot === 'thumbnail'
+                    ? `thumb_greeting.${blob.ext}`
+                    : `greeting.${blob.ext}`;
+                return { mode: 'buffer', buffer: blob.data, attachmentName, mime: blob.mime };
+            }
         }
     }
 

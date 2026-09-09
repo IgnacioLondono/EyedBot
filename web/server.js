@@ -4183,7 +4183,9 @@ app.post('/api/guild/:guildId/verify-config', requireAuth, async (req, res) => {
             ).slice(0, 2000),
             color: String(body.color || existing.color || '7c4dff').replace('#', '').slice(0, 6),
             footer: String(body.footer ?? existing.footer ?? '').slice(0, 300),
-            imageUrl: canonicalPanelMediaUrl(body.imageUrl || body.image_url || existing.imageUrl || ''),
+            imageUrl: canonicalPanelMediaUrl(body.imageUrl !== undefined || body.image_url !== undefined
+                ? (body.imageUrl || body.image_url || '')
+                : (existing.imageUrl || existing.image_url || '')),
             removeRoleOnUnreact: body.removeRoleOnUnreact === true,
             reassignRoleOnUnreact: body.reassignRoleOnUnreact !== false,
             messageId: String(body.messageId || existing.messageId || '').trim(),

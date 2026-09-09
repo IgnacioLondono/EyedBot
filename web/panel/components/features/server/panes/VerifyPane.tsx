@@ -36,6 +36,7 @@ import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { plainColorToHex } from "@/lib/embed-utils";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
+import { withMediaCacheBust } from "@/lib/panel-media";
 
 type VerifyMode = "reaction" | "button" | "both";
 
@@ -443,11 +444,13 @@ export function VerifyPane({ guildId }: { guildId: string }) {
               try {
                 const result = asRecord(await uploadVerifyImage(guildId, file));
                 const config = asRecord(result.config);
+                const uploaded = toStringValue(result.path || result.url || config.imageUrl || config.image_url);
                 if (Object.keys(config).length) {
-                  setForm(normalizeVerify(config));
+                  const next = normalizeVerify(config);
+                  next.imageUrl = withMediaCacheBust(uploaded || next.imageUrl);
+                  setForm(next);
                 } else {
-                  const imageUrl = toStringValue(result.path || result.url);
-                  setForm((current) => ({ ...current, imageUrl }));
+                  setForm((current) => ({ ...current, imageUrl: withMediaCacheBust(uploaded) }));
                 }
                 toast({ title: "Imagen subida", description: "La imagen de verificación fue guardada.", tone: "success" });
               } catch (err) {
