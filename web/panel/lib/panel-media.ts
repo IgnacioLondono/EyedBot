@@ -23,6 +23,20 @@ function extractUploadPath(rawUrl = "") {
   return "";
 }
 
+/** Conserva ?t= / ?v= para bustear cache tras subir (p. ej. greeting-image). */
+function keepCacheBust(pathname: string, search = "") {
+  const path = String(pathname || "").split("?")[0];
+  if (!path) return "";
+  try {
+    const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+    const bust = params.get("t") || params.get("v");
+    if (bust) return `${path}?t=${encodeURIComponent(bust)}`;
+  } catch {
+    // noop
+  }
+  return path;
+}
+
 /**
  * URL estable para <img src>.
  * No usa Date.now() en cada llamada: eso re-disparaba cientos de GETs y tumba el rate-limit.
@@ -35,17 +49,27 @@ export function resolvePanelMediaUrl(value?: string, filePreview?: string) {
   if (/^(blob:|data:)/i.test(raw)) return raw;
 
   const uploadPath = extractUploadPath(raw);
-  if (uploadPath) return uploadPath;
+  if (uploadPath) {
+    try {
+      const u = raw.startsWith("http") ? new URL(raw) : new URL(raw, "http://local.invalid");
+      return keepCacheBust(uploadPath, u.search);
+    } catch {
+      return uploadPath;
+    }
+  }
 
-  if (raw.startsWith("/")) return raw.split("?")[0];
+  if (raw.startsWith("/")) {
+    const [pathPart, queryPart = ""] = raw.split("?");
+    return keepCacheBust(pathPart, queryPart);
+  }
 
   if (/^https?:\/\//i.test(raw)) {
     try {
       const url = new URL(raw);
       if (isLocalNetworkHostname(url.hostname)) {
         const localUpload = extractUploadPath(raw);
-        if (localUpload) return localUpload;
-        if (url.pathname.startsWith("/api/")) return url.pathname.split("?")[0];
+        if (localUpload) return keepCacheBust(localUpload, url.search);
+        if (url.pathname.startsWith("/api/")) return keepCacheBust(url.pathname, url.search);
         return "";
       }
       return raw;
@@ -55,4 +79,11 @@ export function resolvePanelMediaUrl(value?: string, filePreview?: string) {
   }
 
   return raw;
+}
+
+export function withMediaCacheBust(value?: string) {
+  const raw = String(value || "").trim();
+  if (!raw || /^(blob:|data:)/i.test(raw)) return raw;
+  const base = raw.split("?")[0];
+  return `${base}?t=${Date.now()}`;
 }
