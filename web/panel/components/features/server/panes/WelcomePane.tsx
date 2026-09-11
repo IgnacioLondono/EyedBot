@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DoorOpen, ExternalLink, Mail, Paintbrush, PartyPopper } from "lucide-react";
 import {
   deleteWelcomeImage,
@@ -150,7 +150,9 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const [uploadingThumbImage, setUploadingThumbImage] = useState(false);
   const [deletingMainImage, setDeletingMainImage] = useState(false);
   const [deletingThumbImage, setDeletingThumbImage] = useState(false);
+  const [channelToInsert, setChannelToInsert] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -177,6 +179,28 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const imageSlot = tab === "welcome" ? "welcome" : "goodbye";
   const thumbSlot = tab === "welcome" ? "welcome_thumb" : "goodbye_thumb";
   const isCardWelcome = tab === "welcome" && welcome.welcomeStyle === "card" && welcomeCardEnabled;
+
+  function insertChannelMention() {
+    const channel = channels.find((item) => item.id === channelToInsert);
+    if (!channel) return;
+
+    const mention = `<#${channel.id}>`;
+    const textarea = messageInputRef.current;
+    const currentMessage = active.message;
+    const start = textarea?.selectionStart ?? currentMessage.length;
+    const end = textarea?.selectionEnd ?? start;
+    const nextMessage = `${currentMessage.slice(0, start)}${mention}${currentMessage.slice(end)}`;
+
+    setActive((current) => ({ ...current, message: nextMessage }));
+    setChannelToInsert("");
+
+    requestAnimationFrame(() => {
+      if (!messageInputRef.current) return;
+      const cursor = start + mention.length;
+      messageInputRef.current.focus();
+      messageInputRef.current.setSelectionRange(cursor, cursor);
+    });
+  }
 
   const cardPreviewConfig = useMemo(
     () => ({
@@ -416,12 +440,40 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                 />
               </Field>
 
-              <Field label="Mensaje" description="Variables: {user}, {username}, {server}, {memberCount}">
+              <Field
+                label="Mensaje"
+                description="Variables: {user}, {username}, {server}, {memberCount}. También puedes insertar canales."
+              >
                 <Textarea
+                  ref={messageInputRef}
                   value={active.message}
                   onChange={(event) => setActive((current) => ({ ...current, message: event.target.value }))}
                   placeholder="Ej. Bienvenido {user} a {server}"
                 />
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <div className="min-w-56 flex-1">
+                    <Select
+                      aria-label="Canal para insertar en el mensaje"
+                      value={channelToInsert}
+                      onChange={(event) => setChannelToInsert(event.target.value)}
+                    >
+                      <option value="">Selecciona un canal para insertar</option>
+                      {channels
+                        .filter((channel) => ["0", "5", "15"].includes(String(channel.type)))
+                        .map((channel) => (
+                          <option key={channel.id} value={channel.id}>
+                            #{channel.name}
+                          </option>
+                        ))}
+                    </Select>
+                  </div>
+                  <Button type="button" variant="secondary" disabled={!channelToInsert} onClick={insertChannelMention}>
+                    Insertar canal
+                  </Button>
+                </div>
+                <p className="panel-muted text-xs">
+                  Se insertará una mención real como {"<#ID>"} y Discord la mostrará como #{'{canal}'}.
+                </p>
               </Field>
 
               <div className="grid gap-4 md:grid-cols-2">
