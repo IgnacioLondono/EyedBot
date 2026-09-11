@@ -66,9 +66,39 @@ function pushWindowCounter(map, key, windowMs) {
 }
 
 function hasSuspiciousLink(content = '') {
-    const text = String(content || '').toLowerCase();
+    const text = String(content || '')
+        .toLowerCase()
+        .replace(
+            /https?:\/\/[^\s<>()]+|(?:www\.)?[a-z0-9-]+\.[a-z]{2,}(?:\/[^\s<>()]*)?/gi,
+            (url) => isAllowedMediaLink(url) ? '' : url
+        );
     if (!text) return false;
     return /https?:\/\//.test(text) || /\b(?:www\.)?[a-z0-9-]+\.[a-z]{2,}\b/.test(text);
+}
+
+function isAllowedMediaLink(value = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+
+    let url;
+    try {
+        url = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    } catch {
+        return false;
+    }
+
+    const hostname = url.hostname.toLowerCase();
+    const pathname = url.pathname.toLowerCase();
+    const isGifFile = /\.gif$/i.test(pathname);
+    const isImageFile = /\.(?:png|jpe?g|webp|gif)$/i.test(pathname);
+    const isGifProvider = hostname === 'tenor.com'
+        || hostname.endsWith('.tenor.com')
+        || hostname === 'giphy.com'
+        || hostname.endsWith('.giphy.com');
+    const isDiscordMedia = hostname === 'cdn.discordapp.com'
+        || hostname === 'media.discordapp.net';
+
+    return isGifFile || isGifProvider || (isDiscordMedia && isImageFile);
 }
 
 function hasDiscordInvite(content = '') {
@@ -345,6 +375,8 @@ async function handleRoleDelete(role) {
 }
 
 module.exports = {
+    hasSuspiciousLink,
+    isAllowedMediaLink,
     handleMessageCreate,
     handleGuildMemberAdd,
     handleChannelCreate,
