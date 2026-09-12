@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, Clock, Gavel, RefreshCw, Search, Shield, UserX } from "lucide-react";
+import { Ban, CheckCircle2, Clock, Gavel, RefreshCw, Search, Shield, ShieldCheck, UserX } from "lucide-react";
 import { getGuildBans, getGuildMembers, moderateMember, unbanMember } from "@/lib/api/endpoints";
 import { useToast } from "@/components/providers/ToastProvider";
 import { paneTabKey, usePersistedTab } from "@/lib/hooks/usePersistedTab";
@@ -186,21 +186,40 @@ export function ModerationPane({ guildId }: { guildId: string }) {
 
   return (
     <PaneGrid>
-      <SectionCard title="Moderación" description="Gestiona miembros, aplica sanciones y revisa baneos del servidor.">
+      <SectionCard
+        title="Centro de moderación"
+        description="Gestiona la seguridad de tu comunidad desde un solo lugar."
+        className="overflow-hidden"
+      >
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-violet-400/15 bg-gradient-to-r from-violet-500/10 via-transparent to-cyan-400/5 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-medium text-white">Tu servidor está protegido</p>
+              <p className="text-xs text-zinc-400">Las acciones quedan registradas en el audit log de Discord.</p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-200">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Panel operativo
+          </span>
+        </div>
         <Tabs items={MOD_TABS} value={tab} onValueChange={setTab} className="mb-6" />
 
         <div className="mb-5 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <p className="text-xs text-zinc-500">Resultados</p>
-            <p className="text-xl font-semibold text-white">{members.length}</p>
+          <div className="rounded-2xl border border-cyan-300/10 bg-cyan-400/[0.06] px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-cyan-200/70">Resultados</p>
+            <p className="mt-1 text-2xl font-semibold text-white">{members.length}</p>
           </div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <p className="text-xs text-zinc-500">Baneos</p>
-            <p className="text-xl font-semibold text-white">{bans.length || "—"}</p>
+          <div className="rounded-2xl border border-rose-300/10 bg-rose-400/[0.06] px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-rose-200/70">Baneos</p>
+            <p className="mt-1 text-2xl font-semibold text-white">{bans.length || "—"}</p>
           </div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <p className="text-xs text-zinc-500">Motivo por defecto</p>
-            <p className="truncate text-sm text-zinc-300">{reason.trim() || defaultReason}</p>
+          <div className="rounded-2xl border border-violet-300/10 bg-violet-400/[0.06] px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-violet-200/70">Motivo activo</p>
+            <p className="mt-2 truncate text-sm text-zinc-200">{reason.trim() || defaultReason}</p>
           </div>
         </div>
 
@@ -210,12 +229,13 @@ export function ModerationPane({ guildId }: { guildId: string }) {
             onChange={(event) => setReason(event.target.value)}
             placeholder={defaultReason}
             rows={2}
+            className="border-white/10 bg-white/[0.03] focus:border-violet-300/60"
           />
         </Field>
 
         {tab === "members" ? (
           <>
-            <div className="mb-5 mt-5 flex gap-3">
+            <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <Input
@@ -225,8 +245,9 @@ export function ModerationPane({ guildId }: { guildId: string }) {
                   className="pl-10"
                 />
               </div>
-              <Button variant="secondary" onClick={() => void loadMembers(query)} disabled={loadingMembers}>
+              <Button variant="secondary" onClick={() => void loadMembers(query)} disabled={loadingMembers} className="sm:w-11">
                 <RefreshCw className={`h-4 w-4 ${loadingMembers ? "animate-spin" : ""}`} />
+                <span className="sm:hidden">Actualizar resultados</span>
               </Button>
             </div>
             {error ? <Alert title="Error" description={error} variant="danger" /> : null}
@@ -237,7 +258,7 @@ export function ModerationPane({ guildId }: { guildId: string }) {
                 {members.map((member) => (
                   <div
                     key={member.id}
-                    className="rounded-2xl border border-white/8 bg-black/20 p-4"
+                    className="group rounded-2xl border border-white/8 bg-gradient-to-br from-white/[0.045] to-transparent p-4 transition-colors hover:border-violet-300/25 hover:bg-violet-400/[0.04]"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
@@ -265,7 +286,7 @@ export function ModerationPane({ guildId }: { guildId: string }) {
                           ) : null}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 sm:justify-end">
                         <Button
                           size="sm"
                           variant="secondary"
@@ -411,7 +432,20 @@ export function ModerationPane({ guildId }: { guildId: string }) {
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Duración de timeout" description="Aplica a los botones Timeout de la pestaña Miembros.">
+      <SectionCard
+        title="Duración de timeout"
+        description="Define cuánto tiempo se silencia a un miembro."
+        className="h-fit"
+      >
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-amber-300/15 bg-amber-400/[0.06] p-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/10 text-amber-200">
+            <Clock className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white">Sanción temporal</p>
+            <p className="text-xs text-zinc-400">Puedes cambiarla antes de cada acción.</p>
+          </div>
+        </div>
         <Select value={String(timeoutMs)} onChange={(event) => setTimeoutMs(Number(event.target.value))}>
           {TIMEOUT_PRESETS.map((preset) => (
             <option key={preset.ms} value={preset.ms}>
@@ -419,6 +453,13 @@ export function ModerationPane({ guildId }: { guildId: string }) {
             </option>
           ))}
         </Select>
+        <div className="mt-5 space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4">
+          <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Acciones rápidas</p>
+          <p className="text-sm leading-6 text-zinc-400">
+            Usa <span className="text-zinc-200">Timeout</span> para una sanción reversible. Para infracciones graves, utiliza
+            <span className="text-rose-200"> Ban</span> o <span className="text-zinc-200">Expulsar</span>.
+          </p>
+        </div>
       </SectionCard>
     </PaneGrid>
   );
