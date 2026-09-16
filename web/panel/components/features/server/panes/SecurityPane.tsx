@@ -17,6 +17,7 @@ import {
   FormActions,
   Input,
   LockedOverlay,
+  MultiRoleSelect,
   PremiumLock,
   RoleSelect,
   SectionCard,
@@ -30,6 +31,7 @@ const SECURITY_TABS = [
   { id: "bots", label: "Bots" },
   { id: "antispam", label: "Anti-spam" },
   { id: "content", label: "Contenido" },
+  { id: "roles", label: "Roles y canales" },
 ];
 const SECURITY_TAB_IDS = SECURITY_TABS.map((item) => item.id);
 
@@ -59,6 +61,11 @@ type AntiRaidState = {
   botFilterAction: BotFilterAction;
   botAllowlistIds: string[];
   botRoleId: string;
+  protectRoles: boolean;
+  protectChannels: boolean;
+  trustedRoleIds: string[];
+  destructiveActionThreshold: number;
+  actionWindowSec: number;
 };
 
 const defaultAntiRaid: AntiRaidState = {
@@ -84,6 +91,11 @@ const defaultAntiRaid: AntiRaidState = {
   botFilterAction: "kick",
   botAllowlistIds: [],
   botRoleId: "",
+  protectRoles: true,
+  protectChannels: true,
+  trustedRoleIds: [],
+  destructiveActionThreshold: 3,
+  actionWindowSec: 60,
 };
 
 function normalizeIdList(value: unknown): string[] {
@@ -145,6 +157,14 @@ function normalizeAntiRaid(value: unknown): AntiRaidState {
     botFilterAction,
     botAllowlistIds: normalizeIdList(data.botAllowlistIds),
     botRoleId: toStringValue(data.botRoleId),
+    protectRoles: toBooleanValue(data.protectRoles, true),
+    protectChannels: toBooleanValue(data.protectChannels, true),
+    trustedRoleIds: normalizeIdList(data.trustedRoleIds),
+    destructiveActionThreshold: toNumberValue(
+      data.destructiveActionThreshold,
+      defaultAntiRaid.destructiveActionThreshold
+    ),
+    actionWindowSec: toNumberValue(data.actionWindowSec, defaultAntiRaid.actionWindowSec),
   };
 }
 
@@ -228,7 +248,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                   onCheckedChange={(checked) => setAntiRaid((c) => ({ ...c, enabled: checked }))}
                 />
               </div>
-              <Field label="Canal de alerta">
+              <Field
+                label="Canal de alerta"
+                description="Aquí el bot envía todos los avisos de seguridad: ingresos sospechosos, spam, bots bloqueados y cambios de roles/canales."
+              >
                 <ChannelSelect
                   value={antiRaid.alertChannelId}
                   onChange={(alertChannelId) => setAntiRaid((c) => ({ ...c, alertChannelId }))}
@@ -236,7 +259,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                 />
               </Field>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Umbral de entradas (ventana)">
+                <Field
+                  label="Umbral de entradas (ventana)"
+                  description="Máximo de miembros que pueden entrar en 1 minuto antes de considerar que hay una raid. Si se supera, entra en acción."
+                >
                   <Input
                     type="number"
                     value={antiRaid.joinRateThreshold}
@@ -245,7 +271,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                     }
                   />
                 </Field>
-                <Field label="Umbral duro de raid">
+                <Field
+                  label="Umbral duro de raid"
+                  description="Saltillo superior: si entran más miembros que este número en la ventana, se aplica la acción automática directa."
+                >
                   <Input
                     type="number"
                     value={antiRaid.raidJoinHardThreshold}
@@ -254,7 +283,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                     }
                   />
                 </Field>
-                <Field label="Edad mínima de cuenta (días)">
+                <Field
+                  label="Edad mínima de cuenta (días)"
+                  description="Las cuentas más nuevas que este número de días se consideran sospechosas y se les aplica la acción automática."
+                >
                   <Input
                     type="number"
                     value={antiRaid.accountAgeDays}
@@ -263,7 +295,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                     }
                   />
                 </Field>
-                <Field label="Acción automática">
+                <Field
+                  label="Acción automática"
+                  description="Qué hace el bot con el usuario sospechoso: mute temporal (timeout), expulsión (kick) o baneo (ban)."
+                >
                   <Select
                     value={antiRaid.actionMode}
                     onChange={(event) =>
@@ -278,7 +313,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                     <option value="ban">Ban</option>
                   </Select>
                 </Field>
-                <Field label="Duración timeout (min)">
+                <Field
+                  label="Duración timeout (min)"
+                  description="Cuánto dura el silencio aplicado a cuentas o entradas sospechosas (solo si la acción es timeout)."
+                >
                   <Input
                     type="number"
                     value={antiRaid.timeoutMinutes}
@@ -287,7 +325,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                     }
                   />
                 </Field>
-                <Field label="Cooldown de acción (seg)">
+                <Field
+                  label="Cooldown de acción (seg)"
+                  description="Tiempo mínimo entre acciones punitivas de un mismo usuario, para no castigar dos veces la misma cosa."
+                >
                   <Input
                     type="number"
                     value={antiRaid.actionCooldownSec}
@@ -318,7 +359,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Política">
+                <Field
+                  label="Política"
+                  description="Cómo se decide si un bot puede quedarse: solo los verificados por Discord (más tu allowlist), solo los de tu lista de IDs, o simplemente registrar sin expulsar."
+                >
                   <Select
                     value={antiRaid.botFilterMode}
                     onChange={(event) =>
@@ -333,7 +377,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                     <option value="log_only">Solo registrar (no expulsar)</option>
                   </Select>
                 </Field>
-                <Field label="Acción si no pasa">
+                <Field
+                  label="Acción si no pasa"
+                  description="Qué se hace con el bot rechazado: expulsarlo, banearlo o solo registrar el evento en el canal de alerta."
+                >
                   <Select
                     value={antiRaid.botFilterAction}
                     onChange={(event) =>
@@ -371,7 +418,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                   placeholder="Sin rol automático"
                 />
               </Field>
-              <Field label="Canal de alerta" description="Usa el mismo canal de anti-raid si ya lo configuraste.">
+              <Field
+                label="Canal de alerta"
+                description="Canal donde el bot avisa de bots permitidos y de bots bloqueados. Si no eliges uno, usa el del anti-raid."
+              >
                 <ChannelSelect
                   value={antiRaid.alertChannelId}
                   onChange={(alertChannelId) => setAntiRaid((c) => ({ ...c, alertChannelId }))}
@@ -395,21 +445,30 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Mensajes máximos">
+                <Field
+                  label="Mensajes máximos"
+                  description="Máximo de mensajes que un miembro puede enviar dentro de la ventana antes de ser tratado como spammer."
+                >
                   <Input
                     type="number"
                     value={antiRaid.spamMessages}
                     onChange={(event) => setAntiRaid((c) => ({ ...c, spamMessages: Number(event.target.value) }))}
                   />
                 </Field>
-                <Field label="Ventana (seg)">
+                <Field
+                  label="Ventana (seg)"
+                  description="Segundos que se toman como referencia para contar la ráfaga de mensajes."
+                >
                   <Input
                     type="number"
                     value={antiRaid.spamWindowSec}
                     onChange={(event) => setAntiRaid((c) => ({ ...c, spamWindowSec: Number(event.target.value) }))}
                   />
                 </Field>
-                <Field label="Duplicados permitidos">
+                <Field
+                  label="Duplicados permitidos"
+                  description="Cuántas veces seguidas se permite enviar exactamente el mismo mensaje antes de borrarlo."
+                >
                   <Input
                     type="number"
                     value={antiRaid.duplicateMessageThreshold}
@@ -418,7 +477,10 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                     }
                   />
                 </Field>
-                <Field label="Ventana duplicados (seg)">
+                <Field
+                  label="Ventana duplicados (seg)"
+                  description="Período durante el cual se comparan los mensajes repetidos."
+                >
                   <Input
                     type="number"
                     value={antiRaid.duplicateWindowSec}
@@ -455,14 +517,20 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Menciones máximas">
+                <Field
+                  label="Menciones máximas"
+                  description="Máximo de @usuario permitidos en un solo mensaje. Por encima de esto se borra y se aplica la acción."
+                >
                   <Input
                     type="number"
                     value={antiRaid.maxMentions}
                     onChange={(event) => setAntiRaid((c) => ({ ...c, maxMentions: Number(event.target.value) }))}
                   />
                 </Field>
-                <Field label="Menciones de rol máximas">
+                <Field
+                  label="Menciones de rol máximas"
+                  description="Máximo de @Rol (menciones de rol) permitidas por mensaje, común abuso en raids @everyone."
+                >
                   <Input
                     type="number"
                     value={antiRaid.maxRoleMentions}
@@ -472,6 +540,88 @@ export function SecurityPane({ guildId }: { guildId: string }) {
                   />
                 </Field>
               </div>
+              <FormActions onSave={saveAntiRaid} saving={saving} />
+            </div>
+          ) : null}
+
+          {tab === "roles" ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div>
+                    <p className="font-medium text-white">Protección de roles</p>
+                    <p className="text-sm text-zinc-400">
+                      Si alguien sin permiso crea o borra un rol, el bot revierte el cambio al instante y envía una alerta.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={antiRaid.protectRoles}
+                    onCheckedChange={(checked) => setAntiRaid((c) => ({ ...c, protectRoles: checked }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div>
+                    <p className="font-medium text-white">Protección de canales</p>
+                    <p className="text-sm text-zinc-400">
+                      Misma protección aplicada a canales: creaciones o borrados no autorizados se revierten y avisan.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={antiRaid.protectChannels}
+                    onCheckedChange={(checked) => setAntiRaid((c) => ({ ...c, protectChannels: checked }))}
+                  />
+                </div>
+              </div>
+
+              <Field
+                label="Roles que pueden crear roles"
+                description="Estos roles quedan exentos: sus miembros pueden crear y borrar roles y canales sin alertas ni reversión. Útil para staff o para el rol que asigna EyedPlus+ tras un pago. Recuerda que esos roles también quedan exentos del resto de filtros anti-raid."
+              >
+                <MultiRoleSelect
+                  value={antiRaid.trustedRoleIds}
+                  onChange={(trustedRoleIds) => setAntiRaid((c) => ({ ...c, trustedRoleIds }))}
+                  options={roles}
+                  emptyLabel="No hay roles disponibles."
+                />
+              </Field>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field
+                  label="Umbral de cambios"
+                  description="Cuántos cambios protegidos (crear/borrar roles o canales) se permiten en la ventana antes de aplicar la acción automática."
+                >
+                  <Input
+                    type="number"
+                    value={antiRaid.destructiveActionThreshold}
+                    onChange={(event) =>
+                      setAntiRaid((c) => ({ ...c, destructiveActionThreshold: Number(event.target.value) }))
+                    }
+                  />
+                </Field>
+                <Field
+                  label="Ventana (seg)"
+                  description="Segundos que el bot mira hacia atrás para contar los cambios de roles y canales de un mismo usuario."
+                >
+                  <Input
+                    type="number"
+                    value={antiRaid.actionWindowSec}
+                    onChange={(event) =>
+                      setAntiRaid((c) => ({ ...c, actionWindowSec: Number(event.target.value) }))
+                    }
+                  />
+                </Field>
+              </div>
+
+              <Field
+                label="Canal de alerta"
+                description="Canal donde el bot avisa «Cambios destructivos detectados» cuando revierte roles o canales. Si no eliges uno, usa el del anti-raid."
+              >
+                <ChannelSelect
+                  value={antiRaid.alertChannelId}
+                  onChange={(alertChannelId) => setAntiRaid((c) => ({ ...c, alertChannelId }))}
+                  options={channels}
+                />
+              </Field>
               <FormActions onSave={saveAntiRaid} saving={saving} />
             </div>
           ) : null}
