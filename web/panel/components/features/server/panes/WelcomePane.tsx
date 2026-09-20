@@ -56,6 +56,8 @@ type ConfigState = {
   imageUrl: string;
   thumbnailMode: string;
   thumbnailUrl: string;
+  authorName: string;
+  authorIconUrl: string;
   dmEnabled: boolean;
   dmMessage: string;
   welcomeStyle: "embed" | "card";
@@ -82,6 +84,8 @@ const defaultState: ConfigState = {
   imageUrl: "",
   thumbnailMode: "avatar",
   thumbnailUrl: "",
+  authorName: "",
+  authorIconUrl: "",
   dmEnabled: false,
   dmMessage: "",
   welcomeStyle: "embed",
@@ -124,6 +128,8 @@ function normalizeConfig(value: unknown, mode: "welcome" | "goodbye"): ConfigSta
     imageUrl: toStringValue(data.imageUrl || data.image_url),
     thumbnailMode: toStringValue(data.thumbnailMode, "avatar"),
     thumbnailUrl: toStringValue(data.thumbnailUrl),
+    authorName: toStringValue(data.authorName, ""),
+    authorIconUrl: toStringValue(data.authorIconUrl || data.author_icon_url),
     dmEnabled: toBooleanValue(data.dmEnabled),
     dmMessage: toStringValue(
       data.dmMessage,
@@ -165,8 +171,10 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const [testing, setTesting] = useState(false);
   const [uploadingMainImage, setUploadingMainImage] = useState(false);
   const [uploadingThumbImage, setUploadingThumbImage] = useState(false);
+  const [uploadingAuthorImage, setUploadingAuthorImage] = useState(false);
   const [deletingMainImage, setDeletingMainImage] = useState(false);
   const [deletingThumbImage, setDeletingThumbImage] = useState(false);
+  const [deletingAuthorImage, setDeletingAuthorImage] = useState(false);
   const [channelToInsert, setChannelToInsert] = useState("");
   const [error, setError] = useState<string | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -195,6 +203,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const setActive = tab === "welcome" ? setWelcome : setGoodbye;
   const imageSlot = tab === "welcome" ? "welcome" : "goodbye";
   const thumbSlot = tab === "welcome" ? "welcome_thumb" : "goodbye_thumb";
+  const authorSlot = tab === "welcome" ? "welcome_author" : "goodbye_author";
   const isCardWelcome = tab === "welcome" && welcome.welcomeStyle === "card" && welcomeCardEnabled;
   const embedTemplateSlots = getEmbedTemplateSlots(active.embedTemplateId);
   const hasAvatarSlot = embedTemplateSlots.includes("avatar");
@@ -275,8 +284,9 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     }
   }
 
-  async function handleUploadImage(file: File, slot: string, kind: "main" | "thumb") {
-    const setUploading = kind === "main" ? setUploadingMainImage : setUploadingThumbImage;
+  async function handleUploadImage(file: File, slot: string, kind: "main" | "thumb" | "author") {
+    const setUploading =
+      kind === "main" ? setUploadingMainImage : kind === "thumb" ? setUploadingThumbImage : setUploadingAuthorImage;
     setUploading(true);
     try {
       const result = await uploadWelcomeImage(guildId, file, slot);
@@ -296,8 +306,9 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     }
   }
 
-  async function handleDeleteImage(slot: string, kind: "main" | "thumb") {
-    const setDeleting = kind === "main" ? setDeletingMainImage : setDeletingThumbImage;
+  async function handleDeleteImage(slot: string, kind: "main" | "thumb" | "author") {
+    const setDeleting =
+      kind === "main" ? setDeletingMainImage : kind === "thumb" ? setDeletingThumbImage : setDeletingAuthorImage;
     setDeleting(true);
     try {
       const result = await deleteWelcomeImage(guildId, slot);
@@ -538,6 +549,29 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                   />
                 </Field>
               </div>
+
+              <div className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-4">
+                <p className="text-sm font-medium text-white">Autor</p>
+                <Field label="Nombre del autor">
+                  <Input
+                    value={active.authorName}
+                    onChange={(event) => setActive((current) => ({ ...current, authorName: event.target.value }))}
+                    placeholder="Ej. {server}"
+                  />
+                </Field>
+                {active.authorName ? (
+                  <EmbedImageField
+                    label="Icono del autor"
+                    description="URL o archivo subido al panel. Se muestra junto al nombre del autor."
+                    value={active.authorIconUrl}
+                    onChange={(authorIconUrl) => setActive((current) => ({ ...current, authorIconUrl }))}
+                    uploading={uploadingAuthorImage}
+                    deleting={deletingAuthorImage}
+                    onUpload={(file) => handleUploadImage(file, authorSlot, "author")}
+                    onDelete={() => handleDeleteImage(authorSlot, "author")}
+                  />
+                ) : null}
+              </div>
             </>
           ) : null}
 
@@ -647,6 +681,8 @@ export function WelcomePane({ guildId }: { guildId: string }) {
               description={active.message || "Aún no hay un mensaje configurado para esta pestaña."}
               color={plainColorToHex(active.color)}
               footer={active.footer}
+              authorName={active.authorName || undefined}
+              authorIconUrl={active.authorIconUrl}
               imageUrl={hasImageSlot ? active.imageUrl : ""}
               thumbnailUrl={hasThumbSlot ? active.thumbnailUrl : ""}
               thumbnailLabel={hasAvatarSlot ? "Avatar del usuario" : undefined}

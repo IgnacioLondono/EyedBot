@@ -8,7 +8,6 @@ export type EmbedFormState = {
   channelId: string;
   messageId: string;
   templateName: string;
-  embedTemplateId: string;
   title: string;
   description: string;
   color: string;
@@ -26,7 +25,6 @@ export const DEFAULT_EMBED_FORM: EmbedFormState = {
   channelId: "",
   messageId: "",
   templateName: "",
-  embedTemplateId: "classic",
   title: "",
   description: "",
   color: "#a78bfa",
@@ -66,8 +64,6 @@ export function embedColorToNumber(color: string) {
   return Number.parseInt(hex, 16);
 }
 
-const EMBED_TEMPLATE_IDS = ["classic", "avatar", "banner", "avatar-banner", "sidebar"];
-
 export function buildEmbedPayload(form: EmbedFormState) {
   const embed: Record<string, unknown> = {};
 
@@ -78,8 +74,6 @@ export function buildEmbedPayload(form: EmbedFormState) {
   if (form.imageUrl.trim()) embed.image = form.imageUrl.trim();
   if (form.thumbnailUrl.trim()) embed.thumbnail = form.thumbnailUrl.trim();
   if (form.timestamp) embed.timestamp = true;
-  const templateId = String(form.embedTemplateId || "").trim();
-  if (templateId && templateId !== "classic") embed.embedTemplateId = templateId;
 
   if (form.authorName.trim()) {
     embed.author = {
@@ -120,9 +114,6 @@ export function embedToFormState(embed: Record<string, unknown>, base: EmbedForm
 
   return {
     ...base,
-    embedTemplateId: EMBED_TEMPLATE_IDS.includes(String(embed.embedTemplateId || ""))
-      ? String(embed.embedTemplateId)
-      : base.embedTemplateId,
     title: String(embed.title || ""),
     description: String(embed.description || ""),
     color,

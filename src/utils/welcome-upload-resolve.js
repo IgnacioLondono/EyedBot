@@ -252,6 +252,39 @@ function greetingImageSlotForCardBackground(parsed) {
 }
 
 /**
+ * Aplica el bloque de autor (nombre + ícono) a un EmbedBuilder.
+ * El ícono puede ser adjunto local (archivo en disco/MySQL) o URL pública;
+ * Discord admite attachment:// en icon_url del autor.
+ */
+async function applyWelcomeAuthorToEmbed(embed, iconRawUrl, files, guild, authorName = '', authorUrl = '') {
+    const name = String(authorName || '').trim();
+    if (!name) return false;
+
+    let iconResolved = '';
+    if (String(iconRawUrl || '').trim()) {
+        const resolved = await resolveWelcomeMediaForDiscord(iconRawUrl, { guild, slot: 'thumbnail' });
+        if (resolved) {
+            if (resolved.mode === 'buffer') {
+                iconResolved = `attachment://${resolved.attachmentName}`;
+                files.push(new AttachmentBuilder(resolved.buffer, { name: resolved.attachmentName }));
+            } else if (resolved.mode === 'attachment') {
+                iconResolved = `attachment://${resolved.attachmentName}`;
+                files.push(new AttachmentBuilder(resolved.localPath).setName(resolved.attachmentName));
+            } else {
+                iconResolved = resolved.url || '';
+            }
+        }
+    }
+
+    embed.setAuthor({
+        name,
+        ...(iconResolved ? { iconURL: iconResolved } : {}),
+        ...(String(authorUrl || '').trim() ? { url: authorUrl } : {})
+    });
+    return true;
+}
+
+/**
  * Resuelve fondo de tarjeta PNG: archivo local, buffer MySQL o URL pública.
  * Nunca depende de fetch HTTP a /api/... (requiere sesión y falla dentro del contenedor).
  */
@@ -328,5 +361,6 @@ module.exports = {
     resolveWelcomeUploadFile,
     resolveWelcomeMediaForDiscord,
     applyWelcomeMediaToEmbed,
+    applyWelcomeAuthorToEmbed,
     resolveWelcomeCardBackground
 };

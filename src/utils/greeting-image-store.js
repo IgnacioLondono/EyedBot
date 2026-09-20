@@ -3,7 +3,7 @@ const { scopeKey, parseScopedGuildKey } = require('./config-scope');
 
 const MAX_GREETING_IMAGE_BYTES = 8 * 1024 * 1024;
 const GUILD_ID_DB_MAX = 64;
-const VALID_SLOTS = new Set(['welcome', 'goodbye', 'welcome_thumb', 'goodbye_thumb']);
+const VALID_SLOTS = new Set(['welcome', 'goodbye', 'welcome_thumb', 'goodbye_thumb', 'welcome_author', 'goodbye_author']);
 
 const SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS greeting_embed_image (
     guild_id VARCHAR(64) NOT NULL,
@@ -70,21 +70,21 @@ function parseGreetingImageApiUrl(rawUrl = '') {
     if (!raw) return null;
 
     const scoped = raw.match(
-        /\/api\/guild\/([a-f0-9]{8,32}):(\d{17,20})\/greeting-image\/(welcome|goodbye|welcome_thumb|goodbye_thumb)/i
+        /\/api\/guild\/([a-f0-9]{8,32}):(\d{17,20})\/greeting-image\/(welcome|goodbye|welcome_thumb|goodbye_thumb|welcome_author|goodbye_author)/i
     );
     if (scoped) {
         return { guildId: scoped[2], slot: normalizeSlot(scoped[3]), botId: scoped[1] };
     }
 
     const apiMatch = raw.match(
-        /\/api\/guild\/(\d{17,20})\/greeting-image\/(welcome|goodbye|welcome_thumb|goodbye_thumb)/i
+        /\/api\/guild\/(\d{17,20})\/greeting-image\/(welcome|goodbye|welcome_thumb|goodbye_thumb|welcome_author|goodbye_author)/i
     );
     if (apiMatch) {
         return { guildId: apiMatch[1], slot: normalizeSlot(apiMatch[2]) };
     }
 
     const dbMatch = raw.match(
-        /^greeting-db:(?:([a-f0-9]{8,32}):)?(\d{17,20}):(welcome|goodbye|welcome_thumb|goodbye_thumb)$/i
+        /^greeting-db:(?:([a-f0-9]{8,32}):)?(\d{17,20}):(welcome|goodbye|welcome_thumb|goodbye_thumb|welcome_author|goodbye_author)$/i
     );
     if (dbMatch) {
         return { guildId: dbMatch[2], slot: normalizeSlot(dbMatch[3]), botId: dbMatch[1] || undefined };

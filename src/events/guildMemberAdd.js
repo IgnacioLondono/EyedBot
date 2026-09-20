@@ -2,7 +2,7 @@ const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
 const verifyStore = require('../utils/verify-config-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
-const { applyWelcomeMediaToEmbed, resolveWelcomeCardBackground } = require('../utils/welcome-upload-resolve');
+const { applyWelcomeMediaToEmbed, resolveWelcomeCardBackground, applyWelcomeAuthorToEmbed } = require('../utils/welcome-upload-resolve');
 const { isEmbedTemplateId, applyEmbedTemplateToEmbed } = require('../utils/embed-templates');
 const { applyGuildEmbedText } = require('../utils/embed-text-template');
 const { AttachmentBuilder } = require('discord.js');
@@ -156,6 +156,17 @@ module.exports = {
                 } else if (welcomeConfig.thumbnailMode === 'url' && welcomeConfig.thumbnailUrl) {
                     await applyWelcomeMediaToEmbed(embed, welcomeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
                 }
+            }
+
+            if (welcomeConfig.authorName) {
+                await applyWelcomeAuthorToEmbed(
+                    embed,
+                    welcomeConfig.authorIconUrl || '',
+                    files,
+                    member.guild,
+                    applyTemplate(welcomeConfig.authorName, member),
+                    welcomeConfig.authorUrl || ''
+                );
             }
 
             await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files, allowedMentions })).catch(() => null);

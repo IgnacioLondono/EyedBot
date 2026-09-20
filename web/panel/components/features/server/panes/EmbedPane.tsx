@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Download, Layers3, Plus, Send, Trash2 } from "lucide-react";
+import { Download, Layers3, Plus, Send, Trash2 } from "lucide-react";
 import {
   deleteEmbedTemplate,
   getEmbedTemplates,
@@ -31,8 +31,7 @@ import {
   embedToFormState,
   type EmbedFormState,
 } from "@/lib/embed-utils";
-import { asArray, asRecord, cn, getErrorMessage, toStringValue } from "@/lib/utils";
-import { EMBED_TEMPLATES, getEmbedTemplateSlots } from "@/lib/embed-templates";
+import { asArray, asRecord, getErrorMessage, toStringValue } from "@/lib/utils";
 
 export function EmbedPane({ guildId }: { guildId: string }) {
   const { channels } = useGuildChannels(guildId);
@@ -104,10 +103,8 @@ export function EmbedPane({ guildId }: { guildId: string }) {
     setForm((current) => ({ ...current, ...patch }));
   }
 
-  const templateSlots = getEmbedTemplateSlots(form.embedTemplateId);
-  const hasAvatarSlot = templateSlots.includes("avatar");
-  const hasImageSlot = templateSlots.includes("image");
-  const hasThumbSlot = templateSlots.includes("thumbnail");
+  const hasImageSlot = true;
+  const hasThumbSlot = true;
 
   function loadTemplate(template: Record<string, unknown>) {
     const embed = asRecord(template.embed);
@@ -238,33 +235,6 @@ export function EmbedPane({ guildId }: { guildId: string }) {
             />
           </Field>
 
-          <Field label="Plantilla del embed" description="Define la forma y qué espacios de imagen incluye.">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {EMBED_TEMPLATES.map((tpl) => {
-                const selected = form.embedTemplateId === tpl.id;
-                return (
-                  <button
-                    key={tpl.id}
-                    type="button"
-                    onClick={() => patchForm({ embedTemplateId: tpl.id })}
-                    className={cn(
-                      "rounded-2xl border p-3 text-left transition",
-                      selected
-                        ? "border-violet-400/60 bg-violet-500/15"
-                        : "border-white/8 bg-black/20 hover:border-white/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-white">{tpl.label}</p>
-                      {selected ? <Check className="h-4 w-4 shrink-0 text-violet-300" /> : null}
-                    </div>
-                    <p className="mt-1 text-xs leading-relaxed text-zinc-400">{tpl.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
-
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Color">
               <ColorInput value={form.color} onChange={(color) => patchForm({ color })} format="hash" />
@@ -299,12 +269,6 @@ export function EmbedPane({ guildId }: { guildId: string }) {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {hasAvatarSlot ? (
-              <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-300">
-                Esta plantilla usa el <span className="font-medium text-white">avatar del bot</span> como miniatura
-                automáticamente.
-              </div>
-            ) : null}
             {hasImageSlot ? (
               <EmbedImageField
                 label="Imagen principal"
@@ -332,11 +296,6 @@ export function EmbedPane({ guildId }: { guildId: string }) {
                   setThumbnailFile(null);
                 }}
               />
-            ) : null}
-            {!hasAvatarSlot && !hasImageSlot && !hasThumbSlot ? (
-              <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
-                La plantilla «Clásica» no incluye imágenes en el embed.
-              </div>
             ) : null}
           </div>
 

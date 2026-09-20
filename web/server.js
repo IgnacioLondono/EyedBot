@@ -25,7 +25,8 @@ const {
     extractUploadPath,
     resolveWelcomeUploadFile: resolveLocalUploadFile,
     resolveWelcomeCardBackground,
-    applyWelcomeMediaToEmbed
+    applyWelcomeMediaToEmbed,
+    applyWelcomeAuthorToEmbed
 } = require('../src/utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
 const { isEmbedTemplateId, applyEmbedTemplateToEmbed } = require('../src/utils/embed-templates');
@@ -3995,6 +3996,8 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
         message: String(body.message || fallback.message).slice(0, 2000),
         color: String(body.color || (mode === 'goodbye' ? 'ff5f9e' : '7c4dff')).replace('#', '').slice(0, 6),
         footer: String(body.footer || '').slice(0, 300),
+        authorName: String(body.authorName || '').trim().slice(0, 256),
+        authorIconUrl: canonicalWelcomeMediaUrl(body.authorIconUrl) || (existing?.authorIconUrl ? canonicalWelcomeMediaUrl(existing.authorIconUrl) : ''),
         imageUrl: imageUrl.slice(0, 1000),
         embedTemplateId: isEmbedTemplateId(body.embedTemplateId)
             ? String(body.embedTemplateId)
@@ -7558,6 +7561,8 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
         if (slot.endsWith('_thumb')) {
             nextCfg.thumbnailUrl = mediaPath;
             nextCfg.thumbnailMode = 'url';
+        } else if (slot.endsWith('_author')) {
+            nextCfg.authorIconUrl = mediaPath;
         } else {
             nextCfg.imageUrl = mediaPath;
         }
@@ -7615,6 +7620,8 @@ app.delete('/api/guild/:guildId/welcome-image', requireAuth, async (req, res) =>
 
         if (slot.endsWith('_thumb')) {
             nextCfg.thumbnailUrl = '';
+        } else if (slot.endsWith('_author')) {
+            nextCfg.authorIconUrl = '';
         } else {
             nextCfg.imageUrl = '';
             nextCfg.image_url = '';
@@ -7834,6 +7841,17 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
             }
         }
 
+        if (cfg?.authorName) {
+            await applyWelcomeAuthorToEmbed(
+                embed,
+                cfg.authorIconUrl || '',
+                files,
+                guild,
+                applyWelcomeTemplate(cfg.authorName, member),
+                cfg.authorUrl || ''
+            );
+        }
+
         await channel.send({ content, embeds: [embed], files, allowedMentions });
 
         res.json({ success: true, message: 'Prueba de bienvenida enviada' });
@@ -8000,6 +8018,17 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
             else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
                 await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
             }
+        }
+
+        if (cfg?.authorName) {
+            await applyWelcomeAuthorToEmbed(
+                embed,
+                cfg.authorIconUrl || '',
+                files,
+                guild,
+                applyWelcomeTemplate(cfg.authorName, member),
+                cfg.authorUrl || ''
+            );
         }
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;

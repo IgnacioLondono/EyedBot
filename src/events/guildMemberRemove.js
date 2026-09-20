@@ -1,5 +1,5 @@
 const welcomeStore = require('../utils/welcome-config-store');
-const { applyWelcomeMediaToEmbed } = require('../utils/welcome-upload-resolve');
+const { applyWelcomeMediaToEmbed, applyWelcomeAuthorToEmbed } = require('../utils/welcome-upload-resolve');
 const { isEmbedTemplateId, applyEmbedTemplateToEmbed } = require('../utils/embed-templates');
 const { applyGuildEmbedText } = require('../utils/embed-text-template');
 
@@ -47,6 +47,17 @@ module.exports = {
             } else if (goodbyeConfig?.thumbnailMode === 'url' && goodbyeConfig?.thumbnailUrl) {
                 await applyWelcomeMediaToEmbed(embed, goodbyeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
             }
+        }
+
+        if (goodbyeConfig?.authorName) {
+            await applyWelcomeAuthorToEmbed(
+                embed,
+                goodbyeConfig.authorIconUrl || '',
+                files,
+                member.guild,
+                applyTemplate(goodbyeConfig.authorName, member),
+                goodbyeConfig.authorUrl || ''
+            );
         }
 
         await channel.send({ embeds: [embed], files }).catch(() => null);
