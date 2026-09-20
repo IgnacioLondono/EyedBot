@@ -383,18 +383,48 @@ export function WelcomePane({ guildId }: { guildId: string }) {
         />
 
         <div className="space-y-5">
-          {sectionTab === "general" ? (
-            <>
-              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                <div>
-                  <p className="font-medium text-white">Activar {tab === "welcome" ? "bienvenida" : "despedida"}</p>
-                  <p className="text-sm text-zinc-400">Envía mensajes automáticos al canal seleccionado.</p>
-                </div>
-                <Switch
-                  checked={active.enabled}
-                  onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))}
-                />
+          {!isCardWelcome ? (
+            <div className="mb-5 rounded-2xl border border-white/8 bg-black/20 p-4">
+              <div className="mb-1 flex items-center gap-2 text-sm text-zinc-400">Plantilla del embed</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {EMBED_TEMPLATES.map((tpl) => {
+                  const selected = active.embedTemplateId === tpl.id;
+                  return (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => setActive((current) => ({ ...current, embedTemplateId: tpl.id }))}
+                      className={cn(
+                        "rounded-2xl border p-3 text-left transition",
+                        selected
+                          ? "border-violet-400/60 bg-violet-500/15"
+                          : "border-white/8 bg-black/20 hover:border-white/20"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-white">{tpl.label}</p>
+                        {selected ? <Check className="h-4 w-4 shrink-0 text-violet-300" /> : null}
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-zinc-400">{tpl.description}</p>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+          ) : null}
+
+          {sectionTab === "general" ? (
+                <>
+                  <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                    <div>
+                      <p className="font-medium text-white">Activar {tab === "welcome" ? "bienvenida" : "despedida"}</p>
+                      <p className="text-sm text-zinc-400">Envía mensajes automáticos al canal seleccionado.</p>
+                    </div>
+                    <Switch
+                      checked={active.enabled}
+                      onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))}
+                    />
+                  </div>
               <Field label="Canal" description="Destino donde se publicará el mensaje del evento.">
                 <ChannelSelect
                   value={active.channelId}
@@ -425,38 +455,6 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                     <option value="embed">Embed de Discord</option>
                     <option value="card">Tarjeta con imagen</option>
                   </Select>
-                </Field>
-              ) : null}
-
-              {!isCardWelcome ? (
-                <Field
-                  label="Plantilla del embed"
-                  description="Elige la forma del embed y qué espacios de imagen incluye."
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {EMBED_TEMPLATES.map((tpl) => {
-                      const selected = active.embedTemplateId === tpl.id;
-                      return (
-                        <button
-                          key={tpl.id}
-                          type="button"
-                          onClick={() => setActive((current) => ({ ...current, embedTemplateId: tpl.id }))}
-                          className={cn(
-                            "rounded-2xl border p-3 text-left transition",
-                            selected
-                              ? "border-violet-400/60 bg-violet-500/15"
-                              : "border-white/8 bg-black/20 hover:border-white/20"
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium text-white">{tpl.label}</p>
-                            {selected ? <Check className="h-4 w-4 shrink-0 text-violet-300" /> : null}
-                          </div>
-                          <p className="mt-1 text-xs leading-relaxed text-zinc-400">{tpl.description}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
                 </Field>
               ) : null}
 
