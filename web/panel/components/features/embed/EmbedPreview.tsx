@@ -127,10 +127,12 @@ export function EmbedPreview({
   form,
   imageOverride,
   thumbnailOverride,
+  authorIconOverride,
 }: {
   form: EmbedFormState;
   imageOverride?: string;
   thumbnailOverride?: string;
+  authorIconOverride?: string;
 }) {
   return (
     <DiscordEmbedPreview
@@ -141,7 +143,7 @@ export function EmbedPreview({
       imageUrl={imageOverride || form.imageUrl}
       thumbnailUrl={thumbnailOverride || form.thumbnailUrl}
       authorName={form.authorName}
-      authorIconUrl={form.authorIconUrl}
+      authorIconUrl={authorIconOverride || form.authorIconUrl}
       timestamp={form.timestamp}
       fields={form.fields.map((field) => ({
         name: field.name,

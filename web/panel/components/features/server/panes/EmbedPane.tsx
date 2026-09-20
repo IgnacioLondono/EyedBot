@@ -437,6 +437,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
             form={form}
             imageOverride={imagePreviewUrl || undefined}
             thumbnailOverride={thumbnailPreviewUrl || undefined}
+            authorIconOverride={authorIconPreviewUrl || undefined}
           />
         </SectionCard>
 
