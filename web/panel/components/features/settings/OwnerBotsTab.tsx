@@ -918,6 +918,7 @@ export function OwnerBotsTab() {
                 <>
                   <div className="mb-4 grid gap-3 sm:grid-cols-2">
                     <Field label="Servidor" description="Servidor donde está invitado el bot auxiliar.">
+                      <Select value={guildId} onChange={(e) => setGuildId(e.target.value)}>
                         <option value="">Seleccionar…</option>
                         {guilds.map((guild) => (
                           <option key={guild.id} value={guild.id}>

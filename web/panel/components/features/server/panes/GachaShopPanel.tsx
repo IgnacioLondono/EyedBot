@@ -571,9 +571,11 @@ export function GachaShopPanel({
             </Field>
             <div className="md:col-span-2">
               <Field label="Descripción" description="Texto que se muestra en la ficha de la carta (opcional).">
-                  onChange={(event) => setEditForm((c) => (c ? { ...c, description: event.target.value } : c))}
-                  rows={3}
-                />
+                  <Textarea
+                    value={editForm.description}
+                    onChange={(event) => setEditForm((c) => (c ? { ...c, description: event.target.value } : c))}
+                    rows={3}
+                  />
               </Field>
             </div>
             <div className="md:col-span-2">

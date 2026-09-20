@@ -503,9 +503,11 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 />
               </Field>
               <Field label="Canal" description="Canal donde se publicará el mensaje del evento.">
-                  onChange={(channelId) => setEventForm((c) => ({ ...c, channelId }))}
-                  options={channels}
-                />
+                  <ChannelSelect
+                    value={eventForm.channelId}
+                    onChange={(channelId) => setEventForm((c) => ({ ...c, channelId }))}
+                    options={channels}
+                  />
               </Field>
               <Button disabled={busyId === "create-event" || !eventForm.title.trim() || !eventForm.startAt} onClick={() => void handleCreateEvent()}>
                 {busyId === "create-event" ? "Publicando..." : "Publicar evento"}
