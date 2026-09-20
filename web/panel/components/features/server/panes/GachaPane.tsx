@@ -208,7 +208,7 @@ export function GachaPane({ guildId }: { guildId: string }) {
                     onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))}
                   />
                 </div>
-                <Field label="Canal del gacha">
+                <Field label="Canal del gacha" description="Canal donde el bot publica los sorteos y la lista de cartas del banner.">
                   <ChannelSelect
                     value={form.channelId}
                     onChange={(channelId) => setForm((current) => ({ ...current, channelId }))}
@@ -216,14 +216,14 @@ export function GachaPane({ guildId }: { guildId: string }) {
                   />
                 </Field>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Cooldown tirada (seg)">
+                  <Field label="Cooldown tirada (seg)" description="Tiempo mínimo entre tiradas de un mismo usuario.">
                     <Input
                       type="number"
                       value={form.rollCooldownSec}
                       onChange={(event) => setForm((current) => ({ ...current, rollCooldownSec: Number(event.target.value) }))}
                     />
                   </Field>
-                  <Field label="Cooldown claim (seg)">
+                  <Field label="Cooldown claim (seg)" description="Espera mínima antes de poder reclamar de nuevo una carta obtenida.">
                     <Input
                       type="number"
                       value={form.claimCooldownSec}
@@ -252,14 +252,14 @@ export function GachaPane({ guildId }: { guildId: string }) {
                   />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Monedas por XP">
+                  <Field label="Monedas por XP" description="Monedas que recibe el miembro por cada punto de XP de niveles.">
                     <Input
                       type="number"
                       value={form.coinsPerXp}
                       onChange={(event) => setForm((current) => ({ ...current, coinsPerXp: Number(event.target.value) }))}
                     />
                   </Field>
-                  <Field label="Monedas por subir de nivel">
+                  <Field label="Monedas por subir de nivel" description="Recompensa fija que se otorga cada vez que un miembro sube de nivel.">
                     <Input
                       type="number"
                       value={form.coinsPerLevelUp}
@@ -360,14 +360,14 @@ export function GachaPane({ guildId }: { guildId: string }) {
         {tab === "inventory" ? (
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-              <Field label="ID de usuario">
+              <Field label="ID de usuario" description="ID numérico del usuario cuyo historial quieres consultar.">
                 <Input
                   value={inventoryUserId}
                   onChange={(event) => setInventoryUserId(event.target.value)}
                   placeholder="Discord user ID"
                 />
               </Field>
-              <Field label="Buscar carta">
+              <Field label="Buscar carta" description="Busca cartas por nombre, serie o rareza.">
                 <Input
                   value={inventoryQuery}
                   onChange={(event) => setInventoryQuery(event.target.value)}

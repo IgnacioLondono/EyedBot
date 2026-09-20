@@ -569,13 +569,13 @@ export function OwnerBotsTab() {
         description="Pegá Token + Client ID + Client Secret de la app en Discord Developer Portal. Asignalo a uno o más Discord user IDs (uno por línea) y activá el panel branded en /t/{slug}."
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="Nombre interno">
+          <Field label="Nombre interno" description="Etiqueta para identificar el bot en el panel.">
             <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. Bot del servidor" />
           </Field>
-          <Field label="Slug del panel">
+          <Field label="Slug del panel" description="ID de la URL del panel asignable: /t/{slug}.">
             <Input value={newSlug} onChange={(e) => setNewSlug(e.target.value)} placeholder="mi-bot" />
           </Field>
-          <Field label="Token del bot">
+          <Field label="Token del bot" description="Token de la app en Discord Developer Portal.">
             <Input
               type="password"
               value={newToken}
@@ -583,10 +583,10 @@ export function OwnerBotsTab() {
               placeholder="Token desde Discord Developer Portal"
             />
           </Field>
-          <Field label="Client ID (Application ID)">
+          <Field label="Client ID (Application ID)" description="ID de aplicación del bot en Discord.">
             <Input value={newClientId} onChange={(e) => setNewClientId(e.target.value)} placeholder="Opcional si coincide con el token" />
           </Field>
-          <Field label="Client Secret (OAuth2)">
+          <Field label="Client Secret (OAuth2)" description="Secreto OAuth2 requerido para el login del panel.">
             <Input
               type="password"
               value={newClientSecret}
@@ -605,13 +605,13 @@ export function OwnerBotsTab() {
               rows={4}
             />
           </Field>
-          <Field label="Marca · nombre">
+          <Field label="Marca · nombre" description="Nombre que se muestra en el panel branded.">
             <Input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Nombre visible" />
           </Field>
-          <Field label="Marca · logo URL">
+          <Field label="Marca · logo URL" description="URL de la imagen de logo del panel branded.">
             <Input value={newBrandLogo} onChange={(e) => setNewBrandLogo(e.target.value)} placeholder="https://..." />
           </Field>
-          <Field label="Marca · color">
+          <Field label="Marca · color" description="Color principal del panel branded.">
             <ColorInput value={newBrandColor} onChange={setNewBrandColor} placeholder="f59e0b" />
           </Field>
         </div>
@@ -742,10 +742,10 @@ export function OwnerBotsTab() {
                 </div>
 
                 <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
-                  <Field label="Nombre interno">
+                  <Field label="Nombre interno" description="Etiqueta con la que identificas el bot en el panel.">
                     <Input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} />
                   </Field>
-                  <Field label="Usuario en Discord">
+                  <Field label="Usuario en Discord" description="Nombre de usuario de Discord que se muestra del bot.">
                     <Input
                       value={editUsername}
                       onChange={(e) => setEditUsername(e.target.value)}
@@ -849,7 +849,7 @@ export function OwnerBotsTab() {
               description="Redirect a registrar en Discord: /t/{slug}/callback. Los usuarios asignados entran por /t/{slug}."
             >
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Slug">
+                <Field label="Slug" description="ID de la URL del panel asignable: /t/{slug}.">
                   <Input value={editSlug} onChange={(e) => setEditSlug(e.target.value)} />
                 </Field>
                 <Field
@@ -863,10 +863,10 @@ export function OwnerBotsTab() {
                     rows={4}
                   />
                 </Field>
-                <Field label="Client ID">
+                <Field label="Client ID" description="ID de aplicación del bot en Discord.">
                   <Input value={editClientId} onChange={(e) => setEditClientId(e.target.value)} />
                 </Field>
-                <Field label={selected.hasClientSecret ? "Client Secret (dejar vacío para no cambiar)" : "Client Secret"}>
+                <Field label={selected.hasClientSecret ? "Client Secret (dejar vacío para no cambiar)" : "Client Secret"} description="Secreto OAuth2 para el login del panel.">
                   <Input
                     type="password"
                     value={editClientSecret}
@@ -874,13 +874,13 @@ export function OwnerBotsTab() {
                     placeholder={selected.hasClientSecret ? "••••••••" : "Pegar secret"}
                   />
                 </Field>
-                <Field label="Marca · nombre">
+                <Field label="Marca · nombre" description="Nombre que se muestra en el panel branded.">
                   <Input value={editBrandName} onChange={(e) => setEditBrandName(e.target.value)} />
                 </Field>
-                <Field label="Marca · logo URL">
+                <Field label="Marca · logo URL" description="URL de la imagen de logo del panel branded.">
                   <Input value={editBrandLogo} onChange={(e) => setEditBrandLogo(e.target.value)} />
                 </Field>
-                <Field label="Marca · color">
+                <Field label="Marca · color" description="Color principal del panel branded.">
                   <ColorInput value={editBrandColor} onChange={setEditBrandColor} placeholder="f59e0b" />
                 </Field>
               </div>
@@ -917,8 +917,7 @@ export function OwnerBotsTab() {
               ) : (
                 <>
                   <div className="mb-4 grid gap-3 sm:grid-cols-2">
-                    <Field label="Servidor">
-                      <Select value={guildId} onChange={(e) => setGuildId(e.target.value)}>
+                    <Field label="Servidor" description="Servidor donde está invitado el bot auxiliar.">
                         <option value="">Seleccionar…</option>
                         {guilds.map((guild) => (
                           <option key={guild.id} value={guild.id}>
@@ -927,7 +926,7 @@ export function OwnerBotsTab() {
                         ))}
                       </Select>
                     </Field>
-                    <Field label="Canal de texto">
+                    <Field label="Canal de texto" description="Canal del servidor donde se enviarán los mensajes como el bot.">
                       <Select value={channelId} onChange={(e) => setChannelId(e.target.value)}>
                         <option value="">Seleccionar…</option>
                         {channels.map((ch) => (

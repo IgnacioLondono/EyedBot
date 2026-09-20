@@ -268,23 +268,23 @@ export function EventsPane({ guildId }: { guildId: string }) {
                   <Gift className="h-4 w-4 text-violet-300" />
                   Nuevo sorteo
                 </h3>
-                <Button size="sm" variant="ghost" onClick={() => setTab("templates")}>
+                <Button size="sm" variant="ghost" onClick={() => setTab("templates")} title="Abre la galería de plantillas rápidas">
                   <LayoutTemplate className="mr-2 h-4 w-4" />
                   Ver plantillas
                 </Button>
               </div>
 
-              <Field label="Título">
+              <Field label="Título" description="Nombre del sorteo que verán los participantes.">
                 <Input value={giveawayForm.title} onChange={(e) => setGiveawayForm((c) => ({ ...c, title: e.target.value }))} />
               </Field>
-              <Field label="Premio">
+              <Field label="Premio" description="Lo que se entrega al ganador, obligatorio para publicar.">
                 <Input value={giveawayForm.prize} onChange={(e) => setGiveawayForm((c) => ({ ...c, prize: e.target.value }))} />
               </Field>
-              <Field label="Descripción">
+              <Field label="Descripción" description="Texto adicional o reglas del sorteo (opcional).">
                 <Textarea value={giveawayForm.description} onChange={(e) => setGiveawayForm((c) => ({ ...c, description: e.target.value }))} />
               </Field>
 
-              <Field label="Duración rápida">
+              <Field label="Duración rápida" description="Atajos para fijar la duración sin escribirla.">
                 <div className="flex flex-wrap gap-2">
                   {GIVEAWAY_DURATION_PRESETS.map((preset) => (
                     <button
@@ -304,7 +304,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
               </Field>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Duración (min)">
+                <Field label="Duración (min)" description="Minutos que estará activo el sorteo antes de elegir ganador.">
                   <Input
                     type="number"
                     min={5}
@@ -312,7 +312,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                     onChange={(e) => setGiveawayForm((c) => ({ ...c, durationMinutes: Number(e.target.value) || 60 }))}
                   />
                 </Field>
-                <Field label="Ganadores">
+                <Field label="Ganadores" description="Cuántos participantes resultan premiados al finalizar.">
                   <Input
                     type="number"
                     min={1}
@@ -323,14 +323,14 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 </Field>
               </div>
 
-              <Field label="Canal">
+              <Field label="Canal" description="Canal donde se publicará el mensaje del sorteo.">
                 <ChannelSelect
                   value={giveawayForm.channelId}
                   onChange={(channelId) => setGiveawayForm((c) => ({ ...c, channelId }))}
                   options={channels}
                 />
               </Field>
-              <Field label="Rol requerido" description="Opcional">
+              <Field label="Rol requerido" description="Opcional. Solo pueden participar quienes tengan este rol.">
                 <RoleSelect
                   value={giveawayForm.requiredRoleId}
                   onChange={(requiredRoleId) => setGiveawayForm((c) => ({ ...c, requiredRoleId }))}
@@ -338,7 +338,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                   placeholder="Sin rol requerido"
                 />
               </Field>
-              <Button disabled={busyId === "create-giveaway" || !giveawayForm.prize.trim()} onClick={() => void handleCreateGiveaway()}>
+              <Button disabled={busyId === "create-giveaway" || !giveawayForm.prize.trim()} onClick={() => void handleCreateGiveaway()} title="Publica el sorteo en el canal seleccionado">
                 {busyId === "create-giveaway" ? "Publicando..." : "Publicar sorteo"}
               </Button>
             </div>
@@ -486,14 +486,14 @@ export function EventsPane({ guildId }: { guildId: string }) {
                 <Calendar className="h-4 w-4 text-violet-300" />
                 Nuevo evento
               </h3>
-              <Field label="Título">
+                            <Field label="Título" description="Nombre del evento que verán los asistentes en Discord.">
                 <Input value={eventForm.title} onChange={(e) => setEventForm((c) => ({ ...c, title: e.target.value }))} />
               </Field>
-              <Field label="Descripción">
+              <Field label="Descripción" description="Detalles, premios o instrucciones del evento (opcional).">
                 <Textarea value={eventForm.description} onChange={(e) => setEventForm((c) => ({ ...c, description: e.target.value }))} />
               </Field>
-              <Field label="Lugar / enlace">
-                <Input value={eventForm.location} onChange={(e) => setEventForm((c) => ({ ...c, location: e.target.value }))} />
+              <Field label="Lugar / enlace" description="Dónde ocurre: canal de voz, servidor o URL de invitación (opcional).">
+                <Input value={eventForm.location} onChange={(e) => setEventForm((c) => ({ ...c, location: e.target.value }))} placeholder="https://discord.gg/… o canal de voz" />
               </Field>
               <Field label="Inicio" description="Formato datetime-local o ISO">
                 <Input
@@ -502,9 +502,7 @@ export function EventsPane({ guildId }: { guildId: string }) {
                   onChange={(e) => setEventForm((c) => ({ ...c, startAt: e.target.value }))}
                 />
               </Field>
-              <Field label="Canal">
-                <ChannelSelect
-                  value={eventForm.channelId}
+              <Field label="Canal" description="Canal donde se publicará el mensaje del evento.">
                   onChange={(channelId) => setEventForm((c) => ({ ...c, channelId }))}
                   options={channels}
                 />
@@ -560,17 +558,17 @@ export function EventsPane({ guildId }: { guildId: string }) {
               </div>
               <Switch checked={config.enabled} onCheckedChange={(enabled) => setConfig((c) => ({ ...c, enabled }))} />
             </div>
-            <Field label="Canal por defecto">
+            <Field label="Canal por defecto" description="Canal prefijado en los sorteos y eventos nuevos.">
               <ChannelSelect
                 value={config.defaultChannelId}
                 onChange={(defaultChannelId) => setConfig((c) => ({ ...c, defaultChannelId }))}
                 options={channels}
               />
             </Field>
-            <Field label="Color de embeds">
+            <Field label="Color de embeds" description="Color de la barra lateral de los embeds de eventos.">
               <ColorInput value={config.color} onChange={(color) => setConfig((c) => ({ ...c, color }))} />
             </Field>
-            <Field label="Recordatorio antes del evento (min)">
+            <Field label="Recordatorio antes del evento (min)" description="Minutos antes del inicio en los que el bot recuerda el evento (5-1440).">
               <Input
                 type="number"
                 min={5}

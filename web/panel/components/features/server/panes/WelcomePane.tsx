@@ -464,7 +464,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
 
           {sectionTab === "message" && !isCardWelcome ? (
             <>
-              <Field label="Título del embed">
+              <Field label="Título del embed" description="Línea principal que encabeza el mensaje. Admite variables.">
                 <Input
                   value={active.title}
                   onChange={(event) => setActive((current) => ({ ...current, title: event.target.value }))}
@@ -508,10 +508,10 @@ export function WelcomePane({ guildId }: { guildId: string }) {
               </Field>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Color del embed">
+                <Field label="Color del embed" description="Color del borde y acento del embed.">
                   <ColorInput value={active.color} onChange={(color) => setActive((current) => ({ ...current, color }))} />
                 </Field>
-                <Field label="Pie de embed">
+                <Field label="Pie de embed" description="Texto pequeño al pie del mensaje (opcional).">
                   <Input
                     value={active.footer}
                     onChange={(event) => setActive((current) => ({ ...current, footer: event.target.value }))}
@@ -521,7 +521,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
 
               <div className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-4">
                 <p className="text-sm font-medium text-white">Autor</p>
-                <Field label="Nombre del autor">
+                <Field label="Nombre del autor" description="Nombre que se muestra sobre el título. Puede usar {server} o {username}.">
                   <Input
                     value={active.authorName}
                     onChange={(event) => setActive((current) => ({ ...current, authorName: event.target.value }))}

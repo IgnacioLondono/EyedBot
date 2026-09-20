@@ -287,7 +287,7 @@ export function VoicePane({ guildId }: { guildId: string }) {
                 );
               })}
             </div>
-            <Field label="Comandos útiles cuando el canal está bloqueado">
+            <Field label="Comandos útiles cuando el canal está bloqueado" description="Comandos de texto que funcionan sobre el canal temporal del usuario (solo lectura).">
               <Textarea
                 readOnly
                 value={"/vozinvitar — permite acceso a un usuario\n/vozquitar — revoca acceso a un usuario"}

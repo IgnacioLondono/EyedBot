@@ -262,7 +262,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
 
       <div className="flex flex-wrap gap-2">
         {ADDABLE.map((type) => (
-          <Button key={type} size="sm" variant="secondary" onClick={() => addNode(type)}>
+          <Button key={type} size="sm" variant="secondary" onClick={() => addNode(type)} title={`Añade un nodo de tipo ${FLOW_NODE_META[type].title}`}>
             <Plus className="mr-1 h-3.5 w-3.5" />
             {FLOW_NODE_META[type].title}
           </Button>
@@ -275,6 +275,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
             setSelectedId(null);
             setConnectFrom(null);
           }}
+          title="Restablece el flujo de tickets a su configuración inicial"
         >
           <RotateCcw className="mr-1 h-3.5 w-3.5" />
           Plantilla base
@@ -437,7 +438,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
             <p className="text-sm text-zinc-500">Selecciona un nodo para editarlo.</p>
           ) : (
             <div className="space-y-3">
-              <Field label="Etiqueta">
+              <Field label="Etiqueta" description="Nombre visible del nodo en el flujo.">
                 <Input
                   value={selected.data.label}
                   onChange={(e) => updateSelected({ label: e.target.value })}
@@ -446,7 +447,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
 
               {selected.type === "select" ? (
                 <>
-                  <Field label="Fuente de opciones">
+                  <Field label="Fuente de opciones" description="Lista de opciones que se mostrará al usuario en este paso.">
                     <select
                       className="h-10 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-sm text-white"
                       value={selected.data.selectSource || "categories"}
@@ -461,13 +462,13 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
                       <option value="custom">Opciones custom</option>
                     </select>
                   </Field>
-                  <Field label="Placeholder">
+                  <Field label="Placeholder" description="Texto que se muestra antes de elegir (valores sugeridos: «Elige una opción»).">
                     <Input
                       value={selected.data.selectPlaceholder || ""}
                       onChange={(e) => updateSelected({ selectPlaceholder: e.target.value })}
                     />
                   </Field>
-                  <Field label="Guardar como (clave)">
+                  <Field label="Guardar como (clave)" description="Clave en la que se guarda la elección para condicionar ramas del flujo.">
                     <Input
                       value={selected.data.saveAs || ""}
                       onChange={(e) => updateSelected({ saveAs: e.target.value })}
@@ -475,7 +476,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
                     />
                   </Field>
                   {selected.data.selectSource === "custom" ? (
-                    <Field label="Opciones (label|value por línea)">
+                    <Field label="Opciones (label|value por línea)" description="Cada línea define una opción. Ej.: Reportar|report, Sugerir|suggest.">
                       <Textarea
                         value={(selected.data.customOptions || [])
                           .map((o) => `${o.label}|${o.value}`)
@@ -502,13 +503,13 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
 
               {selected.type === "modal" ? (
                 <>
-                  <Field label="Título del modal">
+                  <Field label="Título del modal" description="Encabezado del formulario que se abre en Discord.">
                     <Input
                       value={selected.data.modalTitle || ""}
                       onChange={(e) => updateSelected({ modalTitle: e.target.value })}
                     />
                   </Field>
-                  <Field label="Campos (label|id|short/paragraph)">
+                  <Field label="Campos (label|id|short/paragraph)" description="Hasta 5 campos. Formato por línea: Label|id|paragraph (o short).">
                     <Textarea
                       value={(selected.data.modalFields || [])
                         .map((f) => `${f.label}|${f.id}|${f.style || "short"}`)
@@ -538,7 +539,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
               ) : null}
 
               {selected.type === "message" ? (
-                <Field label="Texto del mensaje">
+                <Field label="Texto del mensaje" description="Contenido que el bot envía en este paso del ticket.">
                   <Textarea
                     value={selected.data.messageText || ""}
                     onChange={(e) => updateSelected({ messageText: e.target.value })}
@@ -547,7 +548,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
               ) : null}
 
               {selected.type === "end" ? (
-                <Field label="Tipo de fin">
+                <Field label="Tipo de fin" description="Cómo finaliza el ticket: con éxito o cancelado.">
                   <select
                     className="h-10 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-sm text-white"
                     value={selected.data.endKind || "success"}
@@ -579,6 +580,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
                           className="h-8"
                           placeholder="rama (option value)"
                           value={edge.optionValue || ""}
+                          title="Escribe el value de la opción de la que depende esta rama"
                           onChange={(e) => {
                             const optionValue = e.target.value;
                             patch((prev) => ({
@@ -598,7 +600,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
                         <span className="shrink-0 text-xs text-zinc-500">
                           → {target?.data.label || edge.target}
                         </span>
-                        <Button size="sm" variant="danger" onClick={() => removeEdge(edge.id)}>
+                        <Button size="sm" variant="danger" onClick={() => removeEdge(edge.id)} title="Quita esta conexión del flujo">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -608,7 +610,7 @@ export function TicketFlowBuilder({ value, onChange }: Props) {
               ) : null}
 
               {selected.type !== "start" ? (
-                <Button size="sm" variant="danger" onClick={() => removeNode(selected.id)}>
+                <Button size="sm" variant="danger" onClick={() => removeNode(selected.id)} title="Elimina este nodo y sus conexiones del flujo">
                   <Trash2 className="mr-1 h-3.5 w-3.5" />
                   Eliminar nodo
                 </Button>

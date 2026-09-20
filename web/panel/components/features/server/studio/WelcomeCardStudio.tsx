@@ -432,15 +432,15 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" disabled={previewLoading} onClick={() => void refreshPreview()}>
+          <Button type="button" variant="ghost" size="sm" disabled={previewLoading} onClick={() => void refreshPreview()} title="Regenera la vista previa con los cambios actuales">
             <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", previewLoading && "animate-spin")} />
             Actualizar
           </Button>
-          <Button type="button" variant="secondary" size="sm" loading={testing} onClick={() => void handleTest()}>
+          <Button type="button" variant="secondary" size="sm" loading={testing} onClick={() => void handleTest()} title="Envía una tarjeta de prueba a tu canal de bienvenida">
             <Send className="mr-1.5 h-3.5 w-3.5" />
             Probar
           </Button>
-          <Button type="button" size="sm" loading={saving} onClick={() => void handleSave()}>
+          <Button type="button" size="sm" loading={saving} onClick={() => void handleSave()} title="Guarda la tarjeta y los cambios en la configuración">
             <Save className="mr-1.5 h-3.5 w-3.5" />
             Guardar
           </Button>
@@ -469,7 +469,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                   <code className="rounded bg-[var(--color-surface-strong)] px-1">[[#ff6b6b]]texto[[/]]</code>
                 </div>
 
-                <Field label="Título">
+                <Field label="Título" description="Texto grande que encabeza la tarjeta. Admite variables.">
                   <Input
                     value={config.title}
                     onChange={(e) => {
@@ -491,7 +491,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                   />
                 </Field>
 
-                <Field label="Subtítulo / mensaje">
+                <Field label="Subtítulo / mensaje" description="Texto principal bajo el nombre. Admite variables.">
                   <Textarea
                     value={config.message}
                     onChange={(e) => {
@@ -518,7 +518,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
 
             {sidebarTab === "design" ? (
               <>
-                <Field label="Fuente">
+                <Field label="Fuente" description="Familia tipográfica de todos los textos de la tarjeta.">
                   <Select
                     value={config.cardFontKey}
                     onChange={(e) => setConfig((c) => (c ? { ...c, cardFontKey: e.target.value } : c))}
@@ -549,7 +549,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                 </Field>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Foco horizontal">
+                  <Field label="Foco horizontal" description="Punto horizontal del fondo que se mantiene visible al recortar.">
                     <input
                       type="range"
                       min={0}
@@ -568,7 +568,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                       className="w-full accent-sky-400"
                     />
                   </Field>
-                  <Field label="Foco vertical">
+                  <Field label="Foco vertical" description="Punto vertical del fondo que se mantiene visible al recortar.">
                     <input
                       type="range"
                       min={0}
@@ -594,31 +594,31 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                     <Palette className="h-3.5 w-3.5" />
                     Colores
                   </p>
-                  <Field label="Anillo avatar">
+                  <Field label="Anillo avatar" description="Color del borde circular alrededor del avatar.">
                     <ColorInput
                       value={config.cardAccentColor}
                       onChange={(color) => setConfig((c) => (c ? { ...c, cardAccentColor: color } : c))}
                     />
                   </Field>
-                  <Field label="Título">
+                  <Field label="Título" description="Color del texto principal de la tarjeta.">
                     <ColorInput
                       value={config.cardTitleColor}
                       onChange={(color) => setConfig((c) => (c ? { ...c, cardTitleColor: color } : c))}
                     />
                   </Field>
-                  <Field label="Nombre">
+                  <Field label="Nombre" description="Color del nombre del miembro bajo el avatar.">
                     <ColorInput
                       value={config.cardNameColor}
                       onChange={(color) => setConfig((c) => (c ? { ...c, cardNameColor: color } : c))}
                     />
                   </Field>
-                  <Field label="Subtítulo">
+                  <Field label="Subtítulo" description="Color del mensaje o subtítulo de la tarjeta.">
                     <ColorInput
                       value={config.cardSubtitleColor}
                       onChange={(color) => setConfig((c) => (c ? { ...c, cardSubtitleColor: color } : c))}
                     />
                   </Field>
-                  <Field label="Esquina">
+                  <Field label="Esquina" description="Color del texto pequeño de la esquina inferior derecha.">
                     <ColorInput
                       value={config.cardOverlayColor}
                       onChange={(color) => setConfig((c) => (c ? { ...c, cardOverlayColor: color } : c))}
@@ -632,6 +632,7 @@ export function WelcomeCardStudio({ guildId }: { guildId: string }) {
                     setConfig((c) => (c ? { ...c, cardLayout: { ...DEFAULT_WELCOME_CARD_LAYOUT } } : c))
                   }
                   className="flex items-center gap-2 text-sm text-[var(--theme-text-secondary)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
+                  title="Devuelve avatar y textos a su posición inicial"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restaurar posiciones

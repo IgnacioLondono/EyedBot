@@ -260,8 +260,8 @@ export const DOCS_ARTICLES: Record<string, DocArticle> = {
     { type: "callout", variant: "premium", title: "EyedPlus+", text: "Tickets avanzados con gestión desde el panel, historial e informes requiere premium." },
     { type: "paragraph", text: "Publica un panel con botones o select menu. Cada ticket abre un canal privado con el usuario y el staff." },
     { type: "list", items: [
-      "Constructor de flujo: categorías, preguntas y plantillas.",
-      "Roles de staff por categoría.",
+      "Títulos y casos: organiza las categorías de la solicitud.",
+      "Roles de staff por título o caso.",
       "Cerrar, reclamar y transcript desde Discord o panel.",
     ]},
   ], true),

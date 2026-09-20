@@ -332,7 +332,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
                   />
                 </div>
 
-                <Field label="Canal de anuncios">
+                <Field label="Canal de anuncios" description="Canal donde se publican los avisos de juegos gratis.">
                   <ChannelSelect
                     value={form.channelId}
                     onChange={(channelId) => setForm((current) => ({ ...current, channelId }))}
@@ -348,7 +348,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
                     placeholder="@everyone o <@&rol>"
                   />
                 </Field>
-                <Field label="Mencionar rol">
+                <Field label="Mencionar rol" description="Atajo para añadir la mención de un rol al aviso. Complementa el campo «Mención al publicar».">
                   <RoleSelect
                     value=""
                     onChange={(roleId) => {
@@ -388,7 +388,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Color del embed">
+                  <Field label="Color del embed" description="Color de la barra lateral del aviso publicado en Discord.">
                     <ColorInput value={form.color} onChange={(color) => setForm((current) => ({ ...current, color }))} />
                   </Field>
                   <Field label="Descuento mínimo (%)" description="Solo ofertas con al menos este descuento (100 = gratis).">
@@ -407,7 +407,7 @@ export function FreeGamesPane({ guildId }: { guildId: string }) {
                   </Field>
                 </div>
 
-                <Field label="Pie del embed">
+                <Field label="Pie del embed" description="Texto pequeño al pie del aviso (opcional).">
                   <Input
                     value={form.footerText}
                     onChange={(event) => setForm((current) => ({ ...current, footerText: event.target.value }))}

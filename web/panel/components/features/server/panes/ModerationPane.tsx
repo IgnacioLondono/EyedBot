@@ -335,14 +335,14 @@ export function ModerationPane({ guildId }: { guildId: string }) {
 
         {tab === "actions" ? (
           <div className="mt-5 space-y-4">
-            <Field label="ID de usuario de Discord">
+            <Field label="ID de usuario de Discord" description="ID numérico del miembro sobre el que se aplicará la acción.">
               <Input
                 value={actionUserId}
                 onChange={(event) => setActionUserId(event.target.value)}
                 placeholder="123456789012345678"
               />
             </Field>
-            <Field label="Duración del timeout">
+            <Field label="Duración del timeout" description="Cuánto tiempo dura la expulsión temporal del servidor.">
               <Select
                 value={String(timeoutMs)}
                 onChange={(event) => setTimeoutMs(Number(event.target.value))}

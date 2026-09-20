@@ -261,7 +261,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                     <p className="font-medium text-white">{item.title}</p>
                     <p className="text-sm text-zinc-400">{item.owner}</p>
                   </div>
-                  <Button size="sm" disabled={busyId === item.id} onClick={() => void runAction(item.id, () => acceptTicket(guildId, item.id), "Aceptado")}>
+                  <Button size="sm" disabled={busyId === item.id} onClick={() => void runAction(item.id, () => acceptTicket(guildId, item.id), "Aceptado")} title="Acepta la solicitud y crea el canal del ticket">
                     Aceptar
                   </Button>
                 </div>
@@ -300,6 +300,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                         event.stopPropagation();
                         void runAction(item.id, () => claimTicket(guildId, item.id), "Reclamado");
                       }}
+                      title="Asigna el ticket a ti para atenderlo"
                     >
                       Reclamar
                     </Button>
@@ -311,6 +312,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                         event.stopPropagation();
                         void runAction(item.id, () => unclaimTicket(guildId, item.id), "Liberado");
                       }}
+                      title="Deja el ticket sin responsable asignado"
                     >
                       <Unlock className="mr-1 h-3.5 w-3.5" />
                       Liberar
@@ -323,6 +325,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                         event.stopPropagation();
                         void runAction(item.id, () => closeTicket(guildId, item.id, {}), "Cerrado");
                       }}
+                      title="Cierra el ticket y guarda el informe con transcripción"
                     >
                       Cerrar
                     </Button>
@@ -350,7 +353,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                     <p className="text-sm text-zinc-500">Sin mensajes en este ticket.</p>
                   )}
                 </div>
-                <Field label="Mensaje al canal de Discord">
+                <Field label="Mensaje al canal de Discord" description="Texto que se envía como el bot dentro del canal del ticket.">
                   <Textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={3} />
                 </Field>
                 <Button className="mt-3" onClick={() => void handleSendMessage()} disabled={sending || !draft.trim()}>
@@ -435,7 +438,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
             </div>
           ) : null}
 
-          <Field label="Buscar en historial">
+          <Field label="Buscar en historial" description="Filtra los informes cerrados por usuario, canal o motivo.">
             <Input value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Usuario, canal o motivo" />
           </Field>
           {filteredHistory.length ? (
@@ -456,6 +459,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                         variant="accent"
                         disabled={loadingReportId === item.id}
                         onClick={() => void viewReport(reportIdFromRow(item))}
+                        title="Abre el informe completo con la transcripción del ticket"
                       >
                         <History className="mr-1 h-3.5 w-3.5" />
                         {loadingReportId === item.id ? "Abriendo…" : "Ver informe"}
@@ -465,6 +469,7 @@ export function TicketsManagePanel({ guildId }: { guildId: string }) {
                         variant="danger"
                         disabled={busyId === item.id}
                         onClick={() => void runAction(item.id, () => deleteTicketReport(guildId, reportIdFromRow(item)), "Informe borrado")}
+                        title="Elimina permanentemente este informe del historial"
                       >
                         Borrar
                       </Button>

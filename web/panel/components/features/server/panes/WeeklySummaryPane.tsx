@@ -134,20 +134,20 @@ export function WeeklySummaryPane({ guildId }: { guildId: string }) {
             <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((c) => ({ ...c, enabled: checked }))} />
           </div>
 
-          <Field label="Canal de publicación">
-            <ChannelSelect
-              value={form.channelId}
-              onChange={(channelId) => setForm((c) => ({ ...c, channelId }))}
-              options={channels}
-            />
-          </Field>
+<Field label="Canal de publicación" description="Canal donde el bot envía el resumen semanal de actividad.">
+                <ChannelSelect
+                  value={form.channelId}
+                  onChange={(channelId) => setForm((c) => ({ ...c, channelId }))}
+                  options={channels}
+                />
+              </Field>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Día de publicación">
-              <Select
-                value={String(form.dayOfWeek)}
-                onChange={(event) => setForm((c) => ({ ...c, dayOfWeek: Number.parseInt(event.target.value, 10) }))}
-              >
+<Field label="Día de publicación" description="Día de la semana en que se publica el resumen automáticamente.">
+                <Select
+                  value={String(form.dayOfWeek)}
+                  onChange={(event) => setForm((c) => ({ ...c, dayOfWeek: Number.parseInt(event.target.value, 10) }))}
+                >
                 {DAYS.map((day, index) => (
                   <option key={day} value={index}>
                     {day}
@@ -169,7 +169,7 @@ export function WeeklySummaryPane({ guildId }: { guildId: string }) {
             </Field>
           </div>
 
-          <Field label="Mencionar rol (opcional)">
+          <Field label="Mencionar rol (opcional)" description="Rol que se notifica cuando se publica el resumen semanal.">
             <RoleSelect
               value={form.mentionRoleId}
               onChange={(roleId) => setForm((c) => ({ ...c, mentionRoleId: roleId }))}

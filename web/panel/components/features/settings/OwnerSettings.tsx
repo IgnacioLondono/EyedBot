@@ -518,7 +518,7 @@ export function OwnerSettings() {
       {tab === "logs" ? (
         <SectionCard title="Logs del sistema" description="Eventos recientes capturados por el backend del panel.">
           <div className="mb-5 max-w-xs">
-            <Field label="Nivel">
+            <Field label="Nivel" description="Filtra los logs por severidad: info, advertencias o errores.">
               <Select value={logLevel} onChange={(event) => setLogLevel(event.target.value)}>
                 <option value="">Todos</option>
                 <option value="info">Info</option>

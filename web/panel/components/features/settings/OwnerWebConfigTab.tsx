@@ -186,7 +186,7 @@ export function OwnerWebConfigTab() {
             checked={config.maintenanceMode}
             onCheckedChange={(checked) => setConfig((c) => (c ? { ...c, maintenanceMode: checked } : c))}
           />
-          <Field label="Mensaje de mantenimiento">
+          <Field label="Mensaje de mantenimiento" description="Texto que verán los usuarios mientras el panel esté en mantenimiento.">
             <Input
               value={config.maintenanceMessage}
               onChange={(event) =>
@@ -209,7 +209,7 @@ export function OwnerWebConfigTab() {
         description="Reglas de premium y checkout."
       >
         <div className="space-y-4">
-          <Field label="Exigir EyedPlus+ para módulos premium">
+          <Field label="Exigir EyedPlus+ para módulos premium" description="Cuándo el panel exige EyedPlus+ para abrir los módulos premium.">
             <Select
               value={premiumMode}
               onChange={(event) => setPremiumMode(event.target.value as PremiumMode)}

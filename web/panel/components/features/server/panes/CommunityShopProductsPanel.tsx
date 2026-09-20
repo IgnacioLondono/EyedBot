@@ -322,7 +322,7 @@ export function CommunityShopProductsPanel({
       {!loading && products.length > 0 ? (
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-[180px] flex-1">
-            <Field label="Categoría existente">
+            <Field label="Categoría existente" description="Filtra el listado por categoría.">
               <Select
                 value={existingCategories.includes(categoryFilter) || categoryFilter === "all" ? categoryFilter : "all"}
                 onChange={(event) => setCategoryFilter(event.target.value)}
@@ -433,14 +433,14 @@ export function CommunityShopProductsPanel({
         )}
       >
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Tipo">
+          <Field label="Tipo" description="Qué entrega al comprar: objeto virtual, personaje del gacha o rol de Discord.">
             <Select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as ProductType }))}>
               <option value="item">Objeto virtual</option>
               <option value="character">Personaje gacha</option>
               <option value="role">Rol de Discord</option>
             </Select>
           </Field>
-          <Field label="Nombre">
+          <Field label="Nombre" description="Nombre visible del producto en EyedShop.">
             <Input value={form.name} maxLength={120} onChange={(event) => setForm((c) => ({ ...c, name: event.target.value }))} />
           </Field>
           <Field label="Categoría" description="Escribe una categoría nueva o elige una existente">
@@ -457,7 +457,7 @@ export function CommunityShopProductsPanel({
               ))}
             </datalist>
           </Field>
-          <Field label="Precio en EyedCoins">
+          <Field label="Precio en EyedCoins" description="Cantidad de EyedCoins que cuesta el producto.">
             <Input type="number" min={1} value={form.priceCoins} onChange={(event) => setForm((c) => ({ ...c, priceCoins: event.target.value }))} />
           </Field>
           <Field label="Stock" description="Vacío = ilimitado">
@@ -466,11 +466,11 @@ export function CommunityShopProductsPanel({
           <Field label="Límite por usuario" description="Vacío = sin límite">
             <Input type="number" min={1} value={form.perUserLimit} disabled={form.type === "role"} onChange={(event) => setForm((c) => ({ ...c, perUserLimit: event.target.value }))} />
           </Field>
-          <Field label="Orden">
+          <Field label="Orden" description="Posición dentro de su categoría (menor = primero).">
             <Input type="number" min={0} value={form.sortOrder} onChange={(event) => setForm((c) => ({ ...c, sortOrder: event.target.value }))} />
           </Field>
           {form.type === "character" ? (
-            <Field label="Personaje">
+            <Field label="Personaje" description="Personaje del gacha que se entregará al comprar.">
               <Select value={form.characterId} onChange={(event) => setForm((c) => ({ ...c, characterId: event.target.value }))}>
                 <option value="">Seleccionar personaje…</option>
                 {characterOptions.map((item) => (
@@ -482,7 +482,7 @@ export function CommunityShopProductsPanel({
             </Field>
           ) : null}
           {form.type === "role" ? (
-            <Field label="Rol que entrega EyedBot">
+            <Field label="Rol que entrega EyedBot" description="Rol que se asigna al usuario al comprar el producto.">
               <Select value={form.roleId} onChange={(event) => setForm((c) => ({ ...c, roleId: event.target.value }))}>
                 <option value="">Seleccionar rol…</option>
                 {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
@@ -506,7 +506,7 @@ export function CommunityShopProductsPanel({
             />
           </div>
           <div className="md:col-span-2">
-            <Field label="Descripción">
+            <Field label="Descripción" description="Texto que se muestra en la tarjeta del producto (máx. 500 caracteres).">
               <Textarea value={form.description} maxLength={500} onChange={(event) => setForm((c) => ({ ...c, description: event.target.value }))} />
             </Field>
           </div>

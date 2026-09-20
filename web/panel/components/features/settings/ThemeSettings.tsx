@@ -30,7 +30,7 @@ function SliderField({
   onChange: (value: number) => void;
 }) {
   return (
-    <Field label={`${label} (${value}%)`}>
+    <Field label={`${label} (${value}%)`} description="Ajusta la intensidad de este parámetro.">
       <input
         type="range"
         id={`theme-slider-${label.toLowerCase().replace(/\s+/g, "-")}`}
@@ -153,7 +153,7 @@ export function ThemeSettings() {
               ["textSecondary", "Texto secundario"],
               ["borderColor", "Bordes"],
             ].map(([key, label]) => (
-              <Field key={key} label={label}>
+              <Field key={key} label={label} description="Color personalizado de este elemento del tema.">
                 <Input
                   type="color"
                   value={theme[key as keyof typeof theme] as string}

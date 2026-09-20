@@ -327,10 +327,10 @@ export function GachaShopPanel({
       </div>
 
       <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto_auto_auto]">
-        <Field label="Buscar">
+        <Field label="Buscar" description="Filtra el catálogo por nombre, serie o ID.">
           <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, serie o ID" />
         </Field>
-        <Field label="Categoría existente">
+        <Field label="Categoría existente" description="Filtra el listado por categoría.">
           <Select
             value={existingCategories.includes(categoryFilter) || categoryFilter === "all" ? categoryFilter : "all"}
             onChange={(event) => setCategoryFilter(event.target.value)}
@@ -538,10 +538,9 @@ export function GachaShopPanel({
       >
         {editForm && editingItem && editingId ? (
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Nombre">
-              <Input value={editForm.name} onChange={(event) => setEditForm((c) => (c ? { ...c, name: event.target.value } : c))} />
+            <Field label="Nombre" description="Nombre del personaje o carta en el catálogo.">
             </Field>
-            <Field label="Rareza">
+            <Field label="Rareza" description="Nivel de rareza: SSR, SR, R o N.">
               <Select value={editForm.rarity} onChange={(event) => setEditForm((c) => (c ? { ...c, rarity: event.target.value } : c))}>
                 <option value="SSR">SSR</option>
                 <option value="SR">SR</option>
@@ -571,9 +570,7 @@ export function GachaShopPanel({
               />
             </Field>
             <div className="md:col-span-2">
-              <Field label="Descripción">
-                <Textarea
-                  value={editForm.description}
+              <Field label="Descripción" description="Texto que se muestra en la ficha de la carta (opcional).">
                   onChange={(event) => setEditForm((c) => (c ? { ...c, description: event.target.value } : c))}
                   rows={3}
                 />

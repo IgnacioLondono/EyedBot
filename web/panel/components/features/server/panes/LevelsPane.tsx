@@ -225,14 +225,20 @@ export function LevelsPane({ guildId }: { guildId: string }) {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                  <span className="text-sm text-zinc-300">XP por mensajes</span>
+                  <div>
+                    <span className="text-sm text-zinc-300">XP por mensajes</span>
+                    <p className="text-xs text-zinc-500">Habilita otorgar XP por escribir en el chat.</p>
+                  </div>
                   <Switch
                     checked={form.messageXpEnabled}
                     onCheckedChange={(checked) => setForm((c) => ({ ...c, messageXpEnabled: checked }))}
                   />
                 </div>
                 <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                  <span className="text-sm text-zinc-300">XP por voz</span>
+                  <div>
+                    <span className="text-sm text-zinc-300">XP por voz</span>
+                    <p className="text-xs text-zinc-500">Habilita otorgar XP por tiempo en canales de voz.</p>
+                  </div>
                   <Switch
                     checked={form.voiceXpEnabled}
                     onCheckedChange={(checked) => setForm((c) => ({ ...c, voiceXpEnabled: checked }))}
@@ -240,7 +246,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
                 </div>
               </div>
 
-              <Field label="Canal de anuncio de subida">
+              <Field label="Canal de anuncio de subida" description="Canal donde el bot avisa cuando un miembro sube de nivel (opcional).">
                 <ChannelSelect
                   value={form.levelUpAnnounceChannelId}
                   onChange={(levelUpAnnounceChannelId) => setForm((c) => ({ ...c, levelUpAnnounceChannelId }))}
@@ -249,21 +255,21 @@ export function LevelsPane({ guildId }: { guildId: string }) {
               </Field>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="XP mínimo por mensaje">
+                <Field label="XP mínimo por mensaje" description="XP base que entrega cada mensaje válido.">
                   <Input
                     type="number"
                     value={form.messageXpMin}
                     onChange={(event) => setForm((c) => ({ ...c, messageXpMin: Number(event.target.value) }))}
                   />
                 </Field>
-                <Field label="XP máximo por mensaje">
+                <Field label="XP máximo por mensaje" description="Tope de XP que puede entregar un mensaje (aleatorio entre mínimo y máximo).">
                   <Input
                     type="number"
                     value={form.messageXpMax}
                     onChange={(event) => setForm((c) => ({ ...c, messageXpMax: Number(event.target.value) }))}
                   />
                 </Field>
-                <Field label="Cooldown mensajes (seg)">
+                <Field label="Cooldown mensajes (seg)" description="Tiempo mínimo entre un mensaje con XP y el siguiente de un mismo usuario.">
                   <Input
                     type="number"
                     value={Math.round(form.messageCooldownMs / 1000)}
@@ -272,14 +278,14 @@ export function LevelsPane({ guildId }: { guildId: string }) {
                     }
                   />
                 </Field>
-                <Field label="XP por minuto en voz">
+                <Field label="XP por minuto en voz" description="XP que gana cada minuto conectado a un canal de voz.">
                   <Input
                     type="number"
                     value={form.voiceXpPerMinute}
                     onChange={(event) => setForm((c) => ({ ...c, voiceXpPerMinute: Number(event.target.value) }))}
                   />
                 </Field>
-                <Field label="Multiplicador global">
+                <Field label="Multiplicador global" description="Factor que multiplica toda la XP entregada (1.0 = normal).">
                   <Input
                     type="number"
                     step="0.1"
@@ -313,7 +319,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
           <SectionCard title="Curva de experiencia" description="Ajusta la dificultad y aplica presets del panel legacy.">
             <div className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="XP base por nivel">
+                <Field label="XP base por nivel" description="XP necesaria para el primer nivel (los siguientes se calculan con el exponente).">
                   <Input
                     type="number"
                     value={form.difficulty.baseXp}
@@ -325,7 +331,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
                     }
                   />
                 </Field>
-                <Field label="Exponente de curva">
+                <Field label="Exponente de curva" description="Controla el crecimiento: mayor exponente = niveles más difíciles de alcanzar.">
                   <Input
                     type="number"
                     step="0.01"
@@ -395,7 +401,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
             {form.roleRewards.length ? (
               form.roleRewards.map((reward, index) => (
                 <div key={`${index}-${reward.level}`} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 md:grid-cols-[120px_1fr_auto]">
-                  <Field label="Nivel">
+                  <Field label="Nivel" description="Nivel al que se desbloquea la recompensa.">
                     <Input
                       type="number"
                       min={1}
@@ -403,7 +409,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
                       onChange={(event) => updateReward(index, { level: Number(event.target.value) })}
                     />
                   </Field>
-                  <Field label="Rol">
+                  <Field label="Rol" description="Rol que se otorga automáticamente al alcanzar ese nivel.">
                     <RoleSelect
                       value={reward.roleId}
                       onChange={(roleId) => updateReward(index, { roleId })}
@@ -411,7 +417,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
                     />
                   </Field>
                   <div className="flex items-end">
-                    <Button variant="danger" size="sm" onClick={() => removeReward(index)}>
+                    <Button variant="danger" size="sm" onClick={() => removeReward(index)} title="Elimina esta recompensa">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -422,7 +428,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
             )}
 
             <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={addReward}>
+              <Button variant="secondary" onClick={addReward} title="Añade una nueva recompensa de rol por nivel">
                 <Plus className="h-4 w-4" />
                 Añadir recompensa
               </Button>
@@ -435,7 +441,7 @@ export function LevelsPane({ guildId }: { guildId: string }) {
       {tab === "leaderboard" ? (
         <SectionCard title="Leaderboard" description="Datos en vivo desde la base de datos de niveles.">
           <div className="mb-4 flex justify-end">
-            <Button variant="secondary" size="sm" onClick={() => void loadLeaderboard()} disabled={boardLoading}>
+            <Button variant="secondary" size="sm" onClick={() => void loadLeaderboard()} disabled={boardLoading} title="Recarga el ranking desde la base de datos">
               <RefreshCw className={`mr-2 h-4 w-4 ${boardLoading ? "animate-spin" : ""}`} />
               Actualizar
             </Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, FlaskConical, Layers, LayoutTemplate } from "lucide-react";
+import { Eye, Layers } from "lucide-react";
 import {
   getTicketConfig,
   publishTickets,
@@ -11,7 +11,6 @@ import {
   deleteTicketImage,
 } from "@/lib/api/endpoints";
 import { TicketsManagePanel } from "@/components/features/server/panes/TicketsManagePanel";
-import { TicketFlowBuilder } from "@/components/features/server/panes/TicketFlowBuilder";
 import { useGuildChannels } from "@/lib/hooks/useGuildChannels";
 import { useGuildRoles } from "@/lib/hooks/useGuildRoles";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -46,14 +45,9 @@ import { withMediaCacheBust } from "@/lib/panel-media";
 
 const TICKET_TABS = [
   { id: "panel", label: "Panel" },
-  { id: "flow", label: "Flujo" },
   { id: "templates", label: "Plantillas" },
-  { id: "roles", label: "Roles" },
-  { id: "preview", label: "Preview" },
   { id: "categories", label: "Títulos" },
-  { id: "labs", label: "Labs" },
   { id: "manage", label: "Gestión" },
-  { id: "guide", label: "Guía" },
 ];
 const TICKET_TAB_IDS = TICKET_TABS.map((item) => item.id);
 
@@ -177,7 +171,7 @@ function OptionEditor({
           className={`space-y-3 rounded-2xl border border-white/8 p-4 ${compact ? "bg-black/30" : "bg-black/20"}`}
         >
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label={primaryLabel}>
+            <Field label={primaryLabel} description="Texto visible de la opción que elegirá el usuario.">
               <Input
                 value={option.label}
                 onChange={(event) => {
@@ -198,7 +192,7 @@ function OptionEditor({
                 }}
               />
             </Field>
-            <Field label="Valor">
+            <Field label="Valor" description="Clave interna que se guarda en el ticket.">
               <Input
                 value={option.value}
                 onChange={(event) => {
@@ -209,7 +203,7 @@ function OptionEditor({
               />
             </Field>
           </div>
-          <Field label="Descripción">
+          <Field label="Descripción" description="Texto que se muestra bajo la opción (opcional).">
             <Input
               value={option.description}
               onChange={(event) => {
@@ -270,7 +264,7 @@ function TitleCategoryEditor({
           className="space-y-4 rounded-2xl border border-violet-500/25 bg-violet-500/5 p-4"
         >
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Título">
+            <Field label="Título" description="Nombre de la categoría del menú de tickets.">
               <Input
                 value={category.label}
                 onChange={(event) => {
@@ -286,14 +280,14 @@ function TitleCategoryEditor({
                 }}
               />
             </Field>
-            <Field label="Valor">
+            <Field label="Valor" description="Clave interna de la categoría.">
               <Input
                 value={category.value}
                 onChange={(event) => updateCategory(index, { value: event.target.value })}
               />
             </Field>
           </div>
-          <Field label="Descripción">
+          <Field label="Descripción" description="Texto de apoyo de la categoría (opcional).">
             <Input
               value={category.description}
               onChange={(event) => updateCategory(index, { description: event.target.value })}
@@ -332,7 +326,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
   const { premiumLocked } = usePanel();
   const { channels } = useGuildChannels(guildId);
   const { roles } = useGuildRoles(guildId);
-  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "tickets"), "manage", TICKET_TAB_IDS);
+  const [tab, setTab] = usePersistedTab(paneTabKey(guildId, "tickets"), "panel", TICKET_TAB_IDS);
   const [config, setConfig] = useState<TicketConfigState>({
     enabled: false,
     panelChannelId: "",
@@ -491,7 +485,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
 
       <SectionCard
         title="Gestión de tickets"
-        description="Equivalente al panel legacy con panel, categorías, preview y operación."
+        description="Configura el panel, los títulos y los roles del sistema de tickets."
         action={<PremiumLock locked={premiumLocked} />}
       >
         <Tabs items={TICKET_TABS} value={tab} onValueChange={setTab} className="mb-6" />
@@ -509,37 +503,37 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                   </div>
                   <Switch checked={config.enabled} onCheckedChange={(checked) => setConfig((c) => ({ ...c, enabled: checked }))} />
                 </div>
-                <Field label="Canal del panel">
+                <Field label="Canal del panel" description="Canal donde se publica el mensaje con el botón de solicitar ticket.">
                   <ChannelSelect
                     value={config.panelChannelId}
                     onChange={(panelChannelId) => setConfig((c) => ({ ...c, panelChannelId }))}
                     options={channels}
                   />
                 </Field>
-                <Field label="Canal de solicitudes">
+                <Field label="Canal de solicitudes" description="Canal donde se publica cada solicitud de ticket que crean los miembros.">
                   <ChannelSelect
                     value={config.requestChannelId}
                     onChange={(requestChannelId) => setConfig((c) => ({ ...c, requestChannelId }))}
                     options={channels}
                   />
                 </Field>
-                <Field label="Título del embed">
+                <Field label="Título del embed" description="Encabezado del mensaje del panel de tickets.">
                   <Input value={config.title} onChange={(event) => setConfig((c) => ({ ...c, title: event.target.value }))} />
                 </Field>
-                <Field label="Mensaje">
+                <Field label="Mensaje" description="Descripción que ve el miembro antes de abrir un ticket (opcional).">
                   <Textarea value={config.message} onChange={(event) => setConfig((c) => ({ ...c, message: event.target.value }))} />
                 </Field>
-                <Field label="Texto del botón">
+                <Field label="Texto del botón" description="Etiqueta del botón que abre la solicitud.">
                   <Input
                     value={config.buttonLabel}
                     onChange={(event) => setConfig((c) => ({ ...c, buttonLabel: event.target.value }))}
                   />
                 </Field>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Color embed">
+                  <Field label="Color embed" description="Color del borde y acento del embed del panel.">
                     <ColorInput value={config.color} onChange={(color) => setConfig((c) => ({ ...c, color }))} />
                   </Field>
-                  <Field label="Footer">
+                  <Field label="Footer" description="Texto pequeño al pie del embed (opcional).">
                     <Input value={config.footer} onChange={(event) => setConfig((c) => ({ ...c, footer: event.target.value }))} />
                   </Field>
                 </div>
@@ -576,29 +570,99 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                     }
                   }}
                 />
+                <Field
+                  label="Roles de staff"
+                  description="Estos roles ven, aceptan y cierran tickets del servidor."
+                >
+                  <MultiRoleSelect
+                    value={config.adminRoleIds}
+                    onChange={(adminRoleIds) => setConfig((c) => ({ ...c, adminRoleIds }))}
+                    options={roles}
+                  />
+                </Field>
+                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div>
+                    <p className="font-medium text-white">Recibo por DM</p>
+                    <p className="text-sm text-zinc-400">Envía confirmación privada al abrir ticket.</p>
+                  </div>
+                  <Switch
+                    checked={config.sendDmReceipt}
+                    onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmReceipt: checked }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div>
+                    <p className="font-medium text-white">Estado pendiente por DM</p>
+                    <p className="text-sm text-zinc-400">Notifica al usuario mientras espera aceptación.</p>
+                  </div>
+                  <Switch
+                    checked={config.sendDmPendingStatus}
+                    onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmPendingStatus: checked }))}
+                  />
+                </div>
+                <Field label="Canal historial de recibos" description="Opcional. Copia de los recibos por DM enviados a los miembros.">
+                  <ChannelSelect
+                    value={config.receiptHistoryChannelId}
+                    onChange={(receiptHistoryChannelId) => setConfig((c) => ({ ...c, receiptHistoryChannelId }))}
+                    options={channels}
+                  />
+                </Field>
+                <div className="space-y-4">
+                  <p className="text-sm text-zinc-400">
+                    Roles por título o caso (opcional): asigna responsables concretos además del staff de tickets.
+                  </p>
+                  {caseEntries.length ? (
+                    caseEntries.map((entry) => (
+                      <Field key={entry.key} label={entry.label} description="Roles que gestionan este tipo de caso.">
+                        <MultiRoleSelect
+                          value={config.caseRoleMap[entry.key] || []}
+                          onChange={(roleIds) =>
+                            setConfig((c) => ({
+                              ...c,
+                              caseRoleMap: { ...c.caseRoleMap, [entry.key]: roleIds },
+                            }))
+                          }
+                          options={roles}
+                        />
+                      </Field>
+                    ))
+                  ) : (
+                    <p className="text-sm text-zinc-500">Añade títulos en la pestaña Títulos para mapear roles por caso.</p>
+                  )}
+                </div>
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+                    <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400">
+                      <Eye className="h-4 w-4" />
+                      Vista previa del embed
+                    </div>
+                    <DiscordEmbedPreview
+                      color={previewColor}
+                      title={config.title || "Soporte"}
+                      description={config.message || "Presiona el botón para abrir un ticket."}
+                      footer={config.footer || "Sistema de Tickets"}
+                      imageUrl={config.imageUrl}
+                    />
+                    <div className="mt-4">
+                      <span className="inline-flex rounded-lg bg-[#5865f2] px-4 py-2 text-sm font-medium text-white">
+                        {config.buttonLabel || "Solicitar ticket"}
+                      </span>
+                    </div>
+                  </div>
+                  <Alert
+                    title="Publicación"
+                    description="Guarda los cambios y usa Publicar panel para enviar este embed al canal configurado."
+                  />
+                </div>
                 <div className="flex flex-wrap gap-3">
                   <FormActions onSave={handleSaveConfig} saving={saving} />
-                  <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing}>
+                  <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing} title="Envía el mensaje del panel al canal configurado">
                     {publishing ? "Publicando..." : "Publicar panel"}
                   </Button>
-                  <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={updatingEmbed}>
+                  <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={updatingEmbed} title="Edita el mensaje ya publicado con la configuración actual">
                     {updatingEmbed ? "Actualizando..." : "Actualizar embed"}
                   </Button>
                 </div>
-              </div>
-            )
-          ) : null}
-
-          {tab === "flow" ? (
-            loading ? (
-              <Alert title="Cargando flujo" description="Consultando grafo de tickets." />
-            ) : (
-              <div className="space-y-5">
-                <TicketFlowBuilder
-                  value={config.customFlow}
-                  onChange={(customFlow) => setConfig((c) => ({ ...c, customFlow }))}
-                />
-                <FormActions onSave={handleSaveConfig} saving={saving} />
               </div>
             )
           ) : null}
@@ -658,49 +722,6 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             </div>
           ) : null}
 
-          {tab === "roles" ? (
-            <div className="space-y-5">
-              <Field
-                label="Roles de staff"
-                description="Estos roles del panel son los que ven, aceptan y cierran tickets. Los roles por categoría en Labs no administran."
-              >
-                <MultiRoleSelect
-                  value={config.adminRoleIds}
-                  onChange={(adminRoleIds) => setConfig((c) => ({ ...c, adminRoleIds }))}
-                  options={roles}
-                />
-              </Field>
-              <FormActions onSave={handleSaveConfig} saving={saving} />
-            </div>
-          ) : null}
-
-          {tab === "preview" ? (
-            <div className="grid gap-5 xl:grid-cols-2">
-              <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-                <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400">
-                  <Eye className="h-4 w-4" />
-                  Vista previa del embed
-                </div>
-                <DiscordEmbedPreview
-                  color={previewColor}
-                  title={config.title || "Soporte"}
-                  description={config.message || "Presiona el botón para abrir un ticket."}
-                  footer={config.footer || "Sistema de Tickets"}
-                  imageUrl={config.imageUrl}
-                />
-                <div className="mt-4">
-                  <span className="inline-flex rounded-lg bg-[#5865f2] px-4 py-2 text-sm font-medium text-white">
-                    {config.buttonLabel || "Solicitar ticket"}
-                  </span>
-                </div>
-              </div>
-              <Alert
-                title="Publicación"
-                description="Guarda los cambios y usa Publicar panel para enviar este embed al canal configurado."
-              />
-            </div>
-          ) : null}
-
           {tab === "categories" ? (
             <div className="space-y-8">
               <TitleCategoryEditor
@@ -711,79 +732,7 @@ export function TicketsPane({ guildId }: { guildId: string }) {
             </div>
           ) : null}
 
-          {tab === "labs" ? (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                <div>
-                  <p className="font-medium text-white">Recibo por DM</p>
-                  <p className="text-sm text-zinc-400">Envía confirmación privada al abrir ticket.</p>
-                </div>
-                <Switch
-                  checked={config.sendDmReceipt}
-                  onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmReceipt: checked }))}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                <div>
-                  <p className="font-medium text-white">Estado pendiente por DM</p>
-                  <p className="text-sm text-zinc-400">Notifica al usuario mientras espera aceptación.</p>
-                </div>
-                <Switch
-                  checked={config.sendDmPendingStatus}
-                  onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmPendingStatus: checked }))}
-                />
-              </div>
-              <Field label="Canal historial de recibos">
-                <ChannelSelect
-                  value={config.receiptHistoryChannelId}
-                  onChange={(receiptHistoryChannelId) => setConfig((c) => ({ ...c, receiptHistoryChannelId }))}
-                  options={channels}
-                />
-              </Field>
-              <div className="space-y-4">
-                <p className="text-sm text-zinc-400">
-                  Los tickets los administran solo los roles de la pestaña Roles. Este mapa es opcional y ya no otorga permisos de gestión.
-                </p>
-                {caseEntries.length ? (
-                  caseEntries.map((entry) => (
-                    <Field key={entry.key} label={entry.label}>
-                      <MultiRoleSelect
-                        value={config.caseRoleMap[entry.key] || []}
-                        onChange={(roleIds) =>
-                          setConfig((c) => ({
-                            ...c,
-                            caseRoleMap: { ...c.caseRoleMap, [entry.key]: roleIds },
-                          }))
-                        }
-                        options={roles}
-                      />
-                    </Field>
-                  ))
-                ) : (
-                  <p className="text-sm text-zinc-500">Añade categorías en la pestaña Categorías para mapear roles por caso.</p>
-                )}
-              </div>
-              <FormActions onSave={handleSaveConfig} saving={saving} />
-            </div>
-          ) : null}
-
           {tab === "manage" ? <TicketsManagePanel guildId={guildId} /> : null}
-
-          {tab === "guide" ? (
-            <div className="space-y-4">
-              <Alert
-                title="Flujo recomendado"
-                description="1) Configura el panel. 2) En Flujo arma el recorrido con nodos y líneas (activa «Usar este flujo»). 3) Roles de staff. 4) Preview y publica. 5) Gestiona pendientes."
-              />
-              <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
-                <div className="mb-2 flex items-center gap-2 font-medium text-zinc-200">
-                  <LayoutTemplate className="h-4 w-4" />
-                  Plantillas disponibles
-                </div>
-                {TICKET_PRESETS.map((preset) => preset.name).join(" · ")}
-              </div>
-            </div>
-          ) : null}
         </div>
       </SectionCard>
 
@@ -800,9 +749,8 @@ export function TicketsPane({ guildId }: { guildId: string }) {
               })
               .join(" · ")
           : "Sin categorías cargadas."}
-        <div className="mt-3 flex items-center gap-2">
-          <FlaskConical className="h-4 w-4" />
-          Labs: DM recibo {config.sendDmReceipt ? "on" : "off"} · pendiente DM{" "}
+        <div className="mt-3 flex items-center gap-2 text-zinc-500">
+          DM recibo {config.sendDmReceipt ? "on" : "off"} · pendiente DM{" "}
           {config.sendDmPendingStatus ? "on" : "off"}
         </div>
       </div>

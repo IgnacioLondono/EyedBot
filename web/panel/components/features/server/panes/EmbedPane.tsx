@@ -207,7 +207,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
       <SectionCard title="Constructor de embeds" description="Crea embeds completos, edita mensajes del bot o guarda plantillas.">
         <div className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Canal destino">
+            <Field label="Canal destino" description="Canal de texto donde se enviará o editará el embed.">
               <ChannelSelect
                 value={form.channelId}
                 onChange={(channelId) => patchForm({ channelId })}
@@ -224,10 +224,9 @@ export function EmbedPane({ guildId }: { guildId: string }) {
             </Field>
           </div>
 
-          <Field label="Título">
-            <Input value={form.title} onChange={(event) => patchForm({ title: event.target.value })} />
+          <Field label="Título" description="Título del embed en negrita (opcional).">
           </Field>
-          <Field label="Descripción">
+          <Field label="Descripción" description="Contenido principal del embed. Admite Markdown.">
             <Textarea
               value={form.description}
               onChange={(event) => patchForm({ description: event.target.value })}
@@ -236,21 +235,20 @@ export function EmbedPane({ guildId }: { guildId: string }) {
           </Field>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Color">
+            <Field label="Color" description="Color de la barra lateral del embed.">
               <ColorInput value={form.color} onChange={(color) => patchForm({ color })} format="hash" />
             </Field>
-            <Field label="Footer">
-              <Input value={form.footer} onChange={(event) => patchForm({ footer: event.target.value })} />
+            <Field label="Footer" description="Texto pequeño al pie del embed (opcional).">
             </Field>
           </div>
 
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-4">
             <p className="text-sm font-medium text-white">Autor</p>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Nombre">
+              <Field label="Nombre" description="Nombre del autor que aparece sobre el embed.">
                 <Input value={form.authorName} onChange={(event) => patchForm({ authorName: event.target.value })} />
               </Field>
-              <Field label="Enlace">
+              <Field label="Enlace" description="URL a la que enlaza el nombre del autor.">
                 <Input value={form.authorUrl} onChange={(event) => patchForm({ authorUrl: event.target.value })} />
               </Field>
             </div>
@@ -322,7 +320,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
             {form.fields.map((field, index) => (
               <div key={`field-${index}`} className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-3">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="Nombre">
+                  <Field label="Nombre" description="Etiqueta del campo, mostrada en negrita dentro del embed.">
                     <Input
                       value={field.name}
                       onChange={(event) => {
@@ -355,7 +353,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
                     </Button>
                   </div>
                 </div>
-                <Field label="Valor">
+                <Field label="Valor" description="Contenido del campo del embed. Admite Markdown.">
                   <Textarea
                     value={field.value}
                     onChange={(event) => {
@@ -370,7 +368,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
             ))}
           </div>
 
-          <Field label="Nombre de plantilla">
+          <Field label="Nombre de plantilla" description="Nombre para guardar el embed como plantilla reutilizable.">
             <Input
               value={form.templateName}
               onChange={(event) => patchForm({ templateName: event.target.value })}

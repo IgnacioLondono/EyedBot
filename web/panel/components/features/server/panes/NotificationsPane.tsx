@@ -209,21 +209,21 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
               </div>
               <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((c) => ({ ...c, enabled: checked }))} />
             </div>
-            <Field label="Canal de publicación">
+            <Field label="Canal de publicación" description="Canal de texto donde el bot publica los avisos de directo.">
               <ChannelSelect
                 value={form.channelId}
                 onChange={(channelId) => setForm((c) => ({ ...c, channelId }))}
                 options={channels}
               />
             </Field>
-            <Field label="Mención o texto extra">
+            <Field label="Mención o texto extra" description="Texto que acompaña al aviso, por ejemplo una mención de rol (@everyone).">
               <Input
                 value={form.mentionText}
                 onChange={(event) => setForm((c) => ({ ...c, mentionText: event.target.value }))}
                 placeholder="@everyone o mención de rol"
               />
             </Field>
-            <Field label="Mencionar rol">
+            <Field label="Mencionar rol" description="Atajo para añadir la mención de un rol al aviso sin escribirla a mano.">
               <RoleSelect
                 value=""
                 onChange={(roleId) => {
@@ -247,10 +247,10 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
               />
             </Field>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Color embed">
+              <Field label="Color embed" description="Color de la barra lateral del aviso publicado en Discord.">
                 <ColorInput value={form.color} onChange={(color) => setForm((c) => ({ ...c, color }))} />
               </Field>
-              <Field label="Footer">
+              <Field label="Footer" description="Texto pequeño al pie del aviso (opcional).">
                 <Input
                   value={form.footerText}
                   onChange={(event) => setForm((c) => ({ ...c, footerText: event.target.value }))}
@@ -285,6 +285,7 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
                 size="sm"
                 variant="secondary"
                 onClick={() => setForm((c) => ({ ...c, sources: [...c.sources, emptySource()] }))}
+                title="Añade una nueva fuente de directos a vigilar"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Añadir fuente
@@ -313,13 +314,14 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
                             sources: c.sources.filter((_, i) => i !== index),
                           }))
                         }
+                        title="Elimina esta fuente de directos"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Plataforma">
+                    <Field label="Plataforma" description="Plataforma en la que se transmite (Twitch, YouTube, Kick, Rumble, TikTok o URL propia).">
                       <Select
                         value={source.platform}
                         onChange={(event) =>
@@ -334,20 +336,20 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
                         <option value="custom">Custom</option>
                       </Select>
                     </Field>
-                    <Field label="Nombre">
+                    <Field label="Nombre" description="Etiqueta para identificar al creador en el panel.">
                       <Input
                         value={source.name}
                         onChange={(event) => updateSource(index, { name: event.target.value })}
                       />
                     </Field>
-                    <Field label="URL principal">
+                    <Field label="URL principal" description="Enlace al canal del creador (se usa en el aviso).">
                       <Input
                         value={source.url}
                         onChange={(event) => updateSource(index, { url: event.target.value })}
                         placeholder="https://..."
                       />
                     </Field>
-                    <Field label="Feed / RSS">
+                    <Field label="Feed / RSS" description="Feed de la plataforma para detectar los directos (URL del canal o feed personalizado).">
                       <Input
                         value={source.feedUrl}
                         onChange={(event) => updateSource(index, { feedUrl: event.target.value })}
@@ -355,7 +357,7 @@ export function NotificationsPane({ guildId }: { guildId: string }) {
                       />
                     </Field>
                     {tab === "stream" ? (
-                      <Field label="Imagen">
+                      <Field label="Imagen" description="Imagen que se muestra en la vista previa del aviso (opcional).">
                         <Input
                           value={source.imageUrl}
                           onChange={(event) => updateSource(index, { imageUrl: event.target.value })}

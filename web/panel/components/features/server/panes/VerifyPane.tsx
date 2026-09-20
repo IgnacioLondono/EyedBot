@@ -269,10 +269,10 @@ export function VerifyPane({ guildId }: { guildId: string }) {
               </div>
               <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
             </div>
-            <Field label="Canal de publicación">
+            <Field label="Canal de publicación" description="Canal donde se envía el mensaje de verificación.">
               <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((current) => ({ ...current, channelId }))} options={channels} />
             </Field>
-            <Field label="Rol al verificar">
+            <Field label="Rol al verificar" description="Rol que recibe cada miembro al completar la verificación.">
               <RoleSelect value={form.roleId} onChange={(roleId) => setForm((current) => ({ ...current, roleId }))} options={roles} />
             </Field>
             <Field label="Rol inicial de nuevo miembro" description="Se asigna al entrar y limita qué canales puede ver hasta verificarse.">
@@ -299,12 +299,12 @@ export function VerifyPane({ guildId }: { guildId: string }) {
               </Select>
             </Field>
             {form.verificationMode !== "button" ? (
-              <Field label="Emoji de reacción">
+              <Field label="Emoji de reacción" description="Emoji que debe reaccionar el miembro para verificarse.">
                 <Input value={form.emoji} onChange={(event) => setForm((current) => ({ ...current, emoji: event.target.value }))} placeholder="✅" />
               </Field>
             ) : null}
             {form.verificationMode !== "reaction" ? (
-              <Field label="Texto del botón">
+              <Field label="Texto del botón" description="Texto que se muestra en el botón de verificación.">
                 <Input
                   value={form.buttonLabel}
                   onChange={(event) => setForm((current) => ({ ...current, buttonLabel: event.target.value }))}
@@ -351,7 +351,7 @@ export function VerifyPane({ guildId }: { guildId: string }) {
                 options={selectableChannels}
               />
             </Field>
-            <Button variant="secondary" onClick={() => void handleSyncPermissions()} disabled={syncingPermissions || !form.newMemberRoleId}>
+            <Button variant="secondary" onClick={() => void handleSyncPermissions()} disabled={syncingPermissions || !form.newMemberRoleId} title="Aplica los permisos de «Ver canal» en todos los canales según la puerta configurada">
               {syncingPermissions ? "Aplicando puerta..." : "Aplicar puerta de verificación"}
             </Button>
           </div>
@@ -416,16 +416,16 @@ export function VerifyPane({ guildId }: { guildId: string }) {
 
         {tab === "embed" ? (
           <div className="space-y-5">
-            <Field label="Título">
+            <Field label="Título" description="Encabezado del embed de verificación.">
               <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
             </Field>
-            <Field label="Descripción">
+            <Field label="Descripción" description="Instrucciones que ve el miembro antes de verificarse.">
               <Textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
             </Field>
-            <Field label="Color del embed">
+            <Field label="Color del embed" description="Color del borde y acento del embed.">
               <ColorInput value={form.color} onChange={(color) => setForm((current) => ({ ...current, color }))} />
             </Field>
-            <Field label="Footer">
+            <Field label="Footer" description="Texto pequeño al pie del embed (opcional).">
               <Input value={form.footer} onChange={(event) => setForm((current) => ({ ...current, footer: event.target.value }))} />
             </Field>
           </div>
@@ -477,10 +477,10 @@ export function VerifyPane({ guildId }: { guildId: string }) {
 
         <div className="mt-5 flex flex-wrap gap-3">
           <FormActions onSave={handleSave} saving={saving} />
-          <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing}>
+          <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing} title="Envía el mensaje de verificación al canal seleccionado">
             {publishing ? "Publicando..." : "Publicar mensaje"}
           </Button>
-          <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={publishing}>
+          <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={publishing} title="Edita el mensaje publicado con la configuración actual">
             Actualizar embed
           </Button>
         </div>

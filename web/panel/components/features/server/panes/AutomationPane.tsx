@@ -189,7 +189,7 @@ export function AutomationPane({ guildId }: { guildId: string }) {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-zinc-400">{templates.length} plantillas disponibles</p>
-              <Button variant="secondary" size="sm" onClick={() => void loadSetup()} disabled={loading}>
+              <Button variant="secondary" size="sm" onClick={() => void loadSetup()} disabled={loading} title="Recarga las plantillas y conflictos desde el servidor">
                 <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 Actualizar
               </Button>
@@ -269,7 +269,7 @@ export function AutomationPane({ guildId }: { guildId: string }) {
 
         {tab === "apply" ? (
           <div className="space-y-5">
-            <Field label="Plantilla seleccionada">
+            <Field label="Plantilla seleccionada" description="Estructura que se creará en el servidor al aplicar.">
               <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
                 <p className="font-medium text-white">{selectedTemplate?.label || "Sin plantilla"}</p>
                 <p className="mt-1 text-sm text-zinc-400">{selectedTemplate?.description}</p>
@@ -284,7 +284,7 @@ export function AutomationPane({ guildId }: { guildId: string }) {
               <Switch checked={skipExisting} onCheckedChange={setSkipExisting} />
             </div>
 
-            <Button onClick={() => void handleApply()} disabled={applying || !selectedTemplate}>
+            <Button onClick={() => void handleApply()} disabled={applying || !selectedTemplate} title="Crea todas las categorías y canales de la plantilla en este servidor">
               <Play className="mr-2 h-4 w-4" />
               {applying ? "Creando estructura…" : "Aplicar plantilla"}
             </Button>

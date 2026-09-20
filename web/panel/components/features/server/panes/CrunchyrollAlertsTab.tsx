@@ -288,10 +288,10 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Canal de avisos">
+        <Field label="Canal de avisos" description="Canal donde se publican los avisos de capítulos nuevos.">
           <ChannelSelect value={form.channelId} onChange={(channelId) => setForm((c) => ({ ...c, channelId }))} options={channels} />
         </Field>
-        <Field label="Mención">
+        <Field label="Mención" description="Texto que acompaña al aviso, por ejemplo @everyone o un ID de rol.">
           <Input
             value={form.mentionText}
             onChange={(event) => setForm((c) => ({ ...c, mentionText: event.target.value }))}
@@ -300,7 +300,7 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
         </Field>
       </div>
 
-      <Field label="Mencionar rol">
+      <Field label="Mencionar rol" description="Atajo para añadir la mención de un rol al aviso. Complementa el campo «Mención».">
         <RoleSelect
           value=""
           onChange={(roleId) => {
@@ -316,7 +316,7 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
         <Field label="Plantilla título" description="{series}, {episode}, {episodeTitle}">
           <Input value={form.titleTemplate} onChange={(event) => setForm((c) => ({ ...c, titleTemplate: event.target.value }))} />
         </Field>
-        <Field label="Color">
+        <Field label="Color" description="Color de la barra lateral del embed del aviso.">
           <ColorInput value={form.color} onChange={(color) => setForm((c) => ({ ...c, color }))} />
         </Field>
       </div>
@@ -329,7 +329,7 @@ export function CrunchyrollAlertsTab({ guildId }: { guildId: string }) {
         />
       </Field>
 
-      <Field label="Footer">
+      <Field label="Footer" description="Texto pequeño al pie del aviso (opcional).">
         <Input value={form.footerText} onChange={(event) => setForm((c) => ({ ...c, footerText: event.target.value }))} />
       </Field>
 
