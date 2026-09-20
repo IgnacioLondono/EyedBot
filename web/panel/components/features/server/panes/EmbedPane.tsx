@@ -42,6 +42,8 @@ export function EmbedPane({ guildId }: { guildId: string }) {
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState("");
+  const [authorIconFile, setAuthorIconFile] = useState<File | null>(null);
+  const [authorIconPreviewUrl, setAuthorIconPreviewUrl] = useState("");
   const [templates, setTemplates] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -72,6 +74,16 @@ export function EmbedPane({ guildId }: { guildId: string }) {
     setThumbnailPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [thumbnailFile]);
+
+  useEffect(() => {
+    if (!authorIconFile) {
+      setAuthorIconPreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(authorIconFile);
+    setAuthorIconPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [authorIconFile]);
 
   useEffect(() => {
     let active = true;
@@ -107,6 +119,8 @@ export function EmbedPane({ guildId }: { guildId: string }) {
     );
     setImageFile(null);
     setThumbnailFile(null);
+    setAuthorIconFile(null);
+    setAuthorIconPreviewUrl("");
     toast({ title: "Plantilla cargada", description: "El editor se rellenó con la plantilla seleccionada.", tone: "success" });
   }
 
@@ -125,6 +139,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
       payload.append("embed", JSON.stringify(buildEmbedPayload(form)));
       if (imageFile) payload.append("imageFile", imageFile);
       if (thumbnailFile) payload.append("thumbnailFile", thumbnailFile);
+      if (authorIconFile) payload.append("authorIconFile", authorIconFile);
 
       await sendEmbed(payload);
       toast({
@@ -156,6 +171,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
       payload.append("embed", JSON.stringify(buildEmbedPayload(form)));
       if (imageFile) payload.append("imageFile", imageFile);
       if (thumbnailFile) payload.append("thumbnailFile", thumbnailFile);
+      if (authorIconFile) payload.append("authorIconFile", authorIconFile);
 
       const result = asRecord(await saveEmbedTemplate(payload));
       const template = asRecord(result.template);
@@ -168,6 +184,8 @@ export function EmbedPane({ guildId }: { guildId: string }) {
       );
       setImageFile(null);
       setThumbnailFile(null);
+      setAuthorIconFile(null);
+      setAuthorIconPreviewUrl("");
       toast({ title: "Template guardado", description: "La plantilla quedó disponible con sus imágenes.", tone: "success" });
       await reloadTemplates();
     } catch (err) {
@@ -258,17 +276,26 @@ export function EmbedPane({ guildId }: { guildId: string }) {
 
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-4">
             <p className="text-sm font-medium text-white">Autor</p>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               <Field label="Nombre">
                 <Input value={form.authorName} onChange={(event) => patchForm({ authorName: event.target.value })} />
-              </Field>
-              <Field label="Icono URL">
-                <Input value={form.authorIconUrl} onChange={(event) => patchForm({ authorIconUrl: event.target.value })} />
               </Field>
               <Field label="Enlace">
                 <Input value={form.authorUrl} onChange={(event) => patchForm({ authorUrl: event.target.value })} />
               </Field>
             </div>
+            <EmbedImageField
+              label="Icono del autor"
+              description="URL del ícono o un archivo de imagen que se adjunta al enviar el embed."
+              value={form.authorIconUrl}
+              onChange={(authorIconUrl) => patchForm({ authorIconUrl })}
+              filePreview={authorIconPreviewUrl}
+              onFileSelect={setAuthorIconFile}
+              onDelete={() => {
+                patchForm({ authorIconUrl: "" });
+                setAuthorIconFile(null);
+              }}
+            />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">

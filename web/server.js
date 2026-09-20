@@ -8014,7 +8014,7 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
 });
 
 // Ruta para enviar embeds (o editar uno existente del bot si llega messageId)
-app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'thumbnailFile', maxCount: 1 }]), async (req, res) => {
+app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'thumbnailFile', maxCount: 1 }, { name: 'authorIconFile', maxCount: 1 }]), async (req, res) => {
     try {
         const { guildId, channelId } = req.body;
         const rawMessageId = String(req.body?.messageId || req.body?.targetMessageId || '').trim();
@@ -8125,6 +8125,26 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             if (botUser && typeof botUser.displayAvatarURL === 'function') {
                 discordEmbed.setThumbnail(botUser.displayAvatarURL({ dynamic: true }));
             }
+        }
+
+        // Icono del autor: preferir archivo subido; si no, resolver URL de plantilla guardada.
+        const authorIconUpload = req.files?.authorIconFile?.[0];
+        let authorIconResolved = '';
+        if (authorIconUpload?.buffer) {
+            const authorIconName = embedAttachmentName(authorIconUpload, `embed_author_${stamp}`);
+            files.push({ attachment: authorIconUpload.buffer, name: authorIconName });
+            authorIconResolved = `attachment://${authorIconName}`;
+        } else if (embed.author?.iconURL) {
+            const resolved = await resolveEmbedImageForDiscord(embed.author.iconURL, `embed_author_${stamp}`);
+            if (resolved?.mode === 'attachment') {
+                files.push({ attachment: resolved.data, name: resolved.name });
+                authorIconResolved = `attachment://${resolved.name}`;
+            } else if (resolved?.mode === 'url') {
+                authorIconResolved = resolved.url;
+            }
+        }
+        if (authorIconResolved && String(embed.author?.name || '').trim()) {
+            discordEmbed.setAuthor({ name: tpl(embed.author.name), iconURL: authorIconResolved, url: embed.author?.url });
         }
 
         const hasFiles = files.length > 0;
@@ -8283,7 +8303,8 @@ app.get('/api/embed-templates/:guildId', requireAuth, (req, res) => {
 
 app.post('/api/embed-templates', requireAuth, upload.fields([
     { name: 'imageFile', maxCount: 1 },
-    { name: 'thumbnailFile', maxCount: 1 }
+    { name: 'thumbnailFile', maxCount: 1 },
+    { name: 'authorIconFile', maxCount: 1 }
 ]), (req, res) => {
     try {
         const guildId = String(req.body?.guildId || '').trim();
@@ -8313,6 +8334,17 @@ app.post('/api/embed-templates', requireAuth, upload.fields([
                 return res.status(400).json({ error: 'La miniatura debe ser un archivo de imagen' });
             }
             embed.thumbnail = persistEmbedTemplateAsset(req, guildId, thumbnailUpload, 'thumb');
+        }
+        const authorIconUpload = req.files?.authorIconFile?.[0];
+        if (authorIconUpload?.buffer) {
+            if (!String(authorIconUpload.mimetype || '').startsWith('image/')) {
+                return res.status(400).json({ error: 'El icono del autor debe ser un archivo de imagen' });
+            }
+            if (!String(embed.author?.name || '').trim()) {
+                return res.status(400).json({ error: 'Indica el nombre del autor para poder usar su icono' });
+            }
+            if (!embed.author || typeof embed.author !== 'object') embed.author = {};
+            embed.author.iconURL = persistEmbedTemplateAsset(req, guildId, authorIconUpload, 'author');
         }
 
         const store = readTemplateStore();
