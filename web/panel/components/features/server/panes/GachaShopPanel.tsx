@@ -539,6 +539,7 @@ export function GachaShopPanel({
         {editForm && editingItem && editingId ? (
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Nombre" description="Nombre del personaje o carta en el catálogo.">
+              <Input value={editForm.name} onChange={(event) => setEditForm((c) => (c ? { ...c, name: event.target.value } : c))} />
             </Field>
             <Field label="Rareza" description="Nivel de rareza: SSR, SR, R o N.">
               <Select value={editForm.rarity} onChange={(event) => setEditForm((c) => (c ? { ...c, rarity: event.target.value } : c))}>

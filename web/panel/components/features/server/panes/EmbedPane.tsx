@@ -225,6 +225,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
           </div>
 
           <Field label="Título" description="Título del embed en negrita (opcional).">
+              <Input value={form.title} onChange={(event) => patchForm({ title: event.target.value })} />
           </Field>
           <Field label="Descripción" description="Contenido principal del embed. Admite Markdown.">
             <Textarea
@@ -239,6 +240,7 @@ export function EmbedPane({ guildId }: { guildId: string }) {
               <ColorInput value={form.color} onChange={(color) => patchForm({ color })} format="hash" />
             </Field>
             <Field label="Footer" description="Texto pequeño al pie del embed (opcional).">
+              <Input value={form.footer} onChange={(event) => patchForm({ footer: event.target.value })} />
             </Field>
           </div>
 
