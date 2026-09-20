@@ -28,6 +28,7 @@ const {
     applyWelcomeMediaToEmbed
 } = require('../src/utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
+const { isEmbedTemplateId, applyEmbedTemplateToEmbed } = require('../src/utils/embed-templates');
 const { resolveEmbedImageForDiscord } = require('../src/utils/discord-media-url');
 const greetingImageStore = require('../src/utils/greeting-image-store');
 let welcomeCardUtils = null;
@@ -3995,6 +3996,9 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
         color: String(body.color || (mode === 'goodbye' ? 'ff5f9e' : '7c4dff')).replace('#', '').slice(0, 6),
         footer: String(body.footer || '').slice(0, 300),
         imageUrl: imageUrl.slice(0, 1000),
+        embedTemplateId: isEmbedTemplateId(body.embedTemplateId)
+            ? String(body.embedTemplateId)
+            : (isEmbedTemplateId(existing?.embedTemplateId) ? String(existing.embedTemplateId) : undefined),
         thumbnailMode: ['none', 'avatar', 'url'].includes(String(body.thumbnailMode || 'avatar')) ? String(body.thumbnailMode) : 'avatar',
         thumbnailUrl: thumbnailUrl.slice(0, 1000),
         dmEnabled: body.dmEnabled === true,
@@ -7816,10 +7820,18 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
-        if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-        else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-            await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
+        if (isEmbedTemplateId(cfg?.embedTemplateId)) {
+            await applyEmbedTemplateToEmbed(embed, cfg, {
+                guild,
+                files,
+                avatarUrl: member.user.displayAvatarURL({ dynamic: true })
+            });
+        } else {
+            if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
+            if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+            else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+                await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
+            }
         }
 
         await channel.send({ content, embeds: [embed], files, allowedMentions });
@@ -7976,10 +7988,18 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
-        if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-        else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-            await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
+        if (isEmbedTemplateId(cfg?.embedTemplateId)) {
+            await applyEmbedTemplateToEmbed(embed, cfg, {
+                guild,
+                files,
+                avatarUrl: member.user.displayAvatarURL({ dynamic: true })
+            });
+        } else {
+            if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
+            if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+            else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+                await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
+            }
         }
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;
@@ -8095,6 +8115,15 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
                 discordEmbed.setThumbnail(`attachment://${resolved.name}`);
             } else if (resolved?.mode === 'url') {
                 discordEmbed.setThumbnail(resolved.url);
+            }
+        }
+
+        // Plantillas con avatar: si el usuario no definió miniatura, usar el avatar del bot.
+        const embedTemplateId = String(embed.embedTemplateId || '').trim();
+        if ((embedTemplateId === 'avatar' || embedTemplateId === 'avatar-banner') && !thumbnailUpload?.buffer && !embed.thumbnail) {
+            const botUser = getBotClient().user;
+            if (botUser && typeof botUser.displayAvatarURL === 'function') {
+                discordEmbed.setThumbnail(botUser.displayAvatarURL({ dynamic: true }));
             }
         }
 

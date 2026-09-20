@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DoorOpen, ExternalLink, Mail, Paintbrush, PartyPopper } from "lucide-react";
+import { Check, DoorOpen, ExternalLink, Mail, Paintbrush, PartyPopper } from "lucide-react";
 import {
   deleteWelcomeImage,
   getGoodbyeConfig,
@@ -35,7 +35,8 @@ import {
 import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { plainColorToHex } from "@/lib/embed-utils";
-import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
+import { asRecord, cn, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
+import { EMBED_TEMPLATES, getEmbedTemplateSlots } from "@/lib/embed-templates";
 import {
   DEFAULT_WELCOME_CARD_LAYOUT,
   mergeWelcomeCardLayout,
@@ -58,6 +59,7 @@ type ConfigState = {
   dmEnabled: boolean;
   dmMessage: string;
   welcomeStyle: "embed" | "card";
+  embedTemplateId: string;
   cardAccentColor: string;
   cardTitleColor: string;
   cardNameColor: string;
@@ -83,6 +85,7 @@ const defaultState: ConfigState = {
   dmEnabled: false,
   dmMessage: "",
   welcomeStyle: "embed",
+  embedTemplateId: "avatar",
   cardAccentColor: "4ade80",
   cardTitleColor: "ffffff",
   cardNameColor: "f8fafc",
@@ -93,6 +96,19 @@ const defaultState: ConfigState = {
   cardFontKey: "system",
   cardLayout: { ...DEFAULT_WELCOME_CARD_LAYOUT },
 };
+
+function deriveEmbedTemplateId(data: Record<string, unknown>): string {
+  const raw = toStringValue(data.embedTemplateId);
+  if (EMBED_TEMPLATES.some((tpl) => tpl.id === raw)) return raw;
+  const imageUrl = toStringValue(data.imageUrl || data.image_url);
+  const thumbnailUrl = toStringValue(data.thumbnailUrl);
+  const thumbnailMode = toStringValue(data.thumbnailMode, "avatar");
+  if (imageUrl && thumbnailMode === "avatar") return "avatar-banner";
+  if (imageUrl) return "banner";
+  if (thumbnailMode === "avatar") return "avatar";
+  if (thumbnailUrl) return "sidebar";
+  return "classic";
+}
 
 function normalizeConfig(value: unknown, mode: "welcome" | "goodbye"): ConfigState {
   const data = asRecord(value);
@@ -114,6 +130,7 @@ function normalizeConfig(value: unknown, mode: "welcome" | "goodbye"): ConfigSta
       mode === "welcome" ? "Bienvenido a {server}, {username}." : ""
     ),
     welcomeStyle: toStringValue(data.welcomeStyle, "embed") === "card" ? "card" : "embed",
+    embedTemplateId: deriveEmbedTemplateId(data),
     cardAccentColor: toStringValue(data.cardAccentColor, "4ade80").replace("#", ""),
     cardTitleColor: toStringValue(data.cardTitleColor, "ffffff").replace("#", ""),
     cardNameColor: toStringValue(data.cardNameColor, "f8fafc").replace("#", ""),
@@ -179,6 +196,10 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const imageSlot = tab === "welcome" ? "welcome" : "goodbye";
   const thumbSlot = tab === "welcome" ? "welcome_thumb" : "goodbye_thumb";
   const isCardWelcome = tab === "welcome" && welcome.welcomeStyle === "card" && welcomeCardEnabled;
+  const embedTemplateSlots = getEmbedTemplateSlots(active.embedTemplateId);
+  const hasAvatarSlot = embedTemplateSlots.includes("avatar");
+  const hasImageSlot = embedTemplateSlots.includes("image");
+  const hasThumbSlot = embedTemplateSlots.includes("thumbnail");
 
   function insertChannelMention() {
     const channel = channels.find((item) => item.id === channelToInsert);
@@ -407,6 +428,38 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                 </Field>
               ) : null}
 
+              {!isCardWelcome ? (
+                <Field
+                  label="Plantilla del embed"
+                  description="Elige la forma del embed y qué espacios de imagen incluye."
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {EMBED_TEMPLATES.map((tpl) => {
+                      const selected = active.embedTemplateId === tpl.id;
+                      return (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          onClick={() => setActive((current) => ({ ...current, embedTemplateId: tpl.id }))}
+                          className={cn(
+                            "rounded-2xl border p-3 text-left transition",
+                            selected
+                              ? "border-violet-400/60 bg-violet-500/15"
+                              : "border-white/8 bg-black/20 hover:border-white/20"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-white">{tpl.label}</p>
+                            {selected ? <Check className="h-4 w-4 shrink-0 text-violet-300" /> : null}
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-zinc-400">{tpl.description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              ) : null}
+
               {isCardWelcome ? (
                 <div className="rounded-2xl border border-violet-400/25 bg-gradient-to-br from-violet-500/15 to-teal-500/10 p-5">
                   <div className="mb-3 flex items-center gap-3">
@@ -495,30 +548,28 @@ export function WelcomePane({ guildId }: { guildId: string }) {
               <div className="mb-1 flex items-center gap-2 text-sm text-zinc-400">
                 Imágenes del embed
               </div>
-              <EmbedImageField
-                label="Imagen principal"
-                description="URL externa o archivo subido al panel."
-                value={active.imageUrl}
-                onChange={(imageUrl) => setActive((current) => ({ ...current, imageUrl }))}
-                uploading={uploadingMainImage}
-                deleting={deletingMainImage}
-                onUpload={(file) => handleUploadImage(file, imageSlot, "main")}
-                onDelete={() => handleDeleteImage(imageSlot, "main")}
-              />
-              <Field label="Miniatura" description="Avatar del usuario, URL personalizada o sin miniatura.">
-                <Select
-                  value={active.thumbnailMode}
-                  onChange={(event) => setActive((current) => ({ ...current, thumbnailMode: event.target.value }))}
-                >
-                  <option value="avatar">Avatar del usuario</option>
-                  <option value="url">URL / imagen subida</option>
-                  <option value="none">Sin miniatura</option>
-                </Select>
-              </Field>
-              {active.thumbnailMode === "url" ? (
+              {hasAvatarSlot ? (
+                <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-300">
+                  Esta plantilla muestra el <span className="font-medium text-white">avatar del usuario</span> como
+                  miniatura automáticamente.
+                </div>
+              ) : null}
+              {hasImageSlot ? (
                 <EmbedImageField
-                  label="Miniatura del embed"
-                  description="Se muestra arriba a la derecha en Discord."
+                  label="Imagen principal"
+                  description="URL externa o archivo subido al panel."
+                  value={active.imageUrl}
+                  onChange={(imageUrl) => setActive((current) => ({ ...current, imageUrl }))}
+                  uploading={uploadingMainImage}
+                  deleting={deletingMainImage}
+                  onUpload={(file) => handleUploadImage(file, imageSlot, "main")}
+                  onDelete={() => handleDeleteImage(imageSlot, "main")}
+                />
+              ) : null}
+              {hasThumbSlot ? (
+                <EmbedImageField
+                  label="Miniatura (logo / emblema)"
+                  description="URL externa o archivo subido al panel. Se muestra arriba a la derecha en Discord."
                   value={active.thumbnailUrl}
                   onChange={(thumbnailUrl) => setActive((current) => ({ ...current, thumbnailUrl }))}
                   uploading={uploadingThumbImage}
@@ -526,6 +577,11 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                   onUpload={(file) => handleUploadImage(file, thumbSlot, "thumb")}
                   onDelete={() => handleDeleteImage(thumbSlot, "thumb")}
                 />
+              ) : null}
+              {!hasAvatarSlot && !hasImageSlot && !hasThumbSlot ? (
+                <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400">
+                  La plantilla «Clásica» no incluye imágenes en el embed.
+                </div>
               ) : null}
             </>
           ) : null}
@@ -593,9 +649,9 @@ export function WelcomePane({ guildId }: { guildId: string }) {
               description={active.message || "Aún no hay un mensaje configurado para esta pestaña."}
               color={plainColorToHex(active.color)}
               footer={active.footer}
-              imageUrl={active.imageUrl}
-              thumbnailUrl={active.thumbnailMode === "url" ? active.thumbnailUrl : ""}
-              thumbnailLabel={active.thumbnailMode === "avatar" ? "Avatar del usuario" : undefined}
+              imageUrl={hasImageSlot ? active.imageUrl : ""}
+              thumbnailUrl={hasThumbSlot ? active.thumbnailUrl : ""}
+              thumbnailLabel={hasAvatarSlot ? "Avatar del usuario" : undefined}
             />
           )}
 

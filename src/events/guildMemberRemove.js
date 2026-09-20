@@ -1,5 +1,6 @@
 const welcomeStore = require('../utils/welcome-config-store');
 const { applyWelcomeMediaToEmbed } = require('../utils/welcome-upload-resolve');
+const { isEmbedTemplateId, applyEmbedTemplateToEmbed } = require('../utils/embed-templates');
 const { applyGuildEmbedText } = require('../utils/embed-text-template');
 
 function applyTemplate(text, member) {
@@ -30,14 +31,22 @@ module.exports = {
         if (goodbyeConfig?.footer) embed.setFooter({ text: applyTemplate(goodbyeConfig.footer, member) });
 
         const files = [];
-        if (goodbyeConfig?.imageUrl) {
-            await applyWelcomeMediaToEmbed(embed, goodbyeConfig.imageUrl, files, member.guild, 'image');
-        }
+        if (isEmbedTemplateId(goodbyeConfig?.embedTemplateId)) {
+            await applyEmbedTemplateToEmbed(embed, goodbyeConfig, {
+                guild: member.guild,
+                files,
+                avatarUrl: member.user.displayAvatarURL({ dynamic: true })
+            });
+        } else {
+            if (goodbyeConfig?.imageUrl) {
+                await applyWelcomeMediaToEmbed(embed, goodbyeConfig.imageUrl, files, member.guild, 'image');
+            }
 
-        if (goodbyeConfig?.thumbnailMode === 'avatar') {
-            embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-        } else if (goodbyeConfig?.thumbnailMode === 'url' && goodbyeConfig?.thumbnailUrl) {
-            await applyWelcomeMediaToEmbed(embed, goodbyeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
+            if (goodbyeConfig?.thumbnailMode === 'avatar') {
+                embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+            } else if (goodbyeConfig?.thumbnailMode === 'url' && goodbyeConfig?.thumbnailUrl) {
+                await applyWelcomeMediaToEmbed(embed, goodbyeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
+            }
         }
 
         await channel.send({ embeds: [embed], files }).catch(() => null);
