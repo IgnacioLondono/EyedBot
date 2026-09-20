@@ -1,13 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Bot, Check, ChevronDown, Loader2 } from "lucide-react";
 import { usePanel } from "@/components/providers/PanelProvider";
 import { cn } from "@/lib/utils";
 
 export function PanelTenantSwitcher() {
-  const router = useRouter();
   const { bootstrap, selectTenant } = usePanel();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,11 +38,9 @@ export function PanelTenantSwitcher() {
     try {
       await selectTenant(botId);
       setOpen(false);
-      router.push("/dashboard");
-      router.refresh();
+      window.location.href = "/dashboard";
     } catch {
       /* refresh/toast handled upstream if needed */
-    } finally {
       setBusy(false);
     }
   }
