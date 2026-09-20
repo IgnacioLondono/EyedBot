@@ -35,6 +35,7 @@ import {
 import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { plainColorToHex } from "@/lib/embed-utils";
+import { withMediaCacheBust } from "@/lib/panel-media";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 import {
   DEFAULT_WELCOME_CARD_LAYOUT,
@@ -253,16 +254,30 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     ];
   }, [isCardWelcome]);
 
-  function applyConfigFromUpload(payload: unknown) {
+  function applyConfigFromUpload(payload: unknown, kind: "main" | "thumb" | "author") {
     const root = asRecord(payload);
     const config = asRecord(root.config);
     if (Object.keys(config).length) {
-      setActive(normalizeConfig(config, tab as "welcome" | "goodbye"));
+      const next = normalizeConfig(config, tab as "welcome" | "goodbye");
+      // URL recién subida con cache-bust para que la vista previa la muestre sí o sí.
+      const uploadedUrl = toStringValue(root.url || root.path || "");
+      if (uploadedUrl) {
+        const busted = withMediaCacheBust(uploadedUrl);
+        if (kind === "thumb") next.thumbnailUrl = busted;
+        else if (kind === "author") next.authorIconUrl = busted;
+        else next.imageUrl = busted;
+      }
+      setActive(next);
       return;
     }
-    const nextUrl = toStringValue(root.path || root.url);
+    const nextUrl = toStringValue(root.url || root.path);
     if (nextUrl) {
-      setActive((current) => ({ ...current, imageUrl: nextUrl }));
+      const busted = withMediaCacheBust(nextUrl);
+      setActive((current) => {
+        if (kind === "thumb") return { ...current, thumbnailUrl: busted };
+        if (kind === "author") return { ...current, authorIconUrl: busted };
+        return { ...current, imageUrl: busted };
+      });
     }
   }
 
@@ -272,7 +287,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     setUploading(true);
     try {
       const result = await uploadWelcomeImage(guildId, file, slot);
-      applyConfigFromUpload(result);
+      applyConfigFromUpload(result, kind);
       if (kind === "thumb") {
         setActive((current) => ({ ...current, thumbnailMode: "url" }));
       }
@@ -297,10 +312,12 @@ export function WelcomePane({ guildId }: { guildId: string }) {
       const config = asRecord(asRecord(result).config);
       if (Object.keys(config).length) {
         setActive(normalizeConfig(config, tab as "welcome" | "goodbye"));
-      } else if (kind === "main") {
-        setActive((current) => ({ ...current, imageUrl: "" }));
-      } else {
+      } else if (kind === "author") {
+        setActive((current) => ({ ...current, authorIconUrl: "" }));
+      } else if (kind === "thumb") {
         setActive((current) => ({ ...current, thumbnailUrl: "" }));
+      } else {
+        setActive((current) => ({ ...current, imageUrl: "" }));
       }
       toast({ title: "Imagen eliminada", description: "Se quitó la imagen.", tone: "success" });
     } catch (err) {
@@ -511,18 +528,16 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                     placeholder="Ej. {server}"
                   />
                 </Field>
-                {active.authorName ? (
-                  <EmbedImageField
-                    label="Icono del autor"
-                    description="URL o archivo subido al panel. Se muestra junto al nombre del autor."
-                    value={active.authorIconUrl}
-                    onChange={(authorIconUrl) => setActive((current) => ({ ...current, authorIconUrl }))}
-                    uploading={uploadingAuthorImage}
-                    deleting={deletingAuthorImage}
-                    onUpload={(file) => handleUploadImage(file, authorSlot, "author")}
-                    onDelete={() => handleDeleteImage(authorSlot, "author")}
-                  />
-                ) : null}
+                <EmbedImageField
+                  label="Foto del autor"
+                  description="URL o archivo subido al panel. Se muestra junto al nombre del autor."
+                  value={active.authorIconUrl}
+                  onChange={(authorIconUrl) => setActive((current) => ({ ...current, authorIconUrl }))}
+                  uploading={uploadingAuthorImage}
+                  deleting={deletingAuthorImage}
+                  onUpload={(file) => handleUploadImage(file, authorSlot, "author")}
+                  onDelete={() => handleDeleteImage(authorSlot, "author")}
+                />
               </div>
             </>
           ) : null}

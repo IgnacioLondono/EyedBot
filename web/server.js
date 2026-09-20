@@ -1256,13 +1256,14 @@ function deleteUploadDiskFile(publicPath = '') {
 
 function deleteWelcomeDiskImagesForSlot(guildId, slot) {
     const uploadsDir = ensureWelcomeUploadsDir();
-    const safeGuildId = greetingImageStore.rawDiscordGuildId(guildId) || String(guildId || '').trim();
     const safeSlot = greetingImageStore.normalizeSlot(slot);
-    const prefix = `${safeGuildId}_${safeSlot}_`;
+    const prefixes = greetingImageStore.storageKeyCandidates(guildId)
+        .map((key) => `${key}_${safeSlot}_`)
+        .concat([`${guildId}_${safeSlot}_`]);
     let removed = 0;
     try {
         for (const fileName of fs.readdirSync(uploadsDir)) {
-            if (!fileName.startsWith(prefix)) continue;
+            if (!prefixes.some((prefix) => fileName.startsWith(prefix))) continue;
             try {
                 fs.unlinkSync(path.join(uploadsDir, fileName));
                 removed += 1;
@@ -7484,12 +7485,14 @@ app.get('/api/guild/:guildId/greeting-image/:slot', requireAuth, async (req, res
 
         let image = await greetingImageStore.getImage(guildId, slot);
         if (!image?.data?.length) {
-            // Fallback: archivo en disco subido junto al API path
+            // Fallback: archivo en disco subido junto al API path (scoped por bot/guild).
             const uploadsDir = ensureWelcomeUploadsDir();
-            const prefix = `${guildId}_${slot}_`;
+            const prefixes = greetingImageStore.storageKeyCandidates(guildId)
+                .map((key) => `${key}_${slot}_`)
+                .concat([`${guildId}_${slot}_`]);
             try {
                 const match = fs.readdirSync(uploadsDir)
-                    .filter((name) => name.startsWith(prefix))
+                    .filter((name) => prefixes.some((prefix) => name.startsWith(prefix)))
                     .sort()
                     .reverse()[0];
                 if (match) {
@@ -7511,7 +7514,9 @@ app.get('/api/guild/:guildId/greeting-image/:slot', requireAuth, async (req, res
         }
 
         res.setHeader('Content-Type', image.mime);
-        res.setHeader('Cache-Control', 'private, max-age=300');
+        // Revalidación siempre: evita que el navegador muestre la versión vieja
+        // tras subir una imagen nueva bajo la misma URL.
+        res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
         return res.send(image.data);
     } catch (error) {
         console.error('Error sirviendo imagen greeting:', error);
@@ -7538,7 +7543,11 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
         const uploadsDir = ensureWelcomeUploadsDir();
         const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `welcome-${guildId}`);
         const extension = extFromMimeOrName(file.mimetype, file.originalname);
-        const fileName = `${guildId}_${slot}_${Date.now()}_${baseName}${extension}`;
+        // Prefijo scoped (bot:guild) para aislar bots del propietario en disco.
+        const diskScopeKey = (greetingImageStore.storageKeyCandidates(guildId)[0] || guildId)
+            .replace(/[^a-zA-Z0-9:\-_.]/g, '_')
+            .slice(0, 64);
+        const fileName = `${diskScopeKey}_${slot}_${Date.now()}_${baseName}${extension}`;
         const outputPath = path.join(uploadsDir, fileName);
         fs.writeFileSync(outputPath, file.buffer);
 

@@ -308,27 +308,28 @@ async function resolveWelcomeCardBackground(imageUrl, guildId) {
             return { backgroundFilePath: null, backgroundUrl: null, backgroundBuffer: blob.data };
         }
 
-        // Fallback disco: {guildId}_{slot}_*
+        // Fallback disco: {guildId}_{slot}_* con claves scoped (bot:guild)
         try {
             const uploadsDir = path.join(__dirname, '..', '..', 'web', 'uploads', 'welcome');
             if (fs.existsSync(uploadsDir)) {
-                const prefixes = [
-                    `${imageGid}_${slot}_`,
-                    routeGid && routeGid !== imageGid ? `${routeGid}_${slot}_` : null
-                ].filter(Boolean);
+                const candidates = greetingImageStore.storageKeyCandidates(imageGid)
+                    .map((key) => `${key}_${slot}_`)
+                    .concat([
+                        routeGid && routeGid !== imageGid ? `${routeGid}_${slot}_` : null,
+                        `${imageGid}_${slot}_`
+                    ]);
                 const names = fs.readdirSync(uploadsDir);
-                for (const prefix of prefixes) {
-                    const match = names
-                        .filter((name) => name.startsWith(prefix))
-                        .sort()
-                        .reverse()[0];
-                    if (match) {
-                        return {
-                            backgroundFilePath: path.join(uploadsDir, match),
-                            backgroundUrl: null,
-                            backgroundBuffer: null
-                        };
-                    }
+                const prefixes = [...new Set(candidates.filter(Boolean))];
+                const match = names
+                    .filter((name) => prefixes.some((prefix) => name.startsWith(prefix)))
+                    .sort()
+                    .reverse()[0];
+                if (match) {
+                    return {
+                        backgroundFilePath: path.join(uploadsDir, match),
+                        backgroundUrl: null,
+                        backgroundBuffer: null
+                    };
                 }
             }
         } catch {

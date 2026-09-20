@@ -200,6 +200,7 @@ module.exports = {
     parseGreetingImageApiUrl,
     normalizeSlot,
     rawDiscordGuildId,
+    storageKeyCandidates,
     setImage,
     getImage,
     deleteImage,
