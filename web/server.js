@@ -3766,6 +3766,42 @@ app.get('/api/admin/main-bot/guild-control', requireOwner, async (req, res) => {
     }
 });
 
+function removeDiscordCommandPayloads(client) {
+    const collection = client?.commands;
+    if (!collection || typeof collection?.values !== 'function') return [];
+    const payloads = [];
+    for (const command of collection.values()) {
+        if (command?.data?.toJSON) payloads.push(command.data.toJSON());
+    }
+    return payloads;
+}
+
+async function applyGuildCommandsOnDiscord(client, guildId, commandsDisabled) {
+    if (!client?.user?.id) {
+        return { applied: false, reason: 'Bot principal no disponible' };
+    }
+    const guild = client?.guilds?.cache?.get(String(guildId));
+    if (!guild) {
+        return { applied: false, reason: 'El bot no está en ese servidor' };
+    }
+    try {
+        if (commandsDisabled) {
+            await guild.commands.set([]);
+            return { applied: true, action: 'clear', total: 0 };
+        }
+        const payloads = removeDiscordCommandPayloads(client);
+        const result = await guild.commands.set(payloads);
+        return {
+            applied: true,
+            action: 'restore',
+            total: Array.isArray(result) ? result.length : payloads.length
+        };
+    } catch (error) {
+        console.error(`⚠️ No se pudo aplicar slash en Discord (guild ${guildId}):`, error?.message || error);
+        return { applied: false, reason: error?.message || String(error) };
+    }
+}
+
 app.put('/api/admin/main-bot/guild-control/:guildId', requireOwner, async (req, res) => {
     try {
         const guildId = String(req.params.guildId || '').trim();
@@ -3796,9 +3832,16 @@ app.put('/api/admin/main-bot/guild-control/:guildId', requireOwner, async (req, 
             || ''
         ).trim();
 
+        const before = mainBotGuildControl.getControl(guildId);
         const control = mainBotGuildControl.setControl(guildId, patch, updatedBy);
         invalidateGuildsApiCache();
-        return res.json({ ok: true, guildId, control });
+
+        let applied = null;
+        if ('commandsDisabled' in patch && patch.commandsDisabled !== before.commandsDisabled) {
+            applied = await applyGuildCommandsOnDiscord(getBotClient(req), guildId, patch.commandsDisabled);
+        }
+
+        return res.json({ ok: true, guildId, control, applied });
     } catch (error) {
         console.error('Error actualizando control del bot principal:', error);
         return res.status(500).json({ error: 'No se pudo actualizar el control del bot principal' });

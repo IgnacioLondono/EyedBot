@@ -199,6 +199,13 @@ export type MainBotGuildControl = {
 export const getMainBotGuildControl = () =>
   apiFetch<{ guilds: MainBotGuildControl[]; total: number }>("/api/admin/main-bot/guild-control");
 
+export type MainBotGuildControlApply = {
+  applied: boolean;
+  action?: "clear" | "restore";
+  total?: number;
+  reason?: string;
+} | null;
+
 export const updateMainBotGuildControl = (
   guildId: string,
   body: {
@@ -208,7 +215,7 @@ export const updateMainBotGuildControl = (
     disabled?: boolean;
   }
 ) =>
-  apiFetch<{ ok: boolean; guildId: string; control: Record<string, unknown> }>(
+  apiFetch<{ ok: boolean; guildId: string; control: Record<string, unknown>; applied?: MainBotGuildControlApply }>(
     `/api/admin/main-bot/guild-control/${encodeURIComponent(guildId)}`,
     { method: "PUT", body }
   );

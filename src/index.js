@@ -184,6 +184,17 @@ async function registerSlashCommands(targetGuildIds = null, options = {}) {
     for (const appId of appIds) {
         const registerOneGuild = async (guildId) => {
             const guildName = client.guilds.cache.get(guildId)?.name || 'unknown';
+
+            if (mainBotGuildControl.isCommandsDisabled(guildId)) {
+                try {
+                    await rest.put(Routes.applicationGuildCommands(appId, guildId), { body: [] });
+                } catch (clearError) {
+                    console.warn(`⚠️ No se pudieron limpiar slash en ${guildName} (${guildId}):`, clearError?.message || clearError);
+                }
+                console.log(`⏭️ Slash omitidos en ${guildName} (${guildId}): comandos desactivados desde el panel.`);
+                return { guildId, ok: true, skipped: true, result: null };
+            }
+
             verboseLog(`↪️ Sincronizando slash en guild ${guildName} (${guildId})...`);
             const result = await syncGuildSlashCommands(rest, appId, guildId, commands, {
                 perGuildTimeoutMs,

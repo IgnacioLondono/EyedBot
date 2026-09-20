@@ -75,7 +75,7 @@ export function MainBotGuildControlTab() {
   async function applyPatch(guildId: string, patch: Record<string, boolean>) {
     setBusyGuildId(guildId);
     try {
-      await updateMainBotGuildControl(guildId, patch);
+      const response = await updateMainBotGuildControl(guildId, patch);
       setGuilds((current) =>
         current.map((guild) =>
           guild.guildId === guildId
@@ -87,11 +87,21 @@ export function MainBotGuildControlTab() {
             : guild
         )
       );
-      toast({
-        title: "Control de servidor actualizado",
-        description: "Los cambios se aplicaron al bot inmediatamente.",
-        tone: "success",
-      });
+      const applied = response?.applied ?? null;
+      if (applied && applied.applied === false) {
+        toast({
+          title: "Ajuste guardado, sin aplicar en Discord",
+          description:
+            applied.reason || "El estado se guardó pero no se pudo recargar en el servidor de Discord.",
+          tone: "danger",
+        });
+      } else {
+        toast({
+          title: "Control de servidor actualizado",
+          description: "Los cambios se guardaron y se aplicaron al servidor de Discord.",
+          tone: "success",
+        });
+      }
     } catch (err) {
       toast({
         title: "No se pudo actualizar",
