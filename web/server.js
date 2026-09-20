@@ -133,6 +133,7 @@ const {
 } = require('../src/events/ticket-interaction');
 const { sanitizeDifficulty, sanitizeXpMultiplier, getProgress } = require('../src/utils/leveling-math');
 const presenceStore = require('../src/utils/presence-store');
+const mainBotGuildControl = require('../src/utils/main-bot-guild-control');
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
@@ -322,6 +323,7 @@ async function resolveLivePresence(discordUserId) {
         : Array.from(getBotClient().guilds.cache.keys());
 
     for (const guildId of guildIds) {
+        if (mainBotGuildControl.isHiddenFromPanel(String(guildId))) continue;
         let guild = getBotClient().guilds.cache.get(String(guildId));
         if (!guild) {
             guild = await getBotClient().guilds.fetch(String(guildId)).catch(() => null);
@@ -1644,7 +1646,10 @@ function filterTrackableGuilds(guilds = [], client = getBotClient()) {
         if (!guild?.id) return false;
         if (!hasAdminOrManageGuildPermission(guild)) return false;
         if (!client) return false;
-        return client.guilds.cache.has(String(guild.id));
+        if (!client.guilds.cache.has(String(guild.id))) return false;
+        // El propietario puede ocultar servidores del bot principal en el panel.
+        if (mainBotGuildControl.isHiddenFromPanel(String(guild.id))) return false;
+        return true;
     });
 }
 
@@ -3541,6 +3546,18 @@ function handleOwnerBotAvatarUpload(req, res, next) {
     });
 }
 
+function handleOwnerBotBannerUpload(req, res, next) {
+    upload.single('banner')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'La imagen supera 8 MB' });
+            }
+            return res.status(400).json({ error: err.message || 'Error al procesar la imagen' });
+        }
+        return next();
+    });
+}
+
 function ownerBotError(res, error, fallback = 'Error en bot auxiliar') {
     const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
     return res.status(statusCode).json({ error: error?.message || fallback });
@@ -3563,6 +3580,7 @@ app.post('/api/admin/bots', requireOwner, async (req, res) => {
             clientId,
             clientSecret,
             assignedDiscordUserId,
+            assignedDiscordUserIds,
             slug,
             brand,
             panelEnabled
@@ -3573,6 +3591,7 @@ app.post('/api/admin/bots', requireOwner, async (req, res) => {
             clientId,
             clientSecret,
             assignedDiscordUserId,
+            assignedDiscordUserIds,
             slug,
             brand,
             panelEnabled
@@ -3628,6 +3647,23 @@ app.post('/api/admin/bots/:botId/avatar', requireOwner, handleOwnerBotAvatarUplo
     } catch (error) {
         console.error('Error actualizando avatar del bot:', error);
         return ownerBotError(res, error, 'No se pudo actualizar el avatar');
+    }
+});
+
+app.post('/api/admin/bots/:botId/banner', requireOwner, handleOwnerBotBannerUpload, async (req, res) => {
+    try {
+        if (!req.file?.buffer?.length) {
+            return res.status(400).json({ error: 'No se recibiÃ³ ninguna imagen' });
+        }
+        const bot = await ownerBotManager.updateBotBanner(
+            String(req.params.botId || ''),
+            req.file.buffer,
+            req.file.mimetype || 'image/png'
+        );
+        return res.json({ bot });
+    } catch (error) {
+        console.error('Error actualizando banner del bot:', error);
+        return ownerBotError(res, error, 'No se pudo actualizar el banner');
     }
 });
 
@@ -3692,6 +3728,80 @@ app.post('/api/admin/bots/:botId/chat', requireOwner, async (req, res) => {
     } catch (error) {
         console.error('Error enviando mensaje del bot:', error);
         return ownerBotError(res, error, 'No se pudo enviar el mensaje');
+    }
+});
+
+// ─── Control del bot principal por servidor ─────────────────────────
+// El propietario puede desactivar por servidor: comandos, recolección
+// de datos y visibilidad del servidor en el panel web.
+
+app.get('/api/admin/main-bot/guild-control', requireOwner, async (req, res) => {
+    try {
+        const client = getBotClient();
+        const controls = mainBotGuildControl.listControls();
+        const guilds = (client?.guilds?.cache?.size ? Array.from(client.guilds.cache.values()) : [])
+            .map((guild) => {
+                const control = controls[String(guild.id)] || mainBotGuildControl.DEFAULT_CONTROL;
+                return {
+                    guildId: String(guild.id),
+                    name: String(guild.name || 'Servidor sin nombre').slice(0, 120),
+                    memberCount: guild.memberCount ?? null,
+                    iconUrl: typeof guild.iconURL === 'function'
+                        ? (guild.iconURL({ dynamic: true, size: 128 }) || null)
+                        : null,
+                    commandsDisabled: control.commandsDisabled === true,
+                    dataCollectionDisabled: control.dataCollectionDisabled === true,
+                    hiddenFromPanel: control.hiddenFromPanel === true,
+                    updatedAt: control.updatedAt || null,
+                    updatedBy: control.updatedBy || null
+                };
+            })
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+        res.setHeader('Cache-Control', 'no-store');
+        return res.json({ guilds, total: guilds.length });
+    } catch (error) {
+        console.error('Error obteniendo control del bot principal:', error);
+        return res.status(500).json({ error: 'No se pudo obtener el control del bot principal' });
+    }
+});
+
+app.put('/api/admin/main-bot/guild-control/:guildId', requireOwner, async (req, res) => {
+    try {
+        const guildId = String(req.params.guildId || '').trim();
+        if (!guildId) return res.status(400).json({ error: 'Falta guildId' });
+
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const patch = {};
+        if (body.commandsDisabled === true || body.commandsDisabled === false) {
+            patch.commandsDisabled = body.commandsDisabled === true;
+        }
+        if (body.dataCollectionDisabled === true || body.dataCollectionDisabled === false) {
+            patch.dataCollectionDisabled = body.dataCollectionDisabled === true;
+        }
+        if (body.hiddenFromPanel === true || body.hiddenFromPanel === false) {
+            patch.hiddenFromPanel = body.hiddenFromPanel === true;
+        }
+        if (body.disabled === true || body.disabled === false) {
+            const disabled = body.disabled === true;
+            patch.commandsDisabled = disabled;
+            patch.dataCollectionDisabled = disabled;
+            patch.hiddenFromPanel = disabled;
+        }
+
+        const updatedBy = String(
+            req.session?.user?.global_name
+            || req.session?.user?.username
+            || req.session?.user?.id
+            || ''
+        ).trim();
+
+        const control = mainBotGuildControl.setControl(guildId, patch, updatedBy);
+        invalidateGuildsApiCache();
+        return res.json({ ok: true, guildId, control });
+    } catch (error) {
+        console.error('Error actualizando control del bot principal:', error);
+        return res.status(500).json({ error: 'No se pudo actualizar el control del bot principal' });
     }
 });
 
@@ -8202,7 +8312,9 @@ app.get('/api/stats', requireAuth, (req, res) => {
     const normalizedPing = Number.isFinite(rawPing) && rawPing >= 0 ? Math.round(rawPing) : null;
 
     const stats = {
-        guilds: getBotClient().guilds.cache.size,
+        guilds: Array.from(getBotClient().guilds.cache.values())
+            .filter((guild) => !mainBotGuildControl.isHiddenFromPanel(String(guild.id)))
+            .length,
         users: getBotClient().users.cache.size,
         channels: getBotClient().channels.cache.size,
         uptime: getBotClient().uptime,

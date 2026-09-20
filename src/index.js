@@ -42,6 +42,7 @@ const {
     registerGuildCommands: syncGuildSlashCommands,
     prioritizeGuildIds
 } = require('./utils/slash-command-register');
+const mainBotGuildControl = require('./utils/main-bot-guild-control');
 require('dotenv').config();
 
 let webPanel = null;
@@ -460,12 +461,20 @@ client.on('guildCreate', (guild) => {
 });
 
 client.on('messageCreate', async (message) => {
+    const guildId = message?.guildId ? String(message.guildId) : '';
+    const guildControl = guildId ? mainBotGuildControl.getControl(guildId) : null;
+
+    // Servidor con el bot totalmente desactivado: no se procesan mensajes.
+    if (guildControl?.commandsDisabled) return;
+
     try {
         await handleAFKAuthorReturn(message);
         await handleAFKMentions(message);
         await handleDisboardBumpMessage(message);
         await handleCountingMessage(message);
-        await handleMessageCreate(message);
+        if (!guildControl?.dataCollectionDisabled) {
+            await handleMessageCreate(message);
+        }
         await antiRaidGuard.handleMessageCreate(message);
     } catch (error) {
         console.error('Error en leveling messageCreate:', error);
@@ -474,9 +483,15 @@ client.on('messageCreate', async (message) => {
 
 client.on('guildMemberAdd', async (member) => {
     try {
+        const guildId = member?.guild?.id ? String(member.guild.id) : '';
+        const guildControl = guildId ? mainBotGuildControl.getControl(guildId) : null;
+        if (guildControl?.commandsDisabled) return;
+
         await guildMemberAddEvent.execute(member);
         await antiRaidGuard.handleGuildMemberAdd(member);
-        await guildActivityStore.incrementGuildMetric(member.guild.id, 'joins');
+        if (!guildControl?.dataCollectionDisabled) {
+            await guildActivityStore.incrementGuildMetric(guildId, 'joins');
+        }
     } catch (error) {
         console.error('Error en guildMemberAdd:', error);
     }
@@ -516,8 +531,14 @@ client.on('roleDelete', async (role) => {
 
 client.on('guildMemberRemove', async (member) => {
     try {
+        const guildId = member?.guild?.id ? String(member.guild.id) : '';
+        const guildControl = guildId ? mainBotGuildControl.getControl(guildId) : null;
+        if (guildControl?.commandsDisabled) return;
+
         await guildMemberRemoveEvent.execute(member);
-        await guildActivityStore.incrementGuildMetric(member.guild.id, 'leaves');
+        if (!guildControl?.dataCollectionDisabled) {
+            await guildActivityStore.incrementGuildMetric(guildId, 'leaves');
+        }
     } catch (error) {
         console.error('Error en guildMemberRemove:', error);
     }
@@ -550,6 +571,15 @@ client.on('messageReactionRemove', async (reaction, user) => {
 });
 
 client.on('interactionCreate', async interaction => {
+    const interactionGuildId = interaction?.guildId ? String(interaction.guildId) : '';
+    if (interactionGuildId && mainBotGuildControl.isCommandsDisabled(interactionGuildId)) {
+        await safeReply(interaction, {
+            content: '⛔ EyedBot está desactivado en este servidor por su propietario.',
+            flags: 64
+        }).catch(() => {});
+        return;
+    }
+
     let musicSystem = interaction.client.musicSystem;
     if (MUSIC_ENABLED && !musicSystem) {
         const MusicSystem = require('./cogs/music');

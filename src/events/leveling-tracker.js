@@ -6,6 +6,7 @@ const communityProgress = require('../utils/community-challenges-achievements');
 const { communityEventBus } = require('../utils/community-event-bus');
 const { getLevelFromXp, sanitizeDifficulty, scaleXpByMultiplier } = require('../utils/leveling-math');
 const { parseRoleRewards } = require('../utils/leveling-rewards');
+const mainBotGuildControl = require('../utils/main-bot-guild-control');
 const {
     awardCoinsForXp,
     awardCoinsForLevelUp,
@@ -226,6 +227,7 @@ async function awardXpToMember(member, amount, source = 'message') {
 
 async function handleMessageCreate(message) {
     if (!message || !message.guild || message.author?.bot) return;
+    if (mainBotGuildControl.isDataCollectionDisabled(message.guild.id)) return;
 
     await levelingStore.incrementUserStats(message.guild.id, message.author.id, { messageCount: 1 });
     await guildActivityStore.incrementGuildMetric(message.guild.id, 'messages', 1).catch(() => null);
@@ -260,8 +262,14 @@ async function handleMessageCreate(message) {
 async function handleAnalyticsVoiceStateUpdate(oldState, newState) {
     const member = newState?.member || oldState?.member;
     if (!member?.guild || member.user?.bot) return;
-
     const guildId = member.guild.id;
+    if (mainBotGuildControl.isDataCollectionDisabled(guildId)) {
+        const userId = member.user.id;
+        if (voiceAnalyticsSessions.has(getVoiceSessionKey(guildId, userId))) {
+            await flushVoiceAnalyticsSession(guildId, userId, Date.now());
+        }
+        return;
+    }
     const userId = member.user.id;
     const oldChannelId = oldState?.channelId || null;
     const newChannelId = newState?.channelId || null;
@@ -281,6 +289,7 @@ async function seedVoiceAnalyticsSessions(client) {
     if (!client?.guilds?.cache) return;
 
     for (const guild of client.guilds.cache.values()) {
+        if (mainBotGuildControl.isDataCollectionDisabled(guild.id)) continue;
         const liveMembers = new Map();
         for (const channel of guild.channels.cache.values()) {
             if (!canTrackVoiceChannel(channel)) continue;
@@ -329,6 +338,7 @@ async function runVoiceXpCycle(client) {
         }
         const guilds = Array.from(client.guilds.cache.values());
         for (const guild of guilds) {
+            if (mainBotGuildControl.isDataCollectionDisabled(guild.id)) continue;
             const cfg = await levelingStore.getLevelingConfig(guild.id);
             if (!cfg || cfg.enabled !== true || cfg.voiceXpEnabled !== true) continue;
 

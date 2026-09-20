@@ -1,5 +1,6 @@
 const presenceStore = require('../utils/presence-store');
 const { communityEventBus } = require('../utils/community-event-bus');
+const mainBotGuildControl = require('../utils/main-bot-guild-control');
 
 function attachPresenceTracking(client) {
     client.on('presenceUpdate', (_oldPresence, newPresence) => {
@@ -9,6 +10,7 @@ function attachPresenceTracking(client) {
 
             const guildId = newPresence.guild?.id;
             if (guildId && !presenceStore.isGuildTracked(guildId)) return;
+            if (guildId && mainBotGuildControl.isDataCollectionDisabled(guildId)) return;
 
             const payload = presenceStore.serializePresence(newPresence, user);
             if (payload) {
@@ -33,6 +35,7 @@ function attachPresenceTracking(client) {
 function seedPresencesFromClient(client) {
     let seeded = 0;
     for (const guild of client.guilds.cache.values()) {
+        if (mainBotGuildControl.isDataCollectionDisabled(guild.id)) continue;
         if (!presenceStore.isGuildTracked(guild.id)) continue;
 
         for (const member of guild.members.cache.values()) {

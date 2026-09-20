@@ -25,6 +25,7 @@ import {
   sendOwnerBotChat,
   updateOwnerBot,
   updateOwnerBotAvatar,
+  updateOwnerBotBanner,
   updateOwnerBotProfile,
 } from "@/lib/api/endpoints";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -33,7 +34,9 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Tabs } from "@/components/ui/Tabs";
 import { ColorInput, Field, SectionCard } from "@/components/features/shared";
+import { Textarea } from "@/components/ui/Textarea";
 import { discordAvatarUrl } from "@/lib/discord-media";
 import { asArray, asRecord, formatDate, getErrorMessage, toStringValue } from "@/lib/utils";
 
@@ -50,10 +53,14 @@ type OwnerBot = {
   clientId: string;
   hasClientSecret: boolean;
   assignedDiscordUserId: string;
+  assignedDiscordUserIds: string[];
   brand: { name: string; logoUrl: string; primaryColor: string };
   panelPath: string;
   avatar: string | null;
   avatarUrl: string | null;
+  banner: string | null;
+  bannerUrl: string | null;
+  description: string;
   guildCount: number;
   ping: number | null;
   commandsEnabled: boolean;
@@ -79,6 +86,10 @@ function parseBot(raw: unknown): OwnerBot {
   const appId = toStringValue(row.applicationId);
   const avatar = toStringValue(row.avatar) || null;
   const brandRow = asRecord(row.brand);
+  const legacyAssignee = toStringValue(row.assignedDiscordUserId);
+  const assigneeList = asArray(row.assignedDiscordUserIds)
+    .map((id) => toStringValue(id))
+    .filter(Boolean);
   return {
     id: toStringValue(row.id),
     label: toStringValue(row.label, "Bot auxiliar"),
@@ -91,7 +102,8 @@ function parseBot(raw: unknown): OwnerBot {
     applicationId: appId,
     clientId: toStringValue(row.clientId || appId),
     hasClientSecret: row.hasClientSecret === true,
-    assignedDiscordUserId: toStringValue(row.assignedDiscordUserId),
+    assignedDiscordUserId: legacyAssignee,
+    assignedDiscordUserIds: assigneeList.length ? assigneeList : legacyAssignee ? [legacyAssignee] : [],
     brand: {
       name: toStringValue(brandRow.name || row.label),
       logoUrl: toStringValue(brandRow.logoUrl),
@@ -100,6 +112,9 @@ function parseBot(raw: unknown): OwnerBot {
     panelPath: toStringValue(row.panelPath),
     avatar,
     avatarUrl: toStringValue(row.avatarUrl) || discordAvatarUrl(appId, avatar),
+    banner: toStringValue(row.banner) || null,
+    bannerUrl: toStringValue(row.bannerUrl) || null,
+    description: toStringValue(row.description) || "",
     guildCount: Number(row.guildCount) || 0,
     ping: row.ping == null ? null : Number(row.ping),
     commandsEnabled: row.commandsEnabled !== false,
@@ -119,6 +134,14 @@ function statusBadge(status: string, enabled: boolean) {
 
 function isIntentsError(message: string | null) {
   return /intents?/i.test(message || "");
+}
+
+function splitUserIds(text: string): string[] | undefined {
+  const ids = text
+    .split(/\r?\n/)
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return ids.length ? ids : undefined;
 }
 
 function developerBotUrl(applicationId: string) {
@@ -195,6 +218,9 @@ export function OwnerBotsTab() {
   const [editBrandColor, setEditBrandColor] = useState("");
   const [editPanelEnabled, setEditPanelEnabled] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const [editDescription, setEditDescription] = useState("");
+  const [detailTab, setDetailTab] = useState("perfil");
 
   const [guilds, setGuilds] = useState<BotGuild[]>([]);
   const [channels, setChannels] = useState<BotChannel[]>([]);
@@ -233,12 +259,13 @@ export function OwnerBotsTab() {
     setEditUsername(selected.username);
     setEditClientId(selected.clientId);
     setEditClientSecret("");
-    setEditAssignee(selected.assignedDiscordUserId);
+    setEditAssignee(selected.assignedDiscordUserIds.join("\n"));
     setEditSlug(selected.slug);
     setEditBrandName(selected.brand.name);
     setEditBrandLogo(selected.brand.logoUrl);
     setEditBrandColor(selected.brand.primaryColor);
     setEditPanelEnabled(selected.panelEnabled);
+    setEditDescription(selected.description || "");
   }, [selected]);
 
   useEffect(() => {
@@ -347,7 +374,7 @@ export function OwnerBotsTab() {
           token: newToken.trim(),
           clientId: newClientId.trim() || undefined,
           clientSecret: newClientSecret.trim() || undefined,
-          assignedDiscordUserId: newAssignee.trim() || undefined,
+          assignedDiscordUserIds: splitUserIds(newAssignee),
           slug: newSlug.trim() || undefined,
           brand: {
             name: newBrandName.trim() || newLabel.trim() || undefined,
@@ -388,7 +415,7 @@ export function OwnerBotsTab() {
         label: editLabel.trim() || undefined,
         slug: editSlug.trim() || undefined,
         clientId: editClientId.trim() || undefined,
-        assignedDiscordUserId: editAssignee.trim(),
+        assignedDiscordUserIds: splitUserIds(editAssignee),
         panelEnabled: editPanelEnabled,
         brand: {
           name: editBrandName.trim(),
@@ -467,8 +494,13 @@ export function OwnerBotsTab() {
         const data = asRecord(await updateOwnerBot(selectedId, { label: editLabel.trim() }));
         setBots((prev) => prev.map((b) => (b.id === selectedId ? parseBot(data.bot) : b)));
       }
-      if (editUsername.trim() && editUsername.trim() !== selected?.username) {
-        const data = asRecord(await updateOwnerBotProfile(selectedId, { username: editUsername.trim() }));
+      const wantsUsername = Boolean(editUsername.trim() && editUsername.trim() !== selected?.username);
+      const wantsDescription = editDescription !== (selected?.description || "");
+      if (wantsUsername || wantsDescription) {
+        const body: { username?: string; description?: string } = {};
+        if (wantsUsername) body.username = editUsername.trim();
+        if (wantsDescription) body.description = editDescription.trim();
+        const data = asRecord(await updateOwnerBotProfile(selectedId, body));
         setBots((prev) => prev.map((b) => (b.id === selectedId ? parseBot(data.bot) : b)));
       }
       toast({ title: "Perfil actualizado", tone: "success" });
@@ -490,6 +522,22 @@ export function OwnerBotsTab() {
       toast({ title: "Avatar actualizado", tone: "success" });
     } catch (err) {
       toast({ title: "Avatar", description: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleBannerChange(file: File | null) {
+    if (!selectedId || !file) return;
+    setBusy("banner");
+    try {
+      const form = new FormData();
+      form.append("banner", file);
+      const data = asRecord(await updateOwnerBotBanner(selectedId, form));
+      setBots((prev) => prev.map((b) => (b.id === selectedId ? parseBot(data.bot) : b)));
+      toast({ title: "Banner actualizado", tone: "success" });
+    } catch (err) {
+      toast({ title: "Banner", description: getErrorMessage(err), tone: "danger" });
     } finally {
       setBusy(null);
     }
@@ -518,7 +566,7 @@ export function OwnerBotsTab() {
     <div className="space-y-5">
       <SectionCard
         title="Crear bot asignable"
-        description="Pegá Token + Client ID + Client Secret de la app en Discord Developer Portal. Asignalo a un Discord user ID y activá el panel branded en /t/{slug}."
+        description="Pegá Token + Client ID + Client Secret de la app en Discord Developer Portal. Asignalo a uno o más Discord user IDs (uno por línea) y activá el panel branded en /t/{slug}."
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Nombre interno">
@@ -546,8 +594,16 @@ export function OwnerBotsTab() {
               placeholder="Requerido para login del panel"
             />
           </Field>
-          <Field label="Asignar a Discord user ID">
-            <Input value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)} placeholder="123456789012345678" />
+          <Field
+            label="Asignar a Discord user IDs"
+            description="Un ID por línea. Todos estos usuarios podrán entrar al bot auxiliar."
+          >
+            <Textarea
+              value={newAssignee}
+              onChange={(e) => setNewAssignee(e.target.value)}
+              placeholder={"123456789012345678\n234567890123456789"}
+              rows={4}
+            />
           </Field>
           <Field label="Marca · nombre">
             <Input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Nombre visible" />
@@ -617,7 +673,45 @@ export function OwnerBotsTab() {
 
         {selected ? (
           <div className="space-y-5">
-            <SectionCard title={selected.label} description="Perfil, estado y chat en servidor.">
+            <Tabs
+              items={[
+                { id: "perfil", label: "Perfil" },
+                { id: "panel", label: "Panel / OAuth" },
+                { id: "chat", label: "Chat" },
+              ]}
+              value={detailTab}
+              onValueChange={setDetailTab}
+            />
+
+            {detailTab === "perfil" ? (
+            <SectionCard title={selected.label} description="Banner, foto, nombre y descripción del bot en Discord.">
+              <div className="relative mb-4 overflow-hidden rounded-2xl border border-white/10">
+                {selected.bannerUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={selected.bannerUrl} alt="" className="h-24 w-full object-cover" />
+                ) : (
+                  <div className="flex h-24 w-full items-center justify-center bg-[var(--color-surface-strong)] text-xs text-[var(--theme-text-secondary)]">
+                    Sin banner
+                  </div>
+                )}
+                <input
+                  ref={bannerInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => void handleBannerChange(e.target.files?.[0] || null)}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="absolute bottom-2 right-2"
+                  disabled={busy === "banner" || selected.status !== "online"}
+                  onClick={() => bannerInputRef.current?.click()}
+                >
+                  <Upload className="mr-1 h-3.5 w-3.5" />
+                  {busy === "banner" ? "Subiendo…" : "Cambiar banner"}
+                </Button>
+              </div>
               <div className="flex flex-wrap items-start gap-4">
                 <div className="relative">
                   {selected.avatarUrl ? (
@@ -669,6 +763,20 @@ export function OwnerBotsTab() {
                   ) : null}
                 </div>
               </div>
+
+              <Field
+                label="Descripción del bot"
+                description="Se muestra en la tarjeta del bot dentro de Discord (máx. 400 caracteres)."
+              >
+                <Textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Describe para qué sirve este bot…"
+                  rows={3}
+                  maxLength={400}
+                />
+                <p className="panel-muted pt-1 text-right text-xs">{editDescription.length}/400</p>
+              </Field>
 
               {isIntentsError(selected.lastError) ? (
                 <div className="mt-4">
@@ -733,17 +841,27 @@ export function OwnerBotsTab() {
                 </Button>
               </div>
             </SectionCard>
+            ) : null}
 
+            {detailTab === "panel" ? (
             <SectionCard
               title="Panel asignable / OAuth"
-              description="Redirect a registrar en Discord: /t/{slug}/callback. El usuario asignado entra por /t/{slug}."
+              description="Redirect a registrar en Discord: /t/{slug}/callback. Los usuarios asignados entran por /t/{slug}."
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Slug">
                   <Input value={editSlug} onChange={(e) => setEditSlug(e.target.value)} />
                 </Field>
-                <Field label="Discord user ID asignado">
-                  <Input value={editAssignee} onChange={(e) => setEditAssignee(e.target.value)} />
+                <Field
+                  label="Discord user IDs asignados"
+                  description="Un ID por línea. Todos entran al panel /t/{slug}."
+                >
+                  <Textarea
+                    value={editAssignee}
+                    onChange={(e) => setEditAssignee(e.target.value)}
+                    placeholder={"123456789012345678\n234567890123456789"}
+                    rows={4}
+                  />
                 </Field>
                 <Field label="Client ID">
                   <Input value={editClientId} onChange={(e) => setEditClientId(e.target.value)} />
@@ -787,7 +905,9 @@ export function OwnerBotsTab() {
                 </Button>
               </div>
             </SectionCard>
+            ) : null}
 
+            {detailTab === "chat" ? (
             <SectionCard
               title="Chat en servidor"
               description="Elige servidor y canal donde está el bot. Los mensajes se envían como el bot; las respuestas de comandos aparecen en el hilo."
@@ -888,6 +1008,7 @@ export function OwnerBotsTab() {
                 </>
               )}
             </SectionCard>
+            ) : null}
           </div>
         ) : bots.length ? null : null}
       </div>

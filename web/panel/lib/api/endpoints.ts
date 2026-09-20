@@ -96,6 +96,7 @@ export type OwnerBotSummary = {
   clientId?: string;
   hasClientSecret?: boolean;
   assignedDiscordUserId?: string;
+  assignedDiscordUserIds?: string[];
   brand?: {
     name: string;
     logoUrl: string;
@@ -105,6 +106,9 @@ export type OwnerBotSummary = {
   panelAuthPath?: string;
   avatar: string | null;
   avatarUrl: string | null;
+  banner: string | null;
+  bannerUrl: string | null;
+  description: string | null;
   guildCount: number;
   ping: number | null;
   commandsEnabled: boolean;
@@ -121,6 +125,7 @@ export const createOwnerBot = (body: {
   clientId?: string;
   clientSecret?: string;
   assignedDiscordUserId?: string;
+  assignedDiscordUserIds?: string[];
   slug?: string;
   brand?: { name?: string; logoUrl?: string; primaryColor?: string };
   panelEnabled?: boolean;
@@ -135,7 +140,7 @@ export const updateOwnerBot = (botId: string, body: Record<string, unknown>) =>
 export const deleteOwnerBot = (botId: string) =>
   apiFetch<{ success: boolean }>(`/api/admin/bots/${encodeURIComponent(botId)}`, { method: "DELETE" });
 
-export const updateOwnerBotProfile = (botId: string, body: { username: string }) =>
+export const updateOwnerBotProfile = (botId: string, body: { username?: string; description?: string }) =>
   apiFetch<{ bot: OwnerBotSummary }>(`/api/admin/bots/${encodeURIComponent(botId)}/profile`, {
     method: "POST",
     body,
@@ -143,6 +148,9 @@ export const updateOwnerBotProfile = (botId: string, body: { username: string })
 
 export const updateOwnerBotAvatar = (botId: string, form: FormData) =>
   apiForm<{ bot: OwnerBotSummary }>(`/api/admin/bots/${encodeURIComponent(botId)}/avatar`, form);
+
+export const updateOwnerBotBanner = (botId: string, form: FormData) =>
+  apiForm<{ bot: OwnerBotSummary }>(`/api/admin/bots/${encodeURIComponent(botId)}/banner`, form);
 
 export const getOwnerBotGuilds = (botId: string) =>
   apiFetch<{ guilds: unknown[] }>(`/api/admin/bots/${encodeURIComponent(botId)}/guilds`);
@@ -175,6 +183,35 @@ export const sendOwnerBotChat = (
     method: "POST",
     body,
   });
+
+export type MainBotGuildControl = {
+  guildId: string;
+  name: string;
+  memberCount: number | null;
+  iconUrl: string | null;
+  commandsDisabled: boolean;
+  dataCollectionDisabled: boolean;
+  hiddenFromPanel: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+export const getMainBotGuildControl = () =>
+  apiFetch<{ guilds: MainBotGuildControl[]; total: number }>("/api/admin/main-bot/guild-control");
+
+export const updateMainBotGuildControl = (
+  guildId: string,
+  body: {
+    commandsDisabled?: boolean;
+    dataCollectionDisabled?: boolean;
+    hiddenFromPanel?: boolean;
+    disabled?: boolean;
+  }
+) =>
+  apiFetch<{ ok: boolean; guildId: string; control: Record<string, unknown> }>(
+    `/api/admin/main-bot/guild-control/${encodeURIComponent(guildId)}`,
+    { method: "PUT", body }
+  );
 
 // ─── Guild base ─────────────────────────────────────────────────────
 

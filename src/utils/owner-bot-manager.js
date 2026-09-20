@@ -101,12 +101,37 @@ function sanitizeBrand(raw) {
     };
 }
 
+function getAssignedUserIds(record) {
+    if (!record) return [];
+    const ids = new Set();
+    const push = (raw) => {
+        const id = String(raw || '').replace(/\D/g, '').trim().slice(0, 32);
+        if (id) ids.add(id);
+    };
+    if (Array.isArray(record.assignedDiscordUserIds)) {
+        record.assignedDiscordUserIds.forEach(push);
+    }
+    push(record.assignedDiscordUserId);
+    return Array.from(ids);
+}
+
+function sanitizeUserIds(input) {
+    const raw = Array.isArray(input) ? input : input ? [input] : [];
+    const ids = new Set();
+    for (const value of raw) {
+        const id = String(value || '').replace(/\D/g, '').trim().slice(0, 32);
+        if (id) ids.add(id);
+    }
+    return Array.from(ids);
+}
+
 function sanitizePublicRecord(record) {
     const rt = runtime.get(record.id);
     const client = rt?.client;
     const user = client?.user;
     const brand = sanitizeBrand(record.brand);
     const clientId = String(record.clientId || user?.id || record.applicationId || '').trim();
+    const assignedIds = getAssignedUserIds(record);
     return {
         id: record.id,
         label: record.label || 'Bot auxiliar',
@@ -120,12 +145,16 @@ function sanitizePublicRecord(record) {
         applicationId: user?.id || record.applicationId || '',
         clientId,
         hasClientSecret: Boolean(String(record.clientSecret || '').trim()),
-        assignedDiscordUserId: String(record.assignedDiscordUserId || '').trim(),
+        assignedDiscordUserIds: assignedIds,
+        assignedDiscordUserId: assignedIds[0] || '',
         brand,
         panelPath: record.slug ? `/t/${record.slug}` : '',
         panelAuthPath: record.slug ? `/t/${record.slug}/auth` : '',
         avatar: user?.avatar || record.avatar || null,
         avatarUrl: user?.displayAvatarURL?.({ size: 128 }) || record.avatarUrl || null,
+        banner: user?.banner || record.banner || null,
+        bannerUrl: user?.bannerURL?.({ size: 480 }) || record.bannerUrl || null,
+        description: record.description || null,
         guildCount: client?.guilds?.cache?.size ?? record.guildCount ?? 0,
         ping: client?.ws?.ping ?? null,
         commandsEnabled: record.commandsEnabled !== false,
@@ -151,7 +180,7 @@ function listBotsForAssignee(discordUserId) {
     const uid = String(discordUserId || '').trim();
     if (!uid) return [];
     return readStore().bots
-        .filter((bot) => String(bot.assignedDiscordUserId || '') === uid && bot.panelEnabled === true)
+        .filter((bot) => bot.panelEnabled === true && getAssignedUserIds(bot).includes(uid))
         .map(sanitizePublicRecord);
 }
 
@@ -159,8 +188,8 @@ function userCanAccessTenant(record, discordUserId, { isOwner = false } = {}) {
     if (!record) return false;
     if (isOwner) return true;
     if (record.panelEnabled !== true) return false;
-    const assigned = String(record.assignedDiscordUserId || '').trim();
-    return Boolean(assigned && assigned === String(discordUserId || '').trim());
+    const uid = String(discordUserId || '').trim();
+    return Boolean(uid && getAssignedUserIds(record).includes(uid));
 }
 
 async function validateBotToken(token) {
@@ -308,6 +337,10 @@ function listBotsPublic() {
             record.clientId = record.applicationId;
             dirty = true;
         }
+        if (!Array.isArray(record.assignedDiscordUserIds) && record.assignedDiscordUserId) {
+            record.assignedDiscordUserIds = [String(record.assignedDiscordUserId)];
+            dirty = true;
+        }
     }
     if (dirty) writeStore(store);
     return store.bots.map(sanitizePublicRecord);
@@ -319,6 +352,7 @@ async function createBot({
     clientId,
     clientSecret,
     assignedDiscordUserId,
+    assignedDiscordUserIds,
     slug,
     brand,
     panelEnabled
@@ -341,6 +375,8 @@ async function createBot({
         );
     }
 
+    const assignedIds = sanitizeUserIds(assignedDiscordUserIds ?? (assignedDiscordUserId ? [assignedDiscordUserId] : []));
+
     const now = new Date().toISOString();
     const record = {
         id: newBotId(),
@@ -349,7 +385,8 @@ async function createBot({
         token: cleanToken,
         clientId: cleanClientId || user.id,
         clientSecret: String(clientSecret || '').trim(),
-        assignedDiscordUserId: String(assignedDiscordUserId || '').replace(/\D/g, '').slice(0, 32),
+        assignedDiscordUserIds: assignedIds,
+        assignedDiscordUserId: assignedIds[0] || '',
         brand: sanitizeBrand(brand || { name: cleanLabel }),
         panelEnabled: panelEnabled === true,
         enabled: true,
@@ -425,8 +462,16 @@ async function updateBot(id, patch = {}) {
         if (secret) record.clientSecret = secret;
     }
 
-    if (Object.prototype.hasOwnProperty.call(patch, 'assignedDiscordUserId')) {
-        record.assignedDiscordUserId = String(patch.assignedDiscordUserId || '').replace(/\D/g, '').slice(0, 32);
+    if (
+        Object.prototype.hasOwnProperty.call(patch, 'assignedDiscordUserIds')
+        || Object.prototype.hasOwnProperty.call(patch, 'assignedDiscordUserId')
+    ) {
+        const rawIds = patch.assignedDiscordUserIds != null
+            ? patch.assignedDiscordUserIds
+            : (patch.assignedDiscordUserId ? [patch.assignedDiscordUserId] : []);
+        const assignedIds = sanitizeUserIds(rawIds);
+        record.assignedDiscordUserIds = assignedIds;
+        record.assignedDiscordUserId = assignedIds[0] || '';
     }
 
     if (patch.brand != null) {
@@ -491,21 +536,63 @@ async function updateBot(id, patch = {}) {
     return sanitizePublicRecord(record);
 }
 
-async function updateBotProfile(id, { username }) {
+async function updateBotProfile(id, { username, description } = {}) {
     const rt = runtime.get(id);
     if (!rt?.client?.user) {
         throw Object.assign(new Error('El bot no está en línea'), { statusCode: 409 });
     }
     const cleanName = String(username || '').trim();
-    if (!cleanName || cleanName.length < 2 || cleanName.length > 32) {
-        throw Object.assign(new Error('El nombre debe tener entre 2 y 32 caracteres'), { statusCode: 400 });
+    if (cleanName) {
+        if (cleanName.length < 2 || cleanName.length > 32) {
+            throw Object.assign(new Error('El nombre debe tener entre 2 y 32 caracteres'), { statusCode: 400 });
+        }
+        await rt.client.user.setUsername(cleanName);
     }
-    await rt.client.user.setUsername(cleanName);
+
+    if (description !== undefined) {
+        const cleanDesc = String(description ?? '').trim();
+        if (cleanDesc.length > 400) {
+            throw Object.assign(new Error('La descripción no puede superar 400 caracteres'), { statusCode: 400 });
+        }
+        let application = rt.client.application;
+        if (!application) {
+            try {
+                application = await rt.client.application?.fetch();
+            } catch {
+                application = undefined;
+            }
+        }
+        if (!application) {
+            throw Object.assign(new Error('No se pudo acceder a la aplicación del bot'), { statusCode: 409 });
+        }
+        await application.edit({ description: cleanDesc });
+    }
 
     const store = readStore();
     const record = findRecord(store, id);
     if (record) {
         record.username = rt.client.user.username;
+        if (description !== undefined) record.description = String(description ?? '').trim();
+        record.updatedAt = new Date().toISOString();
+        writeStore(store);
+    }
+    return sanitizePublicRecord(record || { id });
+}
+
+async function updateBotBanner(id, buffer, mimeType = 'image/png') {
+    const rt = runtime.get(id);
+    if (!rt?.client?.user) {
+        throw Object.assign(new Error('El bot no está en línea'), { statusCode: 409 });
+    }
+    if (!buffer?.length) throw Object.assign(new Error('Imagen vacía'), { statusCode: 400 });
+    const updated = await rt.client.user.setBanner(buffer);
+
+    const store = readStore();
+    const record = findRecord(store, id);
+    if (record) {
+        record.banner = updated?.banner ?? rt.client.user.banner ?? null;
+        record.bannerUrl =
+            (updated?.bannerURL?.({ size: 480 }) || rt.client.user.bannerURL?.({ size: 480 }) || null);
         record.updatedAt = new Date().toISOString();
         writeStore(store);
     }
@@ -675,6 +762,7 @@ module.exports = {
     updateBot,
     updateBotProfile,
     updateBotAvatar,
+    updateBotBanner,
     listBotGuilds,
     listBotGuildChannels,
     fetchBotChatMessages,
