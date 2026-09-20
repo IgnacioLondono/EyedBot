@@ -128,6 +128,12 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         </header>
         ) : null}
 
+        {!isCardStudio && !isGuest ? (
+          <div className="fixed right-5 top-4 z-40 hidden lg:block">
+            <PanelTenantSwitcher />
+          </div>
+        ) : null}
+
         <motion.main
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -137,8 +143,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             isCardStudio
               ? "p-0"
               : isDocs
-                ? "px-4 py-6 lg:px-10 lg:py-8"
-                : "px-4 py-6 lg:px-8 lg:pb-8 xl:px-10"
+                ? "px-4 py-6 lg:px-10 lg:py-8 lg:pt-16"
+                : "px-4 py-6 lg:px-8 lg:pb-8 lg:pt-16 xl:px-10"
           )}
         >
           <div className={cn("mx-auto w-full", isCardStudio ? "max-w-none" : isDocs ? "max-w-3xl xl:max-w-4xl" : "max-w-[88rem]")}>
