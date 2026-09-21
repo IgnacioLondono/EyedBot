@@ -2,8 +2,7 @@ const Embeds = require('../utils/embeds');
 const welcomeStore = require('../utils/welcome-config-store');
 const verifyStore = require('../utils/verify-config-store');
 const { renderWelcomeCardPng, mergeCardLayout } = require('../utils/welcome-card');
-const { applyWelcomeMediaToEmbed, resolveWelcomeCardBackground, applyWelcomeAuthorToEmbed } = require('../utils/welcome-upload-resolve');
-const { isEmbedTemplateId, applyEmbedTemplateToEmbed } = require('../utils/embed-templates');
+const { applyWelcomeMediaToEmbed, resolveWelcomeCardBackground } = require('../utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../utils/embed-text-template');
 const { AttachmentBuilder } = require('discord.js');
 
@@ -140,33 +139,14 @@ module.exports = {
 
             if (welcomeConfig.footer) embed.setFooter({ text: applyTemplate(welcomeConfig.footer, member) });
             const files = [];
-            if (isEmbedTemplateId(welcomeConfig.embedTemplateId)) {
-                await applyEmbedTemplateToEmbed(embed, welcomeConfig, {
-                    guild: member.guild,
-                    files,
-                    avatarUrl: member.user.displayAvatarURL({ dynamic: true })
-                });
-            } else {
-                if (welcomeConfig.imageUrl) {
-                    await applyWelcomeMediaToEmbed(embed, welcomeConfig.imageUrl, files, member.guild, 'image');
-                }
-
-                if (welcomeConfig.thumbnailMode === 'avatar') {
-                    embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-                } else if (welcomeConfig.thumbnailMode === 'url' && welcomeConfig.thumbnailUrl) {
-                    await applyWelcomeMediaToEmbed(embed, welcomeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
-                }
+            if (welcomeConfig.imageUrl) {
+                await applyWelcomeMediaToEmbed(embed, welcomeConfig.imageUrl, files, member.guild, 'image');
             }
 
-            if (welcomeConfig.authorName) {
-                await applyWelcomeAuthorToEmbed(
-                    embed,
-                    welcomeConfig.authorIconUrl || '',
-                    files,
-                    member.guild,
-                    applyTemplate(welcomeConfig.authorName, member),
-                    welcomeConfig.authorUrl || ''
-                );
+            if (welcomeConfig.thumbnailMode === 'avatar') {
+                embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+            } else if (welcomeConfig.thumbnailMode === 'url' && welcomeConfig.thumbnailUrl) {
+                await applyWelcomeMediaToEmbed(embed, welcomeConfig.thumbnailUrl, files, member.guild, 'thumbnail');
             }
 
             await enqueueWelcomeSend(queueKey, () => channel.send({ content, embeds: [embed], files, allowedMentions })).catch(() => null);

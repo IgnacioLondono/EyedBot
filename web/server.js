@@ -25,11 +25,9 @@ const {
     extractUploadPath,
     resolveWelcomeUploadFile: resolveLocalUploadFile,
     resolveWelcomeCardBackground,
-    applyWelcomeMediaToEmbed,
-    applyWelcomeAuthorToEmbed
+    applyWelcomeMediaToEmbed
 } = require('../src/utils/welcome-upload-resolve');
 const { applyGuildEmbedText } = require('../src/utils/embed-text-template');
-const { isEmbedTemplateId, applyEmbedTemplateToEmbed } = require('../src/utils/embed-templates');
 const { resolveEmbedImageForDiscord } = require('../src/utils/discord-media-url');
 const greetingImageStore = require('../src/utils/greeting-image-store');
 let welcomeCardUtils = null;
@@ -1256,14 +1254,13 @@ function deleteUploadDiskFile(publicPath = '') {
 
 function deleteWelcomeDiskImagesForSlot(guildId, slot) {
     const uploadsDir = ensureWelcomeUploadsDir();
+    const safeGuildId = greetingImageStore.rawDiscordGuildId(guildId) || String(guildId || '').trim();
     const safeSlot = greetingImageStore.normalizeSlot(slot);
-    const prefixes = greetingImageStore.storageKeyCandidates(guildId)
-        .map((key) => `${key}_${safeSlot}_`)
-        .concat([`${guildId}_${safeSlot}_`]);
+    const prefix = `${safeGuildId}_${safeSlot}_`;
     let removed = 0;
     try {
         for (const fileName of fs.readdirSync(uploadsDir)) {
-            if (!prefixes.some((prefix) => fileName.startsWith(prefix))) continue;
+            if (!fileName.startsWith(prefix)) continue;
             try {
                 fs.unlinkSync(path.join(uploadsDir, fileName));
                 removed += 1;
@@ -3044,6 +3041,39 @@ app.get('/api/panel/bootstrap', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/api/user/my-bots', requireAuth, async (req, res) => {
+    try {
+        const ownerBotManager = require('../src/utils/owner-bot-manager');
+        const assignedBots = ownerBotManager.listBotsForAssignee(req.session.user?.id);
+
+        const botsWithDetails = assignedBots.map((b) => {
+            const rt = runtime.get(b.id);
+            const client = rt?.client;
+            const user = client?.user;
+            return {
+                id: b.id,
+                slug: b.slug,
+                label: b.label,
+                description: b.description || '',
+                avatarUrl: b.avatarUrl || (user ? user.displayAvatarURL({ size: 256 }) : null),
+                bannerUrl: b.bannerUrl || (user ? user.bannerURL?.({ size: 512 }) : null),
+                username: b.username || (user ? user.username : ''),
+                applicationId: b.applicationId,
+                panelPath: b.panelPath,
+                status: b.status,
+                enabled: b.enabled,
+                panelEnabled: b.panelEnabled
+            };
+        });
+
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({ bots: botsWithDetails });
+    } catch (error) {
+        console.error('Error en /api/user/my-bots:', error);
+        res.status(500).json({ error: 'No se pudieron cargar tus bots' });
+    }
+});
+
 app.get('/api/panel/dashboard-summary', requireAuth, async (req, res) => {
     try {
         const forceRefresh = String(req.query?.refresh || '') === '1';
@@ -3688,7 +3718,12 @@ app.get('/api/admin/bots/:botId/guilds/:guildId/channels', requireOwner, async (
         );
         return res.json({ channels });
     } catch (error) {
-        console.error('Error listando canales del bot:', error);
+        const isNotFound = error?.statusCode === 404;
+        if (isNotFound) {
+            console.warn('Canales del bot: servidor no encontrado', { botId: req.params.botId, guildId: req.params.guildId });
+        } else {
+            console.error('Error listando canales del bot:', error);
+        }
         return ownerBotError(res, error, 'No se pudieron listar canales');
     }
 });
@@ -3707,7 +3742,12 @@ app.get('/api/admin/bots/:botId/chat', requireOwner, async (req, res) => {
         });
         return res.json(data);
     } catch (error) {
-        console.error('Error leyendo chat del bot:', error);
+        const isNotFound = error?.statusCode === 404;
+        if (isNotFound) {
+            console.warn('Chat del bot: servidor/canal no encontrado', { botId: req.params.botId, guildId, channelId });
+        } else {
+            console.error('Error leyendo chat del bot:', error);
+        }
         return ownerBotError(res, error, 'No se pudo leer el chat');
     }
 });
@@ -3997,12 +4037,7 @@ function normalizeGreetingConfigInput(body = {}, mode, userId, existing = null) 
         message: String(body.message || fallback.message).slice(0, 2000),
         color: String(body.color || (mode === 'goodbye' ? 'ff5f9e' : '7c4dff')).replace('#', '').slice(0, 6),
         footer: String(body.footer || '').slice(0, 300),
-        authorName: String(body.authorName || '').trim().slice(0, 256),
-        authorIconUrl: canonicalWelcomeMediaUrl(body.authorIconUrl) || (existing?.authorIconUrl ? canonicalWelcomeMediaUrl(existing.authorIconUrl) : ''),
         imageUrl: imageUrl.slice(0, 1000),
-        embedTemplateId: isEmbedTemplateId(body.embedTemplateId)
-            ? String(body.embedTemplateId)
-            : (isEmbedTemplateId(existing?.embedTemplateId) ? String(existing.embedTemplateId) : undefined),
         thumbnailMode: ['none', 'avatar', 'url'].includes(String(body.thumbnailMode || 'avatar')) ? String(body.thumbnailMode) : 'avatar',
         thumbnailUrl: thumbnailUrl.slice(0, 1000),
         dmEnabled: body.dmEnabled === true,
@@ -7485,14 +7520,12 @@ app.get('/api/guild/:guildId/greeting-image/:slot', requireAuth, async (req, res
 
         let image = await greetingImageStore.getImage(guildId, slot);
         if (!image?.data?.length) {
-            // Fallback: archivo en disco subido junto al API path (scoped por bot/guild).
+            // Fallback: archivo en disco subido junto al API path
             const uploadsDir = ensureWelcomeUploadsDir();
-            const prefixes = greetingImageStore.storageKeyCandidates(guildId)
-                .map((key) => `${key}_${slot}_`)
-                .concat([`${guildId}_${slot}_`]);
+            const prefix = `${guildId}_${slot}_`;
             try {
                 const match = fs.readdirSync(uploadsDir)
-                    .filter((name) => prefixes.some((prefix) => name.startsWith(prefix)))
+                    .filter((name) => name.startsWith(prefix))
                     .sort()
                     .reverse()[0];
                 if (match) {
@@ -7514,9 +7547,7 @@ app.get('/api/guild/:guildId/greeting-image/:slot', requireAuth, async (req, res
         }
 
         res.setHeader('Content-Type', image.mime);
-        // Revalidación siempre: evita que el navegador muestre la versión vieja
-        // tras subir una imagen nueva bajo la misma URL.
-        res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
+        res.setHeader('Cache-Control', 'private, max-age=300');
         return res.send(image.data);
     } catch (error) {
         console.error('Error sirviendo imagen greeting:', error);
@@ -7543,11 +7574,7 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
         const uploadsDir = ensureWelcomeUploadsDir();
         const baseName = sanitizeUploadName(path.parse(file.originalname || '').name || `welcome-${guildId}`);
         const extension = extFromMimeOrName(file.mimetype, file.originalname);
-        // Prefijo scoped (bot:guild) para aislar bots del propietario en disco.
-        const diskScopeKey = (greetingImageStore.storageKeyCandidates(guildId)[0] || guildId)
-            .replace(/[^a-zA-Z0-9:\-_.]/g, '_')
-            .slice(0, 64);
-        const fileName = `${diskScopeKey}_${slot}_${Date.now()}_${baseName}${extension}`;
+        const fileName = `${guildId}_${slot}_${Date.now()}_${baseName}${extension}`;
         const outputPath = path.join(uploadsDir, fileName);
         fs.writeFileSync(outputPath, file.buffer);
 
@@ -7570,8 +7597,6 @@ app.post('/api/guild/:guildId/welcome-image', requireAuth, upload.single('imageF
         if (slot.endsWith('_thumb')) {
             nextCfg.thumbnailUrl = mediaPath;
             nextCfg.thumbnailMode = 'url';
-        } else if (slot.endsWith('_author')) {
-            nextCfg.authorIconUrl = mediaPath;
         } else {
             nextCfg.imageUrl = mediaPath;
         }
@@ -7629,8 +7654,6 @@ app.delete('/api/guild/:guildId/welcome-image', requireAuth, async (req, res) =>
 
         if (slot.endsWith('_thumb')) {
             nextCfg.thumbnailUrl = '';
-        } else if (slot.endsWith('_author')) {
-            nextCfg.authorIconUrl = '';
         } else {
             nextCfg.imageUrl = '';
             nextCfg.image_url = '';
@@ -7836,29 +7859,10 @@ app.post('/api/guild/:guildId/welcome-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (isEmbedTemplateId(cfg?.embedTemplateId)) {
-            await applyEmbedTemplateToEmbed(embed, cfg, {
-                guild,
-                files,
-                avatarUrl: member.user.displayAvatarURL({ dynamic: true })
-            });
-        } else {
-            if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
-            if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-            else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-                await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
-            }
-        }
-
-        if (cfg?.authorName) {
-            await applyWelcomeAuthorToEmbed(
-                embed,
-                cfg.authorIconUrl || '',
-                files,
-                guild,
-                applyWelcomeTemplate(cfg.authorName, member),
-                cfg.authorUrl || ''
-            );
+        if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
+        if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+        else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+            await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
         }
 
         await channel.send({ content, embeds: [embed], files, allowedMentions });
@@ -8015,29 +8019,10 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
 
         if (cfg?.footer) embed.setFooter({ text: applyWelcomeTemplate(cfg.footer, member) });
         const files = [];
-        if (isEmbedTemplateId(cfg?.embedTemplateId)) {
-            await applyEmbedTemplateToEmbed(embed, cfg, {
-                guild,
-                files,
-                avatarUrl: member.user.displayAvatarURL({ dynamic: true })
-            });
-        } else {
-            if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
-            if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
-            else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
-                await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
-            }
-        }
-
-        if (cfg?.authorName) {
-            await applyWelcomeAuthorToEmbed(
-                embed,
-                cfg.authorIconUrl || '',
-                files,
-                guild,
-                applyWelcomeTemplate(cfg.authorName, member),
-                cfg.authorUrl || ''
-            );
+        if (cfg?.imageUrl) await applyWelcomeMediaToEmbed(embed, cfg.imageUrl, files, guild, 'image');
+        if (cfg?.thumbnailMode === 'avatar') embed.setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+        else if (cfg?.thumbnailMode === 'url' && cfg?.thumbnailUrl) {
+            await applyWelcomeMediaToEmbed(embed, cfg.thumbnailUrl, files, guild, 'thumbnail');
         }
 
         const content = cfg?.mentionUser ? `<@${member.id}>` : null;
@@ -8052,7 +8037,7 @@ app.post('/api/guild/:guildId/goodbye-test', requireAuth, async (req, res) => {
 });
 
 // Ruta para enviar embeds (o editar uno existente del bot si llega messageId)
-app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'thumbnailFile', maxCount: 1 }, { name: 'authorIconFile', maxCount: 1 }]), async (req, res) => {
+app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'thumbnailFile', maxCount: 1 }]), async (req, res) => {
     try {
         const { guildId, channelId } = req.body;
         const rawMessageId = String(req.body?.messageId || req.body?.targetMessageId || '').trim();
@@ -8154,35 +8139,6 @@ app.post('/api/send-embed', requireAuth, upload.fields([{ name: 'imageFile', max
             } else if (resolved?.mode === 'url') {
                 discordEmbed.setThumbnail(resolved.url);
             }
-        }
-
-        // Plantillas con avatar: si el usuario no definió miniatura, usar el avatar del bot.
-        const embedTemplateId = String(embed.embedTemplateId || '').trim();
-        if ((embedTemplateId === 'avatar' || embedTemplateId === 'avatar-banner') && !thumbnailUpload?.buffer && !embed.thumbnail) {
-            const botUser = getBotClient().user;
-            if (botUser && typeof botUser.displayAvatarURL === 'function') {
-                discordEmbed.setThumbnail(botUser.displayAvatarURL({ dynamic: true }));
-            }
-        }
-
-        // Icono del autor: preferir archivo subido; si no, resolver URL de plantilla guardada.
-        const authorIconUpload = req.files?.authorIconFile?.[0];
-        let authorIconResolved = '';
-        if (authorIconUpload?.buffer) {
-            const authorIconName = embedAttachmentName(authorIconUpload, `embed_author_${stamp}`);
-            files.push({ attachment: authorIconUpload.buffer, name: authorIconName });
-            authorIconResolved = `attachment://${authorIconName}`;
-        } else if (embed.author?.iconURL) {
-            const resolved = await resolveEmbedImageForDiscord(embed.author.iconURL, `embed_author_${stamp}`);
-            if (resolved?.mode === 'attachment') {
-                files.push({ attachment: resolved.data, name: resolved.name });
-                authorIconResolved = `attachment://${resolved.name}`;
-            } else if (resolved?.mode === 'url') {
-                authorIconResolved = resolved.url;
-            }
-        }
-        if (authorIconResolved && String(embed.author?.name || '').trim()) {
-            discordEmbed.setAuthor({ name: tpl(embed.author.name), iconURL: authorIconResolved, url: embed.author?.url });
         }
 
         const hasFiles = files.length > 0;
@@ -8341,8 +8297,7 @@ app.get('/api/embed-templates/:guildId', requireAuth, (req, res) => {
 
 app.post('/api/embed-templates', requireAuth, upload.fields([
     { name: 'imageFile', maxCount: 1 },
-    { name: 'thumbnailFile', maxCount: 1 },
-    { name: 'authorIconFile', maxCount: 1 }
+    { name: 'thumbnailFile', maxCount: 1 }
 ]), (req, res) => {
     try {
         const guildId = String(req.body?.guildId || '').trim();
@@ -8372,17 +8327,6 @@ app.post('/api/embed-templates', requireAuth, upload.fields([
                 return res.status(400).json({ error: 'La miniatura debe ser un archivo de imagen' });
             }
             embed.thumbnail = persistEmbedTemplateAsset(req, guildId, thumbnailUpload, 'thumb');
-        }
-        const authorIconUpload = req.files?.authorIconFile?.[0];
-        if (authorIconUpload?.buffer) {
-            if (!String(authorIconUpload.mimetype || '').startsWith('image/')) {
-                return res.status(400).json({ error: 'El icono del autor debe ser un archivo de imagen' });
-            }
-            if (!String(embed.author?.name || '').trim()) {
-                return res.status(400).json({ error: 'Indica el nombre del autor para poder usar su icono' });
-            }
-            if (!embed.author || typeof embed.author !== 'object') embed.author = {};
-            embed.author.iconURL = persistEmbedTemplateAsset(req, guildId, authorIconUpload, 'author');
         }
 
         const store = readTemplateStore();

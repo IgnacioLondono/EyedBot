@@ -252,39 +252,6 @@ function greetingImageSlotForCardBackground(parsed) {
 }
 
 /**
- * Aplica el bloque de autor (nombre + ícono) a un EmbedBuilder.
- * El ícono puede ser adjunto local (archivo en disco/MySQL) o URL pública;
- * Discord admite attachment:// en icon_url del autor.
- */
-async function applyWelcomeAuthorToEmbed(embed, iconRawUrl, files, guild, authorName = '', authorUrl = '') {
-    const name = String(authorName || '').trim();
-    if (!name) return false;
-
-    let iconResolved = '';
-    if (String(iconRawUrl || '').trim()) {
-        const resolved = await resolveWelcomeMediaForDiscord(iconRawUrl, { guild, slot: 'thumbnail' });
-        if (resolved) {
-            if (resolved.mode === 'buffer') {
-                iconResolved = `attachment://${resolved.attachmentName}`;
-                files.push(new AttachmentBuilder(resolved.buffer, { name: resolved.attachmentName }));
-            } else if (resolved.mode === 'attachment') {
-                iconResolved = `attachment://${resolved.attachmentName}`;
-                files.push(new AttachmentBuilder(resolved.localPath).setName(resolved.attachmentName));
-            } else {
-                iconResolved = resolved.url || '';
-            }
-        }
-    }
-
-    embed.setAuthor({
-        name,
-        ...(iconResolved ? { iconURL: iconResolved } : {}),
-        ...(String(authorUrl || '').trim() ? { url: authorUrl } : {})
-    });
-    return true;
-}
-
-/**
  * Resuelve fondo de tarjeta PNG: archivo local, buffer MySQL o URL pública.
  * Nunca depende de fetch HTTP a /api/... (requiere sesión y falla dentro del contenedor).
  */
@@ -308,28 +275,27 @@ async function resolveWelcomeCardBackground(imageUrl, guildId) {
             return { backgroundFilePath: null, backgroundUrl: null, backgroundBuffer: blob.data };
         }
 
-        // Fallback disco: {guildId}_{slot}_* con claves scoped (bot:guild)
+        // Fallback disco: {guildId}_{slot}_*
         try {
             const uploadsDir = path.join(__dirname, '..', '..', 'web', 'uploads', 'welcome');
             if (fs.existsSync(uploadsDir)) {
-                const candidates = greetingImageStore.storageKeyCandidates(imageGid)
-                    .map((key) => `${key}_${slot}_`)
-                    .concat([
-                        routeGid && routeGid !== imageGid ? `${routeGid}_${slot}_` : null,
-                        `${imageGid}_${slot}_`
-                    ]);
+                const prefixes = [
+                    `${imageGid}_${slot}_`,
+                    routeGid && routeGid !== imageGid ? `${routeGid}_${slot}_` : null
+                ].filter(Boolean);
                 const names = fs.readdirSync(uploadsDir);
-                const prefixes = [...new Set(candidates.filter(Boolean))];
-                const match = names
-                    .filter((name) => prefixes.some((prefix) => name.startsWith(prefix)))
-                    .sort()
-                    .reverse()[0];
-                if (match) {
-                    return {
-                        backgroundFilePath: path.join(uploadsDir, match),
-                        backgroundUrl: null,
-                        backgroundBuffer: null
-                    };
+                for (const prefix of prefixes) {
+                    const match = names
+                        .filter((name) => name.startsWith(prefix))
+                        .sort()
+                        .reverse()[0];
+                    if (match) {
+                        return {
+                            backgroundFilePath: path.join(uploadsDir, match),
+                            backgroundUrl: null,
+                            backgroundBuffer: null
+                        };
+                    }
                 }
             }
         } catch {
@@ -362,6 +328,5 @@ module.exports = {
     resolveWelcomeUploadFile,
     resolveWelcomeMediaForDiscord,
     applyWelcomeMediaToEmbed,
-    applyWelcomeAuthorToEmbed,
     resolveWelcomeCardBackground
 };

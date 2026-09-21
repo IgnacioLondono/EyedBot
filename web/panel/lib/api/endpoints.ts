@@ -119,6 +119,8 @@ export type OwnerBotSummary = {
 
 export const getOwnerBots = () => apiFetch<{ bots: OwnerBotSummary[] }>("/api/admin/bots");
 
+export const getMyBots = () => apiFetch<{ bots: OwnerBotSummary[] }>("/api/user/my-bots");
+
 export const createOwnerBot = (body: {
   label?: string;
   token: string;

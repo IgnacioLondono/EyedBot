@@ -153,7 +153,7 @@ function sanitizePublicRecord(record) {
         avatar: user?.avatar || record.avatar || null,
         avatarUrl: user?.displayAvatarURL?.({ size: 128 }) || record.avatarUrl || null,
         banner: user?.banner || record.banner || null,
-        bannerUrl: user?.bannerURL?.({ size: 480 }) || record.bannerUrl || null,
+        bannerUrl: user?.bannerURL?.({ size: 512 }) || record.bannerUrl || null,
         description: record.description || null,
         guildCount: client?.guilds?.cache?.size ?? record.guildCount ?? 0,
         ping: client?.ws?.ping ?? null,
@@ -592,7 +592,7 @@ async function updateBotBanner(id, buffer, mimeType = 'image/png') {
     if (record) {
         record.banner = updated?.banner ?? rt.client.user.banner ?? null;
         record.bannerUrl =
-            (updated?.bannerURL?.({ size: 480 }) || rt.client.user.bannerURL?.({ size: 480 }) || null);
+            (updated?.bannerURL?.({ size: 512 }) || rt.client.user.bannerURL?.({ size: 512 }) || null);
         record.updatedAt = new Date().toISOString();
         writeStore(store);
     }

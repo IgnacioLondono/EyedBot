@@ -30,6 +30,7 @@ import { discordAvatarUrl, discordGuildIconUrl } from "@/lib/discord-media";
 import { asArray, asRecord, formatDate, getErrorMessage, toNumberValue, toStringValue } from "@/lib/utils";
 import { usePersistedTab } from "@/lib/hooks/usePersistedTab";
 import { OwnerBotsTab } from "@/components/features/settings/OwnerBotsTab";
+import { MyBotsTab } from "@/components/features/settings/MyBotsTab";
 import { OwnerWebConfigTab } from "@/components/features/settings/OwnerWebConfigTab";
 import { MainBotGuildControlTab } from "@/components/features/settings/MainBotGuildControlTab";
 
@@ -37,6 +38,7 @@ const OWNER_TABS = [
   { id: "overview", label: "Resumen" },
   { id: "web", label: "Web" },
   { id: "bots", label: "Bots" },
+  { id: "my-bots", label: "Mis bots" },
   { id: "guilds", label: "Servidores" },
   { id: "users", label: "Usuarios" },
   { id: "logs", label: "Logs" },
@@ -514,6 +516,8 @@ export function OwnerSettings() {
           </div>
         </SectionCard>
       ) : null}
+
+      {tab === "my-bots" ? <MyBotsTab /> : null}
 
       {tab === "logs" ? (
         <SectionCard title="Logs del sistema" description="Eventos recientes capturados por el backend del panel.">

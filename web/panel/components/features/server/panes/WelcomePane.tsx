@@ -35,7 +35,6 @@ import {
 import { EmbedImageField } from "@/components/features/embed/EmbedImageField";
 import { DiscordEmbedPreview } from "@/components/features/embed/EmbedPreview";
 import { plainColorToHex } from "@/lib/embed-utils";
-import { withMediaCacheBust } from "@/lib/panel-media";
 import { asRecord, getErrorMessage, toBooleanValue, toStringValue } from "@/lib/utils";
 import {
   DEFAULT_WELCOME_CARD_LAYOUT,
@@ -56,12 +55,9 @@ type ConfigState = {
   imageUrl: string;
   thumbnailMode: string;
   thumbnailUrl: string;
-  authorName: string;
-  authorIconUrl: string;
   dmEnabled: boolean;
   dmMessage: string;
   welcomeStyle: "embed" | "card";
-  embedTemplateId: string;
   cardAccentColor: string;
   cardTitleColor: string;
   cardNameColor: string;
@@ -84,12 +80,9 @@ const defaultState: ConfigState = {
   imageUrl: "",
   thumbnailMode: "avatar",
   thumbnailUrl: "",
-  authorName: "",
-  authorIconUrl: "",
   dmEnabled: false,
   dmMessage: "",
   welcomeStyle: "embed",
-  embedTemplateId: "classic",
   cardAccentColor: "4ade80",
   cardTitleColor: "ffffff",
   cardNameColor: "f8fafc",
@@ -115,15 +108,12 @@ function normalizeConfig(value: unknown, mode: "welcome" | "goodbye"): ConfigSta
     imageUrl: toStringValue(data.imageUrl || data.image_url),
     thumbnailMode: toStringValue(data.thumbnailMode, "avatar"),
     thumbnailUrl: toStringValue(data.thumbnailUrl),
-    authorName: toStringValue(data.authorName, ""),
-    authorIconUrl: toStringValue(data.authorIconUrl || data.author_icon_url),
     dmEnabled: toBooleanValue(data.dmEnabled),
     dmMessage: toStringValue(
       data.dmMessage,
       mode === "welcome" ? "Bienvenido a {server}, {username}." : ""
     ),
     welcomeStyle: toStringValue(data.welcomeStyle, "embed") === "card" ? "card" : "embed",
-    embedTemplateId: "classic",
     cardAccentColor: toStringValue(data.cardAccentColor, "4ade80").replace("#", ""),
     cardTitleColor: toStringValue(data.cardTitleColor, "ffffff").replace("#", ""),
     cardNameColor: toStringValue(data.cardNameColor, "f8fafc").replace("#", ""),
@@ -158,10 +148,8 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const [testing, setTesting] = useState(false);
   const [uploadingMainImage, setUploadingMainImage] = useState(false);
   const [uploadingThumbImage, setUploadingThumbImage] = useState(false);
-  const [uploadingAuthorImage, setUploadingAuthorImage] = useState(false);
   const [deletingMainImage, setDeletingMainImage] = useState(false);
   const [deletingThumbImage, setDeletingThumbImage] = useState(false);
-  const [deletingAuthorImage, setDeletingAuthorImage] = useState(false);
   const [channelToInsert, setChannelToInsert] = useState("");
   const [error, setError] = useState<string | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -190,7 +178,6 @@ export function WelcomePane({ guildId }: { guildId: string }) {
   const setActive = tab === "welcome" ? setWelcome : setGoodbye;
   const imageSlot = tab === "welcome" ? "welcome" : "goodbye";
   const thumbSlot = tab === "welcome" ? "welcome_thumb" : "goodbye_thumb";
-  const authorSlot = tab === "welcome" ? "welcome_author" : "goodbye_author";
   const isCardWelcome = tab === "welcome" && welcome.welcomeStyle === "card" && welcomeCardEnabled;
 
   function insertChannelMention() {
@@ -254,40 +241,25 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     ];
   }, [isCardWelcome]);
 
-  function applyConfigFromUpload(payload: unknown, kind: "main" | "thumb" | "author") {
+  function applyConfigFromUpload(payload: unknown) {
     const root = asRecord(payload);
     const config = asRecord(root.config);
     if (Object.keys(config).length) {
-      const next = normalizeConfig(config, tab as "welcome" | "goodbye");
-      // URL recién subida con cache-bust para que la vista previa la muestre sí o sí.
-      const uploadedUrl = toStringValue(root.url || root.path || "");
-      if (uploadedUrl) {
-        const busted = withMediaCacheBust(uploadedUrl);
-        if (kind === "thumb") next.thumbnailUrl = busted;
-        else if (kind === "author") next.authorIconUrl = busted;
-        else next.imageUrl = busted;
-      }
-      setActive(next);
+      setActive(normalizeConfig(config, tab as "welcome" | "goodbye"));
       return;
     }
     const nextUrl = toStringValue(root.url || root.path);
     if (nextUrl) {
-      const busted = withMediaCacheBust(nextUrl);
-      setActive((current) => {
-        if (kind === "thumb") return { ...current, thumbnailUrl: busted };
-        if (kind === "author") return { ...current, authorIconUrl: busted };
-        return { ...current, imageUrl: busted };
-      });
+      setActive((current) => ({ ...current, imageUrl: nextUrl }));
     }
   }
 
-  async function handleUploadImage(file: File, slot: string, kind: "main" | "thumb" | "author") {
-    const setUploading =
-      kind === "main" ? setUploadingMainImage : kind === "thumb" ? setUploadingThumbImage : setUploadingAuthorImage;
+  async function handleUploadImage(file: File, slot: string, kind: "main" | "thumb") {
+    const setUploading = kind === "main" ? setUploadingMainImage : setUploadingThumbImage;
     setUploading(true);
     try {
       const result = await uploadWelcomeImage(guildId, file, slot);
-      applyConfigFromUpload(result, kind);
+      applyConfigFromUpload(result);
       if (kind === "thumb") {
         setActive((current) => ({ ...current, thumbnailMode: "url" }));
       }
@@ -303,21 +275,18 @@ export function WelcomePane({ guildId }: { guildId: string }) {
     }
   }
 
-  async function handleDeleteImage(slot: string, kind: "main" | "thumb" | "author") {
-    const setDeleting =
-      kind === "main" ? setDeletingMainImage : kind === "thumb" ? setDeletingThumbImage : setDeletingAuthorImage;
+  async function handleDeleteImage(slot: string, kind: "main" | "thumb") {
+    const setDeleting = kind === "main" ? setDeletingMainImage : setDeletingThumbImage;
     setDeleting(true);
     try {
       const result = await deleteWelcomeImage(guildId, slot);
       const config = asRecord(asRecord(result).config);
       if (Object.keys(config).length) {
         setActive(normalizeConfig(config, tab as "welcome" | "goodbye"));
-      } else if (kind === "author") {
-        setActive((current) => ({ ...current, authorIconUrl: "" }));
-      } else if (kind === "thumb") {
-        setActive((current) => ({ ...current, thumbnailUrl: "" }));
-      } else {
+      } else if (kind === "main") {
         setActive((current) => ({ ...current, imageUrl: "" }));
+      } else {
+        setActive((current) => ({ ...current, thumbnailUrl: "" }));
       }
       toast({ title: "Imagen eliminada", description: "Se quitó la imagen.", tone: "success" });
     } catch (err) {
@@ -394,17 +363,17 @@ export function WelcomePane({ guildId }: { guildId: string }) {
 
         <div className="space-y-5">
           {sectionTab === "general" ? (
-                <>
-                  <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                    <div>
-                      <p className="font-medium text-white">Activar {tab === "welcome" ? "bienvenida" : "despedida"}</p>
-                      <p className="text-sm text-zinc-400">Envía mensajes automáticos al canal seleccionado.</p>
-                    </div>
-                    <Switch
-                      checked={active.enabled}
-                      onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))}
-                    />
-                  </div>
+            <>
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                <div>
+                  <p className="font-medium text-white">Activar {tab === "welcome" ? "bienvenida" : "despedida"}</p>
+                  <p className="text-sm text-zinc-400">Envía mensajes automáticos al canal seleccionado.</p>
+                </div>
+                <Switch
+                  checked={active.enabled}
+                  onCheckedChange={(checked) => setActive((current) => ({ ...current, enabled: checked }))}
+                />
+              </div>
               <Field label="Canal" description="Destino donde se publicará el mensaje del evento.">
                 <ChannelSelect
                   value={active.channelId}
@@ -464,7 +433,7 @@ export function WelcomePane({ guildId }: { guildId: string }) {
 
           {sectionTab === "message" && !isCardWelcome ? (
             <>
-              <Field label="Título del embed" description="Línea principal que encabeza el mensaje. Admite variables.">
+              <Field label="Título del embed">
                 <Input
                   value={active.title}
                   onChange={(event) => setActive((current) => ({ ...current, title: event.target.value }))}
@@ -508,36 +477,15 @@ export function WelcomePane({ guildId }: { guildId: string }) {
               </Field>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Color del embed" description="Color del borde y acento del embed.">
+                <Field label="Color del embed">
                   <ColorInput value={active.color} onChange={(color) => setActive((current) => ({ ...current, color }))} />
                 </Field>
-                <Field label="Pie de embed" description="Texto pequeño al pie del mensaje (opcional).">
+                <Field label="Pie de embed">
                   <Input
                     value={active.footer}
                     onChange={(event) => setActive((current) => ({ ...current, footer: event.target.value }))}
                   />
                 </Field>
-              </div>
-
-              <div className="rounded-2xl border border-white/8 bg-black/20 p-4 space-y-4">
-                <p className="text-sm font-medium text-white">Autor</p>
-                <Field label="Nombre del autor" description="Nombre que se muestra sobre el título. Puede usar {server} o {username}.">
-                  <Input
-                    value={active.authorName}
-                    onChange={(event) => setActive((current) => ({ ...current, authorName: event.target.value }))}
-                    placeholder="Ej. {server}"
-                  />
-                </Field>
-                <EmbedImageField
-                  label="Foto del autor"
-                  description="URL o archivo subido al panel. Se muestra junto al nombre del autor."
-                  value={active.authorIconUrl}
-                  onChange={(authorIconUrl) => setActive((current) => ({ ...current, authorIconUrl }))}
-                  uploading={uploadingAuthorImage}
-                  deleting={deletingAuthorImage}
-                  onUpload={(file) => handleUploadImage(file, authorSlot, "author")}
-                  onDelete={() => handleDeleteImage(authorSlot, "author")}
-                />
               </div>
             </>
           ) : null}
@@ -557,16 +505,28 @@ export function WelcomePane({ guildId }: { guildId: string }) {
                 onUpload={(file) => handleUploadImage(file, imageSlot, "main")}
                 onDelete={() => handleDeleteImage(imageSlot, "main")}
               />
-              <EmbedImageField
-                label="Miniatura (logo / emblema)"
-                description="URL externa o archivo subido al panel. Se muestra arriba a la derecha en Discord."
-                value={active.thumbnailUrl}
-                onChange={(thumbnailUrl) => setActive((current) => ({ ...current, thumbnailUrl }))}
-                uploading={uploadingThumbImage}
-                deleting={deletingThumbImage}
-                onUpload={(file) => handleUploadImage(file, thumbSlot, "thumb")}
-                onDelete={() => handleDeleteImage(thumbSlot, "thumb")}
-              />
+              <Field label="Miniatura" description="Avatar del usuario, URL personalizada o sin miniatura.">
+                <Select
+                  value={active.thumbnailMode}
+                  onChange={(event) => setActive((current) => ({ ...current, thumbnailMode: event.target.value }))}
+                >
+                  <option value="avatar">Avatar del usuario</option>
+                  <option value="url">URL / imagen subida</option>
+                  <option value="none">Sin miniatura</option>
+                </Select>
+              </Field>
+              {active.thumbnailMode === "url" ? (
+                <EmbedImageField
+                  label="Miniatura del embed"
+                  description="Se muestra arriba a la derecha en Discord."
+                  value={active.thumbnailUrl}
+                  onChange={(thumbnailUrl) => setActive((current) => ({ ...current, thumbnailUrl }))}
+                  uploading={uploadingThumbImage}
+                  deleting={deletingThumbImage}
+                  onUpload={(file) => handleUploadImage(file, thumbSlot, "thumb")}
+                  onDelete={() => handleDeleteImage(thumbSlot, "thumb")}
+                />
+              ) : null}
             </>
           ) : null}
 
@@ -633,10 +593,9 @@ export function WelcomePane({ guildId }: { guildId: string }) {
               description={active.message || "Aún no hay un mensaje configurado para esta pestaña."}
               color={plainColorToHex(active.color)}
               footer={active.footer}
-              authorName={active.authorName || undefined}
-              authorIconUrl={active.authorIconUrl}
               imageUrl={active.imageUrl}
-              thumbnailUrl={active.thumbnailUrl}
+              thumbnailUrl={active.thumbnailMode === "url" ? active.thumbnailUrl : ""}
+              thumbnailLabel={active.thumbnailMode === "avatar" ? "Avatar del usuario" : undefined}
             />
           )}
 

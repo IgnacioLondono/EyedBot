@@ -408,33 +408,6 @@ export function TicketsPane({ guildId }: { guildId: string }) {
     };
   }
 
-  const caseEntries = [
-    ...config.ticketCategories.map((item) => ({
-      key: item.value || item.label,
-      label: `Título · ${item.label || item.value}`,
-    })),
-    ...config.ticketCategories.flatMap((cat) =>
-      (cat.problems || []).map((item) => ({
-        key: item.value || item.label,
-        label: `${cat.label || cat.value} → ${item.label || item.value}`,
-      }))
-    ),
-    ...config.commonProblems.map((item) => ({
-      key: item.value || item.label,
-      label: `Global · ${item.label || item.value}`,
-    })),
-    ...Object.keys(config.caseRoleMap)
-      .filter((key) => !config.ticketCategories.some((item) => (item.value || item.label) === key))
-      .filter(
-        (key) =>
-          !config.ticketCategories.some((cat) =>
-            (cat.problems || []).some((item) => (item.value || item.label) === key)
-          )
-      )
-      .filter((key) => !config.commonProblems.some((item) => (item.value || item.label) === key))
-      .map((key) => ({ key, label: key })),
-  ].filter((entry) => entry.key);
-
   async function handleSaveConfig() {
     setSaving(true);
     try {
@@ -580,90 +553,70 @@ export function TicketsPane({ guildId }: { guildId: string }) {
                     options={roles}
                   />
                 </Field>
-                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                  <div>
-                    <p className="font-medium text-white">Recibo por DM</p>
-                    <p className="text-sm text-zinc-400">Envía confirmación privada al abrir ticket.</p>
-                  </div>
-                  <Switch
-                    checked={config.sendDmReceipt}
-                    onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmReceipt: checked }))}
-                  />
-                </div>
-                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
-                  <div>
-                    <p className="font-medium text-white">Estado pendiente por DM</p>
-                    <p className="text-sm text-zinc-400">Notifica al usuario mientras espera aceptación.</p>
-                  </div>
-                  <Switch
-                    checked={config.sendDmPendingStatus}
-                    onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmPendingStatus: checked }))}
-                  />
-                </div>
-                <Field label="Canal historial de recibos" description="Opcional. Copia de los recibos por DM enviados a los miembros.">
-                  <ChannelSelect
-                    value={config.receiptHistoryChannelId}
-                    onChange={(receiptHistoryChannelId) => setConfig((c) => ({ ...c, receiptHistoryChannelId }))}
-                    options={channels}
-                  />
-                </Field>
-                <div className="space-y-4">
-                  <p className="text-sm text-zinc-400">
-                    Roles por título o caso (opcional): asigna responsables concretos además del staff de tickets.
-                  </p>
-                  {caseEntries.length ? (
-                    caseEntries.map((entry) => (
-                      <Field key={entry.key} label={entry.label} description="Roles que gestionan este tipo de caso.">
-                        <MultiRoleSelect
-                          value={config.caseRoleMap[entry.key] || []}
-                          onChange={(roleIds) =>
-                            setConfig((c) => ({
-                              ...c,
-                              caseRoleMap: { ...c.caseRoleMap, [entry.key]: roleIds },
-                            }))
-                          }
-                          options={roles}
-                        />
-                      </Field>
-                    ))
-                  ) : (
-                    <p className="text-sm text-zinc-500">Añade títulos en la pestaña Títulos para mapear roles por caso.</p>
-                  )}
-                </div>
-                <div className="grid gap-5 xl:grid-cols-2">
-                  <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-                    <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400">
-                      <Eye className="h-4 w-4" />
-                      Vista previa del embed
+              <div className="grid gap-5 xl:grid-cols-2">
+                <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-2">
+                  <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                    <div>
+                      <p className="font-medium text-white">Recibo por DM</p>
+                      <p className="text-sm text-zinc-400">Envía confirmación privada al abrir ticket.</p>
                     </div>
-                    <DiscordEmbedPreview
-                      color={previewColor}
-                      title={config.title || "Soporte"}
-                      description={config.message || "Presiona el botón para abrir un ticket."}
-                      footer={config.footer || "Sistema de Tickets"}
-                      imageUrl={config.imageUrl}
+                    <Switch
+                      checked={config.sendDmReceipt}
+                      onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmReceipt: checked }))}
                     />
-                    <div className="mt-4">
-                      <span className="inline-flex rounded-lg bg-[#5865f2] px-4 py-2 text-sm font-medium text-white">
-                        {config.buttonLabel || "Solicitar ticket"}
-                      </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/20 p-4">
+                    <div>
+                      <p className="font-medium text-white">Estado pendiente por DM</p>
+                      <p className="text-sm text-zinc-400">Notifica al usuario mientras espera aceptación.</p>
                     </div>
+                    <Switch
+                      checked={config.sendDmPendingStatus}
+                      onCheckedChange={(checked) => setConfig((c) => ({ ...c, sendDmPendingStatus: checked }))}
+                    />
+                  </div>
+                  <Field label="Canal historial de recibos" description="Opcional. Copia de los recibos por DM enviados a los miembros.">
+                    <ChannelSelect
+                      value={config.receiptHistoryChannelId}
+                      onChange={(receiptHistoryChannelId) => setConfig((c) => ({ ...c, receiptHistoryChannelId }))}
+                      options={channels}
+                    />
+                  </Field>
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    <FormActions onSave={handleSaveConfig} saving={saving} />
+                    <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing} title="Envía el mensaje del panel al canal configurado">
+                      {publishing ? "Publicando..." : "Publicar panel"}
+                    </Button>
+                    <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={updatingEmbed} title="Edita el mensaje ya publicado con la configuración actual">
+                      {updatingEmbed ? "Actualizando..." : "Actualizar embed"}
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-[28px] border border-white/10 bg-black/20 p-6 sticky top-5 self-start">
+                  <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400">
+                    <Eye className="h-4 w-4" />
+                    Vista previa del embed
+                  </div>
+                  <DiscordEmbedPreview
+                    color={previewColor}
+                    title={config.title || "Soporte"}
+                    description={config.message || "Presiona el botón para abrir un ticket."}
+                    footer={config.footer || "Sistema de Tickets"}
+                    imageUrl={config.imageUrl}
+                  />
+                  <div className="mt-4">
+                    <span className="inline-flex rounded-lg bg-[#5865f2] px-4 py-2 text-sm font-medium text-white">
+                      {config.buttonLabel || "Solicitar ticket"}
+                    </span>
                   </div>
                   <Alert
                     title="Publicación"
                     description="Guarda los cambios y usa Publicar panel para enviar este embed al canal configurado."
+                    className="mt-4"
                   />
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  <FormActions onSave={handleSaveConfig} saving={saving} />
-                  <Button variant="secondary" onClick={() => void handlePublish()} disabled={publishing} title="Envía el mensaje del panel al canal configurado">
-                    {publishing ? "Publicando..." : "Publicar panel"}
-                  </Button>
-                  <Button variant="secondary" onClick={() => void handleUpdateEmbed()} disabled={updatingEmbed} title="Edita el mensaje ya publicado con la configuración actual">
-                    {updatingEmbed ? "Actualizando..." : "Actualizar embed"}
-                  </Button>
-                </div>
               </div>
+            </div>
             )
           ) : null}
 

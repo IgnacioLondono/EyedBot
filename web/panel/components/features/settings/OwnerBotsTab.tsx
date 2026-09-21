@@ -916,7 +916,7 @@ export function OwnerBotsTab() {
                 <Alert title="Bot desconectado" description="Inicia el bot para elegir servidor y chatear." variant="warning" />
               ) : (
                 <>
-                  <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mb-4 grid gap-3 sm:grid-cols-3">
                     <Field label="Servidor" description="Servidor donde está invitado el bot auxiliar.">
                       <Select value={guildId} onChange={(e) => setGuildId(e.target.value)}>
                         <option value="">Seleccionar…</option>
@@ -937,12 +937,29 @@ export function OwnerBotsTab() {
                         ))}
                       </Select>
                     </Field>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => window.open(selected.inviteUrl, "_blank", "noopener,noreferrer")}
+                      disabled={!selected.inviteUrl}
+                    >
+                      <UserPlus className="mr-1 h-4 w-4" />
+                      Invitar bot a servidor
+                    </Button>
                   </div>
+
+                  {guilds.length === 0 ? (
+                    <Alert
+                      title="El bot no está en ningún servidor"
+                      description="Usa el botón «Invitar bot a servidor» para añadirlo con permisos de administrador. Una vez invitado, recarga la lista de servidores."
+                      variant="info"
+                    />
+                  ) : null}
 
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div className="panel-muted flex items-center gap-2 text-xs">
                       <MessageSquare className="h-4 w-4" />
-                      {channelId ? "Actualización automática cada 8 s" : "Selecciona un canal"}
+                      {channelId ? "Actualización automática cada 8 s" : "Selecciona un servidor y canal"}
                     </div>
                     <Button size="sm" variant="ghost" disabled={!channelId || chatLoading} onClick={() => void refreshChat()}>
                       <RefreshCw className={`h-4 w-4 ${chatLoading ? "animate-spin" : ""}`} />
